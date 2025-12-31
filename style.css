@@ -184,7 +184,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .damage-text { position: absolute; color: #ffeb3b; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #c0392b; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; }
 @keyframes floatUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }
 
-/* 揮劍動畫 */
+/* 揮劍動畫 (英雄) */
 .slash-effect {
     position: absolute; font-size: 4em; color: #fff; text-shadow: 0 0 10px cyan; pointer-events: none; z-index: 100;
     top: 30%; left: 50%; transform: translate(-50%, -50%); animation: slashAnim 0.3s forwards;
@@ -193,6 +193,17 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     0% { transform: translate(-50%, -50%) scale(0.5) rotate(-45deg); opacity: 0; }
     20% { opacity: 1; }
     100% { transform: translate(-50%, -50%) scale(1.5) rotate(90deg); opacity: 0; }
+}
+
+/* 🔥 噴毒動畫 (怪物) 🔥 */
+.poison-effect {
+    position: absolute; width: 50px; height: 50px; background: radial-gradient(circle, #2ecc71, transparent);
+    border-radius: 50%; opacity: 0.8; z-index: 99; pointer-events: none;
+    animation: poisonSplash 0.4s forwards;
+}
+@keyframes poisonSplash {
+    0% { transform: scale(0.2); opacity: 1; }
+    100% { transform: scale(1.5); opacity: 0; }
 }
 
 /* 波次提示 */
