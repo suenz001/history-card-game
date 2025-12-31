@@ -27,11 +27,18 @@ let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
-// 戰鬥系統變數
-let battleSlots = [null, null, null]; // 3個防禦槽位
-let selectedBattleCard = null; // 當前選中的備戰卡片
+// 戰鬥變數
+let battleSlots = [null, null, null];
+let selectedBattleCard = null;
+let isBattleActive = false;
+let battleGold = 0;
+let baseHp = 100;
+let currentWave = 1;
+const MAX_WAVES = 3;
+let enemies = [];
+let gameLoopId = null;
+let enemySpawnInterval = null;
 
-// 批量分解變數
 let isBatchMode = false;
 let selectedBatchCards = new Set();
 
@@ -40,7 +47,6 @@ let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// 音效管理
 const audioBgm = document.getElementById('bgm');
 const sfxDraw = document.getElementById('sfx-draw');
 const sfxSsr = document.getElementById('sfx-ssr');
@@ -634,8 +640,12 @@ function renderCard(card, targetContainer) {
             playSound('click');
             toggleBatchSelection(card, cardDiv);
         } else {
-            const actualIndex = currentDisplayList.indexOf(card);
-            if(actualIndex !== -1) openDetailModal(actualIndex);
+            let index = currentDisplayList.indexOf(card);
+            if (index === -1) {
+                currentDisplayList = [card];
+                index = 0;
+            }
+            openDetailModal(index);
         }
     });
 
@@ -886,7 +896,6 @@ batchConfirmBtn.addEventListener('click', async () => {
     }
 });
 
-// 🔥 戰鬥系統邏輯 🔥
 document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
     if(!currentUser) return alert("請先登入");
@@ -896,6 +905,7 @@ document.getElementById('enter-battle-mode-btn').addEventListener('click', async
 
 document.getElementById('retreat-btn').addEventListener('click', () => {
     playSound('click');
+    isBattleActive = false; // 停止戰鬥
     document.getElementById('battle-screen').classList.add('hidden');
     battleSlots = [null, null, null]; 
     renderBattleSlots();
@@ -903,11 +913,36 @@ document.getElementById('retreat-btn').addEventListener('click', () => {
     renderBattleDeck();
 });
 
+// 🔥 新增：戰鬥開始邏輯 🔥
+document.getElementById('start-battle-btn').addEventListener('click', () => {
+    if (isBattleActive) return; // 避免重複點擊
+    playSound('click');
+    
+    // 初始化戰鬥數值
+    isBattleActive = true;
+    baseHp = 100;
+    currentWave = 1;
+    battleGold = 0;
+    enemies = [];
+    
+    // 更新 UI
+    updateBattleUI();
+    document.getElementById('start-battle-btn').classList.add('btn-disabled');
+    document.getElementById('start-battle-btn').innerText = "戰鬥進行中...";
+    
+    // 開始遊戲循環
+    requestAnimationFrame(gameLoop);
+    startWave(currentWave);
+});
+
 function openBattleMode() {
     document.getElementById('battle-screen').classList.remove('hidden');
     renderBattleDeck();
     renderBattleSlots();
     updateStartButton();
+    // 重置畫面
+    document.getElementById('enemy-container').innerHTML = '';
+    document.getElementById('start-battle-btn').classList.remove('btn-disabled');
 }
 
 function renderBattleDeck() {
@@ -921,7 +956,6 @@ function renderBattleDeck() {
         const cardDiv = document.createElement('div');
         const charPath = `assets/cards/${card.id}.webp`;
         const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
-        const starString = '★'.repeat(card.stars || 1);
 
         cardDiv.className = `card ${card.rarity}`;
         if (isDeployed) {
@@ -954,11 +988,13 @@ function renderBattleDeck() {
 
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
+        if(isBattleActive) return; // 戰鬥中不能換人
         playSound('click');
         const slotIndex = parseInt(slot.dataset.slot);
         
         if (selectedBattleCard && !battleSlots[slotIndex]) {
-            battleSlots[slotIndex] = selectedBattleCard;
+            // 初始化英雄戰鬥狀態
+            battleSlots[slotIndex] = { ...selectedBattleCard, currentHp: selectedBattleCard.hp, maxHp: selectedBattleCard.hp };
             selectedBattleCard = null; 
             renderBattleDeck();
             renderBattleSlots();
@@ -976,27 +1012,35 @@ document.querySelectorAll('.defense-slot').forEach(slot => {
 function renderBattleSlots() {
     document.querySelectorAll('.defense-slot').forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot);
-        const card = battleSlots[index];
+        const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder');
+        const hpBar = slotDiv.querySelector('.hero-hp-bar');
         
         const existingCard = slotDiv.querySelector('.card');
         if (existingCard) existingCard.remove();
 
-        if (card) {
+        if (hero) {
             placeholder.style.display = 'none';
+            hpBar.classList.remove('hidden');
             slotDiv.classList.add('active');
             
             const cardDiv = document.createElement('div');
-            const charPath = `assets/cards/${card.id}.webp`;
-            const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
-            cardDiv.className = `card ${card.rarity}`;
+            const charPath = `assets/cards/${hero.id}.webp`;
+            const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
+            cardDiv.className = `card ${hero.rarity}`;
             cardDiv.innerHTML = `
                 <img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
                 <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
             `;
             slotDiv.appendChild(cardDiv);
+            
+            // 更新血條
+            const hpPercent = (hero.currentHp / hero.maxHp) * 100;
+            hpBar.children[0].style.width = `${Math.max(0, hpPercent)}%`;
+            
         } else {
             placeholder.style.display = 'block';
+            hpBar.classList.add('hidden');
             slotDiv.classList.remove('active');
         }
     });
@@ -1013,3 +1057,212 @@ function updateStartButton() {
         btn.innerHTML = `請先部署英雄`;
     }
 }
+
+// ------------------------------------------
+// ⚔️ 戰鬥核心引擎 (Phase 3)
+// ------------------------------------------
+
+function startWave(wave) {
+    if (!isBattleActive) return;
+    
+    // 生成敵人 (數量隨波次增加)
+    const enemyCount = wave * 2 + 2; 
+    let spawned = 0;
+    
+    enemySpawnInterval = setInterval(() => {
+        if (!isBattleActive || spawned >= enemyCount) {
+            clearInterval(enemySpawnInterval);
+            return;
+        }
+        spawnEnemy(wave);
+        spawned++;
+    }, 2000); // 每2秒生一隻
+}
+
+function spawnEnemy(level) {
+    const hp = level * 1000 + 500;
+    const atk = level * 100 + 50;
+    
+    const enemy = {
+        id: Date.now(),
+        maxHp: hp,
+        currentHp: hp,
+        atk: atk,
+        position: 100, // 100% (右邊)
+        speed: 0.15, // 移動速度
+        el: null
+    };
+    
+    // 建立 DOM
+    const el = document.createElement('div');
+    el.className = 'enemy-unit';
+    el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
+    document.getElementById('enemy-container').appendChild(el);
+    enemy.el = el;
+    
+    enemies.push(enemy);
+}
+
+function gameLoop() {
+    if (!isBattleActive) return;
+
+    // 1. 敵人移動與攻擊
+    enemies.forEach((enemy, eIndex) => {
+        // 尋找最近的活著的英雄
+        // 簡單邏輯：防禦塔位置分別約為 25%, 50%, 75%
+        // 我們簡化：如果 enemy.position 碰到 75% (Slot 2), 50% (Slot 1), 25% (Slot 0)
+        
+        let blocked = false;
+        
+        // 檢查是否被英雄阻擋
+        // Slot 2 (最右邊防禦塔) 約在 pos 70-80
+        // Slot 1 (中間) 約在 pos 45-55
+        // Slot 0 (最左邊) 約在 pos 20-30
+        
+        const checkCombat = (slotIdx, minPos, maxPos) => {
+            if (battleSlots[slotIdx] && battleSlots[slotIdx].currentHp > 0) {
+                if (enemy.position <= maxPos && enemy.position >= minPos) {
+                    blocked = true;
+                    // 互相傷害
+                    battleSlots[slotIdx].currentHp -= enemy.atk * 0.05; // 減緩傷害頻率
+                    enemy.currentHp -= battleSlots[slotIdx].atk * 0.05;
+                    
+                    // 英雄受傷特效 (簡易版: 血條更新)
+                    renderBattleSlots(); 
+                    
+                    // 英雄攻擊動畫
+                    const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"]`);
+                    if(Math.random() < 0.1) slotDiv.classList.add('hero-attacking');
+                    else slotDiv.classList.remove('hero-attacking');
+                }
+            }
+        };
+
+        checkCombat(2, 70, 80);
+        checkCombat(1, 45, 55);
+        checkCombat(0, 20, 30);
+
+        if (!blocked) {
+            enemy.position -= enemy.speed;
+        }
+
+        // 更新敵人位置與血量
+        if (enemy.el) {
+            enemy.el.style.left = `${enemy.position}%`;
+            enemy.el.querySelector('.enemy-hp-bar div').style.width = `${(enemy.currentHp/enemy.maxHp)*100}%`;
+        }
+
+        // 2. 死亡判定
+        if (enemy.currentHp <= 0) {
+            // 敵人死亡
+            enemy.el.remove();
+            enemies.splice(eIndex, 1);
+            battleGold += 50 + (currentWave * 10);
+            updateBattleUI();
+            
+            // 飄字特效
+            showDamageText(enemy.position, `+${50 + (currentWave * 10)}G`);
+        }
+        else if (enemy.position <= 0) {
+            // 衝進主堡
+            baseHp -= 10;
+            enemy.el.remove();
+            enemies.splice(eIndex, 1);
+            updateBattleUI();
+            playSound('dismantle'); // 借用碎裂聲當扣血聲
+        }
+    });
+
+    // 3. 英雄死亡移除
+    battleSlots.forEach((hero, idx) => {
+        if (hero && hero.currentHp <= 0) {
+            battleSlots[idx] = null;
+            renderBattleSlots();
+        }
+    });
+
+    // 4. 勝負判定
+    if (baseHp <= 0) {
+        endBattle(false);
+        return;
+    }
+    
+    // 波次結束判定
+    if (enemies.length === 0 && !enemySpawnInterval) {
+        // 這一波清空了
+        // 這裡需要更嚴謹的判斷 (例如 interval 跑完了且 enemies 空了)
+        // 暫時簡化：如果 interval 被清除了 (在 startWave 裡) 且沒敵人
+        // 我們改用更簡單的：檢查是否贏了
+    }
+    
+    // 簡單波次推進邏輯：如果是特定時間後
+    // 這裡為了原型簡單，我們檢查：如果場上沒敵人，且上一波已經生完
+    // (這裡邏輯較複雜，先做簡單版：敵人死光就下一波)
+    if (enemies.length === 0 && document.getElementById('start-battle-btn').innerText.includes("進行中")) {
+         // 這是一個很不嚴謹的判斷，但在原型階段勉強可用
+         // 實際上應該追蹤 spawned 數量
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+// 輔助：更新戰鬥 UI
+function updateBattleUI() {
+    document.getElementById('base-hp').innerText = Math.max(0, Math.floor(baseHp));
+    document.getElementById('base-hp-bar').style.width = `${Math.max(0, baseHp)}%`;
+    document.getElementById('battle-gold').innerText = battleGold;
+    document.getElementById('wave-count').innerText = currentWave;
+}
+
+// 輔助：飄字
+function showDamageText(leftPercent, text) {
+    const el = document.createElement('div');
+    el.className = 'damage-text';
+    el.innerText = text;
+    el.style.left = `${leftPercent}%`;
+    el.style.top = '40%';
+    document.querySelector('.battle-field').appendChild(el);
+    setTimeout(() => el.remove(), 800);
+}
+
+async function endBattle(isWin) {
+    isBattleActive = false;
+    clearInterval(enemySpawnInterval);
+    
+    if (isWin) {
+        alert(`🎉 勝利！獲得 ${battleGold} 金幣`);
+    } else {
+        alert(`😭 戰敗... 獲得 ${Math.floor(battleGold/2)} 金幣`);
+        battleGold = Math.floor(battleGold/2);
+    }
+    
+    // 結算
+    gold += battleGold;
+    await updateCurrencyCloud();
+    updateUIDisplay();
+    
+    // 退出
+    document.getElementById('battle-screen').classList.add('hidden');
+    // 清理戰場
+    document.getElementById('enemy-container').innerHTML = '';
+    battleSlots = [null, null, null];
+}
+
+// 因為 setInterval 比較難判斷波次結束，我們用一個簡單的計時器來推進波次 (原型專用)
+// 真正的遊戲會監聽敵人數量
+let waveTimer = null;
+document.getElementById('start-battle-btn').addEventListener('click', () => {
+    // ... 前面的代碼已執行 startWave(1)
+    
+    // 簡單排程：
+    // 第 0 秒: 第 1 波
+    // 第 10 秒: 第 2 波
+    // 第 20 秒: 第 3 波
+    // 第 35 秒: 結算勝利
+    
+    setTimeout(() => { currentWave = 2; updateBattleUI(); startWave(2); }, 10000);
+    setTimeout(() => { currentWave = 3; updateBattleUI(); startWave(3); }, 20000);
+    setTimeout(() => { 
+        if(baseHp > 0) endBattle(true); 
+    }, 35000);
+});
