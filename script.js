@@ -589,7 +589,6 @@ function renderCard(card, targetContainer) {
         <img src="${framePath}" class="card-frame-img" onerror="this.remove()"> 
     `;
 
-    // 點擊事件分流：批量 / 部署 / 詳情
     cardDiv.addEventListener('click', () => {
         playSound('click');
         if (isBatchMode) {
