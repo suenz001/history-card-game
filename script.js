@@ -27,7 +27,7 @@ let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
-// 戰鬥變數
+// 戰鬥系統變數
 let battleSlots = [null, null, null];
 let selectedBattleCard = null;
 let isBattleActive = false;
@@ -39,6 +39,7 @@ let enemies = [];
 let gameLoopId = null;
 let enemySpawnInterval = null;
 
+// 批量分解變數
 let isBatchMode = false;
 let selectedBatchCards = new Set();
 
@@ -46,6 +47,10 @@ let gachaQueue = [];
 let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
+
+// ==========================================
+// 🔊 音效系統 (Web Audio API 合成版)
+// ==========================================
 
 const audioBgm = document.getElementById('bgm');
 const sfxDraw = document.getElementById('sfx-draw');
@@ -143,6 +148,10 @@ function synthesizeInventory() {
     gainNode.connect(audioCtx.destination);
     noise.start();
 }
+
+// ==========================================
+// ⚙️ 設定介面邏輯
+// ==========================================
 
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
@@ -456,56 +465,43 @@ function renderDetailCard() {
 async function upgradeCardLevel(cost) {
     const card = currentDisplayList[currentCardIndex];
     if (gold < cost) return alert("金幣不足！");
-    
     const currentDocId = card.docId;
-
     gold -= cost;
     playSound('coin');
     card.level++;
     calculateCardStats(card);
     playSound('upgrade'); 
-
     await updateDoc(doc(db, "inventory", card.docId), {
         level: card.level, atk: card.atk, hp: card.hp
     });
-    
     updateUIDisplay();
-    
     if(!document.getElementById('inventory-modal').classList.contains('hidden')){
         filterInventory(currentFilterRarity);
         const newIndex = currentDisplayList.findIndex(c => c.docId === currentDocId);
         if(newIndex !== -1) currentCardIndex = newIndex;
     }
-    
     renderDetailCard();
 }
 
 async function upgradeCardStar() {
     const card = currentDisplayList[currentCardIndex];
     const currentDocId = card.docId;
-
     const duplicate = allUserCards.find(c => c.id === card.id && c.docId !== card.docId);
     if (!duplicate) return alert("沒有重複的卡片可以用來升星！");
     if (!confirm(`確定要消耗一張【${duplicate.name}】來升星嗎？`)) return;
-
     await deleteDoc(doc(db, "inventory", duplicate.docId));
-    
     allUserCards = allUserCards.filter(c => c.docId !== duplicate.docId);
-    
     card.stars++;
     calculateCardStats(card);
     playSound('upgrade'); 
-
     await updateDoc(doc(db, "inventory", card.docId), {
         stars: card.stars, atk: card.atk, hp: card.hp
     });
-
     if(!document.getElementById('inventory-modal').classList.contains('hidden')){
         filterInventory(currentFilterRarity);
         const newIndex = currentDisplayList.findIndex(c => c.docId === currentDocId);
         if(newIndex !== -1) currentCardIndex = newIndex;
     }
-
     renderDetailCard();
     alert(`升星成功！目前 ${card.stars} ★`);
 }
@@ -526,13 +522,10 @@ async function dismantleCurrentCard() {
     }
     try {
         if (card.docId) await deleteDoc(doc(db, "inventory", card.docId));
-        
         playSound('dismantle');
         setTimeout(() => playSound('coin'), 300);
-
         gold += value;
         allUserCards = allUserCards.filter(c => c !== card);
-        
         document.getElementById('detail-modal').classList.add('hidden');
         if (!document.getElementById('inventory-modal').classList.contains('hidden')) {
             filterInventory(currentFilterRarity); 
@@ -617,7 +610,6 @@ function renderCard(card, targetContainer) {
     const idString = String(card.id).padStart(3, '0');
 
     cardDiv.className = `card ${card.rarity}`; 
-    
     if (isBatchMode && selectedBatchCards.has(card.docId)) {
         cardDiv.classList.add('is-selected');
     }
@@ -667,23 +659,14 @@ function playGachaAnimation(highestRarity) {
         text.innerText = "召喚中...";
         playSound('draw'); 
 
-        if (highestRarity === 'SSR') { 
-            circle.classList.add('glow-ssr'); 
-            text.style.color = '#f1c40f'; 
-        } else if (highestRarity === 'SR') { 
-            circle.classList.add('glow-sr'); 
-            text.style.color = '#9b59b6'; 
-        } else { 
-            circle.classList.add('glow-r'); 
-            text.style.color = '#3498db'; 
-        }
+        if (highestRarity === 'SSR') { circle.classList.add('glow-ssr'); text.style.color = '#f1c40f'; } 
+        else if (highestRarity === 'SR') { circle.classList.add('glow-sr'); text.style.color = '#9b59b6'; } 
+        else { circle.classList.add('glow-r'); text.style.color = '#3498db'; }
         
         let duration = highestRarity === 'SSR' ? 3000 : 2000;
         
         if (highestRarity === 'SSR') {
-            setTimeout(() => {
-                burst.classList.add('burst-active'); 
-            }, 2000); 
+            setTimeout(() => { burst.classList.add('burst-active'); }, 2000); 
         }
 
         setTimeout(() => {
@@ -913,7 +896,7 @@ document.getElementById('retreat-btn').addEventListener('click', () => {
     renderBattleDeck();
 });
 
-// 🔥 新增：戰鬥開始邏輯 🔥
+// 🔥 新增：戰鬥開始邏輯 (Phase 3 補完) 🔥
 document.getElementById('start-battle-btn').addEventListener('click', () => {
     if (isBattleActive) return; // 避免重複點擊
     playSound('click');
@@ -948,6 +931,7 @@ function openBattleMode() {
 function renderBattleDeck() {
     const deckContainer = document.getElementById('battle-deck-grid');
     deckContainer.innerHTML = "";
+    // 取前 15 強的卡片
     const battleCandidates = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 15);
 
     battleCandidates.forEach(card => {
@@ -1108,17 +1092,9 @@ function gameLoop() {
 
     // 1. 敵人移動與攻擊
     enemies.forEach((enemy, eIndex) => {
-        // 尋找最近的活著的英雄
-        // 簡單邏輯：防禦塔位置分別約為 25%, 50%, 75%
-        // 我們簡化：如果 enemy.position 碰到 75% (Slot 2), 50% (Slot 1), 25% (Slot 0)
-        
         let blocked = false;
         
-        // 檢查是否被英雄阻擋
-        // Slot 2 (最右邊防禦塔) 約在 pos 70-80
-        // Slot 1 (中間) 約在 pos 45-55
-        // Slot 0 (最左邊) 約在 pos 20-30
-        
+        // 檢查戰鬥 (簡化判定: 根據槽位百分比位置)
         const checkCombat = (slotIdx, minPos, maxPos) => {
             if (battleSlots[slotIdx] && battleSlots[slotIdx].currentHp > 0) {
                 if (enemy.position <= maxPos && enemy.position >= minPos) {
@@ -1127,7 +1103,7 @@ function gameLoop() {
                     battleSlots[slotIdx].currentHp -= enemy.atk * 0.05; // 減緩傷害頻率
                     enemy.currentHp -= battleSlots[slotIdx].atk * 0.05;
                     
-                    // 英雄受傷特效 (簡易版: 血條更新)
+                    // 英雄受傷特效 (更新血條)
                     renderBattleSlots(); 
                     
                     // 英雄攻擊動畫
@@ -1154,22 +1130,18 @@ function gameLoop() {
 
         // 2. 死亡判定
         if (enemy.currentHp <= 0) {
-            // 敵人死亡
             enemy.el.remove();
             enemies.splice(eIndex, 1);
             battleGold += 50 + (currentWave * 10);
             updateBattleUI();
-            
-            // 飄字特效
             showDamageText(enemy.position, `+${50 + (currentWave * 10)}G`);
         }
         else if (enemy.position <= 0) {
-            // 衝進主堡
             baseHp -= 10;
             enemy.el.remove();
             enemies.splice(eIndex, 1);
             updateBattleUI();
-            playSound('dismantle'); // 借用碎裂聲當扣血聲
+            playSound('dismantle');
         }
     });
 
@@ -1187,26 +1159,14 @@ function gameLoop() {
         return;
     }
     
-    // 波次結束判定
-    if (enemies.length === 0 && !enemySpawnInterval) {
-        // 這一波清空了
-        // 這裡需要更嚴謹的判斷 (例如 interval 跑完了且 enemies 空了)
-        // 暫時簡化：如果 interval 被清除了 (在 startWave 裡) 且沒敵人
-        // 我們改用更簡單的：檢查是否贏了
-    }
-    
-    // 簡單波次推進邏輯：如果是特定時間後
-    // 這裡為了原型簡單，我們檢查：如果場上沒敵人，且上一波已經生完
-    // (這裡邏輯較複雜，先做簡單版：敵人死光就下一波)
-    if (enemies.length === 0 && document.getElementById('start-battle-btn').innerText.includes("進行中")) {
-         // 這是一個很不嚴謹的判斷，但在原型階段勉強可用
-         // 實際上應該追蹤 spawned 數量
+    // 簡單排程推進波次 (原型用)
+    if (enemies.length === 0 && !enemySpawnInterval && document.getElementById('start-battle-btn').innerText.includes("進行中")) {
+         // 這裡只是簡單防呆，真正的波次控制由下方的 setTimeout 負責
     }
 
     requestAnimationFrame(gameLoop);
 }
 
-// 輔助：更新戰鬥 UI
 function updateBattleUI() {
     document.getElementById('base-hp').innerText = Math.max(0, Math.floor(baseHp));
     document.getElementById('base-hp-bar').style.width = `${Math.max(0, baseHp)}%`;
@@ -1214,7 +1174,6 @@ function updateBattleUI() {
     document.getElementById('wave-count').innerText = currentWave;
 }
 
-// 輔助：飄字
 function showDamageText(leftPercent, text) {
     const el = document.createElement('div');
     el.className = 'damage-text';
@@ -1236,33 +1195,35 @@ async function endBattle(isWin) {
         battleGold = Math.floor(battleGold/2);
     }
     
-    // 結算
     gold += battleGold;
     await updateCurrencyCloud();
     updateUIDisplay();
     
-    // 退出
     document.getElementById('battle-screen').classList.add('hidden');
-    // 清理戰場
     document.getElementById('enemy-container').innerHTML = '';
     battleSlots = [null, null, null];
 }
 
-// 因為 setInterval 比較難判斷波次結束，我們用一個簡單的計時器來推進波次 (原型專用)
-// 真正的遊戲會監聽敵人數量
-let waveTimer = null;
+// 簡單的波次排程
 document.getElementById('start-battle-btn').addEventListener('click', () => {
-    // ... 前面的代碼已執行 startWave(1)
+    // startWave(1) 已經在上面的 listener 觸發了 (其實應該合併，這裡做個延遲觸發後續波次)
     
-    // 簡單排程：
-    // 第 0 秒: 第 1 波
-    // 第 10 秒: 第 2 波
-    // 第 20 秒: 第 3 波
-    // 第 35 秒: 結算勝利
-    
-    setTimeout(() => { currentWave = 2; updateBattleUI(); startWave(2); }, 10000);
-    setTimeout(() => { currentWave = 3; updateBattleUI(); startWave(3); }, 20000);
+    // 10秒後第2波
     setTimeout(() => { 
-        if(baseHp > 0) endBattle(true); 
+        if(isBattleActive) {
+            currentWave = 2; updateBattleUI(); startWave(2); 
+        }
+    }, 10000);
+    
+    // 20秒後第3波
+    setTimeout(() => { 
+        if(isBattleActive) {
+            currentWave = 3; updateBattleUI(); startWave(3); 
+        }
+    }, 20000);
+    
+    // 35秒後勝利
+    setTimeout(() => { 
+        if(isBattleActive && baseHp > 0) endBattle(true); 
     }, 35000);
 });
