@@ -344,17 +344,12 @@ function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
     cardDiv.className = `card ${card.rarity}`; 
     // 🔥 檢查是否已部署 (背包狀態) 🔥
-    if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) {
-        cardDiv.classList.add('is-deployed');
-    }
+    if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
-    
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats">⚔️${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
-    
     cardDiv.addEventListener('click', () => { 
         playSound('click'); 
         if (cardDiv.classList.contains('is-deployed')) return; // 已部署不能點
-        
         if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } 
         if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } 
         let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); 
@@ -577,7 +572,7 @@ function gameLoop() {
     if (!isBattleActive) return;
     const now = Date.now();
 
-    // 1. 狀態機邏輯
+    // 1. 狀態機邏輯 (State Machine)
     if (battleState.phase === 'SPAWNING') {
         if (battleState.spawned < battleState.totalToSpawn) {
             if (now - battleState.lastSpawnTime > 1500) { 
@@ -606,18 +601,19 @@ function gameLoop() {
         }
     }
 
-    // 2. 主堡攻擊 (傷害 2000)
+    // 2. 主堡攻擊 (傷害削弱到 300，避免秒殺)
     baseAttackCooldown++;
-    if (baseAttackCooldown > 30 && baseHp > 0) { 
+    if (baseAttackCooldown > 60 && baseHp > 0) { 
         const nearest = enemies.find(e => e.position < 25);
         if (nearest) {
-            nearest.currentHp -= 2000; 
+            nearest.currentHp -= 300; // 🔥 傷害修正：300
             baseAttackCooldown = 0;
             const laser = document.createElement('div'); laser.className = 'base-laser'; laser.style.width = `${nearest.position}%`;
             if(nearest.lane === 0) laser.style.top = '15%';
             else if(nearest.lane === 1) laser.style.top = '50%';
             else if(nearest.lane === 2) laser.style.top = '85%';
             document.querySelector('.battle-field-container').appendChild(laser); setTimeout(() => laser.remove(), 150);
+            playSound('dismantle'); // 雷射音效
         }
     }
 
