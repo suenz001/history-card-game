@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=27">
+    <link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 
@@ -84,12 +84,12 @@
             <div class="battle-info">
                 <span>❤️ 主堡: <span id="base-hp">100</span>%</span>
                 <span>💀 波次: <span id="wave-count">1</span>/3</span>
-                <span>💰 戰利品: <span id="battle-gold">0</span></span>
+                <span>💰 <span id="battle-gold">0</span> G</span>
             </div>
             <button id="retreat-btn" class="btn-danger" style="padding: 5px 15px; font-size: 0.9em;">🏳️ 撤退</button>
         </div>
 
-        <div class="battle-field">
+        <div class="battle-field-container">
             <div id="wave-notification" class="hidden">第 1 波</div>
 
             <div class="base-zone">
@@ -97,24 +97,21 @@
                 <div class="base-health-bar"><div id="base-hp-bar" style="width: 100%;"></div></div>
             </div>
 
-            <div class="lane-container">
-                <div class="defense-slot" data-slot="0">
-                    <div class="slot-placeholder">
-                        <span style="font-size:2em;">➕</span><br>點擊部署
-                    </div>
-                    <div class="hero-hp-bar hidden"><div style="width: 100%;"></div></div>
+            <div class="lanes-wrapper">
+                <div class="lane-row" id="lane-0">
+                    <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
+                    <div class="defense-slot" data-slot="1"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
+                    <div class="defense-slot" data-slot="2"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
                 </div>
-                <div class="defense-slot" data-slot="1">
-                    <div class="slot-placeholder">
-                        <span style="font-size:2em;">➕</span><br>點擊部署
-                    </div>
-                    <div class="hero-hp-bar hidden"><div style="width: 100%;"></div></div>
+                <div class="lane-row" id="lane-1">
+                    <div class="defense-slot" data-slot="3"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
+                    <div class="defense-slot" data-slot="4"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
+                    <div class="defense-slot" data-slot="5"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
                 </div>
-                <div class="defense-slot" data-slot="2">
-                    <div class="slot-placeholder">
-                        <span style="font-size:2em;">➕</span><br>點擊部署
-                    </div>
-                    <div class="hero-hp-bar hidden"><div style="width: 100%;"></div></div>
+                <div class="lane-row" id="lane-2">
+                    <div class="defense-slot" data-slot="6"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
+                    <div class="defense-slot" data-slot="7"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
+                    <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
                 </div>
             </div>
 
@@ -126,12 +123,12 @@
         </div>
 
         <div class="battle-deck">
-            <div style="display:flex; justify-content:center; gap:10px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:center; gap:10px; margin-bottom:5px;">
                 <button class="difficulty-btn" data-diff="easy" style="background:#2ecc71;">🟢 簡單</button>
                 <button class="difficulty-btn active" data-diff="normal" style="background:#f39c12;">🟡 普通</button>
                 <button class="difficulty-btn" data-diff="hard" style="background:#e74c3c;">🔴 困難</button>
             </div>
-            <button id="start-battle-btn" class="btn-primary btn-disabled" style="width: 90%; padding: 15px; font-size: 1.2em; margin: 0 auto;">請先部署英雄</button>
+            <button id="start-battle-btn" class="btn-primary btn-disabled" style="width: 90%; padding: 10px; font-size: 1.2em; margin: 0 auto;">請先部署英雄</button>
         </div>
     </div>
 
