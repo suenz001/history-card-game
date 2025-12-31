@@ -163,7 +163,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .battle-header { background: rgba(0,0,0,0.8); padding: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .battle-info { font-weight: bold; color: #f1c40f; display: flex; gap: 15px; font-size: 0.9em; }
 .battle-field { flex: 1; position: relative; background: #34495e; display: flex; align-items: center; overflow: hidden; border-top: 2px solid #555; border-bottom: 2px solid #555; background-image: linear-gradient(#34495e 1px, transparent 1px), linear-gradient(90deg, #34495e 1px, transparent 1px); background-size: 20px 20px; }
-.base-zone { width: 80px; height: 100%; background: #2c3e50; border-right: 4px solid #95a5a6; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
+.base-zone { width: 80px; height: 100%; background: #2c3e50; border-right: 4px solid #95a5a6; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; position: relative; }
 .base-castle { font-size: 3em; }
 .base-health-bar { width: 60px; height: 8px; background: #c0392b; border-radius: 4px; margin-top: 5px; overflow: hidden; }
 #base-hp-bar { height: 100%; background: #2ecc71; transition: width 0.2s; }
@@ -194,3 +194,10 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     20% { opacity: 1; }
     100% { transform: translate(-50%, -50%) scale(1.5) rotate(90deg); opacity: 0; }
 }
+
+/* 主堡雷射 */
+.base-laser {
+    position: absolute; top: 50%; left: 40px; width: 0; height: 4px; background: #00ffff; box-shadow: 0 0 10px #00ffff; z-index: 9;
+    transform-origin: left center; animation: laserShoot 0.2s forwards;
+}
+@keyframes laserShoot { 0% { opacity: 1; } 100% { opacity: 0; } }
