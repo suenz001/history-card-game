@@ -27,6 +27,10 @@ let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
+// 批量分解變數
+let isBatchMode = false;
+let selectedBatchCards = new Set();
+
 let gachaQueue = [];
 let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
@@ -303,9 +307,8 @@ function filterInventory(rarity) {
         container.innerHTML = "<p style='width:100%; text-align:center;'>沒有符合條件的卡片</p>"; return;
     }
     
-    currentDisplayList.forEach((card, index) => {
-        const cardDiv = renderCard(card, container);
-        cardDiv.addEventListener('click', () => { openDetailModal(index); });
+    currentDisplayList.forEach((card) => {
+        renderCard(card, container);
     });
 }
 
@@ -530,10 +533,12 @@ function renderCard(card, targetContainer) {
     const idString = String(card.id).padStart(3, '0');
 
     cardDiv.className = `card`; 
-    // ------------------------------------------------------------------
-    // 關鍵修復：onerror="this.remove()" 
-    // 如果找不到邊框圖片，直接移除元素，確保不會顯示白色 X (Broken Image Icon)
-    // ------------------------------------------------------------------
+    
+    // 如果在批量模式且被選中，添加樣式
+    if (isBatchMode && selectedBatchCards.has(card.docId)) {
+        cardDiv.classList.add('is-selected');
+    }
+
     cardDiv.innerHTML = `
         <div class="card-id-badge">#${idString}</div>
         <img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
@@ -544,6 +549,18 @@ function renderCard(card, targetContainer) {
         </div>
         <img src="${framePath}" class="card-frame-img" onerror="this.remove()"> 
     `;
+
+    // 點擊事件分流：批量模式 vs 一般模式
+    cardDiv.addEventListener('click', () => {
+        if (isBatchMode) {
+            toggleBatchSelection(card, cardDiv);
+        } else {
+            // 需要重新查找 index，因為 filter 後 index 會變
+            const actualIndex = currentDisplayList.indexOf(card);
+            if(actualIndex !== -1) openDetailModal(actualIndex);
+        }
+    });
+
     targetContainer.appendChild(cardDiv);
     return cardDiv;
 }
@@ -600,9 +617,9 @@ async function closeRevealModal() {
         currentDisplayList.push(savedCard); 
         totalPower += (card.atk + card.hp);
     }
-    currentDisplayList.forEach((card, idx) => {
-        const div = renderCard(card, mainContainer);
-        div.addEventListener('click', () => openDetailModal(idx));
+    currentDisplayList.forEach((card) => {
+        // 更新顯示邏輯，不再需要 index
+        renderCard(card, mainContainer);
     });
     updateUIDisplay();
     await updateCurrencyCloud();
@@ -677,3 +694,111 @@ async function loadLeaderboard() {
         });
     } catch (e) { console.error(e); }
 }
+
+// ==========================================
+// 🔧 批量分解功能邏輯
+// ==========================================
+
+const batchToggleBtn = document.getElementById('batch-toggle-btn');
+const batchActionBar = document.getElementById('batch-action-bar');
+const batchInfo = document.getElementById('batch-info');
+const batchConfirmBtn = document.getElementById('batch-confirm-btn');
+
+// 切換批量模式
+batchToggleBtn.addEventListener('click', () => {
+    isBatchMode = !isBatchMode;
+    selectedBatchCards.clear(); 
+    updateBatchUI();
+    filterInventory(currentFilterRarity);
+});
+
+// 更新 UI 狀態
+function updateBatchUI() {
+    if (isBatchMode) {
+        batchToggleBtn.classList.add('active');
+        batchToggleBtn.innerText = "❌ 退出批量";
+        batchActionBar.classList.remove('hidden');
+        batchConfirmBtn.innerText = "確認分解";
+    } else {
+        batchToggleBtn.classList.remove('active');
+        batchToggleBtn.innerText = "🔧 批量分解";
+        batchActionBar.classList.add('hidden');
+    }
+    calculateBatchTotal();
+}
+
+// 點擊卡片時的邏輯 (選取/取消)
+function toggleBatchSelection(card, cardDiv) {
+    if (selectedBatchCards.has(card.docId)) {
+        selectedBatchCards.delete(card.docId);
+        cardDiv.classList.remove('is-selected');
+    } else {
+        selectedBatchCards.add(card.docId);
+        cardDiv.classList.add('is-selected');
+    }
+    calculateBatchTotal();
+}
+
+// 計算總金額
+function calculateBatchTotal() {
+    let totalGold = 0;
+    let count = 0;
+    
+    allUserCards.forEach(card => {
+        if (selectedBatchCards.has(card.docId)) {
+            totalGold += DISMANTLE_VALUES[card.rarity] || 0;
+            count++;
+        }
+    });
+
+    batchInfo.innerHTML = `已選 <span style="color:#e74c3c">${count}</span> 張，獲得 <span style="color:#f1c40f">${totalGold} G</span>`;
+    
+    if (count > 0) {
+        batchConfirmBtn.classList.remove('btn-disabled');
+    } else {
+        batchConfirmBtn.classList.add('btn-disabled');
+    }
+}
+
+// 執行批量分解
+batchConfirmBtn.addEventListener('click', async () => {
+    if (selectedBatchCards.size === 0) return;
+    
+    if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return;
+
+    let totalGold = 0;
+    const deletePromises = [];
+
+    const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId));
+    
+    cardsToRemove.forEach(card => {
+        totalGold += DISMANTLE_VALUES[card.rarity];
+        if (card.docId) {
+            deletePromises.push(deleteDoc(doc(db, "inventory", card.docId)));
+        }
+    });
+
+    try {
+        batchConfirmBtn.innerText = "分解中...";
+        await Promise.all(deletePromises);
+
+        gold += totalGold;
+        allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId));
+        
+        playSound('coin');
+        await updateCurrencyCloud();
+        updateUIDisplay();
+        
+        selectedBatchCards.clear();
+        isBatchMode = false;
+        updateBatchUI();
+        filterInventory(currentFilterRarity); 
+        
+        alert(`批量分解成功！獲得 ${totalGold} 金幣`);
+        
+    } catch (e) {
+        console.error("批量分解失敗", e);
+        alert("分解過程中發生錯誤，請重試");
+        batchConfirmBtn.innerText = "確認分解";
+    }
+});
