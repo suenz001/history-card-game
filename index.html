@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=23">
+    <link rel="stylesheet" href="style.css?v=24">
 </head>
 <body>
 
     <audio id="bgm" loop><source src="assets/sounds/bgm.mp3" type="audio/mpeg"></audio>
-    <audio id="bgm-battle" loop><source src="assets/sounds/battle-bgm.mp3" type="audio/mpeg"></audio> <audio id="sfx-draw"><source src="assets/sounds/draw.mp3" type="audio/mpeg"></audio>
+    <audio id="bgm-battle" loop><source src="assets/sounds/bgm-battle.mp3" type="audio/mpeg"></audio> <audio id="sfx-draw"><source src="assets/sounds/draw.mp3" type="audio/mpeg"></audio>
     <audio id="sfx-ssr"><source src="assets/sounds/ssr.mp3" type="audio/mpeg"></audio>
     <audio id="sfx-reveal"><source src="assets/sounds/reveal.mp3" type="audio/mpeg"></audio>
     <audio id="sfx-coin"><source src="assets/sounds/coin.mp3" type="audio/mpeg"></audio>
@@ -132,11 +132,9 @@
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <h2 id="inventory-title">🎒 我的背包</h2>
                     <select id="sort-select" class="sort-dropdown">
-                        <option value="time_desc">📅 依獲得時間 (新→舊)</option>
-                        <option value="time_asc">📅 依獲得時間 (舊→新)</option>
-                        <option value="id_asc">🔢 依卡片序號 (1→30)</option>
-                        <option value="id_desc">🔢 依卡片序號 (30→1)</option>
-                        <option value="rarity_desc">💎 依稀有度 (高→低)</option>
+                        <option value="time_desc">📅 獲得時間 (新→舊)</option>
+                        <option value="power_desc">🔥 依戰力 (高→低)</option> <option value="rarity_desc">💎 依稀有度 (高→低)</option>
+                        <option value="id_asc">🔢 卡片序號 (1→30)</option>
                     </select>
                     <button id="batch-toggle-btn">🔧 批量分解</button>
                 </div>

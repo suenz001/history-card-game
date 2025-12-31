@@ -36,25 +36,16 @@ input[type="text"], input[type="email"], input[type="password"] {
 .leaderboard-area { flex: 1; min-width: 250px; background: #2c3e50; border: 2px solid #7f8c8d; padding: 15px; border-radius: 10px; width: 100%; }
 .status-bar { background: #34495e; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-size: 1.1em; font-weight: bold; }
 
-/* 🔥 優化後的排行榜樣式 🔥 */
-.rank-item { 
-    display: flex; 
-    justify-content: space-between; 
-    padding: 10px; 
-    border-bottom: 1px solid #555; 
-    font-size: 0.95em; 
-    align-items: center;
-}
+/* 排行榜優化 */
+.rank-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #555; font-size: 0.95em; align-items: center; }
 .rank-item:last-child { border-bottom: none; }
-.rank-item span:nth-child(1) { flex: 2; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } /* 名字靠左 */
-.rank-item span:nth-child(2) { flex: 1; text-align: right; color: #bdc3c7; } /* 戰力靠右 */
+.rank-item span:nth-child(1) { flex: 2; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rank-item span:nth-child(2) { flex: 1; text-align: right; color: #bdc3c7; }
+.rank-item:nth-child(1) span:nth-child(1) { color: #f1c40f; font-weight: bold; text-shadow: 0 0 5px gold; } 
+.rank-item:nth-child(2) span:nth-child(1) { color: #bdc3c7; font-weight: bold; text-shadow: 0 0 5px silver; }
+.rank-item:nth-child(3) span:nth-child(1) { color: #e67e22; font-weight: bold; text-shadow: 0 0 5px #d35400; }
 
-/* 前三名顏色 */
-.rank-item:nth-child(1) span:nth-child(1) { color: #f1c40f; font-weight: bold; text-shadow: 0 0 5px gold; } /* 金 */
-.rank-item:nth-child(2) span:nth-child(1) { color: #bdc3c7; font-weight: bold; text-shadow: 0 0 5px silver; } /* 銀 */
-.rank-item:nth-child(3) span:nth-child(1) { color: #e67e22; font-weight: bold; text-shadow: 0 0 5px #d35400; } /* 銅 */
-
-/* 卡片與排版 */
+/* 卡片 */
 .card-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 20px; }
 .card {
     width: 120px; height: 180px; position: relative; background: #000;
@@ -66,7 +57,7 @@ input[type="text"], input[type="email"], input[type="password"] {
 .card-img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; position: absolute; top: 0; left: 0; z-index: 1; }
 .card-frame-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; object-fit: fill; background: transparent; }
 
-/* 卡片資訊遮罩 */
+/* 卡片資訊 */
 .card-info-overlay {
     position: absolute; bottom: 0; left: 0; width: 100%; 
     background: linear-gradient(to top, rgba(0,0,0,0.95) 15%, rgba(0,0,0,0.7) 50%, transparent 100%);
@@ -80,7 +71,6 @@ input[type="text"], input[type="email"], input[type="password"] {
 
 img[src=""], img:not([src]) { display: none; }
 
-/* 序號與稀有度 */
 .card-id-badge {
     position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); color: #fff;
     padding: 2px 5px; border-radius: 4px; font-size: 0.7em; font-family: monospace; z-index: 15; pointer-events: none; border: 1px solid #777;
@@ -93,7 +83,7 @@ img[src=""], img:not([src]) { display: none; }
 .card-rarity-badge.SR { background: linear-gradient(45deg, #9b59b6, #8e44ad); color: #fff; }
 .card-rarity-badge.R { background: linear-gradient(45deg, #3498db, #2980b9); color: #fff; }
 
-/* 🔥 關鍵修正：彈窗 Z-Index 提高到 2000，確保浮在戰鬥畫面 (1500) 之上 🔥 */
+/* 彈窗 */
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; }
 .modal-content { background: #2c3e50; width: 90%; max-width: 1000px; height: 80%; border-radius: 10px; border: 2px solid #f1c40f; display: flex; flex-direction: column; padding: 20px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #555; padding-bottom: 10px; }
@@ -181,9 +171,8 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .lane-container { flex: 1; display: flex; justify-content: space-around; align-items: center; height: 100%; position: relative; }
 .defense-slot { width: 90px; height: 130px; border: 2px dashed #7f8c8d; border-radius: 8px; background: rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; transition: 0.2s; cursor: pointer; }
 .defense-slot.active { border-style: solid; border-color: #f1c40f; background: rgba(241, 196, 15, 0.1); }
-/* 確保槽位內的卡片樣式正確 */
 .defense-slot .card { transform: scale(0.65); pointer-events: none; margin: 0; border-width: 3px; box-shadow: none; position: absolute; top: 50%; left: 50%; translate: -50% -50%; } 
-.slot-placeholder { color: #aaa; font-size: 0.8em; text-align: center; pointer-events: none; } /* 修正：避免文字擋住點擊 */
+.slot-placeholder { color: #aaa; font-size: 0.8em; text-align: center; pointer-events: none; }
 .hero-hp-bar { position: absolute; bottom: -10px; left: 0; width: 100%; height: 6px; background: #c0392b; border-radius: 3px; overflow: hidden; z-index: 20; }
 .hero-hp-bar > div { height: 100%; background: #2ecc71; }
 .enemy-unit { position: absolute; width: 50px; height: 50px; background: #e74c3c; border-radius: 50%; border: 2px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.5em; z-index: 5; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
@@ -195,18 +184,10 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .damage-text { position: absolute; color: #ffeb3b; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #c0392b; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; }
 @keyframes floatUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }
 
-/* 🔥 揮劍動畫 (Slash Effect) 🔥 */
+/* 揮劍動畫 */
 .slash-effect {
-    position: absolute;
-    font-size: 4em; /* 劍的大小 */
-    color: #fff;
-    text-shadow: 0 0 10px cyan;
-    pointer-events: none;
-    z-index: 100;
-    top: 30%; /* 調整位置 */
-    left: 50%;
-    transform: translate(-50%, -50%);
-    animation: slashAnim 0.3s forwards;
+    position: absolute; font-size: 4em; color: #fff; text-shadow: 0 0 10px cyan; pointer-events: none; z-index: 100;
+    top: 30%; left: 50%; transform: translate(-50%, -50%); animation: slashAnim 0.3s forwards;
 }
 @keyframes slashAnim {
     0% { transform: translate(-50%, -50%) scale(0.5) rotate(-45deg); opacity: 0; }
