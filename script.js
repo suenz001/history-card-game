@@ -27,6 +27,10 @@ let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
+// 戰鬥系統變數
+let battleSlots = [null, null, null]; // 3個防禦槽位
+let selectedBattleCard = null; // 當前選中的備戰卡片
+
 // 批量分解變數
 let isBatchMode = false;
 let selectedBatchCards = new Set();
@@ -36,11 +40,7 @@ let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// ==========================================
-// 🔊 音效系統 (Web Audio API 合成版)
-// ==========================================
-
-// 保留 BGM 和長音效的 DOM 元素
+// 音效管理
 const audioBgm = document.getElementById('bgm');
 const sfxDraw = document.getElementById('sfx-draw');
 const sfxSsr = document.getElementById('sfx-ssr');
@@ -48,7 +48,6 @@ const sfxReveal = document.getElementById('sfx-reveal');
 const sfxCoin = document.getElementById('sfx-coin');
 const sfxUpgrade = document.getElementById('sfx-upgrade');
 
-// 初始化 AudioContext
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioCtx = new AudioContext();
 
@@ -59,7 +58,6 @@ let sfxVolume = 1.0;
 
 audioBgm.volume = bgmVolume;
 
-// 第一次點擊啟動 AudioContext (瀏覽器政策)
 document.body.addEventListener('click', () => {
     if (audioCtx.state === 'suspended') {
         audioCtx.resume();
@@ -71,21 +69,11 @@ document.body.addEventListener('click', () => {
 
 function playSound(type) {
     if (!isSfxOn) return;
-
     try {
-        // --- 合成音效處理 ---
-        if (type === 'click') {
-            synthesizeClick();
-            return;
-        } else if (type === 'dismantle') {
-            synthesizeDismantle();
-            return;
-        } else if (type === 'inventory') {
-            synthesizeInventory();
-            return;
-        }
+        if (type === 'click') { synthesizeClick(); return; }
+        else if (type === 'dismantle') { synthesizeDismantle(); return; }
+        else if (type === 'inventory') { synthesizeInventory(); return; }
 
-        // --- 檔案音效處理 ---
         let sound;
         if (type === 'draw') sound = sfxDraw;
         else if (type === 'ssr') sound = sfxSsr;
@@ -101,77 +89,54 @@ function playSound(type) {
     } catch (e) { console.log("Audio error", e); }
 }
 
-// 🎹 1. 合成：清脆點擊聲 (Switch 風格)
 function synthesizeClick() {
     const osc = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
-    
     osc.type = 'sine';
     osc.frequency.setValueAtTime(800, audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
-    
     gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-
     osc.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     osc.start();
     osc.stop(audioCtx.currentTime + 0.1);
 }
 
-// 🎹 2. 合成：分解碎裂聲 (白噪音 + 快速衰減)
 function synthesizeDismantle() {
-    const bufferSize = audioCtx.sampleRate * 0.5; // 0.5秒
+    const bufferSize = audioCtx.sampleRate * 0.5; 
     const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
-
-    for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-    }
-
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
     const noise = audioCtx.createBufferSource();
     noise.buffer = buffer;
-
     const gainNode = audioCtx.createGain();
     gainNode.gain.setValueAtTime(sfxVolume * 0.8, audioCtx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-
     noise.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     noise.start();
 }
 
-// 🎹 3. 合成：背包開啟聲 (低通濾波噪音，模擬布料)
 function synthesizeInventory() {
-    const bufferSize = audioCtx.sampleRate * 0.3; // 0.3秒
+    const bufferSize = audioCtx.sampleRate * 0.3; 
     const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
-
-    for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-    }
-
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
     const noise = audioCtx.createBufferSource();
     noise.buffer = buffer;
-
     const filter = audioCtx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 800; // 濾掉高頻
-
+    filter.frequency.value = 800; 
     const gainNode = audioCtx.createGain();
     gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
     gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1);
     gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
-
     noise.connect(filter);
     filter.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     noise.start();
 }
-
-// ==========================================
-// ⚙️ 設定介面邏輯
-// ==========================================
 
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
@@ -365,10 +330,6 @@ async function calculateTotalPowerOnly(uid) {
     updateCurrencyCloud();
 }
 
-// ------------------------------------------
-// 背包與排序系統
-// ------------------------------------------
-
 async function loadInventory(uid) {
     const container = document.getElementById('inventory-grid');
     container.innerHTML = "讀取中...";
@@ -560,7 +521,6 @@ async function dismantleCurrentCard() {
     try {
         if (card.docId) await deleteDoc(doc(db, "inventory", card.docId));
         
-        // 分解音效
         playSound('dismantle');
         setTimeout(() => playSound('coin'), 300);
 
@@ -650,18 +610,17 @@ function renderCard(card, targetContainer) {
     const starString = '★'.repeat(stars);
     const idString = String(card.id).padStart(3, '0');
 
-    // 加入 rarity class 以對應 CSS 邊框特效
     cardDiv.className = `card ${card.rarity}`; 
     
-    // 批量模式選取樣式
     if (isBatchMode && selectedBatchCards.has(card.docId)) {
         cardDiv.classList.add('is-selected');
     }
 
-    // 🔥 加上稀有度標籤 HTML 🔥
+    // 加上稀有度標籤 HTML
     cardDiv.innerHTML = `
         <div class="card-id-badge">#${idString}</div>
-        <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div> <img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+        <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
+        <img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
         <div class="card-info-overlay">
             <div class="card-title">${card.title || ""}</div>
             <div class="card-name">${card.name}</div>
@@ -676,11 +635,10 @@ function renderCard(card, targetContainer) {
             playSound('click');
             toggleBatchSelection(card, cardDiv);
         } else {
-            // 🔥 修復 iOS 最新獲得畫面點擊問題 🔥
-            // 如果 card 不在 currentDisplayList 裡 (例如最新獲得列表被重置了)，我們手動建立一個臨時列表
+            // 防呆機制: 如果卡片不在當前列表，臨時建立列表
             let index = currentDisplayList.indexOf(card);
             if (index === -1) {
-                currentDisplayList = [card]; // 臨時覆蓋為單張卡片
+                currentDisplayList = [card];
                 index = 0;
             }
             openDetailModal(index);
@@ -847,7 +805,6 @@ async function loadLeaderboard() {
     } catch (e) { console.error(e); }
 }
 
-// 批量分解功能邏輯
 const batchToggleBtn = document.getElementById('batch-toggle-btn');
 const batchActionBar = document.getElementById('batch-action-bar');
 const batchInfo = document.getElementById('batch-info');
@@ -889,64 +846,185 @@ function toggleBatchSelection(card, cardDiv) {
 function calculateBatchTotal() {
     let totalGold = 0;
     let count = 0;
-    
     allUserCards.forEach(card => {
         if (selectedBatchCards.has(card.docId)) {
             totalGold += DISMANTLE_VALUES[card.rarity] || 0;
             count++;
         }
     });
-
     batchInfo.innerHTML = `已選 <span style="color:#e74c3c">${count}</span> 張，獲得 <span style="color:#f1c40f">${totalGold} G</span>`;
-    
-    if (count > 0) {
-        batchConfirmBtn.classList.remove('btn-disabled');
-    } else {
-        batchConfirmBtn.classList.add('btn-disabled');
-    }
+    if (count > 0) batchConfirmBtn.classList.remove('btn-disabled');
+    else batchConfirmBtn.classList.add('btn-disabled');
 }
 
 batchConfirmBtn.addEventListener('click', async () => {
     playSound('click');
     if (selectedBatchCards.size === 0) return;
-    
     if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return;
 
     let totalGold = 0;
     const deletePromises = [];
-
     const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId));
     
     cardsToRemove.forEach(card => {
         totalGold += DISMANTLE_VALUES[card.rarity];
-        if (card.docId) {
-            deletePromises.push(deleteDoc(doc(db, "inventory", card.docId)));
-        }
+        if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId)));
     });
 
     try {
         batchConfirmBtn.innerText = "分解中...";
         await Promise.all(deletePromises);
-        
         playSound('dismantle');
         setTimeout(() => playSound('coin'), 300);
-
         gold += totalGold;
         allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId));
-        
         await updateCurrencyCloud();
         updateUIDisplay();
-        
         selectedBatchCards.clear();
         isBatchMode = false;
         updateBatchUI();
         filterInventory(currentFilterRarity); 
-        
         alert(`批量分解成功！獲得 ${totalGold} 金幣`);
-        
     } catch (e) {
         console.error("批量分解失敗", e);
         alert("分解過程中發生錯誤，請重試");
         batchConfirmBtn.innerText = "確認分解";
     }
 });
+
+// 🔥 戰鬥系統邏輯 🔥
+document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
+    playSound('click');
+    if(!currentUser) return alert("請先登入");
+    // 確保有最新背包資料 (避免剛登入就戰鬥)
+    if(allUserCards.length === 0) await loadInventory(currentUser.uid);
+    openBattleMode();
+});
+
+document.getElementById('retreat-btn').addEventListener('click', () => {
+    playSound('click');
+    document.getElementById('battle-screen').classList.add('hidden');
+    battleSlots = [null, null, null]; // 清空槽位
+    renderBattleSlots();
+    selectedBattleCard = null;
+    renderBattleDeck();
+});
+
+function openBattleMode() {
+    document.getElementById('battle-screen').classList.remove('hidden');
+    renderBattleDeck();
+    renderBattleSlots();
+    updateStartButton();
+}
+
+function renderBattleDeck() {
+    const deckContainer = document.getElementById('battle-deck-grid');
+    deckContainer.innerHTML = "";
+    
+    // 取前 15 強的卡片
+    const battleCandidates = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 15);
+
+    battleCandidates.forEach(card => {
+        // 檢查是否已在槽位中
+        const isDeployed = battleSlots.some(slot => slot && slot.docId === card.docId);
+        
+        const cardDiv = document.createElement('div');
+        const charPath = `assets/cards/${card.id}.webp`;
+        const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
+        const starString = '★'.repeat(card.stars || 1);
+
+        cardDiv.className = `card ${card.rarity}`;
+        if (isDeployed) {
+            cardDiv.style.opacity = '0.3';
+            cardDiv.style.pointerEvents = 'none';
+        }
+        if (selectedBattleCard && selectedBattleCard.docId === card.docId) {
+            cardDiv.classList.add('selected-for-battle');
+        }
+
+        cardDiv.innerHTML = `
+            <div class="card-id-badge">#${String(card.id).padStart(3,'0')}</div>
+            <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
+            <img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+            <div class="card-info-overlay">
+                <div class="card-name">${card.name}</div>
+                <div class="card-stats">⚔️${card.atk} ❤️${card.hp}</div>
+            </div>
+            <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
+        `;
+
+        cardDiv.onclick = () => {
+            playSound('click');
+            selectedBattleCard = card;
+            renderBattleDeck();
+        };
+        deckContainer.appendChild(cardDiv);
+    });
+}
+
+// 綁定槽位點擊事件
+document.querySelectorAll('.defense-slot').forEach(slot => {
+    slot.addEventListener('click', () => {
+        playSound('click');
+        const slotIndex = parseInt(slot.dataset.slot);
+        
+        // 情況 A: 已經選中一張卡，且該槽位是空的 -> 部署
+        if (selectedBattleCard && !battleSlots[slotIndex]) {
+            battleSlots[slotIndex] = selectedBattleCard;
+            selectedBattleCard = null; // 部署後清除選取狀態
+            renderBattleDeck();
+            renderBattleSlots();
+            updateStartButton();
+        }
+        // 情況 B: 槽位已經有卡 -> 撤下
+        else if (battleSlots[slotIndex]) {
+            battleSlots[slotIndex] = null;
+            renderBattleDeck();
+            renderBattleSlots();
+            updateStartButton();
+        }
+    });
+});
+
+function renderBattleSlots() {
+    document.querySelectorAll('.defense-slot').forEach(slotDiv => {
+        const index = parseInt(slotDiv.dataset.slot);
+        const card = battleSlots[index];
+        const placeholder = slotDiv.querySelector('.slot-placeholder');
+        
+        // 清除舊卡片
+        const existingCard = slotDiv.querySelector('.card');
+        if (existingCard) existingCard.remove();
+
+        if (card) {
+            placeholder.style.display = 'none';
+            slotDiv.classList.add('active');
+            
+            // 建立迷你卡片
+            const cardDiv = document.createElement('div');
+            const charPath = `assets/cards/${card.id}.webp`;
+            const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
+            cardDiv.className = `card ${card.rarity}`;
+            cardDiv.innerHTML = `
+                <img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+                <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
+            `;
+            slotDiv.appendChild(cardDiv);
+        } else {
+            placeholder.style.display = 'block';
+            slotDiv.classList.remove('active');
+        }
+    });
+}
+
+function updateStartButton() {
+    const btn = document.getElementById('start-battle-btn');
+    const deployedCount = battleSlots.filter(s => s !== null).length;
+    if (deployedCount > 0) {
+        btn.classList.remove('btn-disabled');
+        btn.innerHTML = `⚔️ 開始戰鬥 (${deployedCount}/3)`;
+    } else {
+        btn.classList.add('btn-disabled');
+        btn.innerHTML = `請先部署英雄`;
+    }
+}
