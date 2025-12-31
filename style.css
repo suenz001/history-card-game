@@ -6,6 +6,7 @@ body {
     text-align: center;
     margin: 0;
     padding: 10px;
+    overflow-x: hidden;
 }
 
 .game-container { max-width: 1200px; margin: 0 auto; }
@@ -35,27 +36,68 @@ input[type="text"], input[type="email"], input[type="password"] {
 .leaderboard-area { flex: 1; min-width: 250px; background: #2c3e50; border: 2px solid #7f8c8d; padding: 15px; border-radius: 10px; width: 100%; }
 .status-bar { background: #34495e; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-size: 1.1em; font-weight: bold; }
 
-/* 卡片 */
+/* 卡片與排版 */
 .card-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 20px; }
 .card {
     width: 120px; height: 180px; position: relative; background: #000;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.5); transition: transform 0.2s; border-radius: 8px; border: none;
-    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5); transition: transform 0.2s; border-radius: 8px; 
+    cursor: pointer; /* 強制 iOS 識別點擊 */
+    touch-action: manipulation; /* 優化觸控反應，解決 iOS 雙點延遲 */
+    box-sizing: border-box;
 }
 @media (max-width: 600px) { .card { width: 100px; height: 150px; } .status-bar { font-size: 0.9em; } }
 .card:hover { transform: translateY(-5px); z-index: 50; }
 .card-img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; position: absolute; top: 0; left: 0; z-index: 1; }
 .card-frame-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; object-fit: fill; background: transparent; }
-.card-info-overlay {
-    position: absolute; bottom: 8px; left: 5%; width: 90%; background: rgba(0, 0, 0, 0.6);
-    color: white; padding: 2px 0; text-align: center; border-radius: 4px; z-index: 20; pointer-events: none;
-}
-.card-name { font-size: 0.85em; font-weight: bold; color: #fff; margin-bottom: 1px; text-shadow: 1px 1px 2px black;}
-.card-title { font-size: 0.6em; color: #ccc; margin-bottom: 2px; }
-.card-stats { font-size: 0.75em; color: #f1c40f; display: flex; justify-content: center; gap: 5px; flex-wrap: wrap; }
-.card-level-star { font-size: 0.7em; color: #00d2d3; margin-top: 2px; }
 
-/* 隱藏無來源的圖片 (確保無 X) */
+/* 卡片資訊遮罩 */
+.card-info-overlay {
+    position: absolute; 
+    bottom: 0; left: 0; 
+    width: 100%; 
+    background: linear-gradient(to top, rgba(0,0,0,0.95) 15%, rgba(0,0,0,0.7) 50%, transparent 100%);
+    color: white; 
+    padding: 5px 0; 
+    text-align: center; 
+    border-radius: 0 0 8px 8px; 
+    z-index: 20; 
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 40%; 
+}
+
+/* 稱號與文字樣式 */
+.card-title { 
+    font-size: 0.65em; 
+    color: #bdc3c7; 
+    margin-bottom: 1px; 
+    text-shadow: 1px 1px 2px #000;
+    letter-spacing: 1px;
+}
+.card-name { 
+    font-size: 0.9em; 
+    font-weight: bold; 
+    color: #fff; 
+    margin-bottom: 2px; 
+    text-shadow: 0 0 5px #000, 1px 1px 2px black;
+    line-height: 1.1;
+}
+.card-stats { 
+    font-size: 0.75em; 
+    color: #f1c40f; 
+    display: flex; 
+    justify-content: center; 
+    gap: 4px; 
+    flex-wrap: wrap; 
+    background: rgba(0,0,0,0.3); 
+    padding: 2px 0;
+    margin-top: 2px;
+}
+.card-level-star { font-size: 0.7em; color: #00d2d3; margin-bottom: 1px; }
+
+/* 隱藏無來源的圖片 */
 img[src=""], img:not([src]) { display: none; }
 
 /* 卡片序號 */
@@ -67,6 +109,25 @@ img[src=""], img:not([src]) { display: none; }
     z-index: 15; pointer-events: none;
     border: 1px solid #777;
 }
+
+/* 🔥 新增：稀有度標籤樣式 🔥 */
+.card-rarity-badge {
+    position: absolute; 
+    top: 5px; 
+    right: 5px; /* 放在右上角 */
+    padding: 2px 6px; 
+    border-radius: 4px;
+    font-size: 0.8em; 
+    font-weight: bold;
+    z-index: 15; 
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.4);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    font-family: Arial, sans-serif;
+}
+.card-rarity-badge.SSR { background: linear-gradient(45deg, #f1c40f, #f39c12); color: #000; }
+.card-rarity-badge.SR { background: linear-gradient(45deg, #9b59b6, #8e44ad); color: #fff; }
+.card-rarity-badge.R { background: linear-gradient(45deg, #3498db, #2980b9); color: #fff; }
 
 /* 彈窗 */
 .modal {
@@ -107,6 +168,11 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     width: 300px; height: 450px; position: relative; border-radius: 15px;
     box-shadow: 0 0 30px rgba(255, 255, 255, 0.2); animation: popIn 0.3s ease-out;
 }
+.large-card .card-title { font-size: 1.2em; margin-bottom: 5px; }
+.large-card .card-name { font-size: 2em; margin-bottom: 5px; }
+.large-card .card-stats { font-size: 1.4em; padding: 5px; }
+.large-card .card-info-overlay { min-height: 30%; background: linear-gradient(to top, rgba(0,0,0,0.9) 20%, transparent 100%); }
+
 .large-card.ssr-effect::before {
     content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     width: 150%; height: 150%;
@@ -114,19 +180,16 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     animation: rotate-glow 5s linear infinite; z-index: -1;
 }
 @media (max-width: 600px) { .large-card { width: 240px; height: 360px; } }
-.large-card .card-name { font-size: 1.5em; margin-bottom: 5px; }
-.large-card .card-title { font-size: 1em; margin-bottom: 5px; }
-.large-card .card-stats { font-size: 1.2em; }
+
 .large-card .card-level-star { font-size: 1em; color: #00d2d3; margin-top: 5px; display: block;}
 .large-card .card-id-badge { font-size: 1.2em; padding: 5px 10px; top: 10px; left: 10px; }
-.large-card .card-info-overlay { padding: 10px 0; bottom: 20px; }
 .large-card .card-img, .large-card .card-frame-img { border-radius: 15px; }
 
 .upgrade-controls { display: flex; gap: 10px; margin-top: 20px; z-index: 102; width: 100%; max-width: 320px; }
 .upgrade-box { flex: 1; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; border: 1px solid #555; display: flex; flex-direction: column; justify-content: space-between; }
 .upgrade-title { font-size: 0.9em; color: #f1c40f; margin-bottom: 5px; font-weight: bold; }
 
-/* 左右切換箭頭 (解決白色 X 擋住圖片問題) */
+/* 左右切換箭頭 */
 .nav-arrow {
     position: absolute; 
     top: 50%; 
@@ -152,24 +215,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 .btn-close-circle { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.5); color: white; border: 2px solid white; width: 40px; height: 40px; border-radius: 50%; font-size: 1.2em; cursor: pointer; z-index: 102; }
 
-/* 動畫與特效 */
-@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-@keyframes rotate-glow { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
-@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-#gacha-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-#summon-circle { width: 150px; height: 150px; border-radius: 50%; background: white; box-shadow: 0 0 20px white; animation: pulse 0.8s infinite alternate; }
-.glow-r { background: #3498db !important; box-shadow: 0 0 30px #3498db !important; }
-.glow-sr { background: #9b59b6 !important; box-shadow: 0 0 40px #9b59b6 !important; animation: pulse 0.5s infinite alternate !important; }
-.glow-ssr { background: #f1c40f !important; box-shadow: 0 0 60px #f1c40f, 0 0 100px orange !important; animation: shake 0.5s infinite !important; }
-.flash-screen { animation: flash 0.5s forwards; background: white !important; }
-@keyframes pulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.2); opacity: 1; } }
-@keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 100% { transform: translate(1px, -2px) rotate(-1deg); } }
-@keyframes flash { 0% { background: rgba(0,0,0,0.9); } 50% { background: white; } 100% { background: rgba(0,0,0,0); opacity: 0; display: none; } }
-.rank-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #555; font-size: 0.95em; }
-.rank-item:nth-child(1) { color: #f1c40f; } .rank-item:nth-child(2) { color: #bdc3c7; } .rank-item:nth-child(3) { color: #e67e22; }
-.hidden { display: none !important; }
-
-/* --- 批量分解功能樣式 --- */
+/* 批量分解樣式 */
 .card.is-selected {
     border: 3px solid #e74c3c !important;
     transform: translateY(-5px);
@@ -236,3 +282,71 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     font-size: 1em;
 }
 #batch-confirm-btn:hover { background: #c0392b; }
+
+/* 🛡️ 自動補救：CSS 純色邊框 */
+.card { border: 2px solid #555; }
+.card.R { border-color: #3498db; box-shadow: 0 0 5px rgba(52, 152, 219, 0.3); }
+.card.SR { border-color: #9b59b6; box-shadow: 0 0 8px rgba(155, 89, 182, 0.5); }
+.card.SSR { 
+    border-color: #f1c40f; 
+    box-shadow: 0 0 15px rgba(241, 196, 15, 0.8); 
+    animation: goldPulse 1.5s infinite alternate; 
+}
+
+/* 🔥 SSR 特效動畫 🔥 */
+@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes rotate-glow { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+@keyframes goldPulse { from { box-shadow: 0 0 10px rgba(241, 196, 15, 0.5); } to { box-shadow: 0 0 25px rgba(241, 196, 15, 1); } }
+
+/* 召喚陣 */
+#gacha-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+#summon-circle { width: 150px; height: 150px; border-radius: 50%; background: white; box-shadow: 0 0 20px white; animation: pulse 0.8s infinite alternate; z-index: 1001; }
+
+.glow-r { background: #3498db !important; box-shadow: 0 0 30px #3498db !important; }
+.glow-sr { background: #9b59b6 !important; box-shadow: 0 0 40px #9b59b6 !important; animation: pulse 0.5s infinite alternate !important; }
+
+/* SSR 瘋狂特效 */
+.glow-ssr { 
+    background: #f1c40f !important; 
+    box-shadow: 0 0 80px #f1c40f, 0 0 150px orange, 0 0 200px red !important; 
+    animation: superShake 0.1s infinite !important; 
+}
+
+/* 聖光爆發 */
+#summon-burst {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 0; height: 0; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,215,0,0.8) 40%, transparent 80%);
+    opacity: 0;
+    z-index: 1000;
+}
+.burst-active {
+    animation: holyBurst 1s forwards ease-out;
+}
+
+@keyframes pulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.2); opacity: 1; } }
+@keyframes superShake { 
+    0% { transform: translate(2px, 2px) rotate(0deg); } 
+    25% { transform: translate(-2px, -2px) rotate(-2deg); } 
+    50% { transform: translate(2px, -2px) rotate(2deg); } 
+    75% { transform: translate(-2px, 2px) rotate(-2deg); } 
+    100% { transform: translate(2px, 2px) rotate(0deg); } 
+}
+@keyframes holyBurst {
+    0% { width: 0; height: 0; opacity: 1; }
+    50% { width: 200vw; height: 200vw; opacity: 0.8; }
+    100% { width: 300vw; height: 300vw; opacity: 0; }
+}
+
+.flash-screen { 
+    animation: flash 1.5s forwards; 
+    background: white !important; 
+    z-index: 2000;
+}
+@keyframes flash { 
+    0% { background: rgba(0,0,0,0.9); } 
+    20% { background: white; opacity: 1; } 
+    100% { background: rgba(0,0,0,0); opacity: 0; display: none; } 
+}
+
+.hidden { display: none !important; }

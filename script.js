@@ -36,13 +36,21 @@ let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// 音效管理
+// ==========================================
+// 🔊 音效系統 (Web Audio API 合成版)
+// ==========================================
+
+// 保留 BGM 和長音效的 DOM 元素
 const audioBgm = document.getElementById('bgm');
 const sfxDraw = document.getElementById('sfx-draw');
 const sfxSsr = document.getElementById('sfx-ssr');
 const sfxReveal = document.getElementById('sfx-reveal');
 const sfxCoin = document.getElementById('sfx-coin');
 const sfxUpgrade = document.getElementById('sfx-upgrade');
+
+// 初始化 AudioContext
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioContext();
 
 let isBgmOn = true;
 let isSfxOn = true;
@@ -51,9 +59,33 @@ let sfxVolume = 1.0;
 
 audioBgm.volume = bgmVolume;
 
+// 第一次點擊啟動 AudioContext (瀏覽器政策)
+document.body.addEventListener('click', () => {
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    if (isBgmOn && audioBgm.paused) {
+        audioBgm.play().catch(() => {});
+    }
+}, { once: true });
+
 function playSound(type) {
     if (!isSfxOn) return;
+
     try {
+        // --- 合成音效處理 ---
+        if (type === 'click') {
+            synthesizeClick();
+            return;
+        } else if (type === 'dismantle') {
+            synthesizeDismantle();
+            return;
+        } else if (type === 'inventory') {
+            synthesizeInventory();
+            return;
+        }
+
+        // --- 檔案音效處理 ---
         let sound;
         if (type === 'draw') sound = sfxDraw;
         else if (type === 'ssr') sound = sfxSsr;
@@ -69,14 +101,77 @@ function playSound(type) {
     } catch (e) { console.log("Audio error", e); }
 }
 
-function initAudioAutoPlay() {
-    document.body.addEventListener('click', () => {
-        if (isBgmOn && audioBgm.paused) {
-            audioBgm.play().catch(() => {});
-        }
-    }, { once: true });
+// 🎹 1. 合成：清脆點擊聲 (Switch 風格)
+function synthesizeClick() {
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
+    
+    gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.1);
 }
-initAudioAutoPlay();
+
+// 🎹 2. 合成：分解碎裂聲 (白噪音 + 快速衰減)
+function synthesizeDismantle() {
+    const bufferSize = audioCtx.sampleRate * 0.5; // 0.5秒
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.setValueAtTime(sfxVolume * 0.8, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+    noise.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    noise.start();
+}
+
+// 🎹 3. 合成：背包開啟聲 (低通濾波噪音，模擬布料)
+function synthesizeInventory() {
+    const bufferSize = audioCtx.sampleRate * 0.3; // 0.3秒
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 800; // 濾掉高頻
+
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1);
+    gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+
+    noise.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    noise.start();
+}
+
+// ==========================================
+// ⚙️ 設定介面邏輯
+// ==========================================
 
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
@@ -86,6 +181,7 @@ const sfxSlider = document.getElementById('sfx-volume');
 const settingsNameInput = document.getElementById('settings-name-input');
 
 document.getElementById('settings-btn').addEventListener('click', () => {
+    playSound('click');
     settingsModal.classList.remove('hidden');
     bgmToggle.checked = isBgmOn;
     sfxToggle.checked = isSfxOn;
@@ -96,10 +192,12 @@ document.getElementById('settings-btn').addEventListener('click', () => {
 });
 
 document.getElementById('close-settings-btn').addEventListener('click', () => {
+    playSound('click');
     settingsModal.classList.add('hidden');
 });
 
 bgmToggle.addEventListener('change', (e) => {
+    playSound('click');
     isBgmOn = e.target.checked;
     document.getElementById('bgm-status').innerText = isBgmOn ? "開啟" : "關閉";
     if (isBgmOn) audioBgm.play().catch(()=>{});
@@ -107,6 +205,7 @@ bgmToggle.addEventListener('change', (e) => {
 });
 
 sfxToggle.addEventListener('change', (e) => {
+    playSound('click');
     isSfxOn = e.target.checked;
     document.getElementById('sfx-status').innerText = isSfxOn ? "開啟" : "關閉";
 });
@@ -121,6 +220,7 @@ sfxSlider.addEventListener('input', (e) => {
 });
 
 document.getElementById('settings-save-name-btn').addEventListener('click', async () => {
+    playSound('click');
     const newName = settingsNameInput.value.trim();
     if (!newName) return alert("請輸入暱稱");
     if (!currentUser) return alert("請先登入");
@@ -140,8 +240,12 @@ const userInfo = document.getElementById('user-info');
 const gameUI = document.getElementById('game-ui');
 const userNameDisplay = document.getElementById('user-name');
 
-document.getElementById('google-btn').addEventListener('click', () => signInWithPopup(auth, provider).catch(e=>alert(e.message)));
+document.getElementById('google-btn').addEventListener('click', () => {
+    playSound('click');
+    signInWithPopup(auth, provider).catch(e=>alert(e.message));
+});
 document.getElementById('email-signup-btn').addEventListener('click', () => {
+    playSound('click');
     const email = document.getElementById('email-input').value;
     const pass = document.getElementById('pass-input').value;
     if(!email || !pass) return alert("請輸入信箱密碼");
@@ -150,17 +254,22 @@ document.getElementById('email-signup-btn').addEventListener('click', () => {
     }).catch(e=>alert(e.message));
 });
 document.getElementById('email-login-btn').addEventListener('click', () => {
+    playSound('click');
     const email = document.getElementById('email-input').value;
     const pass = document.getElementById('pass-input').value;
     if(!email || !pass) return alert("請輸入信箱密碼");
     signInWithEmailAndPassword(auth, email, pass).catch(e=>alert(e.message));
 });
 document.getElementById('guest-btn').addEventListener('click', () => {
+    playSound('click');
     signInAnonymously(auth).then(async (res) => {
         await updateProfile(res.user, { displayName: "神秘客" }); location.reload();
     }).catch(e=>alert(e.message));
 });
-document.getElementById('logout-btn').addEventListener('click', () => signOut(auth).then(() => location.reload()));
+document.getElementById('logout-btn').addEventListener('click', () => {
+    playSound('click');
+    signOut(auth).then(() => location.reload());
+});
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -237,6 +346,7 @@ function updateUIDisplay() {
 }
 
 document.getElementById('add-gem-btn').addEventListener('click', async () => {
+    playSound('click');
     if (!currentUser) return alert("請先登入");
     gems += 5000; updateUIDisplay(); await updateCurrencyCloud();
     alert("已領取 5000 鑽！");
@@ -256,7 +366,7 @@ async function calculateTotalPowerOnly(uid) {
 }
 
 // ------------------------------------------
-// 背包與排序系統 (Inventory & Sort)
+// 背包與排序系統
 // ------------------------------------------
 
 async function loadInventory(uid) {
@@ -289,6 +399,7 @@ async function loadInventory(uid) {
 }
 
 document.getElementById('sort-select').addEventListener('change', (e) => {
+    playSound('click');
     currentSortMethod = e.target.value;
     filterInventory(currentFilterRarity);
 });
@@ -331,6 +442,7 @@ function sortCards(list, method) {
 }
 
 function openDetailModal(index) {
+    playSound('click');
     currentCardIndex = index;
     const modal = document.getElementById('detail-modal');
     modal.classList.remove('hidden');
@@ -447,9 +559,12 @@ async function dismantleCurrentCard() {
     }
     try {
         if (card.docId) await deleteDoc(doc(db, "inventory", card.docId));
-        gold += value;
-        playSound('coin');
+        
+        // 分解音效
+        playSound('dismantle');
+        setTimeout(() => playSound('coin'), 300);
 
+        gold += value;
         allUserCards = allUserCards.filter(c => c !== card);
         
         document.getElementById('detail-modal').classList.add('hidden');
@@ -463,6 +578,7 @@ async function dismantleCurrentCard() {
 }
 
 function changeCard(direction) {
+    playSound('click');
     if (direction === 'prev') {
         currentCardIndex--;
         if (currentCardIndex < 0) currentCardIndex = currentDisplayList.length - 1;
@@ -486,10 +602,12 @@ detailModal.addEventListener('touchend', e => {
 document.getElementById('prev-card-btn').addEventListener('click', () => changeCard('prev'));
 document.getElementById('next-card-btn').addEventListener('click', () => changeCard('next'));
 document.getElementById('close-detail-btn').addEventListener('click', () => {
+    playSound('click');
     document.getElementById('detail-modal').classList.add('hidden');
 });
 document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
+        playSound('click');
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         filterInventory(e.target.getAttribute('data-filter'));
@@ -532,17 +650,20 @@ function renderCard(card, targetContainer) {
     const starString = '★'.repeat(stars);
     const idString = String(card.id).padStart(3, '0');
 
-    cardDiv.className = `card`; 
+    // 加入 rarity class 以對應 CSS 邊框特效
+    cardDiv.className = `card ${card.rarity}`; 
     
-    // 如果在批量模式且被選中，添加樣式
+    // 批量模式選取樣式
     if (isBatchMode && selectedBatchCards.has(card.docId)) {
         cardDiv.classList.add('is-selected');
     }
 
+    // 🔥 加上稀有度標籤 HTML 🔥
     cardDiv.innerHTML = `
         <div class="card-id-badge">#${idString}</div>
-        <img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+        <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div> <img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
         <div class="card-info-overlay">
+            <div class="card-title">${card.title || ""}</div>
             <div class="card-name">${card.name}</div>
             <div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div>
             <div class="card-stats">⚔️${card.atk} ❤️${card.hp}</div>
@@ -550,14 +671,19 @@ function renderCard(card, targetContainer) {
         <img src="${framePath}" class="card-frame-img" onerror="this.remove()"> 
     `;
 
-    // 點擊事件分流：批量模式 vs 一般模式
     cardDiv.addEventListener('click', () => {
         if (isBatchMode) {
+            playSound('click');
             toggleBatchSelection(card, cardDiv);
         } else {
-            // 需要重新查找 index，因為 filter 後 index 會變
-            const actualIndex = currentDisplayList.indexOf(card);
-            if(actualIndex !== -1) openDetailModal(actualIndex);
+            // 🔥 修復 iOS 最新獲得畫面點擊問題 🔥
+            // 如果 card 不在 currentDisplayList 裡 (例如最新獲得列表被重置了)，我們手動建立一個臨時列表
+            let index = currentDisplayList.indexOf(card);
+            if (index === -1) {
+                currentDisplayList = [card]; // 臨時覆蓋為單張卡片
+                index = 0;
+            }
+            openDetailModal(index);
         }
     });
 
@@ -570,16 +696,38 @@ function playGachaAnimation(highestRarity) {
         const overlay = document.getElementById('gacha-overlay');
         const circle = document.getElementById('summon-circle');
         const text = document.getElementById('summon-text');
-        overlay.className = ''; overlay.classList.remove('hidden'); circle.className = ''; text.innerText = "召喚中...";
+        const burst = document.getElementById('summon-burst');
+
+        overlay.className = ''; 
+        overlay.classList.remove('hidden'); 
+        circle.className = ''; 
+        burst.className = ''; 
+        text.innerText = "召喚中...";
         playSound('draw'); 
-        if (highestRarity === 'SSR') { circle.classList.add('glow-ssr'); text.style.color = '#f1c40f'; } 
-        else if (highestRarity === 'SR') { circle.classList.add('glow-sr'); text.style.color = '#9b59b6'; } 
-        else { circle.classList.add('glow-r'); text.style.color = '#3498db'; }
+
+        if (highestRarity === 'SSR') { 
+            circle.classList.add('glow-ssr'); 
+            text.style.color = '#f1c40f'; 
+        } else if (highestRarity === 'SR') { 
+            circle.classList.add('glow-sr'); 
+            text.style.color = '#9b59b6'; 
+        } else { 
+            circle.classList.add('glow-r'); 
+            text.style.color = '#3498db'; 
+        }
+        
         let duration = highestRarity === 'SSR' ? 3000 : 2000;
+        
+        if (highestRarity === 'SSR') {
+            setTimeout(() => {
+                burst.classList.add('burst-active'); 
+            }, 2000); 
+        }
+
         setTimeout(() => {
             if (highestRarity === 'SSR') {
                 overlay.classList.add('flash-screen');
-                setTimeout(() => { overlay.classList.add('hidden'); overlay.classList.remove('flash-screen'); resolve(); }, 500); 
+                setTimeout(() => { overlay.classList.add('hidden'); overlay.classList.remove('flash-screen'); resolve(); }, 1500); 
             } else { overlay.classList.add('hidden'); resolve(); }
         }, duration);
     });
@@ -618,7 +766,6 @@ async function closeRevealModal() {
         totalPower += (card.atk + card.hp);
     }
     currentDisplayList.forEach((card) => {
-        // 更新顯示邏輯，不再需要 index
         renderCard(card, mainContainer);
     });
     updateUIDisplay();
@@ -627,6 +774,7 @@ async function closeRevealModal() {
 }
 
 document.getElementById('gacha-skip-btn').addEventListener('click', (e) => {
+    playSound('click');
     e.stopPropagation(); 
     let nextSSRIndex = -1;
     for(let i = gachaIndex; i < gachaQueue.length; i++) {
@@ -638,6 +786,7 @@ document.getElementById('gacha-skip-btn').addEventListener('click', (e) => {
 document.getElementById('gacha-reveal-modal').addEventListener('click', showNextRevealCard);
 
 document.getElementById('draw-btn').addEventListener('click', async () => {
+    playSound('click');
     if (gems < 100) return alert("鑽石不足");
     gems -= 100;
     const newCard = drawOneCard();
@@ -646,6 +795,7 @@ document.getElementById('draw-btn').addEventListener('click', async () => {
 });
 
 document.getElementById('draw-10-btn').addEventListener('click', async () => {
+     playSound('click');
      if (gems < 1000) return alert("鑽石不足");
      gems -= 1000;
      let drawnCards = [];
@@ -669,11 +819,13 @@ document.getElementById('draw-10-btn').addEventListener('click', async () => {
 
 const inventoryModal = document.getElementById('inventory-modal');
 document.getElementById('inventory-btn').addEventListener('click', () => {
+    playSound('inventory'); 
     if(!currentUser) return alert("請先登入");
     inventoryModal.classList.remove('hidden'); 
     loadInventory(currentUser.uid); 
 });
 document.getElementById('close-inventory-btn').addEventListener('click', () => {
+    playSound('click');
     inventoryModal.classList.add('hidden'); 
 });
 
@@ -695,24 +847,20 @@ async function loadLeaderboard() {
     } catch (e) { console.error(e); }
 }
 
-// ==========================================
-// 🔧 批量分解功能邏輯
-// ==========================================
-
+// 批量分解功能邏輯
 const batchToggleBtn = document.getElementById('batch-toggle-btn');
 const batchActionBar = document.getElementById('batch-action-bar');
 const batchInfo = document.getElementById('batch-info');
 const batchConfirmBtn = document.getElementById('batch-confirm-btn');
 
-// 切換批量模式
 batchToggleBtn.addEventListener('click', () => {
+    playSound('click');
     isBatchMode = !isBatchMode;
     selectedBatchCards.clear(); 
     updateBatchUI();
     filterInventory(currentFilterRarity);
 });
 
-// 更新 UI 狀態
 function updateBatchUI() {
     if (isBatchMode) {
         batchToggleBtn.classList.add('active');
@@ -727,7 +875,6 @@ function updateBatchUI() {
     calculateBatchTotal();
 }
 
-// 點擊卡片時的邏輯 (選取/取消)
 function toggleBatchSelection(card, cardDiv) {
     if (selectedBatchCards.has(card.docId)) {
         selectedBatchCards.delete(card.docId);
@@ -739,7 +886,6 @@ function toggleBatchSelection(card, cardDiv) {
     calculateBatchTotal();
 }
 
-// 計算總金額
 function calculateBatchTotal() {
     let totalGold = 0;
     let count = 0;
@@ -760,8 +906,8 @@ function calculateBatchTotal() {
     }
 }
 
-// 執行批量分解
 batchConfirmBtn.addEventListener('click', async () => {
+    playSound('click');
     if (selectedBatchCards.size === 0) return;
     
     if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return;
@@ -781,11 +927,13 @@ batchConfirmBtn.addEventListener('click', async () => {
     try {
         batchConfirmBtn.innerText = "分解中...";
         await Promise.all(deletePromises);
+        
+        playSound('dismantle');
+        setTimeout(() => playSound('coin'), 300);
 
         gold += totalGold;
         allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId));
         
-        playSound('coin');
         await updateCurrencyCloud();
         updateUIDisplay();
         
