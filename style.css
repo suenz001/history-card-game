@@ -36,7 +36,7 @@ input[type="text"], input[type="email"], input[type="password"] {
 .leaderboard-area { flex: 1; min-width: 250px; background: #2c3e50; border: 2px solid #7f8c8d; padding: 15px; border-radius: 10px; width: 100%; }
 .status-bar { background: #34495e; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-size: 1.1em; font-weight: bold; }
 
-/* 排行榜優化 */
+/* 排行榜 */
 .rank-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #555; font-size: 0.95em; align-items: center; }
 .rank-item:last-child { border-bottom: none; }
 .rank-item span:nth-child(1) { flex: 2; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -184,7 +184,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .damage-text { position: absolute; color: #ffeb3b; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #c0392b; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; }
 @keyframes floatUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }
 
-/* 揮劍動畫 (英雄) */
+/* 揮劍動畫 */
 .slash-effect {
     position: absolute; font-size: 4em; color: #fff; text-shadow: 0 0 10px cyan; pointer-events: none; z-index: 100;
     top: 30%; left: 50%; transform: translate(-50%, -50%); animation: slashAnim 0.3s forwards;
@@ -195,15 +195,27 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: translate(-50%, -50%) scale(1.5) rotate(90deg); opacity: 0; }
 }
 
-/* 🔥 噴毒動畫 (怪物) 🔥 */
+/* 🔥 噴毒動畫 (放大、顯眼) 🔥 */
 .poison-effect {
-    position: absolute; width: 50px; height: 50px; background: radial-gradient(circle, #2ecc71, transparent);
-    border-radius: 50%; opacity: 0.8; z-index: 99; pointer-events: none;
-    animation: poisonSplash 0.4s forwards;
+    position: absolute; width: 100px; height: 100px; /* 變大 */
+    background: radial-gradient(circle, #00ff00, transparent); /* 鮮綠色 */
+    border-radius: 50%; opacity: 0.9; z-index: 99; pointer-events: none;
+    animation: poisonSplash 0.5s forwards;
 }
 @keyframes poisonSplash {
     0% { transform: scale(0.2); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.8; }
     100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* 🔥 英雄受擊震動 🔥 */
+.hero-hit {
+    animation: shakeHero 0.3s ease-in-out;
+}
+@keyframes shakeHero {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px) rotate(-5deg); }
+    75% { transform: translateX(5px) rotate(5deg); }
 }
 
 /* 波次提示 */

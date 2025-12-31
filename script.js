@@ -41,10 +41,12 @@ let waveData = {
     spawnedCount: 0,
     totalCount: 0,
     lastSpawnTime: 0,
-    state: 'idle' // idle, spawning, fighting, waiting_next_wave
+    state: 'idle', // states: idle, spawning, fighting, waiting_next_wave
+    waveWaitTime: 0
 };
 let gameLoopId = null;
 
+// 批量分解變數
 let isBatchMode = false;
 let selectedBatchCards = new Set();
 
@@ -89,6 +91,7 @@ function playSound(type) {
         if (type === 'click') { synthesizeClick(); return; }
         else if (type === 'dismantle') { synthesizeDismantle(); return; }
         else if (type === 'inventory') { synthesizeInventory(); return; }
+        else if (type === 'poison') { synthesizePoison(); return; } // 新增毒音效
 
         let sound;
         if (type === 'draw') sound = sfxDraw;
@@ -106,8 +109,7 @@ function playSound(type) {
 }
 
 function synthesizeClick() {
-    const osc = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
+    const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
     osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
     gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
     osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
@@ -125,6 +127,14 @@ function synthesizeInventory() {
     const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 800; 
     const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
     noise.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
+}
+
+// 毒液音效
+function synthesizePoison() {
+    const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3);
+    gainNode.gain.setValueAtTime(sfxVolume * 0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+    osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3);
 }
 
 const settingsModal = document.getElementById('settings-modal');
@@ -382,7 +392,7 @@ function calculateBatchTotal() { let totalGold = 0; let count = 0; allUserCards.
 batchConfirmBtn.addEventListener('click', async () => { playSound('click'); if (selectedBatchCards.size === 0) return; if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; let totalGold = 0; const deletePromises = []; const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); cardsToRemove.forEach(card => { totalGold += DISMANTLE_VALUES[card.rarity]; if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); }); try { batchConfirmBtn.innerText = "分解中..."; await Promise.all(deletePromises); playSound('dismantle'); setTimeout(() => playSound('coin'), 300); gold += totalGold; allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); await updateCurrencyCloud(); updateUIDisplay(); selectedBatchCards.clear(); isBatchMode = false; updateBatchUI(); filterInventory(currentFilterRarity); alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
 // ==========================================
-// 🔥 戰鬥系統核心 (狀態機重寫版)
+// 🔥 戰鬥系統核心 (State Machine 重寫版)
 // ==========================================
 
 document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
@@ -473,8 +483,8 @@ function spawnEnemy(level) {
     const atk = level * 100 + 50;
     const enemy = { 
         id: Date.now(), maxHp: hp, currentHp: hp, atk: atk, 
-        position: 100, speed: 0.15 + (level*0.02), 
-        el: null, lastAttackTime: 0 // 初始化冷卻
+        position: 100, speed: 0.10 + (level*0.02), // 稍微變慢
+        el: null, lastAttackTime: 0 
     };
     const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
@@ -483,11 +493,20 @@ function spawnEnemy(level) {
 function showAttackEffect(targetEl, type) {
     const effect = document.createElement('div'); 
     effect.className = type === 'hero' ? 'slash-effect' : 'poison-effect';
-    effect.innerText = type === 'hero' ? '⚔️' : ''; // 英雄顯示劍，怪物顯示毒霧(純CSS)
+    effect.innerText = type === 'hero' ? '⚔️' : ''; 
     
     const rect = targetEl.getBoundingClientRect(); const fieldRect = document.querySelector('.battle-field').getBoundingClientRect();
     effect.style.left = (rect.left - fieldRect.left + rect.width/2) + 'px'; effect.style.top = (rect.top - fieldRect.top + rect.height/2) + 'px';
     document.querySelector('.battle-field').appendChild(effect); setTimeout(() => effect.remove(), 400);
+}
+
+// 英雄受擊震動
+function triggerHeroHit(slotIdx) {
+    const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"]`);
+    if(slotDiv) {
+        slotDiv.classList.add('hero-hit');
+        setTimeout(() => slotDiv.classList.remove('hero-hit'), 300);
+    }
 }
 
 let baseAttackCooldown = 0;
@@ -497,9 +516,11 @@ function gameLoop() {
 
     const now = Date.now();
 
-    // 狀態機邏輯
+    // ----------------------
+    // 1. 狀態機邏輯 (State Machine)
+    // ----------------------
     if (waveData.state === 'spawning') {
-        // 持續生怪直到數量達標
+        // 持續生怪
         if (waveData.spawnedCount < waveData.totalCount) {
             if (now - waveData.lastSpawnTime > 2000) { 
                 spawnEnemy(waveData.currentWave);
@@ -507,32 +528,36 @@ function gameLoop() {
                 waveData.lastSpawnTime = now;
             }
         } else {
-            // 生怪完畢，切換到戰鬥狀態
+            // 生完了 -> 轉戰鬥
             waveData.state = 'fighting';
         }
     } 
     else if (waveData.state === 'fighting') {
-        // 檢查是否所有怪物都已死亡
+        // 戰鬥中，檢查是否全滅
         if (enemies.length === 0) {
-            waveData.state = 'waiting_next_wave'; // 防止重複進入
-            
+            // 全滅 -> 準備下一波
+            waveData.state = 'waiting_next_wave';
+            waveData.waveWaitTime = now;
+            showDamageText(50, "3秒後 下一波...");
+        }
+    }
+    else if (waveData.state === 'waiting_next_wave') {
+        // 等待 3 秒
+        if (now - waveData.waveWaitTime > 3000) {
             if (waveData.currentWave < MAX_WAVES) {
-                // 3秒後進入下一波
-                showDamageText(50, "3秒後 下一波...");
-                setTimeout(() => {
-                    if(isBattleActive) startNextWave(waveData.currentWave + 1);
-                }, 3000);
+                startNextWave(waveData.currentWave + 1);
             } else {
-                // 全部波次結束 -> 勝利
-                setTimeout(() => { if(isBattleActive) endBattle(true); }, 1000);
-                return; 
+                endBattle(true); // 勝利
+                return;
             }
         }
     }
 
-    // 主堡攻擊
+    // ----------------------
+    // 2. 主堡攻擊
+    // ----------------------
     baseAttackCooldown++;
-    if (baseAttackCooldown > 30 && baseHp > 0) { // 增強主堡攻速 (0.5秒)
+    if (baseAttackCooldown > 30 && baseHp > 0) { 
         const nearest = enemies.find(e => e.position < 25);
         if (nearest) {
             nearest.currentHp -= 100; 
@@ -544,28 +569,33 @@ function gameLoop() {
         }
     }
 
-    // 敵人移動與戰鬥
+    // ----------------------
+    // 3. 戰鬥運算
+    // ----------------------
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
         
-        // 檢查戰鬥 (增加攻速冷卻判定)
         const checkCombat = (slotIdx, minPos, maxPos) => {
             if (battleSlots[slotIdx] && battleSlots[slotIdx].currentHp > 0) {
                 
-                // 怪物攻擊 (距離優勢：maxPos + 15)
+                // 怪物攻擊判定 (射程較遠：maxPos + 15)
                 if (enemy.position <= maxPos + 15 && enemy.position >= minPos) {
-                    if (now - enemy.lastAttackTime > 800) { // 怪物快攻 (0.8s)
+                    // 怪物攻速快 (0.8s)
+                    if (now - enemy.lastAttackTime > 800) { 
                         battleSlots[slotIdx].currentHp -= enemy.atk;
                         enemy.lastAttackTime = now;
-                        showAttackEffect(document.querySelector(`.defense-slot[data-slot="${slotIdx}"]`), 'enemy'); // 噴毒
+                        showAttackEffect(document.querySelector(`.defense-slot[data-slot="${slotIdx}"]`), 'enemy'); 
+                        playSound('poison'); // 毒音效
+                        triggerHeroHit(slotIdx); // 震動
                         renderBattleSlots();
                     }
                 }
 
-                // 英雄攻擊 (近戰：maxPos)
+                // 英雄攻擊判定 (近戰：maxPos)
                 if (enemy.position <= maxPos && enemy.position >= minPos) {
-                    blocked = true; // 阻擋移動
-                    if (now - battleSlots[slotIdx].lastAttackTime > 2000) { // 英雄慢攻 (2.0s)
+                    blocked = true; // 怪物被阻擋
+                    // 英雄攻速慢 (2.0s)
+                    if (now - battleSlots[slotIdx].lastAttackTime > 2000) { 
                         enemy.currentHp -= battleSlots[slotIdx].atk;
                         battleSlots[slotIdx].lastAttackTime = now;
                         showAttackEffect(enemy.el, 'hero'); // 揮劍
@@ -582,6 +612,7 @@ function gameLoop() {
             enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
         }
 
+        // 死亡判定
         if (enemy.currentHp <= 0) {
             enemy.el.remove(); enemies.splice(eIndex, 1);
             battleGold += 50 + (waveData.currentWave * 10);
@@ -592,12 +623,11 @@ function gameLoop() {
         }
     });
 
-    // 4. 英雄死亡移除
+    // 英雄死亡移除
     battleSlots.forEach((hero, idx) => {
         if (hero && hero.currentHp <= 0) { battleSlots[idx] = null; renderBattleSlots(); updateStartButton(); }
     });
 
-    // 5. 勝負判定
     if (baseHp <= 0) { endBattle(false); return; }
 
     gameLoopId = requestAnimationFrame(gameLoop);
