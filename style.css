@@ -180,6 +180,12 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .enemy-hp-bar > div { height: 100%; background: #f1c40f; }
 .battle-deck { background: #2c3e50; border-top: 2px solid #f1c40f; padding: 10px; display: flex; flex-direction: column; }
 
+/* 難度按鈕 */
+.difficulty-btn {
+    border: none; padding: 5px 15px; border-radius: 20px; color: white; font-weight: bold; cursor: pointer; opacity: 0.5; transition: 0.2s;
+}
+.difficulty-btn.active { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px white; }
+
 /* 傷害飄字 */
 .damage-text { position: absolute; color: #ffeb3b; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #c0392b; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; }
 @keyframes floatUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }
@@ -208,16 +214,17 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: scale(1.5); opacity: 0; }
 }
 
-/* 🔥 英雄受擊紅閃震動 🔥 */
+/* 🔥 英雄受擊紅閃震動 (超誇張版) 🔥 */
 .card.taking-damage {
     animation: damageShake 0.4s ease-out;
 }
 @keyframes damageShake {
-    0% { transform: translate(-50%, -50%) scale(0.65); filter: none; }
-    20% { transform: translate(-55%, -50%) scale(0.65); filter: sepia(1) hue-rotate(-50deg) saturate(5); } /* 紅色濾鏡 */
-    40% { transform: translate(-45%, -50%) scale(0.65); }
-    60% { transform: translate(-55%, -50%) scale(0.65); filter: sepia(1) hue-rotate(-50deg) saturate(5); }
-    100% { transform: translate(-50%, -50%) scale(0.65); filter: none; }
+    0% { transform: translate(-50%, -50%) scale(0.65) rotate(0deg); filter: none; }
+    20% { transform: translate(-55%, -50%) scale(0.7) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2); } /* 亮紅 */
+    40% { transform: translate(-45%, -50%) scale(0.65) rotate(10deg); }
+    60% { transform: translate(-55%, -50%) scale(0.7) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2); }
+    80% { transform: translate(-45%, -50%) scale(0.65) rotate(10deg); }
+    100% { transform: translate(-50%, -50%) scale(0.65) rotate(0deg); filter: none; }
 }
 
 /* 波次提示 */
