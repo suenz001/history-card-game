@@ -45,7 +45,6 @@ let waveData = {
 };
 let gameLoopId = null;
 
-// 批量分解變數
 let isBatchMode = false;
 let selectedBatchCards = new Set();
 
@@ -75,7 +74,6 @@ audioBattle.volume = bgmVolume;
 
 document.body.addEventListener('click', () => {
     if (audioCtx.state === 'suspended') { audioCtx.resume(); }
-    // 如果音樂開著且都沒有在播，根據場景播放
     if (isBgmOn && audioBgm.paused && audioBattle.paused) {
         if(!document.getElementById('battle-screen').classList.contains('hidden')){
             audioBattle.play().catch(()=>{});
@@ -508,9 +506,15 @@ function gameLoop() {
                 waveData.spawnedCount++;
                 waveData.lastSpawnTime = now;
             }
-        } else if (enemies.length === 0) {
-            // 怪生完了且殺光了 -> 準備進入下一波
-            waveData.state = 'waiting_next_wave';
+        } else {
+            // 生怪完畢，切換到戰鬥狀態
+            waveData.state = 'fighting';
+        }
+    } 
+    else if (waveData.state === 'fighting') {
+        // 檢查是否所有怪物都已死亡
+        if (enemies.length === 0) {
+            waveData.state = 'waiting_next_wave'; // 防止重複進入
             
             if (waveData.currentWave < MAX_WAVES) {
                 // 3秒後進入下一波
@@ -547,19 +551,21 @@ function gameLoop() {
         // 檢查戰鬥 (增加攻速冷卻判定)
         const checkCombat = (slotIdx, minPos, maxPos) => {
             if (battleSlots[slotIdx] && battleSlots[slotIdx].currentHp > 0) {
-                if (enemy.position <= maxPos && enemy.position >= minPos) {
-                    blocked = true;
-                    
-                    // 怪物攻擊 (慢速)
-                    if (now - enemy.lastAttackTime > 2000) { // 2秒一下
+                
+                // 怪物攻擊 (距離優勢：maxPos + 15)
+                if (enemy.position <= maxPos + 15 && enemy.position >= minPos) {
+                    if (now - enemy.lastAttackTime > 800) { // 怪物快攻 (0.8s)
                         battleSlots[slotIdx].currentHp -= enemy.atk;
                         enemy.lastAttackTime = now;
                         showAttackEffect(document.querySelector(`.defense-slot[data-slot="${slotIdx}"]`), 'enemy'); // 噴毒
                         renderBattleSlots();
                     }
+                }
 
-                    // 英雄攻擊 (快速)
-                    if (now - battleSlots[slotIdx].lastAttackTime > 800) { // 0.8秒一下
+                // 英雄攻擊 (近戰：maxPos)
+                if (enemy.position <= maxPos && enemy.position >= minPos) {
+                    blocked = true; // 阻擋移動
+                    if (now - battleSlots[slotIdx].lastAttackTime > 2000) { // 英雄慢攻 (2.0s)
                         enemy.currentHp -= battleSlots[slotIdx].atk;
                         battleSlots[slotIdx].lastAttackTime = now;
                         showAttackEffect(enemy.el, 'hero'); // 揮劍
@@ -591,7 +597,7 @@ function gameLoop() {
         if (hero && hero.currentHp <= 0) { battleSlots[idx] = null; renderBattleSlots(); updateStartButton(); }
     });
 
-    // 5. 勝負判定 & 波次推進
+    // 5. 勝負判定
     if (baseHp <= 0) { endBattle(false); return; }
 
     gameLoopId = requestAnimationFrame(gameLoop);
