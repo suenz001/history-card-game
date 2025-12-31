@@ -116,7 +116,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .nav-arrow.right { right: 20px; }
 .btn-close-circle { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.5); color: white; border: 2px solid white; width: 40px; height: 40px; border-radius: 50%; font-size: 1.2em; cursor: pointer; z-index: 102; }
 
-/* 批量分解與戰鬥系統 */
+/* 批量分解 */
 .card.is-selected { border: 3px solid #e74c3c !important; transform: translateY(-5px); box-shadow: 0 0 15px rgba(231, 76, 60, 0.6); }
 .card.is-selected::after { content: '✔'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3em; color: #e74c3c; border: 3px solid #e74c3c; border-radius: 50%; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; background: rgba(0, 0, 0, 0.7); z-index: 50; pointer-events: none; }
 #batch-toggle-btn { background-color: #34495e; border: 2px solid #95a5a6; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-left: 10px; transition: 0.3s; }
@@ -163,31 +163,35 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .lane-container { flex: 1; display: flex; justify-content: space-around; align-items: center; height: 100%; position: relative; }
 .defense-slot { width: 90px; height: 130px; border: 2px dashed #7f8c8d; border-radius: 8px; background: rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; transition: 0.2s; cursor: pointer; }
 .defense-slot.active { border-style: solid; border-color: #f1c40f; background: rgba(241, 196, 15, 0.1); }
+/* 確保槽位內的卡片樣式正確 */
 .defense-slot .card { transform: scale(0.65); pointer-events: none; margin: 0; border-width: 3px; box-shadow: none; position: absolute; top: 50%; left: 50%; translate: -50% -50%; } 
-.slot-placeholder { color: #aaa; font-size: 0.8em; }
+.slot-placeholder { color: #aaa; font-size: 0.8em; text-align: center; }
 .hero-hp-bar { position: absolute; bottom: -10px; left: 0; width: 100%; height: 6px; background: #c0392b; border-radius: 3px; overflow: hidden; z-index: 20; }
 .hero-hp-bar > div { height: 100%; background: #2ecc71; }
 .enemy-unit { position: absolute; width: 50px; height: 50px; background: #e74c3c; border-radius: 50%; border: 2px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.5em; z-index: 5; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
 .enemy-hp-bar { position: absolute; top: -10px; width: 40px; height: 5px; background: #555; border-radius: 2px; }
 .enemy-hp-bar > div { height: 100%; background: #f1c40f; }
-.battle-deck { height: 220px; background: #2c3e50; border-top: 2px solid #f1c40f; padding: 10px; display: flex; flex-direction: column; }
-.battle-deck h3 { margin: 0 0 10px 0; font-size: 1em; color: #ccc; }
-.card.selected-for-battle { border: 3px solid #2ecc71 !important; transform: translateY(-10px); box-shadow: 0 0 15px #2ecc71; }
+.battle-deck { background: #2c3e50; border-top: 2px solid #f1c40f; padding: 10px; display: flex; flex-direction: column; }
 
-/* 攻擊與受傷特效 */
-@keyframes heroAttack {
-    0% { transform: scale(0.65) translateX(0); }
-    50% { transform: scale(0.65) translateX(20px); } /* 往前衝 */
-    100% { transform: scale(0.65) translateX(0); }
-}
-.hero-attacking .card { animation: heroAttack 0.2s ease-in-out; }
+/* 傷害飄字 */
+.damage-text { position: absolute; color: #ffeb3b; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #c0392b; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; }
+@keyframes floatUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }
 
-.damage-text {
-    position: absolute; color: #ffeb3b; font-weight: bold; font-size: 1.2em;
-    text-shadow: 0 0 3px #c0392b; pointer-events: none; z-index: 100;
-    animation: floatUp 0.8s forwards;
+/* 🔥 揮劍動畫 (Slash Effect) 🔥 */
+.slash-effect {
+    position: absolute;
+    font-size: 4em; /* 劍的大小 */
+    color: #fff;
+    text-shadow: 0 0 10px cyan;
+    pointer-events: none;
+    z-index: 100;
+    top: 30%; /* 調整位置 */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: slashAnim 0.3s forwards;
 }
-@keyframes floatUp {
-    from { transform: translateY(0); opacity: 1; }
-    to { transform: translateY(-30px); opacity: 0; }
+@keyframes slashAnim {
+    0% { transform: translate(-50%, -50%) scale(0.5) rotate(-45deg); opacity: 0; }
+    20% { opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.5) rotate(90deg); opacity: 0; }
 }

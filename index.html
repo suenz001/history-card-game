@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=21">
+    <link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
 
@@ -95,15 +95,21 @@
 
             <div class="lane-container">
                 <div class="defense-slot" data-slot="0">
-                    <div class="slot-placeholder">+ 部署</div>
+                    <div class="slot-placeholder">
+                        <span style="font-size:2em;">➕</span><br>點擊部署
+                    </div>
                     <div class="hero-hp-bar hidden"><div style="width: 100%;"></div></div>
                 </div>
                 <div class="defense-slot" data-slot="1">
-                    <div class="slot-placeholder">+ 部署</div>
+                    <div class="slot-placeholder">
+                        <span style="font-size:2em;">➕</span><br>點擊部署
+                    </div>
                     <div class="hero-hp-bar hidden"><div style="width: 100%;"></div></div>
                 </div>
                 <div class="defense-slot" data-slot="2">
-                    <div class="slot-placeholder">+ 部署</div>
+                    <div class="slot-placeholder">
+                        <span style="font-size:2em;">➕</span><br>點擊部署
+                    </div>
                     <div class="hero-hp-bar hidden"><div style="width: 100%;"></div></div>
                 </div>
             </div>
@@ -115,11 +121,8 @@
             <div id="enemy-container"></div>
         </div>
 
-        <div class="battle-deck">
-            <h3>👇 請選擇 3 名英雄出戰 👇</h3>
-            <div id="battle-deck-grid" class="card-container" style="gap: 10px; flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; padding: 10px;">
-            </div>
-            <button id="start-battle-btn" class="btn-primary btn-disabled" style="width: 100%; margin-top: 10px; padding: 15px; font-size: 1.2em;">請先部署英雄</button>
+        <div class="battle-deck" style="height: 80px; justify-content: center; align-items: center;">
+            <button id="start-battle-btn" class="btn-primary btn-disabled" style="width: 90%; padding: 15px; font-size: 1.2em;">請先部署英雄</button>
         </div>
     </div>
 
@@ -127,7 +130,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                    <h2>🎒 我的背包</h2>
+                    <h2 id="inventory-title">🎒 我的背包</h2>
                     <select id="sort-select" class="sort-dropdown">
                         <option value="time_desc">📅 依獲得時間 (新→舊)</option>
                         <option value="time_asc">📅 依獲得時間 (舊→新)</option>

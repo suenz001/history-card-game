@@ -29,15 +29,14 @@ let currentSortMethod = 'time_desc';
 
 // 戰鬥系統變數
 let battleSlots = [null, null, null];
-let selectedBattleCard = null;
 let isBattleActive = false;
 let battleGold = 0;
 let baseHp = 100;
 let currentWave = 1;
 const MAX_WAVES = 3;
 let enemies = [];
-let gameLoopId = null;
 let enemySpawnInterval = null;
+let deployTargetSlot = null; // 記錄目前要部署到哪個格子 (0, 1, 2)
 
 // 批量分解變數
 let isBatchMode = false;
@@ -47,10 +46,6 @@ let gachaQueue = [];
 let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
-
-// ==========================================
-// 🔊 音效系統 (Web Audio API 合成版)
-// ==========================================
 
 const audioBgm = document.getElementById('bgm');
 const sfxDraw = document.getElementById('sfx-draw');
@@ -148,10 +143,6 @@ function synthesizeInventory() {
     gainNode.connect(audioCtx.destination);
     noise.start();
 }
-
-// ==========================================
-// ⚙️ 設定介面邏輯
-// ==========================================
 
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
@@ -355,22 +346,15 @@ async function loadInventory(uid) {
     querySnapshot.forEach((docSnap) => { 
         let data = docSnap.data();
         let needsUpdate = false;
-        
         if(!data.level) { data.level = 1; needsUpdate = true; }
         if(!data.stars) { data.stars = 1; needsUpdate = true; }
         if(!data.baseAtk) {
             const baseCard = cardDatabase.find(c => c.id === data.id);
-            if(baseCard) {
-                data.baseAtk = baseCard.atk;
-                data.baseHp = baseCard.hp;
-                needsUpdate = true;
-            }
+            if(baseCard) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; }
         }
         if(needsUpdate) updateDoc(doc(db, "inventory", docSnap.id), data);
-
         allUserCards.push({ ...data, docId: docSnap.id }); 
     });
-    
     filterInventory('ALL');
 }
 
@@ -401,18 +385,11 @@ function filterInventory(rarity) {
 
 function sortCards(list, method) {
     list.sort((a, b) => {
-        if (method === 'time_desc') {
-            return b.obtainedAt.seconds - a.obtainedAt.seconds;
-        } else if (method === 'time_asc') {
-            return a.obtainedAt.seconds - b.obtainedAt.seconds;
-        } else if (method === 'id_asc') {
-            return a.id - b.id;
-        } else if (method === 'id_desc') {
-            return b.id - a.id;
-        } else if (method === 'rarity_desc') {
-            const rMap = { 'SSR': 3, 'SR': 2, 'R': 1 };
-            return rMap[b.rarity] - rMap[a.rarity];
-        }
+        if (method === 'time_desc') { return b.obtainedAt.seconds - a.obtainedAt.seconds; } 
+        else if (method === 'time_asc') { return a.obtainedAt.seconds - b.obtainedAt.seconds; } 
+        else if (method === 'id_asc') { return a.id - b.id; } 
+        else if (method === 'id_desc') { return b.id - a.id; } 
+        else if (method === 'rarity_desc') { const rMap = { 'SSR': 3, 'SR': 2, 'R': 1 }; return rMap[b.rarity] - rMap[a.rarity]; }
         return 0;
     });
 }
@@ -471,9 +448,7 @@ async function upgradeCardLevel(cost) {
     card.level++;
     calculateCardStats(card);
     playSound('upgrade'); 
-    await updateDoc(doc(db, "inventory", card.docId), {
-        level: card.level, atk: card.atk, hp: card.hp
-    });
+    await updateDoc(doc(db, "inventory", card.docId), { level: card.level, atk: card.atk, hp: card.hp });
     updateUIDisplay();
     if(!document.getElementById('inventory-modal').classList.contains('hidden')){
         filterInventory(currentFilterRarity);
@@ -494,9 +469,7 @@ async function upgradeCardStar() {
     card.stars++;
     calculateCardStats(card);
     playSound('upgrade'); 
-    await updateDoc(doc(db, "inventory", card.docId), {
-        stars: card.stars, atk: card.atk, hp: card.hp
-    });
+    await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
     if(!document.getElementById('inventory-modal').classList.contains('hidden')){
         filterInventory(currentFilterRarity);
         const newIndex = currentDisplayList.findIndex(c => c.docId === currentDocId);
@@ -517,9 +490,7 @@ async function dismantleCurrentCard() {
     const card = currentDisplayList[currentCardIndex];
     if (!card) return;
     const value = DISMANTLE_VALUES[card.rarity];
-    if (card.rarity !== 'R') {
-        if (!confirm(`確定要分解【${card.name}】嗎？\n獲得 ${value} 金幣。`)) return;
-    }
+    if (card.rarity !== 'R') { if (!confirm(`確定要分解【${card.name}】嗎？\n獲得 ${value} 金幣。`)) return; }
     try {
         if (card.docId) await deleteDoc(doc(db, "inventory", card.docId));
         playSound('dismantle');
@@ -527,9 +498,7 @@ async function dismantleCurrentCard() {
         gold += value;
         allUserCards = allUserCards.filter(c => c !== card);
         document.getElementById('detail-modal').classList.add('hidden');
-        if (!document.getElementById('inventory-modal').classList.contains('hidden')) {
-            filterInventory(currentFilterRarity); 
-        }
+        if (!document.getElementById('inventory-modal').classList.contains('hidden')) { filterInventory(currentFilterRarity); }
         await updateCurrencyCloud();
         updateUIDisplay();
         alert(`已分解！獲得 ${value} 金幣`);
@@ -538,13 +507,8 @@ async function dismantleCurrentCard() {
 
 function changeCard(direction) {
     playSound('click');
-    if (direction === 'prev') {
-        currentCardIndex--;
-        if (currentCardIndex < 0) currentCardIndex = currentDisplayList.length - 1;
-    } else {
-        currentCardIndex++;
-        if (currentCardIndex >= currentDisplayList.length) currentCardIndex = 0;
-    }
+    if (direction === 'prev') { currentCardIndex--; if (currentCardIndex < 0) currentCardIndex = currentDisplayList.length - 1; } 
+    else { currentCardIndex++; if (currentCardIndex >= currentDisplayList.length) currentCardIndex = 0; }
     renderDetailCard();
 }
 
@@ -610,9 +574,7 @@ function renderCard(card, targetContainer) {
     const idString = String(card.id).padStart(3, '0');
 
     cardDiv.className = `card ${card.rarity}`; 
-    if (isBatchMode && selectedBatchCards.has(card.docId)) {
-        cardDiv.classList.add('is-selected');
-    }
+    if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
 
     cardDiv.innerHTML = `
         <div class="card-id-badge">#${idString}</div>
@@ -627,18 +589,23 @@ function renderCard(card, targetContainer) {
         <img src="${framePath}" class="card-frame-img" onerror="this.remove()"> 
     `;
 
+    // 點擊卡片邏輯 (分流：一般、批量分解、部署)
     cardDiv.addEventListener('click', () => {
+        playSound('click');
+        // 1. 批量分解模式
         if (isBatchMode) {
-            playSound('click');
             toggleBatchSelection(card, cardDiv);
-        } else {
-            let index = currentDisplayList.indexOf(card);
-            if (index === -1) {
-                currentDisplayList = [card];
-                index = 0;
-            }
-            openDetailModal(index);
+            return;
         }
+        // 2. 部署模式 (如果 deployTargetSlot 有值)
+        if (deployTargetSlot !== null) {
+            deployHeroToSlot(card);
+            return;
+        }
+        // 3. 一般檢視模式
+        let index = currentDisplayList.indexOf(card);
+        if (index === -1) { currentDisplayList = [card]; index = 0; }
+        openDetailModal(index);
     });
 
     targetContainer.appendChild(cardDiv);
@@ -651,24 +618,13 @@ function playGachaAnimation(highestRarity) {
         const circle = document.getElementById('summon-circle');
         const text = document.getElementById('summon-text');
         const burst = document.getElementById('summon-burst');
-
-        overlay.className = ''; 
-        overlay.classList.remove('hidden'); 
-        circle.className = ''; 
-        burst.className = ''; 
-        text.innerText = "召喚中...";
+        overlay.className = ''; overlay.classList.remove('hidden'); circle.className = ''; burst.className = ''; text.innerText = "召喚中...";
         playSound('draw'); 
-
         if (highestRarity === 'SSR') { circle.classList.add('glow-ssr'); text.style.color = '#f1c40f'; } 
         else if (highestRarity === 'SR') { circle.classList.add('glow-sr'); text.style.color = '#9b59b6'; } 
         else { circle.classList.add('glow-r'); text.style.color = '#3498db'; }
-        
         let duration = highestRarity === 'SSR' ? 3000 : 2000;
-        
-        if (highestRarity === 'SSR') {
-            setTimeout(() => { burst.classList.add('burst-active'); }, 2000); 
-        }
-
+        if (highestRarity === 'SSR') { setTimeout(() => { burst.classList.add('burst-active'); }, 2000); }
         setTimeout(() => {
             if (highestRarity === 'SSR') {
                 overlay.classList.add('flash-screen');
@@ -710,9 +666,7 @@ async function closeRevealModal() {
         currentDisplayList.push(savedCard); 
         totalPower += (card.atk + card.hp);
     }
-    currentDisplayList.forEach((card) => {
-        renderCard(card, mainContainer);
-    });
+    currentDisplayList.forEach((card) => { renderCard(card, mainContainer); });
     updateUIDisplay();
     await updateCurrencyCloud();
     setTimeout(loadLeaderboard, 1000); 
@@ -762,16 +716,20 @@ document.getElementById('draw-10-btn').addEventListener('click', async () => {
      showRevealModal(drawnCards);
 });
 
-const inventoryModal = document.getElementById('inventory-modal');
+// 普通開啟背包
 document.getElementById('inventory-btn').addEventListener('click', () => {
     playSound('inventory'); 
     if(!currentUser) return alert("請先登入");
-    inventoryModal.classList.remove('hidden'); 
+    deployTargetSlot = null; // 確保不是部署模式
+    document.getElementById('inventory-title').innerText = "🎒 我的背包";
+    document.getElementById('inventory-modal').classList.remove('hidden'); 
     loadInventory(currentUser.uid); 
 });
+
 document.getElementById('close-inventory-btn').addEventListener('click', () => {
     playSound('click');
-    inventoryModal.classList.add('hidden'); 
+    document.getElementById('inventory-modal').classList.add('hidden'); 
+    deployTargetSlot = null; // 重置
 });
 
 async function loadLeaderboard() {
@@ -893,7 +851,6 @@ document.getElementById('retreat-btn').addEventListener('click', () => {
     battleSlots = [null, null, null]; 
     renderBattleSlots();
     selectedBattleCard = null;
-    renderBattleDeck();
 });
 
 // 🔥 新增：戰鬥開始邏輯 (Phase 3 補完) 🔥
@@ -908,6 +865,12 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     battleGold = 0;
     enemies = [];
     
+    // 初始化英雄 HP
+    battleSlots.forEach(hero => {
+        if(hero) { hero.currentHp = hero.hp; hero.maxHp = hero.hp; }
+    });
+    renderBattleSlots();
+    
     // 更新 UI
     updateBattleUI();
     document.getElementById('start-battle-btn').classList.add('btn-disabled');
@@ -920,78 +883,54 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
 
 function openBattleMode() {
     document.getElementById('battle-screen').classList.remove('hidden');
-    renderBattleDeck();
     renderBattleSlots();
     updateStartButton();
     // 重置畫面
     document.getElementById('enemy-container').innerHTML = '';
     document.getElementById('start-battle-btn').classList.remove('btn-disabled');
+    document.getElementById('start-battle-btn').innerText = "請先部署英雄";
 }
 
-function renderBattleDeck() {
-    const deckContainer = document.getElementById('battle-deck-grid');
-    deckContainer.innerHTML = "";
-    // 取前 15 強的卡片
-    const battleCandidates = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 15);
-
-    battleCandidates.forEach(card => {
-        const isDeployed = battleSlots.some(slot => slot && slot.docId === card.docId);
-        
-        const cardDiv = document.createElement('div');
-        const charPath = `assets/cards/${card.id}.webp`;
-        const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
-
-        cardDiv.className = `card ${card.rarity}`;
-        if (isDeployed) {
-            cardDiv.style.opacity = '0.3';
-            cardDiv.style.pointerEvents = 'none';
-        }
-        if (selectedBattleCard && selectedBattleCard.docId === card.docId) {
-            cardDiv.classList.add('selected-for-battle');
-        }
-
-        cardDiv.innerHTML = `
-            <div class="card-id-badge">#${String(card.id).padStart(3,'0')}</div>
-            <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
-            <img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
-            <div class="card-info-overlay">
-                <div class="card-name">${card.name}</div>
-                <div class="card-stats">⚔️${card.atk} ❤️${card.hp}</div>
-            </div>
-            <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
-        `;
-
-        cardDiv.onclick = () => {
-            playSound('click');
-            selectedBattleCard = card;
-            renderBattleDeck();
-        };
-        deckContainer.appendChild(cardDiv);
-    });
-}
-
+// 點擊防禦塔槽位 -> 開啟背包選擇英雄
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
         if(isBattleActive) return; // 戰鬥中不能換人
         playSound('click');
         const slotIndex = parseInt(slot.dataset.slot);
         
-        if (selectedBattleCard && !battleSlots[slotIndex]) {
-            // 初始化英雄戰鬥狀態
-            battleSlots[slotIndex] = { ...selectedBattleCard, currentHp: selectedBattleCard.hp, maxHp: selectedBattleCard.hp };
-            selectedBattleCard = null; 
-            renderBattleDeck();
-            renderBattleSlots();
-            updateStartButton();
-        }
-        else if (battleSlots[slotIndex]) {
+        // 如果該格子已經有人，則移除
+        if (battleSlots[slotIndex]) {
             battleSlots[slotIndex] = null;
-            renderBattleDeck();
             renderBattleSlots();
             updateStartButton();
+        } else {
+            // 如果沒人，打開背包準備部署
+            deployTargetSlot = slotIndex;
+            document.getElementById('inventory-title').innerText = "👇 請選擇出戰英雄";
+            document.getElementById('inventory-modal').classList.remove('hidden');
+            loadInventory(currentUser.uid);
         }
     });
 });
+
+// 執行部署 (從背包點擊卡片後觸發)
+function deployHeroToSlot(card) {
+    // 檢查卡片是否已經在其他槽位
+    const isAlreadyDeployed = battleSlots.some(s => s && s.docId === card.docId);
+    if(isAlreadyDeployed) {
+        alert("這位英雄已經在場上了！");
+        return;
+    }
+
+    if (deployTargetSlot !== null) {
+        // 深拷貝並初始化戰鬥屬性
+        battleSlots[deployTargetSlot] = { ...card, currentHp: card.hp, maxHp: card.hp };
+        deployTargetSlot = null; // 重置目標
+        document.getElementById('inventory-modal').classList.add('hidden');
+        renderBattleSlots();
+        updateStartButton();
+    }
+}
 
 function renderBattleSlots() {
     document.querySelectorAll('.defense-slot').forEach(slotDiv => {
@@ -1035,10 +974,10 @@ function updateStartButton() {
     const deployedCount = battleSlots.filter(s => s !== null).length;
     if (deployedCount > 0) {
         btn.classList.remove('btn-disabled');
-        btn.innerHTML = `⚔️ 開始戰鬥 (${deployedCount}/3)`;
+        btn.innerText = `⚔️ 開始戰鬥 (${deployedCount}/3)`;
     } else {
         btn.classList.add('btn-disabled');
-        btn.innerHTML = `請先部署英雄`;
+        btn.innerText = `請先部署英雄`;
     }
 }
 
@@ -1087,6 +1026,23 @@ function spawnEnemy(level) {
     enemies.push(enemy);
 }
 
+// 揮劍特效 (新增)
+function showAttackEffect(targetEl) {
+    const effect = document.createElement('div');
+    effect.className = 'slash-effect';
+    effect.innerText = '⚔️';
+    // 取得目標的位置
+    const rect = targetEl.getBoundingClientRect();
+    const fieldRect = document.querySelector('.battle-field').getBoundingClientRect();
+    
+    // 計算相對位置 (因為 battle-field 是 relative)
+    effect.style.left = (rect.left - fieldRect.left + rect.width/2) + 'px';
+    effect.style.top = (rect.top - fieldRect.top + rect.height/2) + 'px';
+    
+    document.querySelector('.battle-field').appendChild(effect);
+    setTimeout(() => effect.remove(), 300);
+}
+
 function gameLoop() {
     if (!isBattleActive) return;
 
@@ -1100,16 +1056,13 @@ function gameLoop() {
                 if (enemy.position <= maxPos && enemy.position >= minPos) {
                     blocked = true;
                     // 互相傷害
-                    battleSlots[slotIdx].currentHp -= enemy.atk * 0.05; // 減緩傷害頻率
+                    battleSlots[slotIdx].currentHp -= enemy.atk * 0.05; 
                     enemy.currentHp -= battleSlots[slotIdx].atk * 0.05;
                     
-                    // 英雄受傷特效 (更新血條)
-                    renderBattleSlots(); 
+                    renderBattleSlots(); // 更新英雄血量
                     
-                    // 英雄攻擊動畫
-                    const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"]`);
-                    if(Math.random() < 0.1) slotDiv.classList.add('hero-attacking');
-                    else slotDiv.classList.remove('hero-attacking');
+                    // 英雄攻擊特效 (隨機觸發視覺)
+                    if(Math.random() < 0.1) showAttackEffect(enemy.el);
                 }
             }
         };
@@ -1125,7 +1078,7 @@ function gameLoop() {
         // 更新敵人位置與血量
         if (enemy.el) {
             enemy.el.style.left = `${enemy.position}%`;
-            enemy.el.querySelector('.enemy-hp-bar div').style.width = `${(enemy.currentHp/enemy.maxHp)*100}%`;
+            enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
         }
 
         // 2. 死亡判定
@@ -1135,13 +1088,14 @@ function gameLoop() {
             battleGold += 50 + (currentWave * 10);
             updateBattleUI();
             showDamageText(enemy.position, `+${50 + (currentWave * 10)}G`);
+            playSound('dismantle'); // 敵人死亡音效
         }
         else if (enemy.position <= 0) {
             baseHp -= 10;
             enemy.el.remove();
             enemies.splice(eIndex, 1);
             updateBattleUI();
-            playSound('dismantle');
+            playSound('dismantle'); // 主堡受傷音效
         }
     });
 
@@ -1150,6 +1104,7 @@ function gameLoop() {
         if (hero && hero.currentHp <= 0) {
             battleSlots[idx] = null;
             renderBattleSlots();
+            updateStartButton(); // 更新按鈕狀態
         }
     });
 
@@ -1159,11 +1114,6 @@ function gameLoop() {
         return;
     }
     
-    // 簡單排程推進波次 (原型用)
-    if (enemies.length === 0 && !enemySpawnInterval && document.getElementById('start-battle-btn').innerText.includes("進行中")) {
-         // 這裡只是簡單防呆，真正的波次控制由下方的 setTimeout 負責
-    }
-
     requestAnimationFrame(gameLoop);
 }
 
@@ -1202,12 +1152,12 @@ async function endBattle(isWin) {
     document.getElementById('battle-screen').classList.add('hidden');
     document.getElementById('enemy-container').innerHTML = '';
     battleSlots = [null, null, null];
+    // 清除按鈕上的文字
+    document.getElementById('start-battle-btn').innerText = "請先部署英雄";
 }
 
 // 簡單的波次排程
 document.getElementById('start-battle-btn').addEventListener('click', () => {
-    // startWave(1) 已經在上面的 listener 觸發了 (其實應該合併，這裡做個延遲觸發後續波次)
-    
     // 10秒後第2波
     setTimeout(() => { 
         if(isBattleActive) {
