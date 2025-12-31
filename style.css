@@ -134,6 +134,20 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 #batch-confirm-btn { background: #e74c3c; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 1em; }
 #batch-confirm-btn:hover { background: #c0392b; }
 
+/* 🔥 戰鬥中：已部署卡片樣式 🔥 */
+.card.is-deployed {
+    filter: grayscale(1) brightness(0.6);
+    pointer-events: none;
+    border-color: #7f8c8d !important;
+}
+.card.is-deployed::after {
+    content: '已部署';
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 1.2em; font-weight: bold; color: white;
+    background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px;
+    white-space: nowrap; z-index: 30;
+}
+
 /* CSS 純色邊框 */
 .card { border: 2px solid #555; }
 .card.R { border-color: #3498db; box-shadow: 0 0 5px rgba(52, 152, 219, 0.3); }
@@ -176,38 +190,42 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     display: flex;
 }
 
-/* 主堡 (跨三路) */
+/* 主堡 (優化視覺) */
 .base-zone {
-    width: 80px; height: 100%;
+    width: 100px; height: 100%; /* 加寬 */
     background: #2c3e50;
-    border-right: 4px solid #95a5a6;
+    border-right: 8px solid #7f8c8d; /* 加粗牆壁 */
     display: flex; flex-direction: column; justify-content: center; align-items: center;
     z-index: 10;
 }
-.base-castle { font-size: 3em; }
-.base-health-bar { width: 60px; height: 8px; background: #c0392b; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+.base-castle { 
+    font-size: 5em; /* 放大城堡圖示 */
+    display: flex; align-items: center; justify-content: center; height: 100%;
+    filter: drop-shadow(0 0 10px #000);
+}
+.base-health-bar { width: 80px; height: 10px; background: #c0392b; border-radius: 4px; position: absolute; bottom: 20px; overflow: hidden; }
 #base-hp-bar { height: 100%; background: #2ecc71; transition: width 0.2s; }
 
 /* 三條路線 */
 .lanes-wrapper {
     flex: 1;
     display: flex;
-    flex-direction: column; /* 垂直排列 */
+    flex-direction: column; 
     height: 100%;
 }
 .lane-row {
-    flex: 1; /* 三路均分高度 */
+    flex: 1; 
     display: flex;
-    justify-content: space-around; /* 槽位水平排列 */
+    justify-content: space-around; 
     align-items: center;
     border-bottom: 1px dashed rgba(255,255,255,0.1);
     position: relative;
 }
 .lane-row:last-child { border-bottom: none; }
 
-/* 防禦槽位 (縮小一點以適應三路) */
+/* 防禦槽位 */
 .defense-slot {
-    width: 70px; height: 90px; /* 變小 */
+    width: 70px; height: 90px;
     border: 2px dashed #7f8c8d; border-radius: 6px;
     background: rgba(255,255,255,0.05);
     display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -232,13 +250,13 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 敵人實體 */
 .enemy-unit {
     position: absolute;
-    width: 40px; height: 40px; /* 縮小 */
+    width: 40px; height: 40px; 
     background: #e74c3c; border-radius: 50%; border: 2px solid #fff;
     display: flex; justify-content: center; align-items: center;
     font-size: 1.2em; z-index: 5;
     transition: left 0.1s linear;
     box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    transform: translateY(-50%); /* 垂直居中 */
+    transform: translateY(-50%); 
 }
 .enemy-hp-bar { position: absolute; top: -8px; width: 30px; height: 4px; background: #555; border-radius: 2px; }
 .enemy-hp-bar > div { height: 100%; background: #f1c40f; }
@@ -274,7 +292,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 @keyframes poisonSplash { 0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
 
 /* 🔥 英雄受擊紅閃震動 (修正版) 🔥 */
-/* 這裡一定要用 scale(0.45) 配合 defense-slot 的縮放，不然會跳動 */
 .card.taking-damage {
     animation: damageShake 0.4s ease-out;
 }
@@ -296,7 +313,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* 主堡雷射 */
 .base-laser {
-    position: absolute; top: 50%; left: 40px; width: 0; height: 4px; background: #00ffff; box-shadow: 0 0 10px #00ffff; z-index: 9;
+    position: absolute; top: 50%; left: 80px; width: 0; height: 4px; background: #00ffff; box-shadow: 0 0 10px #00ffff; z-index: 9;
     transform-origin: left center; animation: laserShoot 0.2s forwards;
 }
 @keyframes laserShoot { 0% { opacity: 1; } 100% { opacity: 0; } }

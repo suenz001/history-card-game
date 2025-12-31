@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=28">
+    <link rel="stylesheet" href="style.css?v=29">
 </head>
 <body>
 
@@ -128,7 +128,11 @@
                 <button class="difficulty-btn active" data-diff="normal" style="background:#f39c12;">🟡 普通</button>
                 <button class="difficulty-btn" data-diff="hard" style="background:#e74c3c;">🔴 困難</button>
             </div>
-            <button id="start-battle-btn" class="btn-primary btn-disabled" style="width: 90%; padding: 10px; font-size: 1.2em; margin: 0 auto;">請先部署英雄</button>
+            
+            <div style="display: flex; gap: 10px; width: 90%; margin: 0 auto;">
+                <button id="auto-deploy-btn" class="btn-secondary" style="flex: 1; padding: 10px; font-size: 1.1em; background: #8e44ad;">⚡ 自動部署</button>
+                <button id="start-battle-btn" class="btn-primary btn-disabled" style="flex: 2; padding: 10px; font-size: 1.2em;">請先部署英雄</button>
+            </div>
         </div>
     </div>
 

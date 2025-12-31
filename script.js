@@ -38,7 +38,7 @@ let currentDifficulty = 'normal';
 
 // 波次管理
 const WAVE_CONFIG = {
-    1: { count: 6, hp: 800, atk: 50 }, // 數量增加因為有三路
+    1: { count: 6, hp: 800, atk: 50 },
     2: { count: 12, hp: 1500, atk: 100 },
     3: { count: 18, hp: 3000, atk: 200 } 
 };
@@ -342,9 +342,23 @@ function drawSRorAbove() { const rand = Math.random(); let rarity = rand < 0.17 
 
 function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
-    cardDiv.className = `card ${card.rarity}`; if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
+    cardDiv.className = `card ${card.rarity}`; 
+    // 🔥 檢查是否已部署 (背包狀態) 🔥
+    if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) {
+        cardDiv.classList.add('is-deployed');
+    }
+    if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
+    
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats">⚔️${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
-    cardDiv.addEventListener('click', () => { playSound('click'); if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); });
+    
+    cardDiv.addEventListener('click', () => { 
+        playSound('click'); 
+        if (cardDiv.classList.contains('is-deployed')) return; // 已部署不能點
+        
+        if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } 
+        if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } 
+        let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); 
+    });
     targetContainer.appendChild(cardDiv); return cardDiv;
 }
 
@@ -453,6 +467,24 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     gameLoop();
 });
 
+// 🔥 自動部署 🔥
+document.getElementById('auto-deploy-btn').addEventListener('click', () => {
+    if(isBattleActive) return;
+    playSound('click');
+    
+    // 取出戰力最高的 9 張卡
+    const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
+    
+    // 清空並填入槽位
+    battleSlots = new Array(9).fill(null);
+    topHeroes.forEach((hero, index) => {
+        battleSlots[index] = { ...hero, currentHp: hero.hp, maxHp: hero.hp, lastAttackTime: 0 };
+    });
+    
+    renderBattleSlots();
+    updateStartButton();
+});
+
 // 🔥 新增：難度選擇邏輯 🔥
 document.querySelectorAll('.difficulty-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -545,7 +577,7 @@ function gameLoop() {
     if (!isBattleActive) return;
     const now = Date.now();
 
-    // 1. 狀態機邏輯 (State Machine)
+    // 1. 狀態機邏輯
     if (battleState.phase === 'SPAWNING') {
         if (battleState.spawned < battleState.totalToSpawn) {
             if (now - battleState.lastSpawnTime > 1500) { 
@@ -574,19 +606,17 @@ function gameLoop() {
         }
     }
 
-    // 2. 主堡攻擊 (傷害提升到 2000)
+    // 2. 主堡攻擊 (傷害 2000)
     baseAttackCooldown++;
     if (baseAttackCooldown > 30 && baseHp > 0) { 
         const nearest = enemies.find(e => e.position < 25);
         if (nearest) {
-            nearest.currentHp -= 2000; // 🔥 主堡傷害 Buff
+            nearest.currentHp -= 2000; 
             baseAttackCooldown = 0;
             const laser = document.createElement('div'); laser.className = 'base-laser'; laser.style.width = `${nearest.position}%`;
-            // 雷射也要根據路線調整位置
             if(nearest.lane === 0) laser.style.top = '15%';
             else if(nearest.lane === 1) laser.style.top = '50%';
             else if(nearest.lane === 2) laser.style.top = '85%';
-            
             document.querySelector('.battle-field-container').appendChild(laser); setTimeout(() => laser.remove(), 150);
         }
     }
@@ -595,28 +625,16 @@ function gameLoop() {
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
         
-        // 只檢查同一條路的防禦塔
-        // Lane 0: slots 0, 1, 2
-        // Lane 1: slots 3, 4, 5
-        // Lane 2: slots 6, 7, 8
         const startSlot = enemy.lane * 3;
         const endSlot = startSlot + 2;
 
         for(let i = startSlot; i <= endSlot; i++) {
              if (battleSlots[i] && battleSlots[i].currentHp > 0) {
-                // 簡單的位置判定: 
-                // Slot 0/3/6 (前) ~ pos 20
-                // Slot 1/4/7 (中) ~ pos 50
-                // Slot 2/5/8 (後) ~ pos 80
-                // 我們簡化：每個 slot 佔據 30% 空間
-                // 實際上是反過來的，介面顯示左邊是主堡，右邊是敵人
-                // 所以 Slot 0,3,6 是最靠近主堡 (pos 20)
-                // Slot 2,5,8 是最靠近敵人 (pos 80)
                 
                 let slotPos = 0;
-                if(i % 3 === 0) slotPos = 25; // 後排 (靠近主堡)
-                if(i % 3 === 1) slotPos = 50; // 中排
-                if(i % 3 === 2) slotPos = 75; // 前排 (靠近敵人)
+                if(i % 3 === 0) slotPos = 25; 
+                if(i % 3 === 1) slotPos = 50; 
+                if(i % 3 === 2) slotPos = 75; 
 
                 // 怪物攻擊 (距離優勢)
                 if (enemy.position <= slotPos + 15 && enemy.position >= slotPos - 5) {
@@ -747,6 +765,6 @@ function renderBattleSlots() {
 
 function updateStartButton() {
     const btn = document.getElementById('start-battle-btn'); const deployedCount = battleSlots.filter(s => s !== null).length;
-    if (deployedCount > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `⚔️ 開始戰鬥 (${deployedCount}/3)`; } 
+    if (deployedCount > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `⚔️ 開始戰鬥 (${deployedCount}/9)`; } 
     else { btn.classList.add('btn-disabled'); btn.innerText = `請先部署英雄`; }
 }
