@@ -27,24 +27,32 @@ let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
-// 戰鬥系統變數
-let battleSlots = [null, null, null];
+// ==========================================
+// ⚔️ 戰鬥系統變數 (Battle System Variables)
+// ==========================================
+let battleSlots = [null, null, null]; // 槽位
 let isBattleActive = false;
 let battleGold = 0;
 let baseHp = 100;
 let enemies = [];
-let deployTargetSlot = null; 
-
-// 波次管理 (狀態機)
-let waveData = {
-    currentWave: 1,
-    spawnedCount: 0,
-    totalCount: 0,
-    lastSpawnTime: 0,
-    state: 'idle', // states: idle, spawning, fighting, waiting_next_wave
-    waveWaitTime: 0
-};
+let deployTargetSlot = null;
 let gameLoopId = null;
+
+// 波次狀態機
+const WAVE_CONFIG = {
+    1: { count: 3, hp: 800, atk: 50 },
+    2: { count: 5, hp: 1500, atk: 100 },
+    3: { count: 8, hp: 3000, atk: 200 } // Boss wave
+};
+
+let battleState = {
+    wave: 1,
+    spawned: 0,
+    totalToSpawn: 0,
+    lastSpawnTime: 0,
+    phase: 'IDLE', // IDLE, SPAWNING, COMBAT, WAITING, VICTORY, DEFEAT
+    waitTimer: 0
+};
 
 // 批量分解變數
 let isBatchMode = false;
@@ -91,7 +99,7 @@ function playSound(type) {
         if (type === 'click') { synthesizeClick(); return; }
         else if (type === 'dismantle') { synthesizeDismantle(); return; }
         else if (type === 'inventory') { synthesizeInventory(); return; }
-        else if (type === 'poison') { synthesizePoison(); return; } // 新增毒音效
+        else if (type === 'poison') { synthesizePoison(); return; } 
 
         let sound;
         if (type === 'draw') sound = sfxDraw;
@@ -129,7 +137,6 @@ function synthesizeInventory() {
     noise.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
 }
 
-// 毒液音效
 function synthesizePoison() {
     const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
     osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3);
@@ -392,17 +399,14 @@ function calculateBatchTotal() { let totalGold = 0; let count = 0; allUserCards.
 batchConfirmBtn.addEventListener('click', async () => { playSound('click'); if (selectedBatchCards.size === 0) return; if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; let totalGold = 0; const deletePromises = []; const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); cardsToRemove.forEach(card => { totalGold += DISMANTLE_VALUES[card.rarity]; if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); }); try { batchConfirmBtn.innerText = "分解中..."; await Promise.all(deletePromises); playSound('dismantle'); setTimeout(() => playSound('coin'), 300); gold += totalGold; allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); await updateCurrencyCloud(); updateUIDisplay(); selectedBatchCards.clear(); isBatchMode = false; updateBatchUI(); filterInventory(currentFilterRarity); alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
 // ==========================================
-// 🔥 戰鬥系統核心 (State Machine 重寫版)
+// 🔥 戰鬥系統核心 (Phase 4 完美修復版)
 // ==========================================
 
 document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
     if(!currentUser) return alert("請先登入");
     if(allUserCards.length === 0) await loadInventory(currentUser.uid);
-    
-    // 切換音樂
     if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
-    
     document.getElementById('battle-screen').classList.remove('hidden');
     renderBattleSlots();
     updateStartButton();
@@ -410,29 +414,23 @@ document.getElementById('enter-battle-mode-btn').addEventListener('click', async
 
 function stopBattleMusic() {
     audioBattle.pause();
-    if(isBgmOn) audioBgm.play().catch(()=>{});
+    if(isBgmOn) { audioBgm.currentTime = 0; audioBgm.play().catch(()=>{}); }
 }
 
 function resetBattleState() {
     isBattleActive = false;
     if(gameLoopId) cancelAnimationFrame(gameLoopId);
-    
-    stopBattleMusic(); // 停止戰鬥音樂
-    
-    waveData = { state: 'idle', currentWave: 1, spawnedCount: 0, totalCount: 0, lastSpawnTime: 0 };
+    stopBattleMusic();
+    battleState.phase = 'IDLE'; // 重置狀態
     enemies = [];
     document.getElementById('enemy-container').innerHTML = '';
-    
     document.getElementById('start-battle-btn').classList.remove('btn-disabled');
     document.getElementById('start-battle-btn').innerText = "請先部署英雄";
     document.getElementById('battle-screen').classList.add('hidden');
     document.getElementById('wave-notification').classList.add('hidden');
 }
 
-document.getElementById('retreat-btn').addEventListener('click', () => {
-    playSound('click');
-    resetBattleState();
-});
+document.getElementById('retreat-btn').addEventListener('click', () => { playSound('click'); resetBattleState(); });
 
 document.getElementById('start-battle-btn').addEventListener('click', () => {
     if (isBattleActive) return;
@@ -444,13 +442,9 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     enemies = [];
     document.getElementById('enemy-container').innerHTML = '';
     
-    // 初始化英雄冷卻與血量
+    // 初始化英雄
     battleSlots.forEach(hero => { 
-        if(hero) { 
-            hero.currentHp = hero.hp; 
-            hero.maxHp = hero.hp; 
-            hero.lastAttackTime = 0; // 初始化冷卻
-        } 
+        if(hero) { hero.currentHp = hero.hp; hero.maxHp = hero.hp; hero.lastAttackTime = 0; } 
     });
     renderBattleSlots();
     updateBattleUI();
@@ -458,16 +452,16 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     document.getElementById('start-battle-btn').classList.add('btn-disabled');
     document.getElementById('start-battle-btn').innerText = "戰鬥進行中...";
     
-    startNextWave(1); // 開始第一波
+    startWave(1); // 開始第一波
     gameLoop();
 });
 
-function startNextWave(waveNum) {
-    waveData.currentWave = waveNum;
-    waveData.spawnedCount = 0;
-    waveData.totalCount = waveNum * 2 + 2; 
-    waveData.lastSpawnTime = Date.now();
-    waveData.state = 'spawning'; // 進入生怪模式
+function startWave(waveNum) {
+    battleState.wave = waveNum;
+    battleState.spawned = 0;
+    battleState.totalToSpawn = WAVE_CONFIG[waveNum].count;
+    battleState.lastSpawnTime = Date.now();
+    battleState.phase = 'SPAWNING'; // 狀態設定為生怪中
     updateBattleUI();
     
     const waveNotif = document.getElementById('wave-notification');
@@ -478,13 +472,11 @@ function startNextWave(waveNum) {
     waveNotif.style.animation = 'waveFade 2s forwards';
 }
 
-function spawnEnemy(level) {
-    const hp = level * 800 + 500;
-    const atk = level * 100 + 50;
+function spawnEnemy() {
+    const config = WAVE_CONFIG[battleState.wave];
     const enemy = { 
-        id: Date.now(), maxHp: hp, currentHp: hp, atk: atk, 
-        position: 100, speed: 0.10 + (level*0.02), // 稍微變慢
-        el: null, lastAttackTime: 0 
+        id: Date.now(), maxHp: config.hp, currentHp: config.hp, atk: config.atk, 
+        position: 100, speed: 0.1 + (battleState.wave * 0.02), el: null, lastAttackTime: 0 
     };
     const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
@@ -494,18 +486,18 @@ function showAttackEffect(targetEl, type) {
     const effect = document.createElement('div'); 
     effect.className = type === 'hero' ? 'slash-effect' : 'poison-effect';
     effect.innerText = type === 'hero' ? '⚔️' : ''; 
-    
     const rect = targetEl.getBoundingClientRect(); const fieldRect = document.querySelector('.battle-field').getBoundingClientRect();
     effect.style.left = (rect.left - fieldRect.left + rect.width/2) + 'px'; effect.style.top = (rect.top - fieldRect.top + rect.height/2) + 'px';
     document.querySelector('.battle-field').appendChild(effect); setTimeout(() => effect.remove(), 400);
 }
 
-// 英雄受擊震動
+// 英雄受擊紅閃震動 (使用 Force Reflow 確保每次觸發)
 function triggerHeroHit(slotIdx) {
-    const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"]`);
+    const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"] .card`);
     if(slotDiv) {
-        slotDiv.classList.add('hero-hit');
-        setTimeout(() => slotDiv.classList.remove('hero-hit'), 300);
+        slotDiv.classList.remove('taking-damage');
+        void slotDiv.offsetWidth; // Force Reflow
+        slotDiv.classList.add('taking-damage');
     }
 }
 
@@ -513,97 +505,80 @@ let baseAttackCooldown = 0;
 
 function gameLoop() {
     if (!isBattleActive) return;
-
     const now = Date.now();
 
-    // ----------------------
     // 1. 狀態機邏輯 (State Machine)
-    // ----------------------
-    if (waveData.state === 'spawning') {
-        // 持續生怪
-        if (waveData.spawnedCount < waveData.totalCount) {
-            if (now - waveData.lastSpawnTime > 2000) { 
-                spawnEnemy(waveData.currentWave);
-                waveData.spawnedCount++;
-                waveData.lastSpawnTime = now;
+    if (battleState.phase === 'SPAWNING') {
+        if (battleState.spawned < battleState.totalToSpawn) {
+            if (now - battleState.lastSpawnTime > 1500) { 
+                spawnEnemy();
+                battleState.spawned++;
+                battleState.lastSpawnTime = now;
             }
         } else {
-            // 生完了 -> 轉戰鬥
-            waveData.state = 'fighting';
+            battleState.phase = 'COMBAT'; // 生完了，轉戰鬥
         }
     } 
-    else if (waveData.state === 'fighting') {
-        // 戰鬥中，檢查是否全滅
+    else if (battleState.phase === 'COMBAT') {
         if (enemies.length === 0) {
-            // 全滅 -> 準備下一波
-            waveData.state = 'waiting_next_wave';
-            waveData.waveWaitTime = now;
-            showDamageText(50, "3秒後 下一波...");
+            // 敵人死光了，準備下一波
+            battleState.phase = 'WAITING';
+            battleState.waitTimer = now;
+            
+            if (battleState.wave < 3) {
+                showDamageText(50, "3秒後 下一波...");
+            } else {
+                setTimeout(() => { if(isBattleActive) endBattle(true); }, 1000);
+            }
         }
     }
-    else if (waveData.state === 'waiting_next_wave') {
-        // 等待 3 秒
-        if (now - waveData.waveWaitTime > 3000) {
-            if (waveData.currentWave < MAX_WAVES) {
-                startNextWave(waveData.currentWave + 1);
-            } else {
-                endBattle(true); // 勝利
-                return;
+    else if (battleState.phase === 'WAITING') {
+        if (now - battleState.waitTimer > 3000) {
+            if (battleState.wave < 3) {
+                startWave(battleState.wave + 1);
             }
         }
     }
 
-    // ----------------------
     // 2. 主堡攻擊
-    // ----------------------
     baseAttackCooldown++;
     if (baseAttackCooldown > 30 && baseHp > 0) { 
         const nearest = enemies.find(e => e.position < 25);
         if (nearest) {
-            nearest.currentHp -= 100; 
-            baseAttackCooldown = 0;
-            const laser = document.createElement('div'); laser.className = 'base-laser';
-            laser.style.width = `${nearest.position}%`;
-            document.querySelector('.battle-field').appendChild(laser);
-            setTimeout(() => laser.remove(), 150);
+            nearest.currentHp -= 100; baseAttackCooldown = 0;
+            const laser = document.createElement('div'); laser.className = 'base-laser'; laser.style.width = `${nearest.position}%`;
+            document.querySelector('.battle-field').appendChild(laser); setTimeout(() => laser.remove(), 150);
         }
     }
 
-    // ----------------------
-    // 3. 戰鬥運算
-    // ----------------------
+    // 3. 戰鬥邏輯
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
         
         const checkCombat = (slotIdx, minPos, maxPos) => {
             if (battleSlots[slotIdx] && battleSlots[slotIdx].currentHp > 0) {
-                
-                // 怪物攻擊判定 (射程較遠：maxPos + 15)
+                // 怪物噴毒 (距離優勢)
                 if (enemy.position <= maxPos + 15 && enemy.position >= minPos) {
-                    // 怪物攻速快 (0.8s)
-                    if (now - enemy.lastAttackTime > 800) { 
+                    if (now - enemy.lastAttackTime > 800) { // 怪物快攻 0.8s
                         battleSlots[slotIdx].currentHp -= enemy.atk;
                         enemy.lastAttackTime = now;
                         showAttackEffect(document.querySelector(`.defense-slot[data-slot="${slotIdx}"]`), 'enemy'); 
-                        playSound('poison'); // 毒音效
-                        triggerHeroHit(slotIdx); // 震動
+                        playSound('poison');
+                        triggerHeroHit(slotIdx); // 受擊紅閃
                         renderBattleSlots();
                     }
                 }
-
-                // 英雄攻擊判定 (近戰：maxPos)
+                // 英雄揮劍 (近戰)
                 if (enemy.position <= maxPos && enemy.position >= minPos) {
-                    blocked = true; // 怪物被阻擋
-                    // 英雄攻速慢 (2.0s)
-                    if (now - battleSlots[slotIdx].lastAttackTime > 2000) { 
+                    blocked = true; 
+                    if (now - battleSlots[slotIdx].lastAttackTime > 2000) { // 英雄慢攻 2.0s
                         enemy.currentHp -= battleSlots[slotIdx].atk;
                         battleSlots[slotIdx].lastAttackTime = now;
-                        showAttackEffect(enemy.el, 'hero'); // 揮劍
+                        showAttackEffect(enemy.el, 'hero'); 
                     }
                 }
             }
         };
-        
         checkCombat(2, 70, 80); checkCombat(1, 45, 55); checkCombat(0, 20, 30);
 
         if (!blocked) { enemy.position -= enemy.speed; }
@@ -612,10 +587,9 @@ function gameLoop() {
             enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
         }
 
-        // 死亡判定
         if (enemy.currentHp <= 0) {
             enemy.el.remove(); enemies.splice(eIndex, 1);
-            battleGold += 50 + (waveData.currentWave * 10);
+            battleGold += 50 + (battleState.wave * 10);
             updateBattleUI(); showDamageText(enemy.position, `+${50}G`); playSound('dismantle');
         } else if (enemy.position <= 0) {
             baseHp -= 10; enemy.el.remove(); enemies.splice(eIndex, 1);
@@ -623,7 +597,6 @@ function gameLoop() {
         }
     });
 
-    // 英雄死亡移除
     battleSlots.forEach((hero, idx) => {
         if (hero && hero.currentHp <= 0) { battleSlots[idx] = null; renderBattleSlots(); updateStartButton(); }
     });
@@ -637,7 +610,7 @@ function updateBattleUI() {
     document.getElementById('base-hp').innerText = Math.max(0, Math.floor(baseHp));
     document.getElementById('base-hp-bar').style.width = `${Math.max(0, baseHp)}%`;
     document.getElementById('battle-gold').innerText = battleGold;
-    document.getElementById('wave-count').innerText = waveData.currentWave;
+    document.getElementById('wave-count').innerText = battleState.wave;
 }
 
 function showDamageText(leftPercent, text) {
@@ -655,7 +628,7 @@ async function endBattle(isWin) {
     resetBattleState();
 }
 
-// 點擊防禦塔槽位邏輯
+// 點擊防禦塔槽位
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
         if(isBattleActive) return; 

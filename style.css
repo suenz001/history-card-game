@@ -36,7 +36,7 @@ input[type="text"], input[type="email"], input[type="password"] {
 .leaderboard-area { flex: 1; min-width: 250px; background: #2c3e50; border: 2px solid #7f8c8d; padding: 15px; border-radius: 10px; width: 100%; }
 .status-bar { background: #34495e; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-size: 1.1em; font-weight: bold; }
 
-/* 排行榜 */
+/* 排行榜優化 */
 .rank-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #555; font-size: 0.95em; align-items: center; }
 .rank-item:last-child { border-bottom: none; }
 .rank-item span:nth-child(1) { flex: 2; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -197,8 +197,8 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* 🔥 噴毒動畫 (放大、顯眼) 🔥 */
 .poison-effect {
-    position: absolute; width: 100px; height: 100px; /* 變大 */
-    background: radial-gradient(circle, #00ff00, transparent); /* 鮮綠色 */
+    position: absolute; width: 100px; height: 100px; 
+    background: radial-gradient(circle, #00ff00, transparent); 
     border-radius: 50%; opacity: 0.9; z-index: 99; pointer-events: none;
     animation: poisonSplash 0.5s forwards;
 }
@@ -208,14 +208,16 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: scale(1.5); opacity: 0; }
 }
 
-/* 🔥 英雄受擊震動 🔥 */
-.hero-hit {
-    animation: shakeHero 0.3s ease-in-out;
+/* 🔥 英雄受擊紅閃震動 🔥 */
+.card.taking-damage {
+    animation: damageShake 0.4s ease-out;
 }
-@keyframes shakeHero {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-5px) rotate(-5deg); }
-    75% { transform: translateX(5px) rotate(5deg); }
+@keyframes damageShake {
+    0% { transform: translate(-50%, -50%) scale(0.65); filter: none; }
+    20% { transform: translate(-55%, -50%) scale(0.65); filter: sepia(1) hue-rotate(-50deg) saturate(5); } /* 紅色濾鏡 */
+    40% { transform: translate(-45%, -50%) scale(0.65); }
+    60% { transform: translate(-55%, -50%) scale(0.65); filter: sepia(1) hue-rotate(-50deg) saturate(5); }
+    100% { transform: translate(-50%, -50%) scale(0.65); filter: none; }
 }
 
 /* 波次提示 */
