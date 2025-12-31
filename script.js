@@ -616,7 +616,6 @@ function renderCard(card, targetContainer) {
         cardDiv.classList.add('is-selected');
     }
 
-    // 加上稀有度標籤 HTML
     cardDiv.innerHTML = `
         <div class="card-id-badge">#${idString}</div>
         <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
@@ -635,13 +634,8 @@ function renderCard(card, targetContainer) {
             playSound('click');
             toggleBatchSelection(card, cardDiv);
         } else {
-            // 防呆機制: 如果卡片不在當前列表，臨時建立列表
-            let index = currentDisplayList.indexOf(card);
-            if (index === -1) {
-                currentDisplayList = [card];
-                index = 0;
-            }
-            openDetailModal(index);
+            const actualIndex = currentDisplayList.indexOf(card);
+            if(actualIndex !== -1) openDetailModal(actualIndex);
         }
     });
 
@@ -896,7 +890,6 @@ batchConfirmBtn.addEventListener('click', async () => {
 document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
     if(!currentUser) return alert("請先登入");
-    // 確保有最新背包資料 (避免剛登入就戰鬥)
     if(allUserCards.length === 0) await loadInventory(currentUser.uid);
     openBattleMode();
 });
@@ -904,7 +897,7 @@ document.getElementById('enter-battle-mode-btn').addEventListener('click', async
 document.getElementById('retreat-btn').addEventListener('click', () => {
     playSound('click');
     document.getElementById('battle-screen').classList.add('hidden');
-    battleSlots = [null, null, null]; // 清空槽位
+    battleSlots = [null, null, null]; 
     renderBattleSlots();
     selectedBattleCard = null;
     renderBattleDeck();
@@ -920,12 +913,9 @@ function openBattleMode() {
 function renderBattleDeck() {
     const deckContainer = document.getElementById('battle-deck-grid');
     deckContainer.innerHTML = "";
-    
-    // 取前 15 強的卡片
     const battleCandidates = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 15);
 
     battleCandidates.forEach(card => {
-        // 檢查是否已在槽位中
         const isDeployed = battleSlots.some(slot => slot && slot.docId === card.docId);
         
         const cardDiv = document.createElement('div');
@@ -962,21 +952,18 @@ function renderBattleDeck() {
     });
 }
 
-// 綁定槽位點擊事件
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
         playSound('click');
         const slotIndex = parseInt(slot.dataset.slot);
         
-        // 情況 A: 已經選中一張卡，且該槽位是空的 -> 部署
         if (selectedBattleCard && !battleSlots[slotIndex]) {
             battleSlots[slotIndex] = selectedBattleCard;
-            selectedBattleCard = null; // 部署後清除選取狀態
+            selectedBattleCard = null; 
             renderBattleDeck();
             renderBattleSlots();
             updateStartButton();
         }
-        // 情況 B: 槽位已經有卡 -> 撤下
         else if (battleSlots[slotIndex]) {
             battleSlots[slotIndex] = null;
             renderBattleDeck();
@@ -992,7 +979,6 @@ function renderBattleSlots() {
         const card = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder');
         
-        // 清除舊卡片
         const existingCard = slotDiv.querySelector('.card');
         if (existingCard) existingCard.remove();
 
@@ -1000,7 +986,6 @@ function renderBattleSlots() {
             placeholder.style.display = 'none';
             slotDiv.classList.add('active');
             
-            // 建立迷你卡片
             const cardDiv = document.createElement('div');
             const charPath = `assets/cards/${card.id}.webp`;
             const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
