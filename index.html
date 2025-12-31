@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=29">
+    <link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
 
@@ -133,6 +133,15 @@
                 <button id="auto-deploy-btn" class="btn-secondary" style="flex: 1; padding: 10px; font-size: 1.1em; background: #8e44ad;">⚡ 自動部署</button>
                 <button id="start-battle-btn" class="btn-primary btn-disabled" style="flex: 2; padding: 10px; font-size: 1.2em;">請先部署英雄</button>
             </div>
+        </div>
+    </div>
+
+    <div id="battle-result-modal" class="hidden">
+        <div class="result-content">
+            <div id="result-title" class="result-title">VICTORY</div>
+            <div id="result-desc" style="color:#ccc; margin-bottom:5px;">戰鬥獎勵</div>
+            <div id="result-gold" class="result-gold">💰 +0</div>
+            <button id="close-result-btn" class="btn-primary" style="width:100%;">回到大廳</button>
         </div>
     </div>
 

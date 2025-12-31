@@ -303,6 +303,34 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: translate(-50%, -50%) scale(0.45) rotate(0deg); filter: none; }
 }
 
+/* 螢幕震動 */
+@keyframes shakeScreen {
+    0% { transform: translate(0, 0); } 25% { transform: translate(-5px, 5px); }
+    50% { transform: translate(5px, -5px); } 75% { transform: translate(-5px, -5px); } 100% { transform: translate(0, 0); }
+}
+.shake-screen-effect { animation: shakeScreen 0.3s ease-in-out; }
+
+/* 動態血條顏色 */
+.hp-low { background: #e74c3c !important; box-shadow: 0 0 5px #c0392b; } 
+.hp-mid { background: #f1c40f !important; }
+
+/* 戰鬥結算彈窗 */
+#battle-result-modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85); z-index: 3000;
+    display: flex; justify-content: center; align-items: center;
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.result-content {
+    background: #2c3e50; border: 4px solid #f1c40f; border-radius: 15px;
+    padding: 30px; text-align: center; width: 300px;
+    box-shadow: 0 0 50px rgba(241, 196, 15, 0.5);
+}
+.result-title { font-size: 2.5em; margin-bottom: 10px; font-weight: bold; }
+.result-gold { font-size: 1.5em; color: #f1c40f; margin-bottom: 20px; }
+.win-text { color: #2ecc71; text-shadow: 0 0 10px #2ecc71; }
+.lose-text { color: #e74c3c; text-shadow: 0 0 10px #e74c3c; }
+
 /* 波次提示 */
 #wave-notification {
     position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%);

@@ -343,13 +343,12 @@ function drawSRorAbove() { const rand = Math.random(); let rarity = rand < 0.17 
 function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
     cardDiv.className = `card ${card.rarity}`; 
-    // 🔥 檢查是否已部署 (背包狀態) 🔥
     if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats">⚔️${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
     cardDiv.addEventListener('click', () => { 
         playSound('click'); 
-        if (cardDiv.classList.contains('is-deployed')) return; // 已部署不能點
+        if (cardDiv.classList.contains('is-deployed')) return; 
         if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } 
         if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } 
         let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); 
@@ -405,7 +404,7 @@ function calculateBatchTotal() { let totalGold = 0; let count = 0; allUserCards.
 batchConfirmBtn.addEventListener('click', async () => { playSound('click'); if (selectedBatchCards.size === 0) return; if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; let totalGold = 0; const deletePromises = []; const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); cardsToRemove.forEach(card => { totalGold += DISMANTLE_VALUES[card.rarity]; if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); }); try { batchConfirmBtn.innerText = "分解中..."; await Promise.all(deletePromises); playSound('dismantle'); setTimeout(() => playSound('coin'), 300); gold += totalGold; allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); await updateCurrencyCloud(); updateUIDisplay(); selectedBatchCards.clear(); isBatchMode = false; updateBatchUI(); filterInventory(currentFilterRarity); alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
 // ==========================================
-// 🔥 戰鬥系統核心 (Phase 5 最終完美修復版)
+// 🔥 戰鬥系統核心 (Nano Banana 優化版)
 // ==========================================
 
 document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
@@ -466,24 +465,17 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
 document.getElementById('auto-deploy-btn').addEventListener('click', () => {
     if(isBattleActive) return;
     playSound('click');
-    
-    // 取出戰力最高的 9 張卡
     const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
-    
-    // 清空並填入槽位
     battleSlots = new Array(9).fill(null);
-    topHeroes.forEach((hero, index) => {
-        battleSlots[index] = { ...hero, currentHp: hero.hp, maxHp: hero.hp, lastAttackTime: 0 };
-    });
-    
+    topHeroes.forEach((hero, index) => { battleSlots[index] = { ...hero, currentHp: hero.hp, maxHp: hero.hp, lastAttackTime: 0 }; });
     renderBattleSlots();
     updateStartButton();
 });
 
-// 🔥 新增：難度選擇邏輯 🔥
+// 🔥 難度選擇 🔥
 document.querySelectorAll('.difficulty-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-        if(isBattleActive) return; // 戰鬥中不能切換
+        if(isBattleActive) return; 
         playSound('click');
         document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
@@ -509,34 +501,18 @@ function startWave(waveNum) {
 
 function spawnEnemy() {
     const config = WAVE_CONFIG[battleState.wave];
-    
-    // 🔥 難度係數 🔥
     let multHp = 1, multAtk = 1;
     if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
     else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
 
-    // 🔥 隨機分配路線 (0, 1, 2) 🔥
     const lane = Math.floor(Math.random() * 3); 
-
     const enemy = { 
         id: Date.now(), 
-        maxHp: config.hp * multHp, 
-        currentHp: config.hp * multHp, 
-        atk: config.atk * multAtk, 
-        lane: lane, // 綁定路線
-        position: 100, 
-        speed: 0.1 + (battleState.wave * 0.02), 
-        el: null, 
-        lastAttackTime: 0 
+        maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, 
+        lane: lane, position: 100, speed: 0.1 + (battleState.wave * 0.02), el: null, lastAttackTime: 0 
     };
-    
     const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
-    
-    // 設定初始垂直位置
-    if(lane === 0) el.style.top = '15%';
-    else if(lane === 1) el.style.top = '50%';
-    else if(lane === 2) el.style.top = '85%';
-    
+    if(lane === 0) el.style.top = '15%'; else if(lane === 1) el.style.top = '50%'; else if(lane === 2) el.style.top = '85%';
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
@@ -545,23 +521,19 @@ function showAttackEffect(targetEl, type) {
     const effect = document.createElement('div'); 
     effect.className = type === 'hero' ? 'slash-effect' : 'poison-effect';
     effect.innerText = type === 'hero' ? '⚔️' : ''; 
-    
     const rect = targetEl.getBoundingClientRect(); 
     const fieldRect = document.querySelector('.battle-field-container').getBoundingClientRect();
-    
     effect.style.left = (rect.left - fieldRect.left + rect.width/2) + 'px'; 
     effect.style.top = (rect.top - fieldRect.top + rect.height/2) + 'px';
-    
-    document.querySelector('.battle-field-container').appendChild(effect); 
-    setTimeout(() => effect.remove(), 400);
+    document.querySelector('.battle-field-container').appendChild(effect); setTimeout(() => effect.remove(), 400);
 }
 
-// 英雄受擊紅閃震動 (Force Reflow)
+// 英雄受擊紅閃震動
 function triggerHeroHit(slotIdx) {
     const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"] .card`);
     if(slotDiv) {
         slotDiv.classList.remove('taking-damage');
-        void slotDiv.offsetWidth; // Force Reflow
+        void slotDiv.offsetWidth; 
         slotDiv.classList.add('taking-damage');
     }
 }
@@ -572,7 +544,7 @@ function gameLoop() {
     if (!isBattleActive) return;
     const now = Date.now();
 
-    // 1. 狀態機邏輯 (State Machine)
+    // 1. 狀態機邏輯
     if (battleState.phase === 'SPAWNING') {
         if (battleState.spawned < battleState.totalToSpawn) {
             if (now - battleState.lastSpawnTime > 1500) { 
@@ -601,19 +573,17 @@ function gameLoop() {
         }
     }
 
-    // 2. 主堡攻擊 (傷害削弱到 300，避免秒殺)
+    // 2. 主堡攻擊 (傷害300)
     baseAttackCooldown++;
     if (baseAttackCooldown > 60 && baseHp > 0) { 
         const nearest = enemies.find(e => e.position < 25);
         if (nearest) {
-            nearest.currentHp -= 300; // 🔥 傷害修正：300
+            nearest.currentHp -= 300; 
             baseAttackCooldown = 0;
             const laser = document.createElement('div'); laser.className = 'base-laser'; laser.style.width = `${nearest.position}%`;
-            if(nearest.lane === 0) laser.style.top = '15%';
-            else if(nearest.lane === 1) laser.style.top = '50%';
-            else if(nearest.lane === 2) laser.style.top = '85%';
+            if(nearest.lane === 0) laser.style.top = '15%'; else if(nearest.lane === 1) laser.style.top = '50%'; else if(nearest.lane === 2) laser.style.top = '85%';
             document.querySelector('.battle-field-container').appendChild(laser); setTimeout(() => laser.remove(), 150);
-            playSound('dismantle'); // 雷射音效
+            playSound('dismantle');
         }
     }
 
@@ -626,7 +596,6 @@ function gameLoop() {
 
         for(let i = startSlot; i <= endSlot; i++) {
              if (battleSlots[i] && battleSlots[i].currentHp > 0) {
-                
                 let slotPos = 0;
                 if(i % 3 === 0) slotPos = 25; 
                 if(i % 3 === 1) slotPos = 50; 
@@ -634,7 +603,7 @@ function gameLoop() {
 
                 // 怪物攻擊 (距離優勢)
                 if (enemy.position <= slotPos + 15 && enemy.position >= slotPos - 5) {
-                     if (now - enemy.lastAttackTime > 800) { 
+                     if (now - enemy.lastAttackTime > 800) { // 攻速快 0.8s
                         battleSlots[i].currentHp -= enemy.atk;
                         enemy.lastAttackTime = now;
                         showAttackEffect(document.querySelector(`.defense-slot[data-slot="${i}"]`), 'enemy'); 
@@ -644,10 +613,10 @@ function gameLoop() {
                     }
                 }
                 
-                // 英雄攻擊 & 阻擋
+                // 英雄攻擊
                 if (enemy.position <= slotPos + 5 && enemy.position >= slotPos - 5) {
                     blocked = true;
-                    if (now - battleSlots[i].lastAttackTime > 2000) { 
+                    if (now - battleSlots[i].lastAttackTime > 2000) { // 攻速慢 2.0s
                         enemy.currentHp -= battleSlots[i].atk;
                         battleSlots[i].lastAttackTime = now;
                         showAttackEffect(enemy.el, 'hero'); 
@@ -665,6 +634,12 @@ function gameLoop() {
                 showDamageText(10, "-5 HP");
                 playSound('dismantle');
                 updateBattleUI();
+                
+                // 螢幕震動
+                const gameBody = document.body;
+                gameBody.classList.remove('shake-screen-effect');
+                void gameBody.offsetWidth; 
+                gameBody.classList.add('shake-screen-effect');
             }
         }
 
@@ -691,8 +666,13 @@ function gameLoop() {
 }
 
 function updateBattleUI() {
-    document.getElementById('base-hp').innerText = Math.max(0, Math.floor(baseHp));
-    document.getElementById('base-hp-bar').style.width = `${Math.max(0, baseHp)}%`;
+    const hpEl = document.getElementById('base-hp');
+    const barEl = document.getElementById('base-hp-bar');
+    hpEl.innerText = Math.max(0, Math.floor(baseHp));
+    barEl.style.width = `${Math.max(0, baseHp)}%`;
+    barEl.className = ''; 
+    if (baseHp < 30) barEl.classList.add('hp-low'); else if (baseHp < 60) barEl.classList.add('hp-mid');
+
     document.getElementById('battle-gold').innerText = battleGold;
     document.getElementById('wave-count').innerText = battleState.wave;
 }
@@ -709,14 +689,32 @@ async function endBattle(isWin) {
     else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
 
     let finalGold = Math.floor(battleGold * goldMultiplier);
+    
+    // 顯示結算視窗
+    const modal = document.getElementById('battle-result-modal');
+    const title = document.getElementById('result-title');
+    const goldText = document.getElementById('result-gold');
+    const btn = document.getElementById('close-result-btn');
 
-    if (isWin) { alert(`🎉 勝利！獲得 ${finalGold} 金幣`); } 
-    else { alert(`😭 戰敗... 獲得 ${Math.floor(finalGold/2)} 金幣`); finalGold = Math.floor(finalGold/2); }
+    modal.classList.remove('hidden');
+
+    if (isWin) {
+        title.innerText = "VICTORY"; title.className = "result-title win-text"; playSound('reveal');
+    } else {
+        title.innerText = "DEFEAT"; title.className = "result-title lose-text"; finalGold = Math.floor(finalGold / 2); playSound('dismantle');
+    }
+
+    goldText.innerText = `💰 +${finalGold}`;
     
     gold += finalGold;
     await updateCurrencyCloud();
     updateUIDisplay();
-    resetBattleState();
+
+    btn.onclick = () => {
+        playSound('click');
+        modal.classList.add('hidden');
+        resetBattleState();
+    };
 }
 
 // 點擊防禦塔槽位
