@@ -165,7 +165,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .defense-slot.active { border-style: solid; border-color: #f1c40f; background: rgba(241, 196, 15, 0.1); }
 /* 確保槽位內的卡片樣式正確 */
 .defense-slot .card { transform: scale(0.65); pointer-events: none; margin: 0; border-width: 3px; box-shadow: none; position: absolute; top: 50%; left: 50%; translate: -50% -50%; } 
-.slot-placeholder { color: #aaa; font-size: 0.8em; text-align: center; }
+.slot-placeholder { color: #aaa; font-size: 0.8em; text-align: center; pointer-events: none; } /* 修正：避免文字擋住點擊 */
 .hero-hp-bar { position: absolute; bottom: -10px; left: 0; width: 100%; height: 6px; background: #c0392b; border-radius: 3px; overflow: hidden; z-index: 20; }
 .hero-hp-bar > div { height: 100%; background: #2ecc71; }
 .enemy-unit { position: absolute; width: 50px; height: 50px; background: #e74c3c; border-radius: 50%; border: 2px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.5em; z-index: 5; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); }

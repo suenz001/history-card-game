@@ -36,7 +36,7 @@ let currentWave = 1;
 const MAX_WAVES = 3;
 let enemies = [];
 let enemySpawnInterval = null;
-let deployTargetSlot = null; // 記錄目前要部署到哪個格子 (0, 1, 2)
+let deployTargetSlot = null; // 部署目標
 
 // 批量分解變數
 let isBatchMode = false;
@@ -589,20 +589,19 @@ function renderCard(card, targetContainer) {
         <img src="${framePath}" class="card-frame-img" onerror="this.remove()"> 
     `;
 
-    // 點擊卡片邏輯 (分流：一般、批量分解、部署)
+    // 點擊事件分流：批量 / 部署 / 詳情
     cardDiv.addEventListener('click', () => {
         playSound('click');
-        // 1. 批量分解模式
         if (isBatchMode) {
             toggleBatchSelection(card, cardDiv);
             return;
         }
-        // 2. 部署模式 (如果 deployTargetSlot 有值)
+        // 🔥 關鍵修復：檢查是否為部署模式 🔥
         if (deployTargetSlot !== null) {
             deployHeroToSlot(card);
             return;
         }
-        // 3. 一般檢視模式
+        // 一般模式：開詳情
         let index = currentDisplayList.indexOf(card);
         if (index === -1) { currentDisplayList = [card]; index = 0; }
         openDetailModal(index);
@@ -1031,14 +1030,10 @@ function showAttackEffect(targetEl) {
     const effect = document.createElement('div');
     effect.className = 'slash-effect';
     effect.innerText = '⚔️';
-    // 取得目標的位置
     const rect = targetEl.getBoundingClientRect();
     const fieldRect = document.querySelector('.battle-field').getBoundingClientRect();
-    
-    // 計算相對位置 (因為 battle-field 是 relative)
     effect.style.left = (rect.left - fieldRect.left + rect.width/2) + 'px';
     effect.style.top = (rect.top - fieldRect.top + rect.height/2) + 'px';
-    
     document.querySelector('.battle-field').appendChild(effect);
     setTimeout(() => effect.remove(), 300);
 }
@@ -1050,7 +1045,6 @@ function gameLoop() {
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
         
-        // 檢查戰鬥 (簡化判定: 根據槽位百分比位置)
         const checkCombat = (slotIdx, minPos, maxPos) => {
             if (battleSlots[slotIdx] && battleSlots[slotIdx].currentHp > 0) {
                 if (enemy.position <= maxPos && enemy.position >= minPos) {
