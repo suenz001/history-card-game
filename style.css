@@ -195,6 +195,16 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: translate(-50%, -50%) scale(1.5) rotate(90deg); opacity: 0; }
 }
 
+/* 波次提示 */
+#wave-notification {
+    position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 3em; font-weight: bold; color: #e74c3c;
+    text-shadow: 0 0 20px black; z-index: 100;
+    animation: waveFade 2s forwards;
+    pointer-events: none;
+}
+@keyframes waveFade { 0% { opacity: 0; transform: translate(-50%, -30%); } 20% { opacity: 1; transform: translate(-50%, -50%); } 80% { opacity: 1; } 100% { opacity: 0; } }
+
 /* 主堡雷射 */
 .base-laser {
     position: absolute; top: 50%; left: 40px; width: 0; height: 4px; background: #00ffff; box-shadow: 0 0 10px #00ffff; z-index: 9;

@@ -35,15 +35,8 @@ let baseHp = 100;
 let enemies = [];
 let deployTargetSlot = null; 
 
-// 波次管理 (改用物件管理，不依賴 setInterval)
-let waveData = {
-    currentWave: 1,
-    spawnedCount: 0,
-    totalCount: 0,
-    lastSpawnTime: 0,
-    waveStartTime: 0,
-    isWaveActive: false
-};
+// 波次管理
+let waveData = { currentWave: 1, spawnedCount: 0, totalCount: 0, lastSpawnTime: 0, isWaveActive: false };
 let gameLoopId = null;
 
 let isBatchMode = false;
@@ -397,7 +390,6 @@ document.getElementById('enter-battle-mode-btn').addEventListener('click', async
 
 function resetBattleState() {
     isBattleActive = false;
-    // 停止遊戲循環
     if(gameLoopId) cancelAnimationFrame(gameLoopId);
     
     // 停止 BGM
@@ -405,17 +397,14 @@ function resetBattleState() {
     if(isBgmOn) { audioBgm.play().catch(()=>{}); }
     
     // 重置波次
-    waveData = { currentWave: 1, spawnedCount: 0, totalCount: 0, lastSpawnTime: 0, waveStartTime: 0, isWaveActive: false };
+    waveData = { currentWave: 1, spawnedCount: 0, totalCount: 0, lastSpawnTime: 0, isWaveActive: false };
     enemies = [];
     document.getElementById('enemy-container').innerHTML = '';
     
-    // UI 重置
     document.getElementById('start-battle-btn').classList.remove('btn-disabled');
     document.getElementById('start-battle-btn').innerText = "請先部署英雄";
     document.getElementById('battle-screen').classList.add('hidden');
-    
-    // 清除槽位 (可選，這裡不清空方便玩家連續戰鬥)
-    // battleSlots = [null, null, null]; 
+    document.getElementById('wave-notification').classList.add('hidden');
 }
 
 document.getElementById('retreat-btn').addEventListener('click', () => {
@@ -433,7 +422,6 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     enemies = [];
     document.getElementById('enemy-container').innerHTML = '';
     
-    // 英雄血量重置
     battleSlots.forEach(hero => { if(hero) { hero.currentHp = hero.hp; hero.maxHp = hero.hp; } });
     renderBattleSlots();
     updateBattleUI();
@@ -441,7 +429,6 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     document.getElementById('start-battle-btn').classList.add('btn-disabled');
     document.getElementById('start-battle-btn').innerText = "戰鬥進行中...";
     
-    // 啟動第1波
     startNextWave(1);
     gameLoop();
 });
@@ -449,10 +436,19 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
 function startNextWave(waveNum) {
     waveData.currentWave = waveNum;
     waveData.spawnedCount = 0;
-    waveData.totalCount = waveNum * 3 + 2; // 簡單公式
+    waveData.totalCount = waveNum * 3 + 2; 
     waveData.lastSpawnTime = Date.now();
     waveData.isWaveActive = true;
     updateBattleUI();
+    
+    // 波次提示
+    const waveNotif = document.getElementById('wave-notification');
+    waveNotif.innerText = `第 ${waveNum} 波`;
+    waveNotif.classList.remove('hidden');
+    // 重置動畫
+    waveNotif.style.animation = 'none';
+    waveNotif.offsetHeight; /* trigger reflow */
+    waveNotif.style.animation = 'waveFade 2s forwards';
 }
 
 function spawnEnemy(level) {
@@ -478,9 +474,9 @@ function gameLoop() {
 
     const now = Date.now();
 
-    // 1. 生成敵人邏輯 (替代 setInterval)
+    // 1. 生成敵人邏輯
     if (waveData.isWaveActive && waveData.spawnedCount < waveData.totalCount) {
-        if (now - waveData.lastSpawnTime > 2000) { // 每2秒生一隻
+        if (now - waveData.lastSpawnTime > 2000) { 
             spawnEnemy(waveData.currentWave);
             waveData.spawnedCount++;
             waveData.lastSpawnTime = now;
@@ -494,9 +490,7 @@ function gameLoop() {
         if (nearest) {
             nearest.currentHp -= 100; // 主堡傷害
             baseAttackCooldown = 0;
-            // 雷射特效
             const laser = document.createElement('div'); laser.className = 'base-laser';
-            // 計算長度
             laser.style.width = `${nearest.position}%`;
             document.querySelector('.battle-field').appendChild(laser);
             setTimeout(() => laser.remove(), 200);
@@ -528,7 +522,7 @@ function gameLoop() {
         if (enemy.currentHp <= 0) {
             enemy.el.remove(); enemies.splice(eIndex, 1);
             battleGold += 50 + (waveData.currentWave * 10);
-            updateBattleUI(); showDamageText(enemy.position, `+${50}G`); playSound('dismantle');
+            updateBattleUI(); showDamageText(enemy.position, `+${50 + (waveData.currentWave * 10)}G`); playSound('dismantle');
         } else if (enemy.position <= 0) {
             baseHp -= 10; enemy.el.remove(); enemies.splice(eIndex, 1);
             updateBattleUI(); playSound('dismantle');
@@ -570,12 +564,8 @@ function showDamageText(leftPercent, text) {
 }
 
 async function endBattle(isWin) {
-    isBattleActive = false;
-    if(gameLoopId) cancelAnimationFrame(gameLoopId);
-    
     if (isWin) { alert(`🎉 勝利！獲得 ${battleGold} 金幣`); } 
     else { alert(`😭 戰敗... 獲得 ${Math.floor(battleGold/2)} 金幣`); battleGold = Math.floor(battleGold/2); }
-    
     gold += battleGold;
     await updateCurrencyCloud();
     updateUIDisplay();

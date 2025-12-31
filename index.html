@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="style.css?v=26">
 </head>
 <body>
 
@@ -90,6 +90,8 @@
         </div>
 
         <div class="battle-field">
+            <div id="wave-notification" class="hidden">第 1 波</div>
+
             <div class="base-zone">
                 <div class="base-castle">🏰</div>
                 <div class="base-health-bar"><div id="base-hp-bar" style="width: 100%;"></div></div>
@@ -162,9 +164,7 @@
         <button id="close-detail-btn" class="btn-close-circle">✕</button>
         <button id="prev-card-btn" class="nav-arrow left">❮</button>
         <button id="next-card-btn" class="nav-arrow right">❯</button>
-        
         <div id="large-card-view" class="large-card-container"></div>
-        
         <div class="upgrade-controls">
             <div class="upgrade-box">
                 <div class="upgrade-title">提升等級 (Lv.30 Max)</div>
@@ -176,7 +176,6 @@
                 <button id="upgrade-star-btn" class="btn-star">⭐ 升星</button>
             </div>
         </div>
-
         <div style="margin-top: 15px; z-index: 102;">
             <button id="dismantle-btn" class="btn-danger">💰 分解此卡</button>
         </div>
