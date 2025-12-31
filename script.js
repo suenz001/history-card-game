@@ -48,6 +48,7 @@ const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
 const audioBgm = document.getElementById('bgm');
+const audioBattle = document.getElementById('bgm-battle'); // 🔥 戰鬥音樂
 const sfxDraw = document.getElementById('sfx-draw');
 const sfxSsr = document.getElementById('sfx-ssr');
 const sfxReveal = document.getElementById('sfx-reveal');
@@ -63,12 +64,13 @@ let bgmVolume = 0.5;
 let sfxVolume = 1.0;
 
 audioBgm.volume = bgmVolume;
+audioBattle.volume = bgmVolume;
 
 document.body.addEventListener('click', () => {
     if (audioCtx.state === 'suspended') {
         audioCtx.resume();
     }
-    if (isBgmOn && audioBgm.paused) {
+    if (isBgmOn && audioBgm.paused && audioBattle.paused) {
         audioBgm.play().catch(() => {});
     }
 }, { once: true });
@@ -171,8 +173,17 @@ bgmToggle.addEventListener('change', (e) => {
     playSound('click');
     isBgmOn = e.target.checked;
     document.getElementById('bgm-status').innerText = isBgmOn ? "開啟" : "關閉";
-    if (isBgmOn) audioBgm.play().catch(()=>{});
-    else audioBgm.pause();
+    if (isBgmOn) {
+        // 判斷目前在哪個場景
+        if(!document.getElementById('battle-screen').classList.contains('hidden')){
+            audioBattle.play().catch(()=>{});
+        } else {
+            audioBgm.play().catch(()=>{});
+        }
+    } else {
+        audioBgm.pause();
+        audioBattle.pause();
+    }
 });
 
 sfxToggle.addEventListener('change', (e) => {
@@ -184,6 +195,7 @@ sfxToggle.addEventListener('change', (e) => {
 bgmSlider.addEventListener('input', (e) => {
     bgmVolume = parseFloat(e.target.value);
     audioBgm.volume = bgmVolume;
+    audioBattle.volume = bgmVolume;
 });
 
 sfxSlider.addEventListener('input', (e) => {
@@ -595,12 +607,10 @@ function renderCard(card, targetContainer) {
             toggleBatchSelection(card, cardDiv);
             return;
         }
-        // 🔥 關鍵修復：檢查是否為部署模式 🔥
         if (deployTargetSlot !== null) {
             deployHeroToSlot(card);
             return;
         }
-        // 一般模式：開詳情
         let index = currentDisplayList.indexOf(card);
         if (index === -1) { currentDisplayList = [card]; index = 0; }
         openDetailModal(index);
@@ -849,6 +859,12 @@ document.getElementById('retreat-btn').addEventListener('click', () => {
     battleSlots = [null, null, null]; 
     renderBattleSlots();
     selectedBattleCard = null;
+    
+    // 切換回大廳音樂
+    if(isBgmOn) {
+        audioBattle.pause();
+        audioBgm.play().catch(()=>{});
+    }
 });
 
 // 🔥 新增：戰鬥開始邏輯 (Phase 3 補完) 🔥
@@ -887,6 +903,12 @@ function openBattleMode() {
     document.getElementById('enemy-container').innerHTML = '';
     document.getElementById('start-battle-btn').classList.remove('btn-disabled');
     document.getElementById('start-battle-btn').innerText = "請先部署英雄";
+    
+    // 切換戰鬥音樂
+    if(isBgmOn) {
+        audioBgm.pause();
+        audioBattle.play().catch(()=>{});
+    }
 }
 
 // 點擊防禦塔槽位 -> 開啟背包選擇英雄
@@ -906,7 +928,9 @@ document.querySelectorAll('.defense-slot').forEach(slot => {
             deployTargetSlot = slotIndex;
             document.getElementById('inventory-title').innerText = "👇 請選擇出戰英雄";
             document.getElementById('inventory-modal').classList.remove('hidden');
-            loadInventory(currentUser.uid);
+            // 如果還沒有載入過卡片，載入一次
+            if(allUserCards.length === 0) loadInventory(currentUser.uid);
+            else filterInventory('ALL'); // 刷新顯示
         }
     });
 });
@@ -1044,6 +1068,7 @@ function gameLoop() {
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
         
+        // 檢查戰鬥 (簡化判定: 根據槽位百分比位置)
         const checkCombat = (slotIdx, minPos, maxPos) => {
             if (battleSlots[slotIdx] && battleSlots[slotIdx].currentHp > 0) {
                 if (enemy.position <= maxPos && enemy.position >= minPos) {
@@ -1147,6 +1172,12 @@ async function endBattle(isWin) {
     battleSlots = [null, null, null];
     // 清除按鈕上的文字
     document.getElementById('start-battle-btn').innerText = "請先部署英雄";
+    
+    // 切回大廳音樂
+    if(isBgmOn) {
+        audioBattle.pause();
+        audioBgm.play().catch(()=>{});
+    }
 }
 
 // 簡單的波次排程
