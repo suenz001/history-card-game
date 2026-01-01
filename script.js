@@ -1,7 +1,6 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // ==========================================
 // 🔑 您的 Firebase 設定檔
@@ -20,7 +19,6 @@ const firebaseConfig = {
 let app, db, auth, provider;
 try {
     app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
     db = getFirestore(app);
     auth = getAuth(app);
     provider = new GoogleAuthProvider();
@@ -138,7 +136,16 @@ function bindButtons() {
         }
     };
 
-    // 3. 抽卡相關
+    // 🔥 3. 增加鑽石 (補上這個按鈕) 🔥
+    document.getElementById('add-gem-btn').onclick = async () => {
+        playSound('coin');
+        gems += 1000;
+        updateGemDisplay(gems);
+        await updateCurrencyCloud();
+        alert("💎 已獲得 1000 鑽石 (測試用)");
+    };
+
+    // 4. 抽卡相關
     document.getElementById('draw-btn').onclick = async () => { 
         playSound('click'); 
         if (gems < 100) return alert("鑽石不足 (需要 100)"); 
@@ -161,7 +168,7 @@ function bindButtons() {
     
     document.getElementById('gacha-skip-btn').onclick = (e) => { playSound('click'); e.stopPropagation(); let nextSSRIndex = -1; for(let i = gachaIndex; i < gachaQueue.length; i++) { if(gachaQueue[i].rarity === 'SSR') { nextSSRIndex = i; break; } } if (nextSSRIndex !== -1) { gachaIndex = nextSSRIndex; showNextRevealCard(); } else { gachaIndex = gachaQueue.length; closeRevealModal(); } };
 
-    // 4. 批量分解
+    // 5. 批量分解
     document.getElementById('batch-toggle-btn').onclick = () => { playSound('click'); isBatchMode = !isBatchMode; selectedBatchCards.clear(); updateBatchUI(); filterInventory(currentFilterRarity); };
     document.getElementById('batch-confirm-btn').onclick = async () => { 
         playSound('click'); 
@@ -194,7 +201,7 @@ function bindButtons() {
         catch (e) { console.error("雲端同步失敗:", e); }
     };
 
-    // 5. 戰鬥相關
+    // 6. 戰鬥相關
     document.getElementById('enter-battle-mode-btn').onclick = async () => { 
         playSound('click'); 
         if(!currentUser) return alert("請先登入"); 
@@ -229,9 +236,14 @@ function bindButtons() {
         gameLoop(); 
     };
     
-    document.getElementById('retreat-btn').onclick = () => { playSound('click'); resetBattleState(); };
+    // 🔥 撤退按鈕 (修復邏輯) 🔥
+    document.getElementById('retreat-btn').onclick = () => { 
+        playSound('click'); 
+        resetBattleState(); 
+        document.getElementById('battle-screen').classList.add('hidden');
+    };
 
-    // 6. 其他 UI
+    // 7. 其他 UI
     document.getElementById('inventory-btn').onclick = () => { playSound('inventory'); if(!currentUser) return alert("請先登入"); deployTargetSlot = null; document.getElementById('inventory-title').innerText = "🎒 我的背包"; document.getElementById('inventory-modal').classList.remove('hidden'); loadInventory(currentUser.uid); };
     document.getElementById('close-inventory-btn').onclick = () => { playSound('click'); document.getElementById('inventory-modal').classList.add('hidden'); deployTargetSlot = null; };
     document.getElementById('close-detail-btn').onclick = () => { playSound('click'); document.getElementById('detail-modal').classList.add('hidden'); };
@@ -412,7 +424,7 @@ function upgradeCardLevel() { const card = currentDisplayList[currentCardIndex];
 function upgradeCardStar() { const card = currentDisplayList[currentCardIndex]; const dupeIndex = allUserCards.findIndex(c => c.id === card.id && c.docId !== card.docId); if(dupeIndex === -1) return alert("沒有重複卡片"); if(!confirm("消耗一張同名卡片升星?")) return; const dupe = allUserCards[dupeIndex]; allUserCards.splice(dupeIndex, 1); card.stars++; calculateCardStats(card); updateUIDisplay(); playSound('upgrade'); renderDetailCard(); updateCurrencyCloud(); deleteDoc(doc(db, "inventory", dupe.docId)); updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp }); }
 function dismantleCurrentCard() { const card = currentDisplayList[currentCardIndex]; if(!confirm("確定分解?")) return; const val = DISMANTLE_VALUES[card.rarity]; gold += val; allUserCards = allUserCards.filter(c => c.docId !== card.docId); updateUIDisplay(); playSound('dismantle'); document.getElementById('detail-modal').classList.add('hidden'); loadInventory(currentUser.uid); updateCurrencyCloud(); deleteDoc(doc(db, "inventory", card.docId)); }
 
-// 卡片資料庫
+// 卡片資料庫 (保持完整)
 const cardDatabase = [
     { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, attackType: 'melee' },
     { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, attackType: 'melee' },
