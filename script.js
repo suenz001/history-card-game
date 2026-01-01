@@ -82,11 +82,8 @@ audioBattle.volume = bgmVolume;
 document.body.addEventListener('click', () => {
     if (audioCtx.state === 'suspended') { audioCtx.resume(); }
     if (isBgmOn && audioBgm.paused && audioBattle.paused) {
-        if(!document.getElementById('battle-screen').classList.contains('hidden')){
-            audioBattle.play().catch(()=>{});
-        } else {
-            audioBgm.play().catch(()=>{});
-        }
+        if(!document.getElementById('battle-screen').classList.contains('hidden')){ audioBattle.play().catch(()=>{}); } 
+        else { audioBgm.play().catch(()=>{}); }
     }
 }, { once: true });
 
@@ -97,7 +94,7 @@ function playSound(type) {
         else if (type === 'dismantle') { synthesizeDismantle(); return; }
         else if (type === 'inventory') { synthesizeInventory(); return; }
         else if (type === 'poison') { synthesizePoison(); return; } 
-        else if (type === 'hit') { synthesizeHit(); return; } // 🔥 新增受擊音效
+        else if (type === 'hit') { synthesizeHit(); return; }
 
         let sound;
         if (type === 'draw') sound = sfxDraw;
@@ -105,55 +102,15 @@ function playSound(type) {
         else if (type === 'reveal') sound = sfxReveal;
         else if (type === 'coin') sound = sfxCoin;
         else if (type === 'upgrade') sound = sfxUpgrade;
-        
-        if (sound) {
-            sound.volume = sfxVolume;
-            sound.currentTime = 0;
-            sound.play().catch(() => {});
-        }
+        if (sound) { sound.volume = sfxVolume; sound.currentTime = 0; sound.play().catch(() => {}); }
     } catch (e) { console.log("Audio error", e); }
 }
 
-// 合成音效區 (Synthesized Sound Effects)
-function synthesizeClick() {
-    const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
-    osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
-    gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-    osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-}
-
-function synthesizeDismantle() {
-    const bufferSize = audioCtx.sampleRate * 0.5; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(sfxVolume * 0.8, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-    noise.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
-}
-
-function synthesizeInventory() {
-    const bufferSize = audioCtx.sampleRate * 0.3; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 800; 
-    const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
-    noise.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
-}
-
-function synthesizePoison() {
-    const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
-    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3);
-    gainNode.gain.setValueAtTime(sfxVolume * 0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-    osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3);
-}
-
-// 🔥 新增：打擊音效 (Hit) 🔥
-function synthesizeHit() {
-    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
-    osc.type = 'square'; // 方波比較有打擊感
-    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-    gain.gain.setValueAtTime(sfxVolume * 0.4, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-}
+function synthesizeClick() { const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1); gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1); }
+function synthesizeDismantle() { const bufferSize = audioCtx.sampleRate * 0.5; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(sfxVolume * 0.8, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3); noise.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start(); }
+function synthesizeInventory() { const bufferSize = audioCtx.sampleRate * 0.3; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 800; const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3); noise.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start(); }
+function synthesizePoison() { const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain(); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3); gainNode.gain.setValueAtTime(sfxVolume * 0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3); osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3); }
+function synthesizeHit() { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = 'square'; osc.frequency.setValueAtTime(150, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); gain.gain.setValueAtTime(sfxVolume * 0.4, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1); }
 
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
@@ -161,43 +118,22 @@ const sfxToggle = document.getElementById('sfx-toggle');
 const bgmSlider = document.getElementById('bgm-volume');
 const sfxSlider = document.getElementById('sfx-volume');
 const settingsNameInput = document.getElementById('settings-name-input');
-
 document.getElementById('settings-btn').addEventListener('click', () => { playSound('click'); settingsModal.classList.remove('hidden'); bgmToggle.checked = isBgmOn; sfxToggle.checked = isSfxOn; bgmSlider.value = bgmVolume; sfxSlider.value = sfxVolume; });
 document.getElementById('close-settings-btn').addEventListener('click', () => { playSound('click'); settingsModal.classList.add('hidden'); });
-
-bgmToggle.addEventListener('change', (e) => {
-    isBgmOn = e.target.checked;
-    if (isBgmOn) {
-        if(!document.getElementById('battle-screen').classList.contains('hidden')){ audioBattle.play().catch(()=>{}); } else { audioBgm.play().catch(()=>{}); }
-    } else { audioBgm.pause(); audioBattle.pause(); }
-});
-
+bgmToggle.addEventListener('change', (e) => { isBgmOn = e.target.checked; if (isBgmOn) { if(!document.getElementById('battle-screen').classList.contains('hidden')){ audioBattle.play().catch(()=>{}); } else { audioBgm.play().catch(()=>{}); } } else { audioBgm.pause(); audioBattle.pause(); } });
 sfxToggle.addEventListener('change', (e) => { isSfxOn = e.target.checked; });
 bgmSlider.addEventListener('input', (e) => { bgmVolume = parseFloat(e.target.value); audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; });
 sfxSlider.addEventListener('input', (e) => { sfxVolume = parseFloat(e.target.value); });
+document.getElementById('settings-save-name-btn').addEventListener('click', async () => { const newName = settingsNameInput.value.trim(); if (!newName) return alert("請輸入暱稱"); try { await updateProfile(currentUser, { displayName: newName }); await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); document.getElementById('user-name').innerText = `玩家：${newName}`; loadLeaderboard(); alert("改名成功！"); settingsModal.classList.add('hidden'); } catch (e) { console.error(e); alert("改名失敗"); } });
 
-document.getElementById('settings-save-name-btn').addEventListener('click', async () => {
-    const newName = settingsNameInput.value.trim();
-    if (!newName) return alert("請輸入暱稱");
-    try { await updateProfile(currentUser, { displayName: newName }); await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); document.getElementById('user-name').innerText = `玩家：${newName}`; loadLeaderboard(); alert("改名成功！"); settingsModal.classList.add('hidden'); } catch (e) { console.error(e); alert("改名失敗"); }
-});
-
-const loginSection = document.getElementById('login-section');
-const userInfo = document.getElementById('user-info');
-const gameUI = document.getElementById('game-ui');
-const userNameDisplay = document.getElementById('user-name');
-
+const loginSection = document.getElementById('login-section'); const userInfo = document.getElementById('user-info'); const gameUI = document.getElementById('game-ui'); const userNameDisplay = document.getElementById('user-name');
 document.getElementById('google-btn').addEventListener('click', () => { playSound('click'); signInWithPopup(auth, provider).catch(e=>alert(e.message)); });
 document.getElementById('email-signup-btn').addEventListener('click', () => { playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { await updateProfile(res.user, { displayName: "新玩家" }); location.reload(); }).catch(e=>alert(e.message)); });
 document.getElementById('email-login-btn').addEventListener('click', () => { playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; signInWithEmailAndPassword(auth, email, pass).catch(e=>alert(e.message)); });
 document.getElementById('guest-btn').addEventListener('click', () => { playSound('click'); signInAnonymously(auth).then(async (res) => { await updateProfile(res.user, { displayName: "神秘客" }); location.reload(); }).catch(e=>alert(e.message)); });
 document.getElementById('logout-btn').addEventListener('click', () => { playSound('click'); signOut(auth).then(() => location.reload()); });
 
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        currentUser = user; loginSection.style.display = 'none'; userInfo.style.display = 'flex'; userNameDisplay.innerText = `玩家：${user.displayName || '未命名'}`; await loadUserData(user); gameUI.classList.remove('hidden'); await calculateTotalPowerOnly(user.uid); loadLeaderboard();
-    } else { loginSection.style.display = 'block'; userInfo.style.display = 'none'; gameUI.classList.add('hidden'); }
-});
+onAuthStateChanged(auth, async (user) => { if (user) { currentUser = user; loginSection.style.display = 'none'; userInfo.style.display = 'flex'; userNameDisplay.innerText = `玩家：${user.displayName || '未命名'}`; await loadUserData(user); gameUI.classList.remove('hidden'); await calculateTotalPowerOnly(user.uid); loadLeaderboard(); } else { loginSection.style.display = 'block'; userInfo.style.display = 'none'; gameUI.classList.add('hidden'); } });
 
 const cardDatabase = [
     { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, attackType: 'melee' },
@@ -271,11 +207,8 @@ async function loadInventory(uid) {
 }
 
 document.getElementById('sort-select').addEventListener('change', (e) => { playSound('click'); currentSortMethod = e.target.value; filterInventory(currentFilterRarity); });
-
 function filterInventory(rarity) {
-    currentFilterRarity = rarity; 
-    const container = document.getElementById('inventory-grid');
-    container.innerHTML = "";
+    currentFilterRarity = rarity; const container = document.getElementById('inventory-grid'); container.innerHTML = "";
     if (rarity === 'ALL') currentDisplayList = [...allUserCards]; else currentDisplayList = allUserCards.filter(card => card.rarity === rarity);
     sortCards(currentDisplayList, currentSortMethod);
     if (currentDisplayList.length === 0) { container.innerHTML = "<p style='width:100%; text-align:center;'>沒有符合條件的卡片</p>"; return; }
@@ -293,7 +226,6 @@ function sortCards(list, method) {
         return 0;
     });
 }
-
 function openDetailModal(index) { playSound('click'); currentCardIndex = index; document.getElementById('detail-modal').classList.remove('hidden'); renderDetailCard(); }
 
 function renderDetailCard() {
@@ -309,13 +241,11 @@ function renderDetailCard() {
 }
 
 async function upgradeCardLevel(cost) {
-    const card = currentDisplayList[currentCardIndex];
-    if (gold < cost) return alert("金幣不足！");
+    const card = currentDisplayList[currentCardIndex]; if (gold < cost) return alert("金幣不足！");
     const currentDocId = card.docId; gold -= cost; playSound('coin'); card.level++; calculateCardStats(card); playSound('upgrade'); 
     await updateDoc(doc(db, "inventory", card.docId), { level: card.level, atk: card.atk, hp: card.hp }); updateUIDisplay();
     if(!document.getElementById('inventory-modal').classList.contains('hidden')){ filterInventory(currentFilterRarity); const newIndex = currentDisplayList.findIndex(c => c.docId === currentDocId); if(newIndex !== -1) currentCardIndex = newIndex; } renderDetailCard();
 }
-
 async function upgradeCardStar() {
     const card = currentDisplayList[currentCardIndex]; const currentDocId = card.docId;
     const duplicate = allUserCards.find(c => c.id === card.id && c.docId !== card.docId);
@@ -325,7 +255,6 @@ async function upgradeCardStar() {
     await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
     if(!document.getElementById('inventory-modal').classList.contains('hidden')){ filterInventory(currentFilterRarity); const newIndex = currentDisplayList.findIndex(c => c.docId === currentDocId); if(newIndex !== -1) currentCardIndex = newIndex; } renderDetailCard(); alert(`升星成功！目前 ${card.stars} ★`);
 }
-
 function calculateCardStats(card) { const levelBonus = (card.level - 1) * 0.03; const starBonus = (card.stars - 1) * 0.20; card.atk = Math.floor(card.baseAtk * (1 + levelBonus) * (1 + starBonus)); card.hp = Math.floor(card.baseHp * (1 + levelBonus) * (1 + starBonus)); }
 
 async function dismantleCurrentCard() {
@@ -350,31 +279,16 @@ async function saveCardToCloud(card) {
     const docRef = await addDoc(collection(db, "inventory"), { name: card.name, rarity: card.rarity, atk: card.atk, hp: card.hp, title: card.title, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 1, obtainedAt: new Date(), owner: currentUser.uid, id: card.id });
     card.docId = docRef.id; card.baseAtk = card.atk; card.baseHp = card.hp; card.level = 1; card.stars = 1; return card;
 }
-
 function drawOneCard() { const rand = Math.random(); let rarity = rand < RATES.SSR ? "SSR" : (rand < RATES.SSR + RATES.SR ? "SR" : "R"); const pool = cardDatabase.filter(card => card.rarity === rarity); return { ...pool[Math.floor(Math.random() * pool.length)] }; }
 function drawSRorAbove() { const rand = Math.random(); let rarity = rand < 0.17 ? "SSR" : "SR"; const pool = cardDatabase.filter(card => card.rarity === rarity); return { ...pool[Math.floor(Math.random() * pool.length)] }; }
-
 function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
-    cardDiv.className = `card ${card.rarity}`; 
-    if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
-    if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
-    
-    // 🔥 新增：類型圖示 🔥
+    cardDiv.className = `card ${card.rarity}`; if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); } if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
-
-    cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats">${typeIcon} ${card.atk} ❤️ ${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
-    
-    cardDiv.addEventListener('click', () => { 
-        playSound('click'); 
-        if (cardDiv.classList.contains('is-deployed')) return; 
-        if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } 
-        if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } 
-        let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); 
-    });
+    cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="type-badge">${typeIcon}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats">${typeIcon} ${card.atk} ❤️ ${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
+    cardDiv.addEventListener('click', () => { playSound('click'); if (cardDiv.classList.contains('is-deployed')) return; if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); });
     targetContainer.appendChild(cardDiv); return cardDiv;
 }
-
 function playGachaAnimation(highestRarity) {
     return new Promise((resolve) => {
         const overlay = document.getElementById('gacha-overlay'); const circle = document.getElementById('summon-circle'); const text = document.getElementById('summon-text'); const burst = document.getElementById('summon-burst');
@@ -384,33 +298,17 @@ function playGachaAnimation(highestRarity) {
         setTimeout(() => { if (highestRarity === 'SSR') { overlay.classList.add('flash-screen'); setTimeout(() => { overlay.classList.add('hidden'); overlay.classList.remove('flash-screen'); resolve(); }, 1500); } else { overlay.classList.add('hidden'); resolve(); } }, highestRarity === 'SSR' ? 3000 : 2000);
     });
 }
-
 function showRevealModal(cards) { gachaQueue = cards; gachaIndex = 0; const modal = document.getElementById('gacha-reveal-modal'); modal.classList.remove('hidden'); document.getElementById('card-display-area').innerHTML = ""; showNextRevealCard(); }
 function showNextRevealCard() {
     const container = document.getElementById('gacha-reveal-container'); container.innerHTML = ""; if (gachaIndex >= gachaQueue.length) { closeRevealModal(); return; }
     const card = gachaQueue[gachaIndex]; card.level = 1; card.stars = 1; const cardDiv = renderCard(card, container); cardDiv.classList.add('large-card'); cardDiv.classList.remove('card'); playSound('reveal'); 
     if (card.rarity === 'SSR') { playSound('ssr'); cardDiv.classList.add('ssr-effect'); } gachaIndex++;
 }
-
 async function closeRevealModal() {
-    const modal = document.getElementById('gacha-reveal-modal'); 
-    modal.classList.add('hidden'); 
-    currentDisplayList = []; 
-    const mainContainer = document.getElementById('card-display-area');
-    mainContainer.innerHTML = ""; // 🔥 清除主畫面舊卡片
-
-    for (const card of gachaQueue) { 
-        const savedCard = await saveCardToCloud(card); 
-        currentDisplayList.push(savedCard); 
-        allUserCards.push(savedCard); // 🔥 同步更新到背包快取，防止顯示錯誤
-        totalPower += (card.atk + card.hp); 
-    }
-    currentDisplayList.forEach((card) => { renderCard(card, mainContainer); }); 
-    updateUIDisplay(); 
-    await updateCurrencyCloud(); 
-    setTimeout(loadLeaderboard, 1000); 
+    const modal = document.getElementById('gacha-reveal-modal'); modal.classList.add('hidden'); currentDisplayList = []; const mainContainer = document.getElementById('card-display-area'); mainContainer.innerHTML = "";
+    for (const card of gachaQueue) { const savedCard = await saveCardToCloud(card); currentDisplayList.push(savedCard); allUserCards.push(savedCard); totalPower += (card.atk + card.hp); }
+    currentDisplayList.forEach((card) => { renderCard(card, mainContainer); }); updateUIDisplay(); await updateCurrencyCloud(); setTimeout(loadLeaderboard, 1000); 
 }
-
 document.getElementById('gacha-skip-btn').addEventListener('click', (e) => { playSound('click'); e.stopPropagation(); let nextSSRIndex = -1; for(let i = gachaIndex; i < gachaQueue.length; i++) { if(gachaQueue[i].rarity === 'SSR') { nextSSRIndex = i; break; } } if (nextSSRIndex !== -1) { gachaIndex = nextSSRIndex; showNextRevealCard(); } else { gachaIndex = gachaQueue.length; closeRevealModal(); } });
 document.getElementById('gacha-reveal-modal').addEventListener('click', showNextRevealCard);
 document.getElementById('draw-btn').addEventListener('click', async () => { playSound('click'); if (gems < 100) return alert("鑽石不足"); gems -= 100; const newCard = drawOneCard(); await playGachaAnimation(newCard.rarity); showRevealModal([newCard]); });
@@ -419,6 +317,76 @@ document.getElementById('draw-10-btn').addEventListener('click', async () => {
      for(let i=0; i<9; i++) { const c = drawOneCard(); drawnCards.push(c); if(c.rarity === 'SSR') highestRarity = 'SSR'; else if(c.rarity === 'SR') { if (highestRarity !== 'SSR') highestRarity = 'SR'; hasSRorAbove = true; } }
      let lastCard; if (hasSRorAbove || highestRarity === 'SSR') lastCard = drawOneCard(); else lastCard = drawSRorAbove(); drawnCards.push(lastCard); if (lastCard.rarity === 'SSR') highestRarity = 'SSR'; else if (lastCard.rarity === 'SR' && highestRarity !== 'SSR') highestRarity = 'SR';
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
+});
+document.getElementById('inventory-btn').addEventListener('click', () => { playSound('inventory'); if(!currentUser) return alert("請先登入"); deployTargetSlot = null; document.getElementById('inventory-title').innerText = "🎒 我的背包"; document.getElementById('inventory-modal').classList.remove('hidden'); loadInventory(currentUser.uid); });
+document.getElementById('close-inventory-btn').addEventListener('click', () => { playSound('click'); document.getElementById('inventory-modal').classList.add('hidden'); deployTargetSlot = null; });
+async function loadLeaderboard() {
+    const listDiv = document.getElementById('leaderboard-list'); const q = query(collection(db, "users"), orderBy("combatPower", "desc"), limit(10));
+    try { const querySnapshot = await getDocs(q); listDiv.innerHTML = ""; let rank = 1; querySnapshot.forEach((doc) => { const data = doc.data(); const row = document.createElement('div'); row.className = 'rank-item'; row.innerHTML = `<span>#${rank} ${data.name || "無名氏"}</span><span>${data.combatPower || 0}</span>`; listDiv.appendChild(row); rank++; }); } catch (e) { console.error(e); }
+}
+const batchToggleBtn = document.getElementById('batch-toggle-btn'); const batchActionBar = document.getElementById('batch-action-bar'); const batchInfo = document.getElementById('batch-info'); const batchConfirmBtn = document.getElementById('batch-confirm-btn');
+batchToggleBtn.addEventListener('click', () => { playSound('click'); isBatchMode = !isBatchMode; selectedBatchCards.clear(); updateBatchUI(); filterInventory(currentFilterRarity); });
+function updateBatchUI() { if (isBatchMode) { batchToggleBtn.classList.add('active'); batchToggleBtn.innerText = "❌ 退出批量"; batchActionBar.classList.remove('hidden'); batchConfirmBtn.innerText = "確認分解"; } else { batchToggleBtn.classList.remove('active'); batchToggleBtn.innerText = "🔧 批量分解"; batchActionBar.classList.add('hidden'); } calculateBatchTotal(); }
+function toggleBatchSelection(card, cardDiv) { if (selectedBatchCards.has(card.docId)) { selectedBatchCards.delete(card.docId); cardDiv.classList.remove('is-selected'); } else { selectedBatchCards.add(card.docId); cardDiv.classList.add('is-selected'); } calculateBatchTotal(); }
+function calculateBatchTotal() { let totalGold = 0; let count = 0; allUserCards.forEach(card => { if (selectedBatchCards.has(card.docId)) { totalGold += DISMANTLE_VALUES[card.rarity] || 0; count++; } }); batchInfo.innerHTML = `已選 <span style="color:#e74c3c">${count}</span> 張，獲得 <span style="color:#f1c40f">${totalGold} G</span>`; if (count > 0) batchConfirmBtn.classList.remove('btn-disabled'); else batchConfirmBtn.classList.add('btn-disabled'); }
+batchConfirmBtn.addEventListener('click', async () => { playSound('click'); if (selectedBatchCards.size === 0) return; if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; let totalGold = 0; const deletePromises = []; const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); cardsToRemove.forEach(card => { totalGold += DISMANTLE_VALUES[card.rarity]; if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); }); try { batchConfirmBtn.innerText = "分解中..."; await Promise.all(deletePromises); playSound('dismantle'); setTimeout(() => playSound('coin'), 300); gold += totalGold; allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); await updateCurrencyCloud(); updateUIDisplay(); selectedBatchCards.clear(); isBatchMode = false; updateBatchUI(); filterInventory(currentFilterRarity); alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
+
+// ==========================================
+// 🔥 戰鬥系統核心 (Phase 5 最終完美修復版)
+// ==========================================
+
+document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
+    playSound('click');
+    if(!currentUser) return alert("請先登入");
+    if(allUserCards.length === 0) await loadInventory(currentUser.uid);
+    if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
+    document.getElementById('battle-screen').classList.remove('hidden');
+    renderBattleSlots();
+    updateStartButton();
+});
+
+function stopBattleMusic() {
+    audioBattle.pause();
+    if(isBgmOn) { audioBgm.currentTime = 0; audioBgm.play().catch(()=>{}); }
+}
+
+function resetBattleState() {
+    isBattleActive = false;
+    if(gameLoopId) cancelAnimationFrame(gameLoopId);
+    stopBattleMusic();
+    battleState.phase = 'IDLE'; 
+    enemies = [];
+    document.getElementById('enemy-container').innerHTML = '';
+    document.getElementById('start-battle-btn').classList.remove('btn-disabled');
+    document.getElementById('start-battle-btn').innerText = "請先部署英雄";
+    document.getElementById('battle-screen').classList.add('hidden');
+    document.getElementById('wave-notification').classList.add('hidden');
+}
+
+document.getElementById('retreat-btn').addEventListener('click', () => { playSound('click'); resetBattleState(); });
+
+document.getElementById('start-battle-btn').addEventListener('click', () => {
+    if (isBattleActive) return;
+    playSound('click');
+    
+    isBattleActive = true;
+    baseHp = 100;
+    battleGold = 0;
+    enemies = [];
+    document.getElementById('enemy-container').innerHTML = '';
+    
+    // 初始化英雄
+    battleSlots.forEach(hero => { 
+        if(hero) { hero.currentHp = hero.hp; hero.maxHp = hero.hp; hero.lastAttackTime = 0; } 
+    });
+    renderBattleSlots();
+    updateBattleUI();
+    
+    document.getElementById('start-battle-btn').classList.add('btn-disabled');
+    document.getElementById('start-battle-btn').innerText = "戰鬥進行中...";
+    
+    startWave(1); // 開始第一波
+    gameLoop();
 });
 
 // 🔥 自動部署 🔥
@@ -477,27 +445,6 @@ function spawnEnemy() {
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
-function showAttackEffect(targetEl, type) {
-    if(!targetEl) return;
-    const effect = document.createElement('div'); 
-    effect.className = type === 'hero' ? 'slash-effect' : 'poison-effect';
-    effect.innerText = type === 'hero' ? '⚔️' : ''; 
-    const rect = targetEl.getBoundingClientRect(); 
-    const fieldRect = document.querySelector('.battle-field-container').getBoundingClientRect();
-    effect.style.left = (rect.left - fieldRect.left + rect.width/2) + 'px'; 
-    effect.style.top = (rect.top - fieldRect.top + rect.height/2) + 'px';
-    document.querySelector('.battle-field-container').appendChild(effect); setTimeout(() => effect.remove(), 400);
-}
-
-function triggerHeroHit(slotIdx) {
-    const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"] .card`);
-    if(slotDiv) {
-        slotDiv.classList.remove('taking-damage');
-        void slotDiv.offsetWidth; 
-        slotDiv.classList.add('taking-damage');
-    }
-}
-
 // 🔥 發射飛行道具 (Projectiles) - 含角度計算 🔥
 function fireProjectile(startEl, targetEl, type, onHitCallback) {
     if(!startEl || !targetEl) return;
@@ -505,19 +452,21 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     const projectile = document.createElement('div');
     projectile.className = 'projectile';
     
+    // 🎨 優化圖示：根據類型給予更合理的符號
     if (type === 'arrow') {
-        projectile.innerText = '➵'; 
-        projectile.style.color = '#f1c40f'; 
-        projectile.style.fontSize = '2.5em';
+        projectile.innerText = '➵'; // 這是箭，不是弓！
+        projectile.style.color = '#f1c40f'; // 金色箭矢
+        projectile.style.fontSize = '2.5em'; // 調整大小
     } else if (type === 'fireball') {
-        projectile.innerText = '☄️'; 
+        projectile.innerText = '☄️'; // 彗星/火球
         projectile.style.fontSize = '3em';
     } else {
-        projectile.innerText = '🌙'; 
+        projectile.innerText = '🌙'; // 劍氣波 (看起來像揮砍)
         projectile.style.color = '#a29bfe';
         projectile.style.fontSize = '3em';
     }
     
+    // 1. 取得座標
     const containerRect = document.querySelector('.battle-field-container').getBoundingClientRect();
     const startRect = startEl.getBoundingClientRect();
     const targetRect = targetEl.getBoundingClientRect();
@@ -527,23 +476,39 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     const endX = targetRect.left - containerRect.left + targetRect.width / 2;
     const endY = targetRect.top - containerRect.top + targetRect.height / 2;
 
+    // 2. 📐 計算角度 (讓箭頭指向敵人)
     const angle = Math.atan2(endY - startY, endX - startX) * (180 / Math.PI);
 
+    // 3. 設定初始位置與角度
     projectile.style.left = `${startX}px`;
     projectile.style.top = `${startY}px`;
-    projectile.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+    projectile.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`; // 🔥 關鍵旋轉
 
     document.querySelector('.battle-field-container').appendChild(projectile);
+
+    // 強制重繪
     void projectile.offsetWidth; 
 
+    // 4. 設定目標位置 (保持角度)
     projectile.style.left = `${endX}px`;
     projectile.style.top = `${endY}px`;
     projectile.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
 
+    // 5. 命中回調
     setTimeout(() => {
         projectile.remove();
         if(onHitCallback) onHitCallback();
-    }, 300); 
+    }, 300); // 飛行時間 0.3秒
+}
+
+// 英雄受擊紅閃震動
+function triggerHeroHit(slotIdx) {
+    const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"] .card`);
+    if(slotDiv) {
+        slotDiv.classList.remove('taking-damage');
+        void slotDiv.offsetWidth; 
+        slotDiv.classList.add('taking-damage');
+    }
 }
 
 let baseAttackCooldown = 0;
@@ -585,7 +550,7 @@ function gameLoop() {
     if (baseAttackCooldown > 60 && baseHp > 0) { 
         const nearest = enemies.find(e => e.position < 25);
         if (nearest) {
-            nearest.currentHp -= 300; 
+            nearest.currentHp -= 150; // 下修傷害至150
             baseAttackCooldown = 0;
             const laser = document.createElement('div'); laser.className = 'base-laser'; laser.style.width = `${nearest.position}%`;
             if(nearest.lane === 0) laser.style.top = '15%'; else if(nearest.lane === 1) laser.style.top = '50%'; else if(nearest.lane === 2) laser.style.top = '85%';
@@ -594,25 +559,21 @@ function gameLoop() {
         }
     }
 
-    // 3. 戰鬥邏輯
+    // 戰鬥邏輯 (加入 Projectile)
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
-        
         const startSlot = enemy.lane * 3;
         const endSlot = startSlot + 2;
 
         for(let i = startSlot; i <= endSlot; i++) {
              if (battleSlots[i] && battleSlots[i].currentHp > 0) {
-                
                 let slotPos = 0;
-                if(i % 3 === 0) slotPos = 25; 
-                if(i % 3 === 1) slotPos = 50; 
-                if(i % 3 === 2) slotPos = 75; 
+                if(i % 3 === 0) slotPos = 25; if(i % 3 === 1) slotPos = 50; if(i % 3 === 2) slotPos = 75; 
 
                 // 怪物攻擊 (距離優勢)
                 if (enemy.position <= slotPos + 15 && enemy.position >= slotPos - 5) {
                      if (now - enemy.lastAttackTime > 800) { 
-                        // 🔥 怪物發射火球
+                        // 🔥 怪物發射火球 (這裡可換成噴毒)
                         fireProjectile(enemy.el, document.querySelector(`.defense-slot[data-slot="${i}"]`), 'fireball', () => {
                              battleSlots[i].currentHp -= enemy.atk;
                              triggerHeroHit(i); // 受擊特效
@@ -627,7 +588,7 @@ function gameLoop() {
                 if (enemy.position <= slotPos + 5 && enemy.position >= slotPos - 5) {
                     blocked = true;
                     if (now - battleSlots[i].lastAttackTime > 2000) { 
-                         // 🔥 判斷英雄類型
+                         // 🔥 判斷英雄類型，發射不同飛行道具
                          const isRanged = battleSlots[i].attackType === 'ranged';
                          fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, isRanged ? 'arrow' : 'slash', () => {
                              if(enemy.el) { 
