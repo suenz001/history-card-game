@@ -135,18 +135,8 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 #batch-confirm-btn:hover { background: #c0392b; }
 
 /* 🔥 戰鬥中：已部署卡片樣式 🔥 */
-.card.is-deployed {
-    filter: grayscale(1) brightness(0.6);
-    pointer-events: none;
-    border-color: #7f8c8d !important;
-}
-.card.is-deployed::after {
-    content: '已部署';
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    font-size: 1.2em; font-weight: bold; color: white;
-    background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px;
-    white-space: nowrap; z-index: 30;
-}
+.card.is-deployed { filter: grayscale(1) brightness(0.6); pointer-events: none; border-color: #7f8c8d !important; }
+.card.is-deployed::after { content: '已部署'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2em; font-weight: bold; color: white; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px; white-space: nowrap; z-index: 30; }
 
 /* CSS 純色邊框 */
 .card { border: 2px solid #555; }
@@ -179,58 +169,23 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* 戰場容器 */
 .battle-field-container {
-    flex: 1;
-    position: relative;
-    background: #34495e;
-    overflow: hidden;
-    border-top: 2px solid #555;
-    border-bottom: 2px solid #555;
-    background-image: linear-gradient(#2c3e50 1px, transparent 1px), linear-gradient(90deg, #2c3e50 1px, transparent 1px);
-    background-size: 20px 20px;
-    display: flex;
+    flex: 1; position: relative; background: #34495e; overflow: hidden; border-top: 2px solid #555; border-bottom: 2px solid #555;
+    background-image: linear-gradient(#2c3e50 1px, transparent 1px), linear-gradient(90deg, #2c3e50 1px, transparent 1px); background-size: 20px 20px; display: flex;
 }
 
 /* 主堡 (優化視覺) */
-.base-zone {
-    width: 100px; height: 100%; /* 加寬 */
-    background: #2c3e50;
-    border-right: 8px solid #7f8c8d; /* 加粗牆壁 */
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    z-index: 10;
-}
-.base-castle { 
-    font-size: 5em; /* 放大城堡圖示 */
-    display: flex; align-items: center; justify-content: center; height: 100%;
-    filter: drop-shadow(0 0 10px #000);
-}
+.base-zone { width: 100px; height: 100%; background: #2c3e50; border-right: 8px solid #7f8c8d; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
+.base-castle { font-size: 5em; display: flex; align-items: center; justify-content: center; height: 100%; filter: drop-shadow(0 0 10px #000); }
 .base-health-bar { width: 80px; height: 10px; background: #c0392b; border-radius: 4px; position: absolute; bottom: 20px; overflow: hidden; }
 #base-hp-bar { height: 100%; background: #2ecc71; transition: width 0.2s; }
 
 /* 三條路線 */
-.lanes-wrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column; 
-    height: 100%;
-}
-.lane-row {
-    flex: 1; 
-    display: flex;
-    justify-content: space-around; 
-    align-items: center;
-    border-bottom: 1px dashed rgba(255,255,255,0.1);
-    position: relative;
-}
+.lanes-wrapper { flex: 1; display: flex; flex-direction: column; height: 100%; }
+.lane-row { flex: 1; display: flex; justify-content: space-around; align-items: center; border-bottom: 1px dashed rgba(255,255,255,0.1); position: relative; }
 .lane-row:last-child { border-bottom: none; }
 
 /* 防禦槽位 */
-.defense-slot {
-    width: 70px; height: 90px;
-    border: 2px dashed #7f8c8d; border-radius: 6px;
-    background: rgba(255,255,255,0.05);
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    position: relative; transition: 0.2s; cursor: pointer;
-}
+.defense-slot { width: 70px; height: 90px; border: 2px dashed #7f8c8d; border-radius: 6px; background: rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; transition: 0.2s; cursor: pointer; }
 .defense-slot.active { border-style: solid; border-color: #f1c40f; background: rgba(241, 196, 15, 0.1); }
 .defense-slot .card { transform: scale(0.45); pointer-events: none; margin: 0; border-width: 2px; box-shadow: none; position: absolute; top: 50%; left: 50%; translate: -50% -50%; } 
 .slot-placeholder { color: #aaa; font-size: 0.8em; text-align: center; pointer-events: none; }
@@ -238,26 +193,9 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .hero-hp-bar > div { height: 100%; background: #2ecc71; }
 
 /* 敵人出生區 */
-.enemy-spawn-zone {
-    width: 50px; height: 100%;
-    background: rgba(0,0,0,0.3);
-    border-left: 4px dashed #c0392b;
-    display: flex; justify-content: center; align-items: center;
-    color: #e74c3c; font-weight: bold; writing-mode: vertical-lr;
-    z-index: 10;
-}
-
+.enemy-spawn-zone { width: 50px; height: 100%; background: rgba(0,0,0,0.3); border-left: 4px dashed #c0392b; display: flex; justify-content: center; align-items: center; color: #e74c3c; font-weight: bold; writing-mode: vertical-lr; z-index: 10; }
 /* 敵人實體 */
-.enemy-unit {
-    position: absolute;
-    width: 40px; height: 40px; 
-    background: #e74c3c; border-radius: 50%; border: 2px solid #fff;
-    display: flex; justify-content: center; align-items: center;
-    font-size: 1.2em; z-index: 5;
-    transition: left 0.1s linear;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    transform: translateY(-50%); 
-}
+.enemy-unit { position: absolute; width: 40px; height: 40px; background: #e74c3c; border-radius: 50%; border: 2px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.2em; z-index: 5; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: translateY(-50%); }
 .enemy-hp-bar { position: absolute; top: -8px; width: 30px; height: 4px; background: #555; border-radius: 2px; }
 .enemy-hp-bar > div { height: 100%; background: #f1c40f; }
 
@@ -270,26 +208,29 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .damage-text { position: absolute; color: #ffeb3b; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #c0392b; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; }
 @keyframes floatUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }
 
-/* 揮劍動畫 */
-.slash-effect {
-    position: absolute; font-size: 3em; color: #fff; text-shadow: 0 0 10px cyan; pointer-events: none; z-index: 100;
-    transform: translate(-50%, -50%); animation: slashAnim 0.3s forwards;
-}
-@keyframes slashAnim {
-    0% { transform: translate(-50%, -50%) scale(0.5) rotate(-45deg); opacity: 0; }
-    20% { opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1.5) rotate(90deg); opacity: 0; }
+/* 🔥 飛行道具 (Projectile) 🔥 */
+.projectile {
+    position: absolute;
+    z-index: 50;
+    transition: all 0.3s linear; /* 飛行速度 */
+    pointer-events: none;
+    font-size: 2em; /* Emoji 大小 */
+    filter: drop-shadow(0 0 5px white);
 }
 
-/* 噴毒動畫 */
+/* 🔥 噴毒動畫 (放大、顯眼) 🔥 */
 .poison-effect {
-    position: absolute; width: 60px; height: 60px; 
+    position: absolute; width: 100px; height: 100px; 
     background: radial-gradient(circle, #00ff00, transparent); 
     border-radius: 50%; opacity: 0.9; z-index: 99; pointer-events: none;
     transform: translate(-50%, -50%);
     animation: poisonSplash 0.5s forwards;
 }
-@keyframes poisonSplash { 0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
+@keyframes poisonSplash {
+    0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+    50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+    100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
 
 /* 🔥 英雄受擊紅閃震動 (修正版) 🔥 */
 .card.taking-damage {
@@ -297,17 +238,14 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 }
 @keyframes damageShake {
     0% { transform: translate(-50%, -50%) scale(0.45) rotate(0deg); filter: none; }
-    20% { transform: translate(-55%, -50%) scale(0.5) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); } /* 亮紅 */
+    20% { transform: translate(-55%, -50%) scale(0.5) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); }
     40% { transform: translate(-45%, -50%) scale(0.45) rotate(10deg); }
     60% { transform: translate(-55%, -50%) scale(0.5) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); }
     100% { transform: translate(-50%, -50%) scale(0.45) rotate(0deg); filter: none; }
 }
 
 /* 螢幕震動 */
-@keyframes shakeScreen {
-    0% { transform: translate(0, 0); } 25% { transform: translate(-5px, 5px); }
-    50% { transform: translate(5px, -5px); } 75% { transform: translate(-5px, -5px); } 100% { transform: translate(0, 0); }
-}
+@keyframes shakeScreen { 0% { transform: translate(0, 0); } 25% { transform: translate(-5px, 5px); } 50% { transform: translate(5px, -5px); } 75% { transform: translate(-5px, -5px); } 100% { transform: translate(0, 0); } }
 .shake-screen-effect { animation: shakeScreen 0.3s ease-in-out; }
 
 /* 動態血條顏色 */
@@ -315,17 +253,8 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .hp-mid { background: #f1c40f !important; }
 
 /* 戰鬥結算彈窗 */
-#battle-result-modal {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.85); z-index: 3000;
-    display: flex; justify-content: center; align-items: center;
-    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.result-content {
-    background: #2c3e50; border: 4px solid #f1c40f; border-radius: 15px;
-    padding: 30px; text-align: center; width: 300px;
-    box-shadow: 0 0 50px rgba(241, 196, 15, 0.5);
-}
+#battle-result-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 3000; display: flex; justify-content: center; align-items: center; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.result-content { background: #2c3e50; border: 4px solid #f1c40f; border-radius: 15px; padding: 30px; text-align: center; width: 300px; box-shadow: 0 0 50px rgba(241, 196, 15, 0.5); }
 .result-title { font-size: 2.5em; margin-bottom: 10px; font-weight: bold; }
 .result-gold { font-size: 1.5em; color: #f1c40f; margin-bottom: 20px; }
 .win-text { color: #2ecc71; text-shadow: 0 0 10px #2ecc71; }

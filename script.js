@@ -404,7 +404,7 @@ function calculateBatchTotal() { let totalGold = 0; let count = 0; allUserCards.
 batchConfirmBtn.addEventListener('click', async () => { playSound('click'); if (selectedBatchCards.size === 0) return; if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; let totalGold = 0; const deletePromises = []; const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); cardsToRemove.forEach(card => { totalGold += DISMANTLE_VALUES[card.rarity]; if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); }); try { batchConfirmBtn.innerText = "分解中..."; await Promise.all(deletePromises); playSound('dismantle'); setTimeout(() => playSound('coin'), 300); gold += totalGold; allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); await updateCurrencyCloud(); updateUIDisplay(); selectedBatchCards.clear(); isBatchMode = false; updateBatchUI(); filterInventory(currentFilterRarity); alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
 // ==========================================
-// 🔥 戰鬥系統核心 (Nano Banana 優化版)
+// 🔥 戰鬥系統核心 (Projectiles + Animation Update)
 // ==========================================
 
 document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
@@ -447,7 +447,6 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     enemies = [];
     document.getElementById('enemy-container').innerHTML = '';
     
-    // 初始化英雄
     battleSlots.forEach(hero => { 
         if(hero) { hero.currentHp = hero.hp; hero.maxHp = hero.hp; hero.lastAttackTime = 0; } 
     });
@@ -457,7 +456,7 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     document.getElementById('start-battle-btn').classList.add('btn-disabled');
     document.getElementById('start-battle-btn').innerText = "戰鬥進行中...";
     
-    startWave(1); // 開始第一波
+    startWave(1); 
     gameLoop();
 });
 
@@ -511,21 +510,48 @@ function spawnEnemy() {
         maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, 
         lane: lane, position: 100, speed: 0.1 + (battleState.wave * 0.02), el: null, lastAttackTime: 0 
     };
+    
     const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
     if(lane === 0) el.style.top = '15%'; else if(lane === 1) el.style.top = '50%'; else if(lane === 2) el.style.top = '85%';
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
-function showAttackEffect(targetEl, type) {
-    if(!targetEl) return;
-    const effect = document.createElement('div'); 
-    effect.className = type === 'hero' ? 'slash-effect' : 'poison-effect';
-    effect.innerText = type === 'hero' ? '⚔️' : ''; 
-    const rect = targetEl.getBoundingClientRect(); 
-    const fieldRect = document.querySelector('.battle-field-container').getBoundingClientRect();
-    effect.style.left = (rect.left - fieldRect.left + rect.width/2) + 'px'; 
-    effect.style.top = (rect.top - fieldRect.top + rect.height/2) + 'px';
-    document.querySelector('.battle-field-container').appendChild(effect); setTimeout(() => effect.remove(), 400);
+// 🔥 發射飛行道具 (Projectiles) 🔥
+function fireProjectile(startEl, targetEl, type, onHitCallback) {
+    if(!startEl || !targetEl) return;
+    
+    const projectile = document.createElement('div');
+    projectile.className = 'projectile';
+    projectile.innerText = type === 'arrow' ? '🏹' : (type === 'fireball' ? '🔥' : '⚔️'); // 根據類型換圖
+    
+    // 取得起始點和目標點的座標 (相對於 battle-field-container)
+    const containerRect = document.querySelector('.battle-field-container').getBoundingClientRect();
+    const startRect = startEl.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+
+    const startX = startRect.left - containerRect.left + startRect.width / 2;
+    const startY = startRect.top - containerRect.top + startRect.height / 2;
+    const endX = targetRect.left - containerRect.left + targetRect.width / 2;
+    const endY = targetRect.top - containerRect.top + targetRect.height / 2;
+
+    // 設定初始位置
+    projectile.style.left = `${startX}px`;
+    projectile.style.top = `${startY}px`;
+
+    document.querySelector('.battle-field-container').appendChild(projectile);
+
+    // 強制瀏覽器重繪 (Force Reflow) 以觸發 transition
+    void projectile.offsetWidth; 
+
+    // 設定目標位置 (觸發移動)
+    projectile.style.left = `${endX}px`;
+    projectile.style.top = `${endY}px`;
+
+    // 飛行結束後 (300ms) 執行扣血回調
+    setTimeout(() => {
+        projectile.remove();
+        if(onHitCallback) onHitCallback();
+    }, 300);
 }
 
 // 英雄受擊紅閃震動
@@ -544,7 +570,6 @@ function gameLoop() {
     if (!isBattleActive) return;
     const now = Date.now();
 
-    // 1. 狀態機邏輯
     if (battleState.phase === 'SPAWNING') {
         if (battleState.spawned < battleState.totalToSpawn) {
             if (now - battleState.lastSpawnTime > 1500) { 
@@ -552,9 +577,7 @@ function gameLoop() {
                 battleState.spawned++;
                 battleState.lastSpawnTime = now;
             }
-        } else {
-            battleState.phase = 'COMBAT'; 
-        }
+        } else { battleState.phase = 'COMBAT'; }
     } 
     else if (battleState.phase === 'COMBAT') {
         if (enemies.length === 0) {
@@ -565,15 +588,12 @@ function gameLoop() {
     }
     else if (battleState.phase === 'WAITING') {
         if (now - battleState.waitTimer > 3000) {
-            if (battleState.wave < 3) {
-                startWave(battleState.wave + 1);
-            } else {
-                endBattle(true); return;
-            }
+            if (battleState.wave < 3) { startWave(battleState.wave + 1); } 
+            else { endBattle(true); return; }
         }
     }
 
-    // 2. 主堡攻擊 (傷害300)
+    // 主堡攻擊
     baseAttackCooldown++;
     if (baseAttackCooldown > 60 && baseHp > 0) { 
         const nearest = enemies.find(e => e.position < 25);
@@ -587,59 +607,58 @@ function gameLoop() {
         }
     }
 
-    // 3. 戰鬥邏輯
+    // 戰鬥邏輯 (加入 Projectile)
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
-        
         const startSlot = enemy.lane * 3;
         const endSlot = startSlot + 2;
 
         for(let i = startSlot; i <= endSlot; i++) {
              if (battleSlots[i] && battleSlots[i].currentHp > 0) {
                 let slotPos = 0;
-                if(i % 3 === 0) slotPos = 25; 
-                if(i % 3 === 1) slotPos = 50; 
-                if(i % 3 === 2) slotPos = 75; 
+                if(i % 3 === 0) slotPos = 25; if(i % 3 === 1) slotPos = 50; if(i % 3 === 2) slotPos = 75; 
 
                 // 怪物攻擊 (距離優勢)
                 if (enemy.position <= slotPos + 15 && enemy.position >= slotPos - 5) {
-                     if (now - enemy.lastAttackTime > 800) { // 攻速快 0.8s
-                        battleSlots[i].currentHp -= enemy.atk;
+                     if (now - enemy.lastAttackTime > 800) { 
+                        // 🔥 怪物發射火球 (這裡可換成噴毒)
+                        fireProjectile(enemy.el, document.querySelector(`.defense-slot[data-slot="${i}"]`), 'fireball', () => {
+                             battleSlots[i].currentHp -= enemy.atk;
+                             triggerHeroHit(i); // 受擊特效
+                             playSound('poison');
+                             renderBattleSlots();
+                        });
                         enemy.lastAttackTime = now;
-                        showAttackEffect(document.querySelector(`.defense-slot[data-slot="${i}"]`), 'enemy'); 
-                        playSound('poison');
-                        triggerHeroHit(i); 
-                        renderBattleSlots();
                     }
                 }
                 
                 // 英雄攻擊
                 if (enemy.position <= slotPos + 5 && enemy.position >= slotPos - 5) {
                     blocked = true;
-                    if (now - battleSlots[i].lastAttackTime > 2000) { // 攻速慢 2.0s
-                        enemy.currentHp -= battleSlots[i].atk;
-                        battleSlots[i].lastAttackTime = now;
-                        showAttackEffect(enemy.el, 'hero'); 
+                    if (now - battleSlots[i].lastAttackTime > 2000) { 
+                         // 🔥 英雄發射箭矢 (這裡可換成揮劍)
+                         fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, 'arrow', () => {
+                             if(enemy.el) { // 確保敵人還活著
+                                 enemy.currentHp -= battleSlots[i].atk;
+                             }
+                         });
+                         battleSlots[i].lastAttackTime = now;
                     }
                 }
              }
         }
 
-        // 🛑 怪物停在主堡前 (12%)
         if (enemy.position <= 12) {
             blocked = true;
-            if (now - enemy.lastAttackTime > 1000) { // 攻擊主堡
+            if (now - enemy.lastAttackTime > 1000) { 
                 baseHp -= 5;
                 enemy.lastAttackTime = now;
                 showDamageText(10, "-5 HP");
                 playSound('dismantle');
                 updateBattleUI();
-                
-                // 螢幕震動
                 const gameBody = document.body;
                 gameBody.classList.remove('shake-screen-effect');
-                void gameBody.offsetWidth; 
-                gameBody.classList.add('shake-screen-effect');
+                void gameBody.offsetWidth; gameBody.classList.add('shake-screen-effect');
             }
         }
 
@@ -656,25 +675,17 @@ function gameLoop() {
         } 
     });
 
-    battleSlots.forEach((hero, idx) => {
-        if (hero && hero.currentHp <= 0) { battleSlots[idx] = null; renderBattleSlots(); updateStartButton(); }
-    });
-
+    battleSlots.forEach((hero, idx) => { if (hero && hero.currentHp <= 0) { battleSlots[idx] = null; renderBattleSlots(); updateStartButton(); } });
     if (baseHp <= 0) { endBattle(false); return; }
 
     gameLoopId = requestAnimationFrame(gameLoop);
 }
 
 function updateBattleUI() {
-    const hpEl = document.getElementById('base-hp');
-    const barEl = document.getElementById('base-hp-bar');
-    hpEl.innerText = Math.max(0, Math.floor(baseHp));
-    barEl.style.width = `${Math.max(0, baseHp)}%`;
-    barEl.className = ''; 
-    if (baseHp < 30) barEl.classList.add('hp-low'); else if (baseHp < 60) barEl.classList.add('hp-mid');
-
-    document.getElementById('battle-gold').innerText = battleGold;
-    document.getElementById('wave-count').innerText = battleState.wave;
+    const hpEl = document.getElementById('base-hp'); const barEl = document.getElementById('base-hp-bar');
+    hpEl.innerText = Math.max(0, Math.floor(baseHp)); barEl.style.width = `${Math.max(0, baseHp)}%`;
+    barEl.className = ''; if (baseHp < 30) barEl.classList.add('hp-low'); else if (baseHp < 60) barEl.classList.add('hp-mid');
+    document.getElementById('battle-gold').innerText = battleGold; document.getElementById('wave-count').innerText = battleState.wave;
 }
 
 function showDamageText(leftPercent, text) {
@@ -684,50 +695,22 @@ function showDamageText(leftPercent, text) {
 }
 
 async function endBattle(isWin) {
-    let goldMultiplier = 1;
-    if (currentDifficulty === 'easy') goldMultiplier = 0.5;
-    else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
-
+    let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     let finalGold = Math.floor(battleGold * goldMultiplier);
-    
-    // 顯示結算視窗
-    const modal = document.getElementById('battle-result-modal');
-    const title = document.getElementById('result-title');
-    const goldText = document.getElementById('result-gold');
-    const btn = document.getElementById('close-result-btn');
-
+    const modal = document.getElementById('battle-result-modal'); const title = document.getElementById('result-title'); const goldText = document.getElementById('result-gold'); const btn = document.getElementById('close-result-btn');
     modal.classList.remove('hidden');
-
-    if (isWin) {
-        title.innerText = "VICTORY"; title.className = "result-title win-text"; playSound('reveal');
-    } else {
-        title.innerText = "DEFEAT"; title.className = "result-title lose-text"; finalGold = Math.floor(finalGold / 2); playSound('dismantle');
-    }
-
+    if (isWin) { title.innerText = "VICTORY"; title.className = "result-title win-text"; playSound('reveal'); } else { title.innerText = "DEFEAT"; title.className = "result-title lose-text"; finalGold = Math.floor(finalGold / 2); playSound('dismantle'); }
     goldText.innerText = `💰 +${finalGold}`;
-    
-    gold += finalGold;
-    await updateCurrencyCloud();
-    updateUIDisplay();
-
-    btn.onclick = () => {
-        playSound('click');
-        modal.classList.add('hidden');
-        resetBattleState();
-    };
+    gold += finalGold; await updateCurrencyCloud(); updateUIDisplay();
+    btn.onclick = () => { playSound('click'); modal.classList.add('hidden'); resetBattleState(); };
 }
 
-// 點擊防禦塔槽位
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
-        if(isBattleActive) return; 
-        playSound('click');
-        const slotIndex = parseInt(slot.dataset.slot);
+        if(isBattleActive) return; playSound('click'); const slotIndex = parseInt(slot.dataset.slot);
         if (battleSlots[slotIndex]) { battleSlots[slotIndex] = null; renderBattleSlots(); updateStartButton(); } 
         else {
-            deployTargetSlot = slotIndex;
-            document.getElementById('inventory-title').innerText = "👇 請選擇出戰英雄";
-            document.getElementById('inventory-modal').classList.remove('hidden');
+            deployTargetSlot = slotIndex; document.getElementById('inventory-title').innerText = "👇 請選擇出戰英雄"; document.getElementById('inventory-modal').classList.remove('hidden');
             if(allUserCards.length === 0) loadInventory(currentUser.uid); else filterInventory('ALL'); 
         }
     });
@@ -738,8 +721,7 @@ function deployHeroToSlot(card) {
     if(isAlreadyDeployed) { alert("這位英雄已經在場上了！"); return; }
     if (deployTargetSlot !== null) {
         battleSlots[deployTargetSlot] = { ...card, currentHp: card.hp, maxHp: card.hp, lastAttackTime: 0 };
-        deployTargetSlot = null; document.getElementById('inventory-modal').classList.add('hidden');
-        renderBattleSlots(); updateStartButton();
+        deployTargetSlot = null; document.getElementById('inventory-modal').classList.add('hidden'); renderBattleSlots(); updateStartButton();
     }
 }
 
