@@ -343,17 +343,30 @@ function drawSRorAbove() { const rand = Math.random(); let rarity = rand < 0.17 
 function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
     cardDiv.className = `card ${card.rarity}`; 
+    // 🔥 檢查是否已部署 (背包狀態) 🔥
     if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     
-    // 🔥 攻擊類型圖示邏輯 🔥
+    // 🔥 新增：類型圖示 🔥
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
 
-    cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats">${typeIcon} ${card.atk} ❤️ ${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
+    cardDiv.innerHTML = `
+        <div class="card-id-badge">#${idString}</div>
+        <div class="type-badge">${typeIcon}</div> <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
+        <img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+        <div class="card-info-overlay">
+            <div class="card-title">${card.title || ""}</div>
+            <div class="card-name">${card.name}</div>
+            <div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div>
+            <div class="card-stats">⚔️${card.atk} ❤️${card.hp}</div>
+        </div>
+        <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
+    `;
     
     cardDiv.addEventListener('click', () => { 
         playSound('click'); 
-        if (cardDiv.classList.contains('is-deployed')) return; 
+        if (cardDiv.classList.contains('is-deployed')) return; // 已部署不能點
+        
         if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } 
         if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } 
         let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); 
@@ -409,7 +422,7 @@ function calculateBatchTotal() { let totalGold = 0; let count = 0; allUserCards.
 batchConfirmBtn.addEventListener('click', async () => { playSound('click'); if (selectedBatchCards.size === 0) return; if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; let totalGold = 0; const deletePromises = []; const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); cardsToRemove.forEach(card => { totalGold += DISMANTLE_VALUES[card.rarity]; if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); }); try { batchConfirmBtn.innerText = "分解中..."; await Promise.all(deletePromises); playSound('dismantle'); setTimeout(() => playSound('coin'), 300); gold += totalGold; allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); await updateCurrencyCloud(); updateUIDisplay(); selectedBatchCards.clear(); isBatchMode = false; updateBatchUI(); filterInventory(currentFilterRarity); alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
 // ==========================================
-// 🔥 戰鬥系統核心 (Phase 5 最終完美修復版)
+// 🔥 戰鬥系統核心 (Projectiles + Animation Update)
 // ==========================================
 
 document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
@@ -452,7 +465,6 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     enemies = [];
     document.getElementById('enemy-container').innerHTML = '';
     
-    // 初始化英雄
     battleSlots.forEach(hero => { 
         if(hero) { hero.currentHp = hero.hp; hero.maxHp = hero.hp; hero.lastAttackTime = 0; } 
     });
@@ -462,7 +474,7 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     document.getElementById('start-battle-btn').classList.add('btn-disabled');
     document.getElementById('start-battle-btn').innerText = "戰鬥進行中...";
     
-    startWave(1); // 開始第一波
+    startWave(1); 
     gameLoop();
 });
 
@@ -645,6 +657,7 @@ function gameLoop() {
                 // 怪物攻擊 (距離優勢)
                 if (enemy.position <= slotPos + 15 && enemy.position >= slotPos - 5) {
                      if (now - enemy.lastAttackTime > 800) { 
+                        // 🔥 怪物發射火球 (這裡可換成噴毒)
                         fireProjectile(enemy.el, document.querySelector(`.defense-slot[data-slot="${i}"]`), 'fireball', () => {
                              battleSlots[i].currentHp -= enemy.atk;
                              triggerHeroHit(i); // 受擊特效
