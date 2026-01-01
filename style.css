@@ -34,6 +34,7 @@ button:active { transform: scale(0.95); }
 .card-frame-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
 .card-info-overlay { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(0,0,0,0.95) 15%, rgba(0,0,0,0.7) 50%, transparent 100%); color: white; padding: 5px 0; text-align: center; border-radius: 0 0 8px 8px; z-index: 20; pointer-events: none; }
 .card-title { font-size: 0.65em; color: #bdc3c7; } .card-name { font-size: 0.9em; font-weight: bold; } .card-stats { font-size: 0.75em; color: #f1c40f; }
+.card-level-star { font-size: 0.7em; color: #00d2d3; margin-bottom: 1px; }
 .card-id-badge { position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); padding: 2px 5px; border-radius: 4px; font-size: 0.7em; z-index: 15; }
 .card-rarity-badge { position: absolute; top: 5px; right: 5px; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; font-weight: bold; z-index: 15; }
 .type-badge { position: absolute; top: 30px; left: 5px; background: rgba(0,0,0,0.8); width: 20px; height: 20px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 0.8em; border: 1px solid #aaa; z-index: 15; }
@@ -44,7 +45,7 @@ button:active { transform: scale(0.95); }
 .R { border-color: #3498db; } .card-rarity-badge.R { background: linear-gradient(45deg, #3498db, #2980b9); }
 
 /* 彈窗 */
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 3000; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; }
 .modal-content { background: #2c3e50; width: 90%; max-width: 1000px; height: 80%; border-radius: 10px; border: 2px solid #f1c40f; display: flex; flex-direction: column; padding: 20px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #555; padding-bottom: 10px; }
 #inventory-grid { flex: 1; overflow-y: auto; padding: 10px; }
@@ -69,7 +70,8 @@ button:active { transform: scale(0.95); }
 .card.is-selected::after { content: '✔'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3em; color: #e74c3c; border: 3px solid #e74c3c; border-radius: 50%; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; background: rgba(0, 0, 0, 0.7); z-index: 50; pointer-events: none; }
 #batch-toggle-btn { background-color: #34495e; border: 2px solid #95a5a6; color: white; padding: 5px 15px; border-radius: 20px; }
 #batch-toggle-btn.active { background-color: #e74c3c; border-color: #c0392b; box-shadow: 0 0 10px #e74c3c; }
-#batch-action-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(44, 62, 80, 0.95); border: 2px solid #e74c3c; padding: 10px 20px; border-radius: 50px; display: flex; align-items: center; gap: 15px; z-index: 3500; width: 90%; max-width: 500px; justify-content: space-between; }
+#batch-action-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(44, 62, 80, 0.95); border: 2px solid #e74c3c; padding: 10px 20px; border-radius: 50px; display: flex; align-items: center; gap: 15px; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 90%; max-width: 500px; justify-content: space-between; }
+#batch-confirm-btn { background: #e74c3c; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
 
 /* 戰鬥畫面 */
 #battle-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #2c3e50; z-index: 1500; display: flex; flex-direction: column; }
@@ -94,7 +96,6 @@ button:active { transform: scale(0.95); }
 .difficulty-btn { padding: 5px 15px; border-radius: 20px; color: white; opacity: 0.5; }
 .difficulty-btn.active { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px white; }
 
-/* 特效 */
 .projectile { position: absolute; z-index: 50; transition: all 0.3s linear; pointer-events: none; font-size: 2.5em; filter: drop-shadow(0 0 5px white); }
 .poison-effect { position: absolute; width: 100px; height: 100px; background: radial-gradient(circle, #00ff00, transparent); border-radius: 50%; opacity: 0.9; z-index: 99; pointer-events: none; transform: translate(-50%, -50%); animation: poisonSplash 0.5s forwards; }
 @keyframes poisonSplash { 0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
@@ -103,22 +104,19 @@ button:active { transform: scale(0.95); }
 @keyframes damageShake { 0% { transform: translate(-50%, -50%) scale(0.45) rotate(0deg); filter: none; } 20% { transform: translate(-55%, -50%) scale(0.5) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); } 100% { transform: translate(-50%, -50%) scale(0.45) rotate(0deg); filter: none; } }
 @keyframes shakeScreen { 0% { transform: translate(0, 0); } 25% { transform: translate(-2px, 2px); } 50% { transform: translate(2px, -2px); } 100% { transform: translate(0, 0); } }
 .shake-screen-effect { animation: shakeScreen 0.2s ease-in-out; }
+.hp-low { background: #e74c3c !important; box-shadow: 0 0 5px #c0392b; } .hp-mid { background: #f1c40f !important; }
 
-.hp-low { background: #e74c3c !important; } .hp-mid { background: #f1c40f !important; }
-.card.is-deployed { filter: grayscale(1) brightness(0.6); pointer-events: none; border-color: #7f8c8d !important; }
-.card.is-deployed::after { content: '已部署'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2em; font-weight: bold; background: rgba(0,0,0,0.7); padding: 5px 10px; z-index: 30; }
-
-/* 抽卡動畫 */
-#gacha-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-#summon-circle { width: 150px; height: 150px; border-radius: 50%; background: white; box-shadow: 0 0 20px white; animation: pulse 0.8s infinite alternate; z-index: 1001; }
-#summon-burst { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 0; height: 0; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,215,0,0.8) 40%, transparent 80%); opacity: 0; z-index: 1000; }
-.burst-active { animation: holyBurst 1s forwards ease-out; }
-@keyframes pulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.2); opacity: 1; } }
-@keyframes rotate-glow { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
-@keyframes holyBurst { 0% { width: 0; height: 0; opacity: 1; } 50% { width: 200vw; height: 200vw; opacity: 0.8; } 100% { width: 300vw; height: 300vw; opacity: 0; } }
-.flash-screen { animation: flash 1.5s forwards; background: white !important; z-index: 2000; }
-@keyframes flash { 0% { background: rgba(0,0,0,0.9); } 20% { background: white; opacity: 1; } 100% { background: rgba(0,0,0,0); opacity: 0; display: none; } }
-@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-
+#battle-result-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 3000; display: flex; justify-content: center; align-items: center; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.result-content { background: #2c3e50; border: 4px solid #f1c40f; border-radius: 15px; padding: 30px; text-align: center; width: 300px; box-shadow: 0 0 50px rgba(241, 196, 15, 0.5); }
+.result-title { font-size: 2.5em; margin-bottom: 10px; font-weight: bold; }
+.result-gold { font-size: 1.5em; color: #f1c40f; margin-bottom: 20px; }
+.win-text { color: #2ecc71; text-shadow: 0 0 10px #2ecc71; }
+.lose-text { color: #e74c3c; text-shadow: 0 0 10px #e74c3c; }
+#wave-notification { position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%); font-size: 3em; font-weight: bold; color: #e74c3c; text-shadow: 0 0 20px black; z-index: 100; animation: waveFade 2s forwards; pointer-events: none; }
+@keyframes waveFade { 0% { opacity: 0; transform: translate(-50%, -30%); } 20% { opacity: 1; transform: translate(-50%, -50%); } 80% { opacity: 1; } 100% { opacity: 0; } }
 .base-laser { position: absolute; top: 50%; left: 80px; width: 0; height: 4px; background: #00ffff; box-shadow: 0 0 10px #00ffff; z-index: 9; transform-origin: left center; animation: laserShoot 0.2s forwards; }
 @keyframes laserShoot { 0% { opacity: 1; } 100% { opacity: 0; } }
+.slash-effect { position: absolute; font-size: 3em; color: #fff; text-shadow: 0 0 10px cyan; pointer-events: none; z-index: 100; transform: translate(-50%, -50%); animation: slashAnim 0.3s forwards; }
+@keyframes slashAnim { 0% { transform: translate(-50%, -50%) scale(0.5) rotate(-45deg); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5) rotate(90deg); opacity: 0; } }
+.damage-text { position: absolute; color: #ffeb3b; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #c0392b; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; }
+@keyframes floatUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }

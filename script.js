@@ -23,7 +23,7 @@ let allUserCards = []; let currentDisplayList = []; let currentCardIndex = 0;
 let currentFilterRarity = 'ALL'; let currentSortMethod = 'time_desc';
 
 // 戰鬥系統變數
-let battleSlots = new Array(9).fill(null);
+let battleSlots = new Array(9).fill(null); // 9個槽位 (3x3)
 let isBattleActive = false;
 let battleGold = 0;
 let baseHp = 100;
@@ -124,21 +124,50 @@ const cardDatabase = [
     { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, attackType: 'ranged' }
 ];
 
-// 🔥 初始化：綁定所有按鈕 🔥
+// 初始化
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // 登入按鈕
+    // 綁定所有按鈕
     document.getElementById('google-btn').onclick = () => { playSound('click'); signInWithPopup(auth, provider).catch(e=>alert(e.message)); };
     document.getElementById('email-signup-btn').onclick = () => { playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { await updateProfile(res.user, { displayName: "新玩家" }); location.reload(); }).catch(e=>alert(e.message)); };
     document.getElementById('email-login-btn').onclick = () => { playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; signInWithEmailAndPassword(auth, email, pass).catch(e=>alert(e.message)); };
     document.getElementById('guest-btn').onclick = () => { playSound('click'); signInAnonymously(auth).then(async (res) => { await updateProfile(res.user, { displayName: "神秘客" }); location.reload(); }).catch(e=>alert(e.message)); };
     document.getElementById('logout-btn').onclick = () => { playSound('click'); signOut(auth).then(() => location.reload()); };
     
-    // 設定按鈕
     document.getElementById('settings-btn').onclick = () => { playSound('click'); document.getElementById('settings-modal').classList.remove('hidden'); };
     document.getElementById('close-settings-btn').onclick = () => { playSound('click'); document.getElementById('settings-modal').classList.add('hidden'); };
     
-    // 抽卡按鈕 (修復動畫)
+    document.getElementById('enter-battle-mode-btn').onclick = async () => {
+        playSound('click');
+        if(!currentUser) return alert("請先登入");
+        if(allUserCards.length === 0) await loadInventory(currentUser.uid);
+        if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
+        document.getElementById('battle-screen').classList.remove('hidden');
+        renderBattleSlots();
+        updateStartButton();
+    };
+
+    document.getElementById('auto-deploy-btn').onclick = () => {
+        if(isBattleActive) return; playSound('click');
+        const topHeroes = [...allUserCards].sort((a,b)=>(b.atk+b.hp)-(a.atk+a.hp)).slice(0,9);
+        battleSlots = new Array(9).fill(null);
+        topHeroes.forEach((h,i)=>battleSlots[i]={...h,currentHp:h.hp,maxHp:h.hp,lastAttackTime:0});
+        renderBattleSlots(); updateStartButton();
+    };
+
+    document.getElementById('start-battle-btn').onclick = () => {
+        if(isBattleActive) return; playSound('click');
+        isBattleActive = true; baseHp = 100; battleGold = 0; enemies = [];
+        document.getElementById('enemy-container').innerHTML='';
+        battleSlots.forEach(h=>{if(h){h.currentHp=h.hp;h.maxHp=h.hp;h.lastAttackTime=0;}});
+        renderBattleSlots(); updateBattleUI();
+        document.getElementById('start-battle-btn').classList.add('btn-disabled');
+        document.getElementById('start-battle-btn').innerText="戰鬥進行中...";
+        startWave(1); gameLoop();
+    };
+
+    document.getElementById('retreat-btn').onclick = () => { playSound('click'); resetBattleState(); };
+
+    // 抽卡按鈕
     document.getElementById('draw-btn').onclick = async () => { 
         playSound('click'); 
         if (gems < 100) return alert("鑽石不足"); 
@@ -159,45 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     document.getElementById('gacha-skip-btn').onclick = (e) => { playSound('click'); e.stopPropagation(); let nextSSRIndex = -1; for(let i = gachaIndex; i < gachaQueue.length; i++) { if(gachaQueue[i].rarity === 'SSR') { nextSSRIndex = i; break; } } if (nextSSRIndex !== -1) { gachaIndex = nextSSRIndex; showNextRevealCard(); } else { gachaIndex = gachaQueue.length; closeRevealModal(); } };
     
-    // 戰鬥按鈕
-    document.getElementById('enter-battle-mode-btn').onclick = async () => {
-        playSound('click');
-        if(!currentUser) return alert("請先登入");
-        if(allUserCards.length === 0) await loadInventory(currentUser.uid);
-        if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
-        document.getElementById('battle-screen').classList.remove('hidden');
-        renderBattleSlots();
-        updateStartButton();
-    };
-    document.getElementById('auto-deploy-btn').onclick = () => {
-        if(isBattleActive) return;
-        playSound('click');
-        const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
-        battleSlots = new Array(9).fill(null);
-        topHeroes.forEach((hero, index) => { battleSlots[index] = { ...hero, currentHp: hero.hp, maxHp: hero.hp, lastAttackTime: 0 }; });
-        renderBattleSlots();
-        updateStartButton();
-    };
-    document.getElementById('start-battle-btn').onclick = () => {
-        if(isBattleActive) return;
-        playSound('click');
-        isBattleActive = true;
-        baseHp = 100;
-        battleGold = 0;
-        enemies = [];
-        document.getElementById('enemy-container').innerHTML = '';
-        battleSlots.forEach(hero => { 
-            if(hero) { hero.currentHp = hero.hp; hero.maxHp = hero.hp; hero.lastAttackTime = 0; } 
-        });
-        renderBattleSlots();
-        updateBattleUI();
-        document.getElementById('start-battle-btn').classList.add('btn-disabled');
-        document.getElementById('start-battle-btn').innerText = "戰鬥進行中...";
-        startWave(1); 
-        gameLoop();
-    };
-    document.getElementById('retreat-btn').onclick = () => { playSound('click'); resetBattleState(); };
-    
     // 背包與其他按鈕
     document.getElementById('inventory-btn').onclick = () => { playSound('inventory'); if(!currentUser) return alert("請先登入"); deployTargetSlot = null; document.getElementById('inventory-title').innerText = "🎒 我的背包"; document.getElementById('inventory-modal').classList.remove('hidden'); loadInventory(currentUser.uid); };
     document.getElementById('close-inventory-btn').onclick = () => { playSound('click'); document.getElementById('inventory-modal').classList.add('hidden'); deployTargetSlot = null; };
@@ -205,7 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('prev-card-btn').onclick = () => changeCard('prev');
     document.getElementById('next-card-btn').onclick = () => changeCard('next');
     
-    // 綁定難度選擇
     document.querySelectorAll('.difficulty-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             if(isBattleActive) return; 
@@ -220,16 +209,16 @@ document.addEventListener('DOMContentLoaded', () => {
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
-        document.getElementById('login-section').style.display = 'none';
-        document.getElementById('user-info').style.display = 'flex';
+        document.getElementById('login-section').style.display='none';
+        document.getElementById('user-info').style.display='flex';
         document.getElementById('user-name').innerText = `玩家：${user.displayName || '未命名'}`;
         await loadUserData(user);
         document.getElementById('game-ui').classList.remove('hidden');
         await calculateTotalPowerOnly(user.uid);
         loadLeaderboard();
     } else {
-        document.getElementById('login-section').style.display = 'block';
-        document.getElementById('user-info').style.display = 'none';
+        document.getElementById('login-section').style.display='block';
+        document.getElementById('user-info').style.display='none';
         document.getElementById('game-ui').classList.add('hidden');
     }
 });
@@ -246,7 +235,7 @@ function playGachaAnimation(highestRarity) {
         const text = document.getElementById('summon-text');
         const burst = document.getElementById('summon-burst');
         
-        overlay.classList.remove('hidden'); // 🔥 確保顯示
+        overlay.classList.remove('hidden'); 
         circle.className = ''; burst.className = ''; 
         text.innerText = "召喚中..."; 
         playSound('draw'); 
@@ -282,7 +271,7 @@ function showNextRevealCard() {
 async function closeRevealModal() {
     document.getElementById('gacha-reveal-modal').classList.add('hidden'); 
     currentDisplayList = []; 
-    const mainContainer = document.getElementById('card-display-area'); mainContainer.innerHTML = ""; 
+    const mainContainer = document.getElementById('card-display-area'); mainContainer.innerHTML = "";
     for (const card of gachaQueue) { 
         const savedCard = await saveCardToCloud(card); 
         currentDisplayList.push(savedCard); allUserCards.push(savedCard); totalPower += (card.atk + card.hp); 
@@ -299,7 +288,7 @@ function renderCard(card, targetContainer) {
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="type-badge">${typeIcon}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats">${typeIcon} ${card.atk} ❤️ ${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
     
-    // 防止重複綁定
+    // 防止重複綁定 (使用 cloneNode 是一個技巧)
     const newDiv = cardDiv.cloneNode(true);
     newDiv.addEventListener('click', () => { 
         playSound('click'); 
@@ -333,7 +322,7 @@ function spawnEnemy() {
 }
 
 function fireProjectile(startEl, targetEl, type, onHitCallback) {
-    if(!startEl || !targetEl || !document.body.contains(startEl) || !document.body.contains(targetEl)) return;
+    if(!startEl || !targetEl) return;
     const projectile = document.createElement('div'); projectile.className = 'projectile';
     if (type === 'arrow') { projectile.innerText = '➵'; projectile.style.color = '#f1c40f'; projectile.style.fontSize = '2.5em'; } 
     else if (type === 'fireball') { projectile.innerText = '☄️'; projectile.style.fontSize = '3em'; } 
@@ -363,22 +352,22 @@ function gameLoop() {
     } else if (battleState.phase === 'COMBAT') {
         if (enemies.length === 0) { battleState.phase = 'WAITING'; battleState.waitTimer = now; if(battleState.wave<3) showDamageText(50, "3秒後 下一波..."); }
     } else if (battleState.phase === 'WAITING') {
-        if (now - battleState.waitTimer > 3000) { if (battleState.wave < 3) startWave(battleState.wave + 1); else { endBattle(true); return; } }
+        if (now - battleState.waitTimer > 3000) {
+            if (battleState.wave < 3) startWave(battleState.wave + 1); else { endBattle(true); return; }
+        }
     }
     
-    // 主堡雷射
-    baseAttackCooldown++;
-    if (baseAttackCooldown > 60 && baseHp > 0) { 
+    // 主堡
+    if (baseHp > 0) {
         const nearest = enemies.find(e => e.position < 25);
-        if (nearest) {
-            nearest.currentHp -= 150; baseAttackCooldown = 0;
+        if (nearest && Math.random() < 0.05) { // 隨機觸發雷射
+            nearest.currentHp -= 150; 
             const laser = document.createElement('div'); laser.className = 'base-laser'; laser.style.width = `${nearest.position}%`;
             if(nearest.lane === 0) laser.style.top = '15%'; else if(nearest.lane === 1) laser.style.top = '50%'; else if(nearest.lane === 2) laser.style.top = '85%';
             document.querySelector('.battle-field-container').appendChild(laser); setTimeout(() => laser.remove(), 150); playSound('dismantle');
         }
     }
-
-    // 戰鬥判定
+    // 戰鬥
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
         const startSlot = enemy.lane * 3; const endSlot = startSlot + 2;
@@ -388,7 +377,7 @@ function gameLoop() {
                 if (enemy.position <= slotPos+15 && enemy.position >= slotPos-5) {
                      if (now - enemy.lastAttackTime > 800) { 
                         fireProjectile(enemy.el, document.querySelector(`.defense-slot[data-slot="${i}"]`), 'fireball', () => {
-                             if(battleSlots[i] && battleSlots[i].currentHp > 0) {
+                             if(battleSlots[i]) {
                                  battleSlots[i].currentHp -= enemy.atk;
                                  const slotCard = document.querySelector(`.defense-slot[data-slot="${i}"] .card`);
                                  if(slotCard) { slotCard.classList.remove('taking-damage'); void slotCard.offsetWidth; slotCard.classList.add('taking-damage'); }
@@ -416,7 +405,6 @@ function gameLoop() {
             blocked = true;
             if (now - enemy.lastAttackTime > 1000) { 
                 baseHp -= 5; enemy.lastAttackTime = now; updateBattleUI();
-                showDamageText(10, "-5 HP"); playSound('dismantle');
                 if(now - lastShakeTime > 500) { document.body.classList.remove('shake-screen-effect'); void document.body.offsetWidth; document.body.classList.add('shake-screen-effect'); lastShakeTime = now; }
             }
         }
@@ -425,10 +413,8 @@ function gameLoop() {
             enemy.el.style.left = `${enemy.position}%`;
             enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
         }
-        if (enemy.currentHp <= 0) { enemy.el.remove(); enemies.splice(eIndex, 1); battleGold += 50; updateBattleUI(); showDamageText(enemy.position, "+50G"); } 
+        if (enemy.currentHp <= 0) { enemy.el.remove(); enemies.splice(eIndex, 1); battleGold += 50; updateBattleUI(); } 
     });
-    
-    // 檢查英雄死亡
     battleSlots.forEach((hero, idx) => { if (hero && hero.currentHp <= 0) { battleSlots[idx] = null; renderBattleSlots(); } });
     if (baseHp <= 0) { endBattle(false); return; }
     gameLoopId = requestAnimationFrame(gameLoop);
@@ -438,13 +424,7 @@ function updateBattleUI() {
     const hpEl = document.getElementById('base-hp'); const barEl = document.getElementById('base-hp-bar');
     hpEl.innerText = Math.max(0, Math.floor(baseHp)); barEl.style.width = `${Math.max(0, baseHp)}%`;
     barEl.className = ''; if (baseHp < 30) barEl.classList.add('hp-low'); else if (baseHp < 60) barEl.classList.add('hp-mid');
-    document.getElementById('battle-gold').innerText = battleGold; document.getElementById('wave-count').innerText = battleState.wave;
-}
-
-function showDamageText(leftPercent, text) {
-    const el = document.createElement('div'); el.className = 'damage-text'; el.innerText = text;
-    el.style.left = `${leftPercent}%`; el.style.top = '40%';
-    document.querySelector('.battle-field-container').appendChild(el); setTimeout(() => el.remove(), 800);
+    document.getElementById('battle-gold').innerText = battleGold;
 }
 
 function resetBattleState() {
@@ -457,10 +437,10 @@ function resetBattleState() {
 async function endBattle(isWin) {
     let goldMultiplier = currentDifficulty==='easy'?0.5:(currentDifficulty==='hard'?2.0:1);
     let finalGold = Math.floor(battleGold * goldMultiplier);
-    const modal = document.getElementById('battle-result-modal'); const title = document.getElementById('result-title'); const goldText = document.getElementById('result-gold'); const btn = document.getElementById('close-result-btn');
+    const modal = document.getElementById('battle-result-modal');
     modal.classList.remove('hidden');
-    if (isWin) { title.innerText = "VICTORY"; title.className = "result-title win-text"; playSound('reveal'); } else { title.innerText = "DEFEAT"; title.className = "result-title lose-text"; finalGold = Math.floor(finalGold / 2); playSound('dismantle'); }
-    goldText.innerText = `💰 +${finalGold}`;
+    document.getElementById('result-title').innerText = isWin ? "VICTORY" : "DEFEAT";
+    document.getElementById('result-gold').innerText = `💰 +${finalGold}`;
     gold += finalGold; await updateCurrencyCloud(); updateUIDisplay();
-    btn.onclick = () => { playSound('click'); modal.classList.add('hidden'); resetBattleState(); };
+    document.getElementById('close-result-btn').onclick = () => { playSound('click'); modal.classList.add('hidden'); resetBattleState(); };
 }

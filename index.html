@@ -4,13 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=36">
+    <link rel="stylesheet" href="style.css?v=32">
     <script>
-        // 🛡️ 錯誤捕捉：如果 JS 崩潰，會彈窗提示，不用猜
+        // 錯誤捕捉：如果 JS 崩潰，會在 Console 顯示，不彈窗擾人
         window.onerror = function(msg, url, line, col, error) {
             console.error("JS Error:", msg, "Line:", line);
-            // alert("⚠️ 程式發生錯誤 (Line " + line + "):\n" + msg); 
-            // 註解掉 alert 避免太擾人，但在 console 看得到
             return false;
         };
     </script>
@@ -25,7 +23,7 @@
     <audio id="sfx-reveal"><source src="assets/sounds/reveal.mp3" type="audio/mpeg"></audio>
     <audio id="sfx-coin"><source src="assets/sounds/coin.mp3" type="audio/mpeg"></audio>
     <audio id="sfx-upgrade"><source src="assets/sounds/upgrade.mp3" type="audio/mpeg"></audio>
-
+    
     <div class="game-container">
         <h1>⚔️ 歷史英靈：策略對決</h1>
 
@@ -159,6 +157,7 @@
                         <option value="time_desc">📅 獲得時間 (新→舊)</option>
                         <option value="power_desc">🔥 依戰力 (高→低)</option>
                         <option value="rarity_desc">💎 依稀有度 (高→低)</option>
+                        <option value="id_asc">🔢 卡片序號 (1→30)</option>
                     </select>
                     <button id="batch-toggle-btn">🔧 批量分解</button>
                 </div>
