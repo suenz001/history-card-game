@@ -4,7 +4,7 @@ import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, 
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
 
 // ==========================================
-// 🔑 您的設定檔 (請確認這裡是否正確)
+// 🔑 您的設定檔 (依照您的截圖)
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyCaLWMEi7wNxeCjUQC86axbRsxLMDWQrq8",
@@ -75,7 +75,7 @@ function bindButtons() {
         playSound('coin');
         gems += 1000;
         updateGemDisplay(gems);
-        alert("💎 已獲得 1000 鑽石 (測試用)"); // 先彈窗讓你知道有反應
+        // 不彈窗干擾，直接加
         try { await updateCurrencyCloud(); } catch(e) { console.warn("雲端存檔失敗:", e); }
     };
 
@@ -83,7 +83,7 @@ function bindButtons() {
     document.getElementById('draw-btn').onclick = async () => { 
         playSound('click'); 
         if (gems < 100) return alert("鑽石不足"); 
-        gems -= 100; updateGemDisplay(gems); 
+        gems -= 100; updateGemDisplay(gems); // 🔥 先扣鑽石 (UI優先)
         const newCard = drawOneCard(); 
         await playGachaAnimation(newCard.rarity); 
         showRevealModal([newCard]); 
@@ -92,7 +92,7 @@ function bindButtons() {
     document.getElementById('draw-10-btn').onclick = async () => {
          playSound('click'); 
          if (gems < 1000) return alert("鑽石不足"); 
-         gems -= 1000; updateGemDisplay(gems); 
+         gems -= 1000; updateGemDisplay(gems); // 🔥 先扣鑽石 (UI優先)
          let drawnCards = []; let highestRarity = 'R'; let hasSRorAbove = false;
          for(let i=0; i<9; i++) { const c = drawOneCard(); drawnCards.push(c); if(c.rarity === 'SSR') highestRarity = 'SSR'; else if(c.rarity === 'SR') { if (highestRarity !== 'SSR') highestRarity = 'SR'; hasSRorAbove = true; } }
          let lastCard; if (hasSRorAbove || highestRarity === 'SSR') lastCard = drawOneCard(); else lastCard = drawSRorAbove(); drawnCards.push(lastCard); if (lastCard.rarity === 'SSR') highestRarity = 'SSR'; else if (lastCard.rarity === 'SR' && highestRarity !== 'SSR') highestRarity = 'SR';
@@ -179,25 +179,25 @@ function bindButtons() {
         let totalGold = 0; 
         const deletePromises = []; 
         const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); 
+        
+        // 優先更新本地 UI
         cardsToRemove.forEach(card => { 
             totalGold += DISMANTLE_VALUES[card.rarity]; 
             if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); 
         }); 
-        try { 
-            document.getElementById('batch-confirm-btn').innerText = "分解中..."; 
-            await Promise.all(deletePromises); 
-            playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
-            gold += totalGold; 
-            allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); 
-            await updateCurrencyCloud(); 
-            updateUIDisplay(); 
-            selectedBatchCards.clear(); isBatchMode = false; updateBatchUI(); filterInventory(currentFilterRarity); 
-            alert(`批量分解成功！獲得 ${totalGold} 金幣`); 
-        } catch (e) { 
-            console.error("批量分解失敗", e); alert("分解失敗，請檢查權限"); 
-        } finally {
-            document.getElementById('batch-confirm-btn').innerText = "確認分解";
-        }
+        
+        allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId));
+        gold += totalGold;
+        updateUIDisplay();
+        selectedBatchCards.clear(); 
+        isBatchMode = false; 
+        updateBatchUI(); 
+        filterInventory(currentFilterRarity); 
+        playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
+        alert(`批量分解成功！獲得 ${totalGold} 金幣`); 
+
+        try { await Promise.all(deletePromises); await updateCurrencyCloud(); } 
+        catch (e) { console.error("雲端同步失敗", e); }
     });
 
     document.body.addEventListener('click', initAudio, { once: true });
@@ -215,6 +215,11 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
+function handleAuthError(error) {
+    console.error("Auth Error:", error);
+    alert("登入錯誤: " + error.message);
+}
+
 // --- 邏輯函式 ---
 async function loadUserData(user) {
     try {
@@ -226,14 +231,34 @@ async function loadUserData(user) {
 }
 
 async function closeRevealModal() {
-    document.getElementById('gacha-reveal-modal').classList.add('hidden'); currentDisplayList = []; const mainContainer = document.getElementById('card-display-area'); mainContainer.innerHTML = "";
+    document.getElementById('gacha-reveal-modal').classList.add('hidden'); 
+    currentDisplayList = []; 
+    const mainContainer = document.getElementById('card-display-area'); 
+    mainContainer.innerHTML = "";
+
+    // 🔥 優先顯示卡片 (避免雲端失敗時以為沒抽到)
     updateGemDisplay(gems);
+    
     for (const card of gachaQueue) { 
-        try { const savedCard = await saveCardToCloud(card); currentDisplayList.push(savedCard); allUserCards.push(savedCard); totalPower += (card.atk + card.hp); }
-        catch (e) { console.error("存檔失敗:", e); card.docId = "temp_" + Date.now(); allUserCards.push(card); currentDisplayList.push(card); }
+        // 暫時 ID
+        if(!card.docId) card.docId = "temp_" + Date.now() + Math.random();
+        
+        // 先加到本地
+        allUserCards.push(card); 
+        currentDisplayList.push(card);
+        totalPower += (card.atk + card.hp);
+
+        // 再嘗試存雲端
+        saveCardToCloud(card).then(saved => {
+            // 更新回真實 ID (如果成功)
+            card.docId = saved.docId;
+        }).catch(e => console.error("存檔失敗 (但本地已顯示)", e));
     }
+    
     currentDisplayList.forEach((card) => { renderCard(card, mainContainer); }); 
-    updateUIDisplay(); try { await updateCurrencyCloud(); } catch(e){} setTimeout(loadLeaderboard, 1000); 
+    updateUIDisplay(); 
+    try { await updateCurrencyCloud(); } catch(e){} 
+    setTimeout(loadLeaderboard, 1000); 
 }
 
 function updateGemDisplay(newVal) { gems = newVal; document.getElementById('gem-count').innerText = gems; }
@@ -273,7 +298,7 @@ function synthesizePoison() { const osc=audioCtx.createOscillator();const g=audi
 function synthesizeHit() { const osc=audioCtx.createOscillator();const g=audioCtx.createGain();osc.type='square';osc.frequency.setValueAtTime(150,audioCtx.currentTime);osc.frequency.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.1);g.gain.setValueAtTime(sfxVolume*0.4,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.1);osc.connect(g);g.connect(audioCtx.destination);osc.start();osc.stop(audioCtx.currentTime+0.1); }
 
 // ==========================================
-// 🔥 補回消失的戰鬥函式 (這是之前缺少的！)
+// 🔥 補回消失的戰鬥函式
 // ==========================================
 
 function updateStartButton() {
@@ -368,72 +393,112 @@ function gameLoop() {
 
     if (battleState.phase === 'SPAWNING') {
         if (battleState.spawned < battleState.totalToSpawn) {
-            if (now - battleState.lastSpawnTime > 1500) { spawnEnemy(); battleState.spawned++; battleState.lastSpawnTime = now; }
+            if (now - battleState.lastSpawnTime > 1500) { 
+                spawnEnemy();
+                battleState.spawned++;
+                battleState.lastSpawnTime = now;
+            }
         } else { battleState.phase = 'COMBAT'; }
-    } else if (battleState.phase === 'COMBAT') {
-        if (enemies.length === 0) { battleState.phase = 'WAITING'; battleState.waitTimer = now; if(battleState.wave<3) showDamageText(50, "3秒後 下一波..."); }
-    } else if (battleState.phase === 'WAITING') {
-        if (now - battleState.waitTimer > 3000) { if (battleState.wave < 3) startWave(battleState.wave + 1); else { endBattle(true); return; } }
+    } 
+    else if (battleState.phase === 'COMBAT') {
+        if (enemies.length === 0) {
+            battleState.phase = 'WAITING';
+            battleState.waitTimer = now;
+            if (battleState.wave < 3) showDamageText(50, "3秒後 下一波...");
+        }
+    }
+    else if (battleState.phase === 'WAITING') {
+        if (now - battleState.waitTimer > 3000) {
+            if (battleState.wave < 3) { startWave(battleState.wave + 1); } 
+            else { endBattle(true); return; }
+        }
     }
 
-    // 主堡雷射
+    // 主堡攻擊
     baseAttackCooldown++;
     if (baseAttackCooldown > 60 && baseHp > 0) { 
         const nearest = enemies.find(e => e.position < 25);
         if (nearest) {
-            nearest.currentHp -= 150; baseAttackCooldown = 0;
+            nearest.currentHp -= 150; 
+            baseAttackCooldown = 0;
             const laser = document.createElement('div'); laser.className = 'base-laser'; laser.style.width = `${nearest.position}%`;
             if(nearest.lane === 0) laser.style.top = '15%'; else if(nearest.lane === 1) laser.style.top = '50%'; else if(nearest.lane === 2) laser.style.top = '85%';
-            document.querySelector('.battle-field-container').appendChild(laser); setTimeout(() => laser.remove(), 150); playSound('dismantle');
+            document.querySelector('.battle-field-container').appendChild(laser); setTimeout(() => laser.remove(), 150);
+            playSound('dismantle');
         }
     }
 
+    // 戰鬥邏輯
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
-        const startSlot = enemy.lane * 3; const endSlot = startSlot + 2;
+        const startSlot = enemy.lane * 3;
+        const endSlot = startSlot + 2;
+
         for(let i = startSlot; i <= endSlot; i++) {
              if (battleSlots[i] && battleSlots[i].currentHp > 0) {
-                let slotPos = i%3===0?25:(i%3===1?50:75);
-                if (enemy.position <= slotPos+15 && enemy.position >= slotPos-5) {
+                let slotPos = 0;
+                if(i % 3 === 0) slotPos = 25; if(i % 3 === 1) slotPos = 50; if(i % 3 === 2) slotPos = 75; 
+
+                // 怪物攻擊
+                if (enemy.position <= slotPos + 15 && enemy.position >= slotPos - 5) {
                      if (now - enemy.lastAttackTime > 800) { 
                         fireProjectile(enemy.el, document.querySelector(`.defense-slot[data-slot="${i}"]`), 'fireball', () => {
-                             if(battleSlots[i] && battleSlots[i].currentHp>0) {
-                                 battleSlots[i].currentHp -= enemy.atk;
-                                 triggerHeroHit(i); playSound('poison'); renderBattleSlots();
-                             }
+                             battleSlots[i].currentHp -= enemy.atk;
+                             triggerHeroHit(i);
+                             playSound('poison');
+                             renderBattleSlots();
                         });
                         enemy.lastAttackTime = now;
                     }
                 }
-                if (enemy.position <= slotPos+5 && enemy.position >= slotPos-5) blocked = true;
-                if (enemy.position <= slotPos+40 && enemy.position >= slotPos-5) {
+                
+                // 英雄攻擊
+                if (enemy.position <= slotPos + 5 && enemy.position >= slotPos - 5) {
+                    blocked = true;
                     if (now - battleSlots[i].lastAttackTime > 2000) { 
                          const isRanged = battleSlots[i].attackType === 'ranged';
-                         if (enemy.position <= slotPos + (isRanged?40:8)) {
-                            fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, isRanged?'arrow':'slash', () => {
-                                if(enemy.el) { enemy.currentHp -= battleSlots[i].atk; playSound('hit'); }
-                            });
-                            battleSlots[i].lastAttackTime = now;
-                         }
+                         fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, isRanged ? 'arrow' : 'slash', () => {
+                             if(enemy.el) { 
+                                 enemy.currentHp -= battleSlots[i].atk;
+                                 playSound('hit');
+                             }
+                         });
+                         battleSlots[i].lastAttackTime = now;
                     }
                 }
              }
         }
+
         if (enemy.position <= 12) {
             blocked = true;
             if (now - enemy.lastAttackTime > 1000) { 
-                baseHp -= 5; enemy.lastAttackTime = now; updateBattleUI();
-                showDamageText(10, "-5 HP"); playSound('dismantle');
-                if(now - lastShakeTime > 500) { document.body.classList.remove('shake-screen-effect'); void document.body.offsetWidth; document.body.classList.add('shake-screen-effect'); lastShakeTime = now; }
+                baseHp -= 5;
+                enemy.lastAttackTime = now;
+                showDamageText(10, "-5 HP");
+                playSound('dismantle');
+                updateBattleUI();
+                const gameBody = document.body;
+                gameBody.classList.remove('shake-screen-effect');
+                void gameBody.offsetWidth; gameBody.classList.add('shake-screen-effect');
             }
         }
-        if (!blocked) enemy.position -= enemy.speed;
-        if (enemy.el) { enemy.el.style.left = `${enemy.position}%`; enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`; }
-        if (enemy.currentHp <= 0) { enemy.el.remove(); enemies.splice(eIndex, 1); battleGold += 50; updateBattleUI(); showDamageText(enemy.position, "+50G"); playSound('dismantle'); } 
+
+        if (!blocked) { enemy.position -= enemy.speed; }
+        if (enemy.el) {
+            enemy.el.style.left = `${enemy.position}%`;
+            enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
+        }
+
+        if (enemy.currentHp <= 0) {
+            enemy.el.remove(); enemies.splice(eIndex, 1);
+            battleGold += 50 + (battleState.wave * 10);
+            updateBattleUI(); showDamageText(enemy.position, `+${50}G`); playSound('dismantle');
+        } 
     });
 
-    battleSlots.forEach((hero, idx) => { if (hero && hero.currentHp <= 0) { battleSlots[idx] = null; renderBattleSlots(); } });
+    battleSlots.forEach((hero, idx) => { if (hero && hero.currentHp <= 0) { battleSlots[idx] = null; renderBattleSlots(); updateStartButton(); } });
     if (baseHp <= 0) { endBattle(false); return; }
+
     gameLoopId = requestAnimationFrame(gameLoop);
 }
 
@@ -464,7 +529,7 @@ function stopBattleMusic() {
 }
 
 async function endBattle(isWin) {
-    let goldMultiplier = currentDifficulty==='easy'?0.5:(currentDifficulty==='hard'?2.0:1);
+    let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     let finalGold = Math.floor(battleGold * goldMultiplier);
     const modal = document.getElementById('battle-result-modal');
     modal.classList.remove('hidden');
