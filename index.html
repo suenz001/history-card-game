@@ -4,7 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=31">
+    <link rel="stylesheet" href="style.css?v=999">
+    <script>
+        // 🔥 全域錯誤捕捉 (若 JS 崩潰會彈窗提示) 🔥
+        window.onerror = function(msg, url, line, col, error) {
+            alert("⚠️ 遊戲發生錯誤，請截圖給開發者：\n" + msg + "\nLine: " + line);
+            return false;
+        };
+    </script>
 </head>
 <body>
 
@@ -16,11 +23,10 @@
     <audio id="sfx-reveal"><source src="assets/sounds/reveal.mp3" type="audio/mpeg"></audio>
     <audio id="sfx-coin"><source src="assets/sounds/coin.mp3" type="audio/mpeg"></audio>
     <audio id="sfx-upgrade"><source src="assets/sounds/upgrade.mp3" type="audio/mpeg"></audio>
-    
-    <div class="game-container">
+    <audio id="sfx-hit" style="display:none;"></audio> <div class="game-container">
         <h1>⚔️ 歷史英靈：策略對決</h1>
 
-        <div id="login-section">
+        <div id="login-section" style="position: relative; z-index: 5000;">
             <h3>請選擇登入方式：</h3>
             <button id="google-btn" class="btn-primary" style="background:#db4437; width: 100%;">Google 登入</button>
             <hr style="margin: 20px 0; border-color: #555;">
@@ -91,12 +97,10 @@
 
         <div class="battle-field-container">
             <div id="wave-notification" class="hidden">第 1 波</div>
-
             <div class="base-zone">
                 <div class="base-castle">🏰</div>
                 <div class="base-health-bar"><div id="base-hp-bar" style="width: 100%;"></div></div>
             </div>
-
             <div class="lanes-wrapper">
                 <div class="lane-row" id="lane-0">
                     <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
@@ -114,7 +118,6 @@
                     <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
                 </div>
             </div>
-
             <div class="enemy-spawn-zone">💀 <br> 敵軍<br>來襲</div>
             <div id="enemy-container"></div>
         </div>
@@ -147,9 +150,10 @@
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <h2 id="inventory-title">🎒 我的背包</h2>
                     <select id="sort-select" class="sort-dropdown">
+                        <option value="time_desc">📅 獲得時間 (新→舊)</option>
                         <option value="power_desc">🔥 依戰力 (高→低)</option>
                         <option value="rarity_desc">💎 依稀有度 (高→低)</option>
-                        <option value="time_desc">📅 獲得時間 (新→舊)</option>
+                        <option value="id_asc">🔢 卡片序號 (1→30)</option>
                     </select>
                     <button id="batch-toggle-btn">🔧 批量分解</button>
                 </div>
@@ -175,18 +179,10 @@
         <button id="next-card-btn" class="nav-arrow right">❯</button>
         <div id="large-card-view" class="large-card-container"></div>
         <div class="upgrade-controls">
-            <div class="upgrade-box">
-                <div class="upgrade-title">提升等級 (Lv.30 Max)</div>
-                <button id="upgrade-level-btn" class="btn-upgrade">⬆️ 升級</button>
-            </div>
-            <div class="upgrade-box">
-                <div class="upgrade-title">提升星級 (5★ Max)</div>
-                <button id="upgrade-star-btn" class="btn-star">⭐ 升星</button>
-            </div>
+            <div class="upgrade-box"><div class="upgrade-title">提升等級 (Lv.30 Max)</div><button id="upgrade-level-btn" class="btn-upgrade">⬆️ 升級</button></div>
+            <div class="upgrade-box"><div class="upgrade-title">提升星級 (5★ Max)</div><button id="upgrade-star-btn" class="btn-star">⭐ 升星</button></div>
         </div>
-        <div style="margin-top: 15px; z-index: 102;">
-            <button id="dismantle-btn" class="btn-danger">💰 分解此卡</button>
-        </div>
+        <div style="margin-top: 15px; z-index: 102;"><button id="dismantle-btn" class="btn-danger">💰 分解此卡</button></div>
     </div>
 
     <div id="gacha-reveal-modal" class="modal hidden" style="background: rgba(0,0,0,0.98); z-index: 2000;">
@@ -207,7 +203,6 @@
             <div class="modal-header"><h2>⚙️ 遊戲設定</h2><button id="close-settings-btn" class="btn-primary" style="background:#c0392b;">關閉</button></div>
             <div class="settings-body">
                 <div class="setting-item"><label>玩家暱稱</label><div style="display:flex; gap:5px;"><input type="text" id="settings-name-input"><button id="settings-save-name-btn" class="btn-primary">儲存</button></div></div>
-                <hr style="border-color: #555; margin: 15px 0;">
                 <div class="setting-item"><label>背景音樂</label><input type="checkbox" id="bgm-toggle" checked> <input type="range" id="bgm-volume" min="0" max="1" step="0.1" value="0.5"></div>
                 <div class="setting-item"><label>遊戲音效</label><input type="checkbox" id="sfx-toggle" checked> <input type="range" id="sfx-volume" min="0" max="1" step="0.1" value="1.0"></div>
             </div>
