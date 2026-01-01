@@ -27,8 +27,7 @@ let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
-// 戰鬥系統變數
-let battleSlots = new Array(9).fill(null); // 9個槽位 (3x3)
+let battleSlots = new Array(9).fill(null);
 let isBattleActive = false;
 let battleGold = 0;
 let baseHp = 100;
@@ -36,25 +35,15 @@ let enemies = [];
 let deployTargetSlot = null; 
 let currentDifficulty = 'normal';
 
-// 波次管理
 const WAVE_CONFIG = {
     1: { count: 6, hp: 800, atk: 50 },
     2: { count: 12, hp: 1500, atk: 100 },
     3: { count: 18, hp: 3000, atk: 200 } 
 };
-let battleState = {
-    wave: 1,
-    spawned: 0,
-    totalToSpawn: 0,
-    lastSpawnTime: 0,
-    phase: 'IDLE',
-    waitTimer: 0
-};
+let battleState = { wave: 1, spawned: 0, totalToSpawn: 0, lastSpawnTime: 0, phase: 'IDLE', waitTimer: 0 };
 let gameLoopId = null;
-
 let isBatchMode = false;
 let selectedBatchCards = new Set();
-
 let gachaQueue = [];
 let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
@@ -70,7 +59,6 @@ const sfxUpgrade = document.getElementById('sfx-upgrade');
 
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioCtx = new AudioContext();
-
 let isBgmOn = true;
 let isSfxOn = true;
 let bgmVolume = 0.5;
@@ -82,11 +70,8 @@ audioBattle.volume = bgmVolume;
 document.body.addEventListener('click', () => {
     if (audioCtx.state === 'suspended') { audioCtx.resume(); }
     if (isBgmOn && audioBgm.paused && audioBattle.paused) {
-        if(!document.getElementById('battle-screen').classList.contains('hidden')){
-            audioBattle.play().catch(()=>{});
-        } else {
-            audioBgm.play().catch(()=>{});
-        }
+        if(!document.getElementById('battle-screen').classList.contains('hidden')){ audioBattle.play().catch(()=>{}); } 
+        else { audioBgm.play().catch(()=>{}); }
     }
 }, { once: true });
 
@@ -104,42 +89,14 @@ function playSound(type) {
         else if (type === 'reveal') sound = sfxReveal;
         else if (type === 'coin') sound = sfxCoin;
         else if (type === 'upgrade') sound = sfxUpgrade;
-        
-        if (sound) {
-            sound.volume = sfxVolume;
-            sound.currentTime = 0;
-            sound.play().catch(() => {});
-        }
+        if (sound) { sound.volume = sfxVolume; sound.currentTime = 0; sound.play().catch(() => {}); }
     } catch (e) { console.log("Audio error", e); }
 }
 
-function synthesizeClick() {
-    const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
-    osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
-    gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-    osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-}
-
-function synthesizeDismantle() {
-    const bufferSize = audioCtx.sampleRate * 0.5; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(sfxVolume * 0.8, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-    noise.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
-}
-
-function synthesizeInventory() {
-    const bufferSize = audioCtx.sampleRate * 0.3; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 800; 
-    const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
-    noise.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
-}
-
-function synthesizePoison() {
-    const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
-    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3);
-    gainNode.gain.setValueAtTime(sfxVolume * 0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-    osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3);
-}
+function synthesizeClick() { const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1); gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1); }
+function synthesizeDismantle() { const bufferSize = audioCtx.sampleRate * 0.5; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(sfxVolume * 0.8, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3); noise.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start(); }
+function synthesizeInventory() { const bufferSize = audioCtx.sampleRate * 0.3; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 800; const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3); noise.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start(); }
+function synthesizePoison() { const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain(); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3); gainNode.gain.setValueAtTime(sfxVolume * 0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3); osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3); }
 
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
@@ -147,80 +104,59 @@ const sfxToggle = document.getElementById('sfx-toggle');
 const bgmSlider = document.getElementById('bgm-volume');
 const sfxSlider = document.getElementById('sfx-volume');
 const settingsNameInput = document.getElementById('settings-name-input');
-
 document.getElementById('settings-btn').addEventListener('click', () => { playSound('click'); settingsModal.classList.remove('hidden'); bgmToggle.checked = isBgmOn; sfxToggle.checked = isSfxOn; bgmSlider.value = bgmVolume; sfxSlider.value = sfxVolume; });
 document.getElementById('close-settings-btn').addEventListener('click', () => { playSound('click'); settingsModal.classList.add('hidden'); });
-
-bgmToggle.addEventListener('change', (e) => {
-    isBgmOn = e.target.checked;
-    if (isBgmOn) {
-        if(!document.getElementById('battle-screen').classList.contains('hidden')){ audioBattle.play().catch(()=>{}); } else { audioBgm.play().catch(()=>{}); }
-    } else { audioBgm.pause(); audioBattle.pause(); }
-});
-
+bgmToggle.addEventListener('change', (e) => { isBgmOn = e.target.checked; if (isBgmOn) { if(!document.getElementById('battle-screen').classList.contains('hidden')){ audioBattle.play().catch(()=>{}); } else { audioBgm.play().catch(()=>{}); } } else { audioBgm.pause(); audioBattle.pause(); } });
 sfxToggle.addEventListener('change', (e) => { isSfxOn = e.target.checked; });
 bgmSlider.addEventListener('input', (e) => { bgmVolume = parseFloat(e.target.value); audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; });
 sfxSlider.addEventListener('input', (e) => { sfxVolume = parseFloat(e.target.value); });
+document.getElementById('settings-save-name-btn').addEventListener('click', async () => { const newName = settingsNameInput.value.trim(); if (!newName) return alert("請輸入暱稱"); try { await updateProfile(currentUser, { displayName: newName }); await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); document.getElementById('user-name').innerText = `玩家：${newName}`; loadLeaderboard(); alert("改名成功！"); settingsModal.classList.add('hidden'); } catch (e) { console.error(e); alert("改名失敗"); } });
 
-document.getElementById('settings-save-name-btn').addEventListener('click', async () => {
-    const newName = settingsNameInput.value.trim();
-    if (!newName) return alert("請輸入暱稱");
-    try { await updateProfile(currentUser, { displayName: newName }); await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); document.getElementById('user-name').innerText = `玩家：${newName}`; loadLeaderboard(); alert("改名成功！"); settingsModal.classList.add('hidden'); } catch (e) { console.error(e); alert("改名失敗"); }
-});
-
-const loginSection = document.getElementById('login-section');
-const userInfo = document.getElementById('user-info');
-const gameUI = document.getElementById('game-ui');
-const userNameDisplay = document.getElementById('user-name');
-
+const loginSection = document.getElementById('login-section'); const userInfo = document.getElementById('user-info'); const gameUI = document.getElementById('game-ui'); const userNameDisplay = document.getElementById('user-name');
 document.getElementById('google-btn').addEventListener('click', () => { playSound('click'); signInWithPopup(auth, provider).catch(e=>alert(e.message)); });
 document.getElementById('email-signup-btn').addEventListener('click', () => { playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { await updateProfile(res.user, { displayName: "新玩家" }); location.reload(); }).catch(e=>alert(e.message)); });
 document.getElementById('email-login-btn').addEventListener('click', () => { playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; signInWithEmailAndPassword(auth, email, pass).catch(e=>alert(e.message)); });
 document.getElementById('guest-btn').addEventListener('click', () => { playSound('click'); signInAnonymously(auth).then(async (res) => { await updateProfile(res.user, { displayName: "神秘客" }); location.reload(); }).catch(e=>alert(e.message)); });
 document.getElementById('logout-btn').addEventListener('click', () => { playSound('click'); signOut(auth).then(() => location.reload()); });
 
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        currentUser = user; loginSection.style.display = 'none'; userInfo.style.display = 'flex'; userNameDisplay.innerText = `玩家：${user.displayName || '未命名'}`; await loadUserData(user); gameUI.classList.remove('hidden'); await calculateTotalPowerOnly(user.uid); loadLeaderboard();
-    } else { loginSection.style.display = 'block'; userInfo.style.display = 'none'; gameUI.classList.add('hidden'); }
-});
+onAuthStateChanged(auth, async (user) => { if (user) { currentUser = user; loginSection.style.display = 'none'; userInfo.style.display = 'flex'; userNameDisplay.innerText = `玩家：${user.displayName || '未命名'}`; await loadUserData(user); gameUI.classList.remove('hidden'); await calculateTotalPowerOnly(user.uid); loadLeaderboard(); } else { loginSection.style.display = 'block'; userInfo.style.display = 'none'; gameUI.classList.add('hidden'); } });
 
+// 🔥 設定英雄攻擊類型 (Melee / Ranged) 🔥
 const cardDatabase = [
-    { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝" },
-    { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王" },
-    { id: 3, name: "拿破崙", rarity: "SSR", atk: 1550, hp: 2000, title: "戰爭之神" },
-    { id: 13, name: "成吉思汗", rarity: "SSR", atk: 1700, hp: 1900, title: "草原霸主" },
-    { id: 14, name: "凱撒大帝", rarity: "SSR", atk: 1500, hp: 2300, title: "羅馬獨裁者" },
-    { id: 15, name: "漢尼拔", rarity: "SSR", atk: 1580, hp: 2100, title: "戰略之父" },
-    { id: 16, name: "埃及豔后", rarity: "SSR", atk: 1400, hp: 1800, title: "尼羅河女王" },
-    { id: 17, name: "宮本武藏", rarity: "SSR", atk: 1800, hp: 1500, title: "二天一流" },
-    { id: 4, name: "諸葛亮", rarity: "SR", atk: 1200, hp: 1400, title: "臥龍先生" },
-    { id: 5, name: "聖女貞德", rarity: "SR", atk: 900, hp: 1800, title: "奧爾良少女" },
-    { id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, title: "第六天魔王" },
-    { id: 7, name: "愛因斯坦", rarity: "SR", atk: 1300, hp: 1000, title: "物理之父" },
-    { id: 18, name: "關羽", rarity: "SR", atk: 1250, hp: 1500, title: "武聖" },
-    { id: 19, name: "華盛頓", rarity: "SR", atk: 1000, hp: 1600, title: "開國元勛" },
-    { id: 20, name: "薩拉丁", rarity: "SR", atk: 1150, hp: 1450, title: "沙漠之鷹" },
-    { id: 21, name: "林肯", rarity: "SR", atk: 1100, hp: 1200, title: "解放者" },
-    { id: 22, name: "源義經", rarity: "SR", atk: 1280, hp: 1100, title: "牛若丸" },
-    { id: 23, name: "南丁格爾", rarity: "SR", atk: 500, hp: 2000, title: "提燈天使" },
-    { id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士" },
-    { id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, title: "龜甲陣列" },
-    { id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, title: "武士道" },
-    { id: 11, name: "維京海盜", rarity: "R", atk: 550, hp: 700, title: "狂戰士" },
-    { id: 12, name: "條頓騎士", rarity: "R", atk: 450, hp: 850, title: "鐵十字" },
-    { id: 24, name: "英國長弓兵", rarity: "R", atk: 600, hp: 300, title: "遠程打擊" },
-    { id: 25, name: "蒙古騎兵", rarity: "R", atk: 550, hp: 500, title: "騎射手" },
-    { id: 26, name: "忍者", rarity: "R", atk: 650, hp: 300, title: "影之軍團" },
-    { id: 27, name: "十字軍", rarity: "R", atk: 400, hp: 800, title: "聖殿騎士" },
-    { id: 28, name: "祖魯戰士", rarity: "R", atk: 500, hp: 600, title: "長矛兵" },
-    { id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, title: "熱兵器" },
-    { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風" }
+    { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, attackType: 'melee' },
+    { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, attackType: 'melee' },
+    { id: 3, name: "拿破崙", rarity: "SSR", atk: 1550, hp: 2000, attackType: 'ranged' }, // 炮兵/槍
+    { id: 13, name: "成吉思汗", rarity: "SSR", atk: 1700, hp: 1900, attackType: 'ranged' }, // 騎射
+    { id: 14, name: "凱撒大帝", rarity: "SSR", atk: 1500, hp: 2300, attackType: 'melee' },
+    { id: 15, name: "漢尼拔", rarity: "SSR", atk: 1580, hp: 2100, attackType: 'melee' },
+    { id: 16, name: "埃及豔后", rarity: "SSR", atk: 1400, hp: 1800, attackType: 'ranged' }, // 魔法/毒
+    { id: 17, name: "宮本武藏", rarity: "SSR", atk: 1800, hp: 1500, attackType: 'melee' },
+    { id: 4, name: "諸葛亮", rarity: "SR", atk: 1200, hp: 1400, attackType: 'ranged' },
+    { id: 5, name: "聖女貞德", rarity: "SR", atk: 900, hp: 1800, attackType: 'melee' },
+    { id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, attackType: 'ranged' }, // 火繩槍
+    { id: 7, name: "愛因斯坦", rarity: "SR", atk: 1300, hp: 1000, attackType: 'ranged' }, // 科學光波
+    { id: 18, name: "關羽", rarity: "SR", atk: 1250, hp: 1500, attackType: 'melee' },
+    { id: 19, name: "華盛頓", rarity: "SR", atk: 1000, hp: 1600, attackType: 'ranged' },
+    { id: 20, name: "薩拉丁", rarity: "SR", atk: 1150, hp: 1450, attackType: 'melee' },
+    { id: 21, name: "林肯", rarity: "SR", atk: 1100, hp: 1200, attackType: 'melee' }, // 斧頭幫?
+    { id: 22, name: "源義經", rarity: "SR", atk: 1280, hp: 1100, attackType: 'melee' },
+    { id: 23, name: "南丁格爾", rarity: "SR", atk: 500, hp: 2000, attackType: 'ranged' }, // 補師算遠程
+    { id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, attackType: 'melee' },
+    { id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, attackType: 'melee' },
+    { id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, attackType: 'melee' },
+    { id: 11, name: "維京海盜", rarity: "R", atk: 550, hp: 700, attackType: 'melee' },
+    { id: 12, name: "條頓騎士", rarity: "R", atk: 450, hp: 850, attackType: 'melee' },
+    { id: 24, name: "英國長弓兵", rarity: "R", atk: 600, hp: 300, attackType: 'ranged' },
+    { id: 25, name: "蒙古騎兵", rarity: "R", atk: 550, hp: 500, attackType: 'ranged' },
+    { id: 26, name: "忍者", rarity: "R", atk: 650, hp: 300, attackType: 'melee' },
+    { id: 27, name: "十字軍", rarity: "R", atk: 400, hp: 800, attackType: 'melee' },
+    { id: 28, name: "祖魯戰士", rarity: "R", atk: 500, hp: 600, attackType: 'melee' },
+    { id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, attackType: 'ranged' },
+    { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, attackType: 'ranged' }
 ];
 
 async function loadUserData(user) {
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
+    const userRef = doc(db, "users", user.uid); const userSnap = await getDoc(userRef);
     if (userSnap.exists()) { const data = userSnap.data(); gems = data.gems; gold = data.gold; } 
     else { gems = 1000; gold = 5000; await setDoc(userRef, { name: user.displayName||"未命名", gems, gold, combatPower: 0, createdAt: new Date() }); }
     updateUIDisplay();
@@ -231,25 +167,26 @@ function updateUIDisplay() { document.getElementById('gem-count').innerText = ge
 document.getElementById('add-gem-btn').addEventListener('click', async () => { playSound('click'); if (!currentUser) return alert("請先登入"); gems += 5000; updateUIDisplay(); await updateCurrencyCloud(); alert("已領取 5000 鑽！"); });
 
 async function calculateTotalPowerOnly(uid) {
-    const q = query(collection(db, "inventory"), where("owner", "==", uid));
-    const querySnapshot = await getDocs(q);
-    let tempPower = 0;
+    const q = query(collection(db, "inventory"), where("owner", "==", uid)); const querySnapshot = await getDocs(q); let tempPower = 0;
     querySnapshot.forEach((doc) => { const card = doc.data(); tempPower += (card.atk + card.hp); });
     totalPower = tempPower; updateUIDisplay(); updateCurrencyCloud();
 }
 
 async function loadInventory(uid) {
-    const container = document.getElementById('inventory-grid');
-    container.innerHTML = "讀取中...";
-    const q = query(collection(db, "inventory"), where("owner", "==", uid));
-    const querySnapshot = await getDocs(q);
-    allUserCards = [];
+    const container = document.getElementById('inventory-grid'); container.innerHTML = "讀取中...";
+    const q = query(collection(db, "inventory"), where("owner", "==", uid)); const querySnapshot = await getDocs(q); allUserCards = [];
     querySnapshot.forEach((docSnap) => { 
-        let data = docSnap.data();
-        let needsUpdate = false;
+        let data = docSnap.data(); let needsUpdate = false;
         if(!data.level) { data.level = 1; needsUpdate = true; }
         if(!data.stars) { data.stars = 1; needsUpdate = true; }
-        if(!data.baseAtk) { const baseCard = cardDatabase.find(c => c.id === data.id); if(baseCard) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; } }
+        if(!data.baseAtk || !data.attackType) { // 補上 attackType
+            const baseCard = cardDatabase.find(c => c.id === data.id);
+            if(baseCard) { 
+                data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; 
+                data.attackType = baseCard.attackType; // 🔥 寫入攻擊類型
+                needsUpdate = true; 
+            }
+        }
         if(needsUpdate) updateDoc(doc(db, "inventory", docSnap.id), data);
         allUserCards.push({ ...data, docId: docSnap.id }); 
     });
@@ -257,11 +194,8 @@ async function loadInventory(uid) {
 }
 
 document.getElementById('sort-select').addEventListener('change', (e) => { playSound('click'); currentSortMethod = e.target.value; filterInventory(currentFilterRarity); });
-
 function filterInventory(rarity) {
-    currentFilterRarity = rarity; 
-    const container = document.getElementById('inventory-grid');
-    container.innerHTML = "";
+    currentFilterRarity = rarity; const container = document.getElementById('inventory-grid'); container.innerHTML = "";
     if (rarity === 'ALL') currentDisplayList = [...allUserCards]; else currentDisplayList = allUserCards.filter(card => card.rarity === rarity);
     sortCards(currentDisplayList, currentSortMethod);
     if (currentDisplayList.length === 0) { container.innerHTML = "<p style='width:100%; text-align:center;'>沒有符合條件的卡片</p>"; return; }
@@ -279,7 +213,6 @@ function sortCards(list, method) {
         return 0;
     });
 }
-
 function openDetailModal(index) { playSound('click'); currentCardIndex = index; document.getElementById('detail-modal').classList.remove('hidden'); renderDetailCard(); }
 
 function renderDetailCard() {
@@ -295,13 +228,11 @@ function renderDetailCard() {
 }
 
 async function upgradeCardLevel(cost) {
-    const card = currentDisplayList[currentCardIndex];
-    if (gold < cost) return alert("金幣不足！");
+    const card = currentDisplayList[currentCardIndex]; if (gold < cost) return alert("金幣不足！");
     const currentDocId = card.docId; gold -= cost; playSound('coin'); card.level++; calculateCardStats(card); playSound('upgrade'); 
     await updateDoc(doc(db, "inventory", card.docId), { level: card.level, atk: card.atk, hp: card.hp }); updateUIDisplay();
     if(!document.getElementById('inventory-modal').classList.contains('hidden')){ filterInventory(currentFilterRarity); const newIndex = currentDisplayList.findIndex(c => c.docId === currentDocId); if(newIndex !== -1) currentCardIndex = newIndex; } renderDetailCard();
 }
-
 async function upgradeCardStar() {
     const card = currentDisplayList[currentCardIndex]; const currentDocId = card.docId;
     const duplicate = allUserCards.find(c => c.id === card.id && c.docId !== card.docId);
@@ -311,7 +242,6 @@ async function upgradeCardStar() {
     await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
     if(!document.getElementById('inventory-modal').classList.contains('hidden')){ filterInventory(currentFilterRarity); const newIndex = currentDisplayList.findIndex(c => c.docId === currentDocId); if(newIndex !== -1) currentCardIndex = newIndex; } renderDetailCard(); alert(`升星成功！目前 ${card.stars} ★`);
 }
-
 function calculateCardStats(card) { const levelBonus = (card.level - 1) * 0.03; const starBonus = (card.stars - 1) * 0.20; card.atk = Math.floor(card.baseAtk * (1 + levelBonus) * (1 + starBonus)); card.hp = Math.floor(card.baseHp * (1 + levelBonus) * (1 + starBonus)); }
 
 async function dismantleCurrentCard() {
@@ -336,26 +266,15 @@ async function saveCardToCloud(card) {
     const docRef = await addDoc(collection(db, "inventory"), { name: card.name, rarity: card.rarity, atk: card.atk, hp: card.hp, title: card.title, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 1, obtainedAt: new Date(), owner: currentUser.uid, id: card.id });
     card.docId = docRef.id; card.baseAtk = card.atk; card.baseHp = card.hp; card.level = 1; card.stars = 1; return card;
 }
-
 function drawOneCard() { const rand = Math.random(); let rarity = rand < RATES.SSR ? "SSR" : (rand < RATES.SSR + RATES.SR ? "SR" : "R"); const pool = cardDatabase.filter(card => card.rarity === rarity); return { ...pool[Math.floor(Math.random() * pool.length)] }; }
 function drawSRorAbove() { const rand = Math.random(); let rarity = rand < 0.17 ? "SSR" : "SR"; const pool = cardDatabase.filter(card => card.rarity === rarity); return { ...pool[Math.floor(Math.random() * pool.length)] }; }
-
 function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
-    cardDiv.className = `card ${card.rarity}`; 
-    if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
-    if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
+    cardDiv.className = `card ${card.rarity}`; if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); } if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats">⚔️${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
-    cardDiv.addEventListener('click', () => { 
-        playSound('click'); 
-        if (cardDiv.classList.contains('is-deployed')) return; 
-        if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } 
-        if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } 
-        let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); 
-    });
+    cardDiv.addEventListener('click', () => { playSound('click'); if (cardDiv.classList.contains('is-deployed')) return; if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); });
     targetContainer.appendChild(cardDiv); return cardDiv;
 }
-
 function playGachaAnimation(highestRarity) {
     return new Promise((resolve) => {
         const overlay = document.getElementById('gacha-overlay'); const circle = document.getElementById('summon-circle'); const text = document.getElementById('summon-text'); const burst = document.getElementById('summon-burst');
@@ -365,7 +284,6 @@ function playGachaAnimation(highestRarity) {
         setTimeout(() => { if (highestRarity === 'SSR') { overlay.classList.add('flash-screen'); setTimeout(() => { overlay.classList.add('hidden'); overlay.classList.remove('flash-screen'); resolve(); }, 1500); } else { overlay.classList.add('hidden'); resolve(); } }, highestRarity === 'SSR' ? 3000 : 2000);
     });
 }
-
 function showRevealModal(cards) { gachaQueue = cards; gachaIndex = 0; const modal = document.getElementById('gacha-reveal-modal'); modal.classList.remove('hidden'); document.getElementById('card-display-area').innerHTML = ""; showNextRevealCard(); }
 function showNextRevealCard() {
     const container = document.getElementById('gacha-reveal-container'); container.innerHTML = ""; if (gachaIndex >= gachaQueue.length) { closeRevealModal(); return; }
@@ -377,7 +295,6 @@ async function closeRevealModal() {
     for (const card of gachaQueue) { const savedCard = await saveCardToCloud(card); currentDisplayList.push(savedCard); totalPower += (card.atk + card.hp); }
     currentDisplayList.forEach((card) => { renderCard(card, mainContainer); }); updateUIDisplay(); await updateCurrencyCloud(); setTimeout(loadLeaderboard, 1000); 
 }
-
 document.getElementById('gacha-skip-btn').addEventListener('click', (e) => { playSound('click'); e.stopPropagation(); let nextSSRIndex = -1; for(let i = gachaIndex; i < gachaQueue.length; i++) { if(gachaQueue[i].rarity === 'SSR') { nextSSRIndex = i; break; } } if (nextSSRIndex !== -1) { gachaIndex = nextSSRIndex; showNextRevealCard(); } else { gachaIndex = gachaQueue.length; closeRevealModal(); } });
 document.getElementById('gacha-reveal-modal').addEventListener('click', showNextRevealCard);
 document.getElementById('draw-btn').addEventListener('click', async () => { playSound('click'); if (gems < 100) return alert("鑽石不足"); gems -= 100; const newCard = drawOneCard(); await playGachaAnimation(newCard.rarity); showRevealModal([newCard]); });
@@ -387,15 +304,12 @@ document.getElementById('draw-10-btn').addEventListener('click', async () => {
      let lastCard; if (hasSRorAbove || highestRarity === 'SSR') lastCard = drawOneCard(); else lastCard = drawSRorAbove(); drawnCards.push(lastCard); if (lastCard.rarity === 'SSR') highestRarity = 'SSR'; else if (lastCard.rarity === 'SR' && highestRarity !== 'SSR') highestRarity = 'SR';
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
 });
-
 document.getElementById('inventory-btn').addEventListener('click', () => { playSound('inventory'); if(!currentUser) return alert("請先登入"); deployTargetSlot = null; document.getElementById('inventory-title').innerText = "🎒 我的背包"; document.getElementById('inventory-modal').classList.remove('hidden'); loadInventory(currentUser.uid); });
 document.getElementById('close-inventory-btn').addEventListener('click', () => { playSound('click'); document.getElementById('inventory-modal').classList.add('hidden'); deployTargetSlot = null; });
-
 async function loadLeaderboard() {
     const listDiv = document.getElementById('leaderboard-list'); const q = query(collection(db, "users"), orderBy("combatPower", "desc"), limit(10));
     try { const querySnapshot = await getDocs(q); listDiv.innerHTML = ""; let rank = 1; querySnapshot.forEach((doc) => { const data = doc.data(); const row = document.createElement('div'); row.className = 'rank-item'; row.innerHTML = `<span>#${rank} ${data.name || "無名氏"}</span><span>${data.combatPower || 0}</span>`; listDiv.appendChild(row); rank++; }); } catch (e) { console.error(e); }
 }
-
 const batchToggleBtn = document.getElementById('batch-toggle-btn'); const batchActionBar = document.getElementById('batch-action-bar'); const batchInfo = document.getElementById('batch-info'); const batchConfirmBtn = document.getElementById('batch-confirm-btn');
 batchToggleBtn.addEventListener('click', () => { playSound('click'); isBatchMode = !isBatchMode; selectedBatchCards.clear(); updateBatchUI(); filterInventory(currentFilterRarity); });
 function updateBatchUI() { if (isBatchMode) { batchToggleBtn.classList.add('active'); batchToggleBtn.innerText = "❌ 退出批量"; batchActionBar.classList.remove('hidden'); batchConfirmBtn.innerText = "確認分解"; } else { batchToggleBtn.classList.remove('active'); batchToggleBtn.innerText = "🔧 批量分解"; batchActionBar.classList.add('hidden'); } calculateBatchTotal(); }
@@ -447,6 +361,7 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
     enemies = [];
     document.getElementById('enemy-container').innerHTML = '';
     
+    // 初始化英雄
     battleSlots.forEach(hero => { 
         if(hero) { hero.currentHp = hero.hp; hero.maxHp = hero.hp; hero.lastAttackTime = 0; } 
     });
@@ -516,15 +431,26 @@ function spawnEnemy() {
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
-// 🔥 發射飛行道具 (Projectiles) 🔥
+// 🔥 發射飛行道具 (Projectiles) - 含角度計算 🔥
 function fireProjectile(startEl, targetEl, type, onHitCallback) {
     if(!startEl || !targetEl) return;
     
     const projectile = document.createElement('div');
     projectile.className = 'projectile';
-    projectile.innerText = type === 'arrow' ? '🏹' : (type === 'fireball' ? '🔥' : '⚔️'); // 根據類型換圖
     
-    // 取得起始點和目標點的座標 (相對於 battle-field-container)
+    if (type === 'arrow') {
+        projectile.innerText = '➵'; 
+        projectile.style.color = '#f1c40f'; 
+        projectile.style.fontSize = '2.5em';
+    } else if (type === 'fireball') {
+        projectile.innerText = '☄️'; 
+        projectile.style.fontSize = '3em';
+    } else {
+        projectile.innerText = '🌙'; 
+        projectile.style.color = '#a29bfe';
+        projectile.style.fontSize = '3em';
+    }
+    
     const containerRect = document.querySelector('.battle-field-container').getBoundingClientRect();
     const startRect = startEl.getBoundingClientRect();
     const targetRect = targetEl.getBoundingClientRect();
@@ -534,24 +460,23 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     const endX = targetRect.left - containerRect.left + targetRect.width / 2;
     const endY = targetRect.top - containerRect.top + targetRect.height / 2;
 
-    // 設定初始位置
+    const angle = Math.atan2(endY - startY, endX - startX) * (180 / Math.PI);
+
     projectile.style.left = `${startX}px`;
     projectile.style.top = `${startY}px`;
+    projectile.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
 
     document.querySelector('.battle-field-container').appendChild(projectile);
-
-    // 強制瀏覽器重繪 (Force Reflow) 以觸發 transition
     void projectile.offsetWidth; 
 
-    // 設定目標位置 (觸發移動)
     projectile.style.left = `${endX}px`;
     projectile.style.top = `${endY}px`;
+    projectile.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
 
-    // 飛行結束後 (300ms) 執行扣血回調
     setTimeout(() => {
         projectile.remove();
         if(onHitCallback) onHitCallback();
-    }, 300);
+    }, 300); 
 }
 
 // 英雄受擊紅閃震動
@@ -621,7 +546,6 @@ function gameLoop() {
                 // 怪物攻擊 (距離優勢)
                 if (enemy.position <= slotPos + 15 && enemy.position >= slotPos - 5) {
                      if (now - enemy.lastAttackTime > 800) { 
-                        // 🔥 怪物發射火球 (這裡可換成噴毒)
                         fireProjectile(enemy.el, document.querySelector(`.defense-slot[data-slot="${i}"]`), 'fireball', () => {
                              battleSlots[i].currentHp -= enemy.atk;
                              triggerHeroHit(i); // 受擊特效
@@ -636,9 +560,10 @@ function gameLoop() {
                 if (enemy.position <= slotPos + 5 && enemy.position >= slotPos - 5) {
                     blocked = true;
                     if (now - battleSlots[i].lastAttackTime > 2000) { 
-                         // 🔥 英雄發射箭矢 (這裡可換成揮劍)
-                         fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, 'arrow', () => {
-                             if(enemy.el) { // 確保敵人還活著
+                         // 🔥 判斷英雄類型，發射不同飛行道具
+                         const isRanged = battleSlots[i].attackType === 'ranged';
+                         fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, isRanged ? 'arrow' : 'slash', () => {
+                             if(enemy.el) { 
                                  enemy.currentHp -= battleSlots[i].atk;
                              }
                          });

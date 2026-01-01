@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=30">
+    <link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
 
@@ -115,10 +115,7 @@
                 </div>
             </div>
 
-            <div class="enemy-spawn-zone">
-                💀 <br> 敵軍<br>來襲
-            </div>
-            
+            <div class="enemy-spawn-zone">💀 <br> 敵軍<br>來襲</div>
             <div id="enemy-container"></div>
         </div>
 
@@ -128,7 +125,6 @@
                 <button class="difficulty-btn active" data-diff="normal" style="background:#f39c12;">🟡 普通</button>
                 <button class="difficulty-btn" data-diff="hard" style="background:#e74c3c;">🔴 困難</button>
             </div>
-            
             <div style="display: flex; gap: 10px; width: 90%; margin: 0 auto;">
                 <button id="auto-deploy-btn" class="btn-secondary" style="flex: 1; padding: 10px; font-size: 1.1em; background: #8e44ad;">⚡ 自動部署</button>
                 <button id="start-battle-btn" class="btn-primary btn-disabled" style="flex: 2; padding: 10px; font-size: 1.2em;">請先部署英雄</button>
@@ -151,10 +147,9 @@
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <h2 id="inventory-title">🎒 我的背包</h2>
                     <select id="sort-select" class="sort-dropdown">
-                        <option value="time_desc">📅 獲得時間 (新→舊)</option>
                         <option value="power_desc">🔥 依戰力 (高→低)</option>
                         <option value="rarity_desc">💎 依稀有度 (高→低)</option>
-                        <option value="id_asc">🔢 卡片序號 (1→30)</option>
+                        <option value="time_desc">📅 獲得時間 (新→舊)</option>
                     </select>
                     <button id="batch-toggle-btn">🔧 批量分解</button>
                 </div>
@@ -167,7 +162,6 @@
                 <button class="filter-btn" data-filter="R" style="color:#3498db; border-color:#3498db;">R</button>
             </div>
             <div id="inventory-grid" class="card-container" style="justify-content: flex-start;"></div>
-            
             <div id="batch-action-bar" class="hidden">
                 <div id="batch-info">已選 0 張，獲得 0 G</div>
                 <button id="batch-confirm-btn">確認分解</button>
@@ -183,11 +177,10 @@
         <div class="upgrade-controls">
             <div class="upgrade-box">
                 <div class="upgrade-title">提升等級 (Lv.30 Max)</div>
-                <button id="upgrade-level-btn" class="btn-upgrade">⬆️ 升級 <span id="upgrade-cost" style="font-size:0.8em;">(500G)</span></button>
+                <button id="upgrade-level-btn" class="btn-upgrade">⬆️ 升級</button>
             </div>
             <div class="upgrade-box">
                 <div class="upgrade-title">提升星級 (5★ Max)</div>
-                <div style="font-size:0.8em; color:#aaa; margin-bottom:5px;">需消耗 1 張同名卡片</div>
                 <button id="upgrade-star-btn" class="btn-star">⭐ 升星</button>
             </div>
         </div>
@@ -198,47 +191,25 @@
 
     <div id="gacha-reveal-modal" class="modal hidden" style="background: rgba(0,0,0,0.98); z-index: 2000;">
         <div style="position: absolute; top: 20px; right: 20px; z-index: 2005;">
-            <button id="gacha-skip-btn" class="btn-secondary" style="font-size: 1.2em; padding: 10px 20px; border: 2px solid white;">⏩ 跳過 (Skip)</button>
+            <button id="gacha-skip-btn" class="btn-secondary" style="font-size: 1.2em; padding: 10px 20px; border: 2px solid white;">⏩ 跳過</button>
         </div>
         <div id="gacha-reveal-container" class="large-card-container"></div>
-        <div id="gacha-next-hint" style="margin-top: 30px; color: white; animation: blink 1s infinite;">點擊螢幕顯示下一張</div>
     </div>
 
     <div id="gacha-overlay" class="hidden">
         <div id="summon-burst"></div>
         <div id="summon-circle"></div>
-        <h2 id="summon-text" style="color: white; margin-top: 20px; letter-spacing: 5px;">召喚中...</h2>
+        <h2 id="summon-text" style="color: white; margin-top: 20px;">召喚中...</h2>
     </div>
 
     <div id="settings-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 400px; height: auto;">
-            <div class="modal-header">
-                <h2>⚙️ 遊戲設定</h2>
-                <button id="close-settings-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
-            </div>
+            <div class="modal-header"><h2>⚙️ 遊戲設定</h2><button id="close-settings-btn" class="btn-primary" style="background:#c0392b;">關閉</button></div>
             <div class="settings-body">
-                <div class="setting-item">
-                    <label>玩家暱稱</label>
-                    <div style="display:flex; gap:5px;">
-                        <input type="text" id="settings-name-input" placeholder="輸入新暱稱" style="flex:1;">
-                        <button id="settings-save-name-btn" class="btn-primary">儲存</button>
-                    </div>
-                </div>
+                <div class="setting-item"><label>玩家暱稱</label><div style="display:flex; gap:5px;"><input type="text" id="settings-name-input"><button id="settings-save-name-btn" class="btn-primary">儲存</button></div></div>
                 <hr style="border-color: #555; margin: 15px 0;">
-                <div class="setting-item">
-                    <label>背景音樂 (BGM)</label>
-                    <div class="control-row">
-                        <input type="checkbox" id="bgm-toggle" checked> <span id="bgm-status">開啟</span>
-                    </div>
-                    <input type="range" id="bgm-volume" min="0" max="1" step="0.1" value="0.5" style="width:100%;">
-                </div>
-                <div class="setting-item">
-                    <label>遊戲音效 (SFX)</label>
-                    <div class="control-row">
-                        <input type="checkbox" id="sfx-toggle" checked> <span id="sfx-status">開啟</span>
-                    </div>
-                    <input type="range" id="sfx-volume" min="0" max="1" step="0.1" value="1.0" style="width:100%;">
-                </div>
+                <div class="setting-item"><label>背景音樂</label><input type="checkbox" id="bgm-toggle" checked> <input type="range" id="bgm-volume" min="0" max="1" step="0.1" value="0.5"></div>
+                <div class="setting-item"><label>遊戲音效</label><input type="checkbox" id="sfx-toggle" checked> <input type="range" id="sfx-volume" min="0" max="1" step="0.1" value="1.0"></div>
             </div>
         </div>
     </div>
