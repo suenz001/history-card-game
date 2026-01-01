@@ -2,6 +2,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+console.log("正在載入遊戲腳本...");
+
 const firebaseConfig = {
   apiKey: "AIzaSyCaLWMEi7wNxeCjUQC86axbRsxLMDWQrq8",
   authDomain: "gacha-game-v1.firebaseapp.com",
@@ -12,11 +14,13 @@ const firebaseConfig = {
   measurementId: "G-N0EM6EJ9BK"
 };
 
+// 初始化 Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
+// 全域變數
 let currentUser = null;
 let gems = 0;
 let gold = 0;
@@ -27,22 +31,23 @@ let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
-// 戰鬥系統變數
-let battleSlots = new Array(9).fill(null); // 9個槽位 (3x3)
+// 戰鬥變數
+let battleSlots = new Array(9).fill(null);
 let isBattleActive = false;
 let battleGold = 0;
 let baseHp = 100;
 let enemies = [];
 let deployTargetSlot = null; 
 let currentDifficulty = 'normal';
-let lastShakeTime = 0; // 🔥 螢幕震動冷卻
+let lastShakeTime = 0;
 
-// 波次管理
+// 波次設定
 const WAVE_CONFIG = {
     1: { count: 6, hp: 800, atk: 50 },
     2: { count: 12, hp: 1500, atk: 100 },
     3: { count: 18, hp: 3000, atk: 200 } 
 };
+
 let battleState = {
     wave: 1,
     spawned: 0,
@@ -53,14 +58,16 @@ let battleState = {
 };
 let gameLoopId = null;
 
+// 背包與抽卡變數
 let isBatchMode = false;
 let selectedBatchCards = new Set();
-
 let gachaQueue = [];
 let gachaIndex = 0;
+
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
+// 音效系統 (使用懶加載防止報錯)
 const audioBgm = document.getElementById('bgm');
 const audioBattle = document.getElementById('bgm-battle');
 const sfxDraw = document.getElementById('sfx-draw');
@@ -69,19 +76,22 @@ const sfxReveal = document.getElementById('sfx-reveal');
 const sfxCoin = document.getElementById('sfx-coin');
 const sfxUpgrade = document.getElementById('sfx-upgrade');
 
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-const audioCtx = new AudioContext();
-
+let audioCtx = null; // 先設為 null
 let isBgmOn = true;
 let isSfxOn = true;
 let bgmVolume = 0.5;
 let sfxVolume = 1.0;
 
-audioBgm.volume = bgmVolume;
-audioBattle.volume = bgmVolume;
-
-document.body.addEventListener('click', () => {
-    if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+// 初始化音效 (在使用者第一次點擊時才啟動)
+function initAudio() {
+    if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    // 播放背景音樂
     if (isBgmOn && audioBgm.paused && audioBattle.paused) {
         if(!document.getElementById('battle-screen').classList.contains('hidden')){
             audioBattle.play().catch(()=>{});
@@ -89,11 +99,15 @@ document.body.addEventListener('click', () => {
             audioBgm.play().catch(()=>{});
         }
     }
-}, { once: true });
+}
+
+document.body.addEventListener('click', initAudio, { once: true });
 
 function playSound(type) {
     if (!isSfxOn) return;
     try {
+        if (!audioCtx) initAudio(); // 確保有點擊後才發聲
+        
         if (type === 'click') { synthesizeClick(); return; }
         else if (type === 'dismantle') { synthesizeDismantle(); return; }
         else if (type === 'inventory') { synthesizeInventory(); return; }
@@ -112,48 +126,47 @@ function playSound(type) {
             sound.currentTime = 0;
             sound.play().catch(() => {});
         }
-    } catch (e) { console.log("Audio error", e); }
+    } catch (e) { console.warn("Audio error (ignoring):", e); }
 }
 
+// 合成音效函數
 function synthesizeClick() {
+    if(!audioCtx) return;
     const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
     osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
     gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
     osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
 }
-
 function synthesizeDismantle() {
+    if(!audioCtx) return;
     const bufferSize = audioCtx.sampleRate * 0.5; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
     const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const gainNode = audioCtx.createGain();
     gainNode.gain.setValueAtTime(sfxVolume * 0.8, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
     noise.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
 }
-
 function synthesizeInventory() {
+    if(!audioCtx) return;
     const bufferSize = audioCtx.sampleRate * 0.3; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
     const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 800; 
     const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
     noise.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
 }
-
 function synthesizePoison() {
+    if(!audioCtx) return;
     const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
     osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3);
     gainNode.gain.setValueAtTime(sfxVolume * 0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
     osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3);
 }
-
 function synthesizeHit() {
+    if(!audioCtx) return;
     const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
-    osc.type = 'square'; 
-    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-    gain.gain.setValueAtTime(sfxVolume * 0.4, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+    osc.type = 'square'; osc.frequency.setValueAtTime(150, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(sfxVolume * 0.4, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
 }
 
+// 設定與音量控制
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
 const sfxToggle = document.getElementById('sfx-toggle');
@@ -170,7 +183,6 @@ bgmToggle.addEventListener('change', (e) => {
         if(!document.getElementById('battle-screen').classList.contains('hidden')){ audioBattle.play().catch(()=>{}); } else { audioBgm.play().catch(()=>{}); }
     } else { audioBgm.pause(); audioBattle.pause(); }
 });
-
 sfxToggle.addEventListener('change', (e) => { isSfxOn = e.target.checked; });
 bgmSlider.addEventListener('input', (e) => { bgmVolume = parseFloat(e.target.value); audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; });
 sfxSlider.addEventListener('input', (e) => { sfxVolume = parseFloat(e.target.value); });
@@ -181,6 +193,7 @@ document.getElementById('settings-save-name-btn').addEventListener('click', asyn
     try { await updateProfile(currentUser, { displayName: newName }); await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); document.getElementById('user-name').innerText = `玩家：${newName}`; loadLeaderboard(); alert("改名成功！"); settingsModal.classList.add('hidden'); } catch (e) { console.error(e); alert("改名失敗"); }
 });
 
+// 登入與介面切換
 const loginSection = document.getElementById('login-section');
 const userInfo = document.getElementById('user-info');
 const gameUI = document.getElementById('game-ui');
@@ -194,10 +207,22 @@ document.getElementById('logout-btn').addEventListener('click', () => { playSoun
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        currentUser = user; loginSection.style.display = 'none'; userInfo.style.display = 'flex'; userNameDisplay.innerText = `玩家：${user.displayName || '未命名'}`; await loadUserData(user); gameUI.classList.remove('hidden'); await calculateTotalPowerOnly(user.uid); loadLeaderboard();
-    } else { loginSection.style.display = 'block'; userInfo.style.display = 'none'; gameUI.classList.add('hidden'); }
+        currentUser = user;
+        loginSection.style.display = 'none';
+        userInfo.style.display = 'flex';
+        userNameDisplay.innerText = `玩家：${user.displayName || '未命名'}`;
+        await loadUserData(user);
+        gameUI.classList.remove('hidden');
+        await calculateTotalPowerOnly(user.uid);
+        loadLeaderboard();
+    } else {
+        loginSection.style.display = 'block';
+        userInfo.style.display = 'none';
+        gameUI.classList.add('hidden');
+    }
 });
 
+// 卡片資料庫
 const cardDatabase = [
     { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, attackType: 'melee' },
     { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, attackType: 'melee' },
@@ -272,9 +297,7 @@ async function loadInventory(uid) {
 document.getElementById('sort-select').addEventListener('change', (e) => { playSound('click'); currentSortMethod = e.target.value; filterInventory(currentFilterRarity); });
 
 function filterInventory(rarity) {
-    currentFilterRarity = rarity; 
-    const container = document.getElementById('inventory-grid');
-    container.innerHTML = "";
+    currentFilterRarity = rarity; const container = document.getElementById('inventory-grid'); container.innerHTML = "";
     if (rarity === 'ALL') currentDisplayList = [...allUserCards]; else currentDisplayList = allUserCards.filter(card => card.rarity === rarity);
     sortCards(currentDisplayList, currentSortMethod);
     if (currentDisplayList.length === 0) { container.innerHTML = "<p style='width:100%; text-align:center;'>沒有符合條件的卡片</p>"; return; }
@@ -358,12 +381,8 @@ function renderCard(card, targetContainer) {
     cardDiv.className = `card ${card.rarity}`; 
     if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
-    
-    // 🔥 新增：類型圖示 🔥
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
-
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="type-badge">${typeIcon}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats">${typeIcon} ${card.atk} ❤️ ${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
-    
     cardDiv.addEventListener('click', () => { 
         playSound('click'); 
         if (cardDiv.classList.contains('is-deployed')) return; 
@@ -396,12 +415,12 @@ async function closeRevealModal() {
     modal.classList.add('hidden'); 
     currentDisplayList = []; 
     const mainContainer = document.getElementById('card-display-area');
-    mainContainer.innerHTML = ""; // 🔥 清除主畫面舊卡片
+    mainContainer.innerHTML = ""; 
 
     for (const card of gachaQueue) { 
         const savedCard = await saveCardToCloud(card); 
         currentDisplayList.push(savedCard); 
-        allUserCards.push(savedCard); // 🔥 同步更新到背包快取，防止顯示錯誤
+        allUserCards.push(savedCard); 
         totalPower += (card.atk + card.hp); 
     }
     currentDisplayList.forEach((card) => { renderCard(card, mainContainer); }); 
@@ -478,26 +497,19 @@ function spawnEnemy() {
 
 // 🔥 發射飛行道具 (Projectiles) - 含角度計算 🔥
 function fireProjectile(startEl, targetEl, type, onHitCallback) {
-    if(!startEl || !targetEl) return;
+    if(!startEl || !targetEl || !document.body.contains(startEl) || !document.body.contains(targetEl)) return;
     
     const projectile = document.createElement('div');
     projectile.className = 'projectile';
     
-    // 🎨 優化圖示：根據類型給予更合理的符號
     if (type === 'arrow') {
-        projectile.innerText = '➵'; // 這是箭，不是弓！
-        projectile.style.color = '#f1c40f'; // 金色箭矢
-        projectile.style.fontSize = '2.5em'; // 調整大小
+        projectile.innerText = '➵'; projectile.style.color = '#f1c40f'; projectile.style.fontSize = '2.5em';
     } else if (type === 'fireball') {
-        projectile.innerText = '☄️'; // 彗星/火球
-        projectile.style.fontSize = '3em';
+        projectile.innerText = '☄️'; projectile.style.fontSize = '3em';
     } else {
-        projectile.innerText = '🌙'; // 劍氣波 (看起來像揮砍)
-        projectile.style.color = '#a29bfe';
-        projectile.style.fontSize = '3em';
+        projectile.innerText = '🌙'; projectile.style.color = '#a29bfe'; projectile.style.fontSize = '3em';
     }
     
-    // 1. 取得座標
     const containerRect = document.querySelector('.battle-field-container').getBoundingClientRect();
     const startRect = startEl.getBoundingClientRect();
     const targetRect = targetEl.getBoundingClientRect();
@@ -507,32 +519,25 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     const endX = targetRect.left - containerRect.left + targetRect.width / 2;
     const endY = targetRect.top - containerRect.top + targetRect.height / 2;
 
-    // 2. 📐 計算角度 (讓箭頭指向敵人)
     const angle = Math.atan2(endY - startY, endX - startX) * (180 / Math.PI);
 
-    // 3. 設定初始位置與角度
     projectile.style.left = `${startX}px`;
     projectile.style.top = `${startY}px`;
-    projectile.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`; // 🔥 關鍵旋轉
+    projectile.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
 
     document.querySelector('.battle-field-container').appendChild(projectile);
-
-    // 強制重繪
     void projectile.offsetWidth; 
 
-    // 4. 設定目標位置 (保持角度)
     projectile.style.left = `${endX}px`;
     projectile.style.top = `${endY}px`;
     projectile.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
 
-    // 5. 命中回調
     setTimeout(() => {
         projectile.remove();
         if(onHitCallback) onHitCallback();
-    }, 300); // 飛行時間 0.3秒
+    }, 300); 
 }
 
-// 英雄受擊紅閃震動
 function triggerHeroHit(slotIdx) {
     const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"] .card`);
     if(slotDiv) {
@@ -541,9 +546,6 @@ function triggerHeroHit(slotIdx) {
         slotDiv.classList.add('taking-damage');
     }
 }
-
-let baseAttackCooldown = 0;
-let lastShakeTime = 0; // 🔥 螢幕震動冷卻
 
 function gameLoop() {
     if (!isBattleActive) return;
@@ -556,7 +558,9 @@ function gameLoop() {
                 battleState.spawned++;
                 battleState.lastSpawnTime = now;
             }
-        } else { battleState.phase = 'COMBAT'; }
+        } else {
+            battleState.phase = 'COMBAT'; 
+        }
     } 
     else if (battleState.phase === 'COMBAT') {
         if (enemies.length === 0) {
@@ -567,8 +571,11 @@ function gameLoop() {
     }
     else if (battleState.phase === 'WAITING') {
         if (now - battleState.waitTimer > 3000) {
-            if (battleState.wave < 3) { startWave(battleState.wave + 1); } 
-            else { endBattle(true); return; }
+            if (battleState.wave < 3) {
+                startWave(battleState.wave + 1);
+            } else {
+                endBattle(true); return;
+            }
         }
     }
 
@@ -586,7 +593,7 @@ function gameLoop() {
         }
     }
 
-    // 戰鬥邏輯 (加入 Projectile)
+    // 戰鬥邏輯
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
         const startSlot = enemy.lane * 3;
@@ -600,7 +607,6 @@ function gameLoop() {
                 // 怪物攻擊 (距離優勢)
                 if (enemy.position <= slotPos + 15 && enemy.position >= slotPos - 5) {
                      if (now - enemy.lastAttackTime > 800) { 
-                        // 🔥 怪物發射火球 (這裡可換成噴毒)
                         fireProjectile(enemy.el, document.querySelector(`.defense-slot[data-slot="${i}"]`), 'fireball', () => {
                              battleSlots[i].currentHp -= enemy.atk;
                              triggerHeroHit(i); // 受擊特效
@@ -613,27 +619,16 @@ function gameLoop() {
                 
                 // 英雄攻擊
                 if (enemy.position <= slotPos + 5 && enemy.position >= slotPos - 5) {
-                    blocked = true; // 🔥 只有近距離才會阻擋移動
-                }
-
-                // 英雄發動攻擊 (射程更遠: +40)
-                if (enemy.position <= slotPos + 40 && enemy.position >= slotPos - 5) {
+                    blocked = true;
                     if (now - battleSlots[i].lastAttackTime > 2000) { 
-                        // 🔥 判斷英雄類型
-                        const isRanged = battleSlots[i].attackType === 'ranged';
-                        
-                        // 遠程: 40% 射程 / 近戰: 8% 射程
-                        const rangeLimit = isRanged ? 40 : 8;
-
-                        if (enemy.position <= slotPos + rangeLimit) {
-                            fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, isRanged ? 'arrow' : 'slash', () => {
-                                if(enemy.el) { 
-                                    enemy.currentHp -= battleSlots[i].atk;
-                                    playSound('hit'); // 🔥 命中音效
-                                }
-                            });
-                            battleSlots[i].lastAttackTime = now;
-                        }
+                         const isRanged = battleSlots[i].attackType === 'ranged';
+                         fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, isRanged ? 'arrow' : 'slash', () => {
+                             if(enemy.el) { 
+                                 enemy.currentHp -= battleSlots[i].atk;
+                                 playSound('hit'); 
+                             }
+                         });
+                         battleSlots[i].lastAttackTime = now;
                     }
                 }
              }
@@ -648,7 +643,6 @@ function gameLoop() {
                 playSound('dismantle');
                 updateBattleUI();
                 
-                // 🔥 螢幕震動冷卻 (防止太暈) 🔥
                 if(now - lastShakeTime > 500) {
                     const gameBody = document.body;
                     gameBody.classList.remove('shake-screen-effect');
