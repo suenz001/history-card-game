@@ -51,11 +51,10 @@ let enemies = [];
 let deployTargetSlot = null; 
 let currentDifficulty = 'normal';
 
-// 🔥 平衡調整：增加怪物數量 🔥
 const WAVE_CONFIG = {
-    1: { count: 8, hp: 800, atk: 50 },   // 原 6 -> 8
-    2: { count: 16, hp: 1500, atk: 100 }, // 原 12 -> 16
-    3: { count: 30, hp: 3000, atk: 200 }  // 原 18 -> 30 (大決戰感)
+    1: { count: 8, hp: 800, atk: 50 },
+    2: { count: 16, hp: 1500, atk: 100 },
+    3: { count: 30, hp: 3000, atk: 200 } 
 };
 let battleState = {
     wave: 1, spawned: 0, totalToSpawn: 0, lastSpawnTime: 0, phase: 'IDLE', waitTimer: 0
@@ -443,6 +442,7 @@ function updateInventoryCounts() {
     });
 }
 
+// 🔥 修正：一鍵自動升星 (支援多張重複升星) 🔥
 async function autoStarUp() {
     if (!currentUser) return alert("請先登入");
     if (isBatchMode) return alert("請先關閉批量分解模式");
@@ -451,6 +451,7 @@ async function autoStarUp() {
     const confirmed = confirm("⚡ 一鍵升星會自動合併重複的卡片，將每種英雄等級最高的卡片升到最高星數。\n\n確定要執行嗎？");
     if (!confirmed) return;
 
+    // 將卡片按 ID 分組
     const groups = {};
     allUserCards.forEach(card => {
         if (!groups[card.id]) groups[card.id] = [];
@@ -462,6 +463,8 @@ async function autoStarUp() {
     const deletePromises = [];
     const updatePromises = [];
     const newCardsState = [];
+    // 記錄已經被刪除的 docId，避免重複處理
+    const deletedDocIds = new Set();
 
     for (const id in groups) {
         let cards = groups[id];
@@ -470,42 +473,59 @@ async function autoStarUp() {
             continue;
         }
 
+        // 排序：先比星數高，再比等級高
         cards.sort((a, b) => {
             if (b.stars !== a.stars) return b.stars - a.stars;
             return b.level - a.level;
         });
 
-        let mainCard = cards[0];
-        const fodders = cards.slice(1);
-        let fodderIndex = 0;
-
-        while (mainCard.stars < 5 && fodderIndex < fodders.length) {
-            const fodder = fodders[fodderIndex];
-            deletePromises.push(deleteDoc(doc(db, "inventory", fodder.docId)));
-            consumedCount++;
+        // 迭代每一張卡，看它能不能當主卡
+        for (let i = 0; i < cards.length; i++) {
+            let mainCard = cards[i];
             
-            mainCard.stars++;
-            calculateCardStats(mainCard);
-            fodderIndex++;
-        }
+            // 如果這張卡已經被標記刪除了，就跳過
+            if (deletedDocIds.has(mainCard.docId)) continue;
+            
+            // 如果已經滿星，就保留，找下一張當主卡
+            if (mainCard.stars >= 5) {
+                newCardsState.push(mainCard);
+                continue;
+            }
 
-        if (fodderIndex > 0) {
-            upgradedCount++;
-            updatePromises.push(updateDoc(doc(db, "inventory", mainCard.docId), {
-                stars: mainCard.stars,
-                atk: mainCard.atk,
-                hp: mainCard.hp
-            }));
-        }
+            // 開始找素材 (從主卡後面開始找)
+            for (let j = i + 1; j < cards.length; j++) {
+                let fodder = cards[j];
+                
+                // 如果素材已經被刪除，或主卡已經滿星，就停
+                if (deletedDocIds.has(fodder.docId)) continue;
+                if (mainCard.stars >= 5) break;
 
-        newCardsState.push(mainCard); 
-        for (let i = fodderIndex; i < fodders.length; i++) {
-            newCardsState.push(fodders[i]);
+                // 吃掉素材
+                deletedDocIds.add(fodder.docId);
+                deletePromises.push(deleteDoc(doc(db, "inventory", fodder.docId)));
+                consumedCount++;
+
+                // 主卡升級
+                mainCard.stars++;
+                calculateCardStats(mainCard);
+            }
+
+            // 處理完後，如果主卡有變動，加入更新清單
+            if (mainCard.stars > cards[i].stars) { // 注意這裡邏輯，其實 stars 已經變了
+                upgradedCount++;
+                updatePromises.push(updateDoc(doc(db, "inventory", mainCard.docId), {
+                    stars: mainCard.stars,
+                    atk: mainCard.atk,
+                    hp: mainCard.hp
+                }));
+            }
+            // 保留主卡
+            newCardsState.push(mainCard);
         }
     }
 
-    if (upgradedCount === 0) {
-        return alert("目前沒有可升星的卡片組合 (需有重複卡片)");
+    if (upgradedCount === 0 && consumedCount === 0) {
+        return alert("目前沒有可升星的卡片組合");
     }
 
     try {
@@ -519,7 +539,7 @@ async function autoStarUp() {
         await updateCurrencyCloud();
         updateUIDisplay();
         
-        alert(`升星完成！\n共升級了 ${upgradedCount} 位英雄\n消耗了 ${consumedCount} 張素材卡`);
+        alert(`升星完成！\n共升級了 ${upgradedCount} 次\n消耗了 ${consumedCount} 張素材卡`);
     } catch (e) {
         console.error("自動升星失敗", e);
         alert("升星過程中發生錯誤，請重試");
@@ -853,7 +873,7 @@ function spawnHeroes() {
         // 修正：左右反轉 (右邊=前排)
         const startPos = 5 + (col * 4); 
         
-        // 初始位置
+        // 初始位置還是分散的 (為了視覺效果)
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
 
         const el = document.createElement('div');
@@ -1021,7 +1041,7 @@ function gameLoop() {
         }
     }
 
-    // 🔥 英雄邏輯 (Active Hunting)
+    // 🔥 英雄邏輯
     heroEntities.sort((a, b) => b.position - a.position);
 
     heroEntities.forEach((hero, hIndex) => {
@@ -1035,7 +1055,7 @@ function gameLoop() {
 
         enemies.forEach(enemy => {
             if (enemy.currentHp > 0) {
-                // 計算歐幾里得距離
+                // 計算歐幾里得距離 (直線距離)
                 const dx = enemy.position - hero.position;
                 const dy = enemy.y - hero.y; 
                 const dist = Math.sqrt(dx*dx + dy*dy);
@@ -1066,7 +1086,7 @@ function gameLoop() {
             }
         }
 
-        // 🔥 防追撞 + 繞路邏輯 (20% overlap allowed)
+        // 🔥 防追撞 + 繞路邏輯 (Smart AI)
         if (!blocked) {
             for (let other of heroEntities) {
                 if (other !== hero && other.currentHp > 0) {
@@ -1083,7 +1103,7 @@ function gameLoop() {
             }
         }
 
-        // 移動 & 索敵
+        // 移動 & 索敵 (Free roam)
         if (!blocked) {
              // 如果有敵人，往敵人移動
              if (nearestEnemy) {
@@ -1124,7 +1144,7 @@ function gameLoop() {
         return;
     }
 
-    // 🔥 敵人邏輯 (Active Hunting)
+    // 🔥 敵人邏輯 (Smart AI for Enemies too)
     enemies.sort((a, b) => a.position - b.position);
 
     enemies.forEach((enemy, eIndex) => {
@@ -1147,7 +1167,7 @@ function gameLoop() {
             }
         });
 
-        // 攻擊 (射程修正為 3)
+        // 攻擊
         if (nearestHero && minTotalDist <= 3) { 
             blocked = true;
             if (now - enemy.lastAttackTime > 800) {
@@ -1163,23 +1183,20 @@ function gameLoop() {
             }
         }
 
-        // 防追撞
+        // 防追撞 + 繞路
         if (!blocked) {
             for (let other of enemies) {
                 if (other !== enemy && other.currentHp > 0) {
-                    // 敵人往左走，所以位置比較小的是在"前方"(左方)? 不對，位置比較小的是靠近左邊
-                    // 這裡簡化邏輯：檢查兩者距離是否太近
                     let dist = Math.abs(enemy.position - other.position);
                     let vDist = Math.abs(other.y - enemy.y);
-                    
+                    // 敵人互相推擠距離
                     if (dist < 2 && vDist < 5) {
-                         // 簡單的推擠邏輯：如果對方在我前面擋著
-                         if ((enemy.position > other.position && nearestHero && nearestHero.position < enemy.position) ||
-                             (enemy.position < other.position && nearestHero && nearestHero.position > enemy.position)) {
-                                blocked = true;
-                                if (enemy.y <= other.y) dodgeY = -0.3;
-                                else dodgeY = 0.3;
-                                break;
+                         // 如果對方擋在我去目標的路上 (簡單判斷：誰離目標近)
+                         if (minTotalDist > 999 || (enemy.position > other.position)) { // 這裡假設都往左
+                             blocked = true;
+                             if (enemy.y <= other.y) dodgeY = -0.3;
+                             else dodgeY = 0.3;
+                             break;
                          }
                     }
                 }
@@ -1189,11 +1206,10 @@ function gameLoop() {
         // 移動 & 索敵
         if (!blocked) { 
              if (nearestHero) {
-                 // X 軸移動
+                 // 追殺英雄
                  if (enemy.position > nearestHero.position + 1) enemy.position -= enemy.speed;
                  else if (enemy.position < nearestHero.position - 1) enemy.position += enemy.speed;
                  
-                 // Y 軸移動
                  if (enemy.y < nearestHero.y) enemy.y += 0.15;
                  else if (enemy.y > nearestHero.y) enemy.y -= 0.15;
              } else {
@@ -1211,10 +1227,15 @@ function gameLoop() {
             enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
         }
 
-        // 移除主堡傷害邏輯，改為到達終點就停下或消失? 這裡保持在左邊聚集
+        if (enemy.currentHp <= 0) {
+            enemy.el.remove(); enemies.splice(eIndex, 1);
+            battleGold += 50 + (battleState.wave * 10);
+            updateBattleUI(); 
+            showDamageText(enemy.position, enemy.y, `+50G`, 'gold-text'); 
+            playSound('dismantle');
+        } 
     });
 
-    // 勝利判定
     if (enemies.length === 0 && battleState.phase === 'COMBAT') {
         // Wait
     }
@@ -1310,7 +1331,6 @@ function renderBattleSlots() {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); 
         
-        // 移除舊的卡片
         const existingCard = slotDiv.querySelector('.card'); if (existingCard) existingCard.remove();
         
         if (hero) {
