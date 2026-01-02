@@ -221,7 +221,17 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .enemy-spawn-zone { width: 50px; height: 100%; background: rgba(0,0,0,0.3); border-left: 4px dashed #c0392b; display: flex; justify-content: center; align-items: center; color: #e74c3c; font-weight: bold; writing-mode: vertical-lr; z-index: 10; }
 
 /* 🔥 新增：英雄單位 (跑動中) */
-.hero-unit { position: absolute; width: 45px; height: 45px; border-radius: 50%; border: 3px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.2em; z-index: 20; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: translateY(-50%); background-size: cover; background-position: center; }
+.hero-unit { 
+    position: absolute; width: 45px; height: 45px; 
+    border-radius: 50%; border: 3px solid #fff; 
+    display: flex; justify-content: center; align-items: center; 
+    font-size: 1.2em; z-index: 20; 
+    transition: left 0.1s linear; 
+    box-shadow: 0 0 10px rgba(0,0,0,0.5); 
+    transform: translateY(-50%); 
+    background-size: cover; 
+    background-position: center 15%; /* 🔥 修正：讓卡片大頭照對準臉部 */
+}
 .hero-unit.SSR { border-color: #f1c40f; }
 .hero-unit.SR { border-color: #9b59b6; }
 .hero-unit.R { border-color: #3498db; }
@@ -277,6 +287,16 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     pointer-events: none;
     font-size: 2em; /* Emoji 大小 */
     filter: drop-shadow(0 0 5px white);
+}
+/* 🔥 魔王投射物 (火球/暗黑球) */
+.boss-projectile {
+    position: absolute; z-index: 60;
+    width: 30px; height: 30px;
+    background: radial-gradient(circle, #fff, #8e44ad);
+    border-radius: 50%;
+    box-shadow: 0 0 15px #8e44ad;
+    transition: all 0.5s linear; /* 飛行時間 */
+    pointer-events: none;
 }
 
 /* 🔥 噴毒動畫 (放大、顯眼) 🔥 */
