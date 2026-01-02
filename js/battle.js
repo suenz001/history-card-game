@@ -97,12 +97,20 @@ function spawnHeroes() {
         const startPos = 5 + (col * 4); 
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
 
+        // 🔥 新增：根據攻擊類型決定圖示
+        const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
+
         const el = document.createElement('div');
         el.className = `hero-unit ${card.rarity}`;
         el.style.backgroundImage = `url(assets/cards/${card.id}.webp)`;
         el.style.left = `${startPos}%`;
         el.style.top = `${startY}%`;
-        el.innerHTML = `<div class="hero-hp-bar"><div style="width:100%"></div></div>`;
+        
+        // 🔥 新增：在 innerHTML 中加入 .hero-type-badge
+        el.innerHTML = `
+            <div class="hero-hp-bar"><div style="width:100%"></div></div>
+            <div class="hero-type-badge">${typeIcon}</div>
+        `;
         container.appendChild(el);
 
         let finalHp = card.hp;
@@ -121,7 +129,7 @@ function spawnHeroes() {
             lastAttackTime: 0,
             el: el,
             patrolDir: 1,
-            totalDamage: 0 // 🔥 新增：傷害統計
+            totalDamage: 0
         });
     });
 }
@@ -228,19 +236,19 @@ function fireBossSkill(boss) {
         
         playSound('dismantle');
 
-        // 🔥 修改：縮小判定範圍 (15%)，只對爆炸點附近的英雄造成傷害
+        // 🔥 修改：大幅縮小判定範圍 (從 15 縮小到 7)
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position;
             const dy = hero.y - target.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
             
-            if (dist < 15) { 
+            if (dist < 7) { 
                 hero.currentHp -= 300;
                 triggerHeroHit(hero.el);
                 showDamageText(hero.position, hero.y, `-300`, 'hero-dmg');
-                // 擊退
-                if(hero.position < boss.position) hero.position -= 5;
-                else hero.position += 5;
+                // 🔥 修改：大幅縮小擊退距離 (從 5 縮小到 2)
+                if(hero.position < boss.position) hero.position -= 2;
+                else hero.position += 2;
             }
         });
 
@@ -320,7 +328,7 @@ function gameLoop() {
         }
     }
 
-    // 🔥 英雄邏輯
+    // 英雄邏輯
     heroEntities.sort((a, b) => b.position - a.position);
 
     heroEntities.forEach((hero, hIndex) => {
@@ -355,7 +363,7 @@ function gameLoop() {
                         nearestEnemy.currentHp -= hero.atk;
                         showDamageText(nearestEnemy.position, nearestEnemy.y, `-${hero.atk}`, 'hero-dmg');
                         triggerHeroHit(nearestEnemy.el);
-                        // 🔥 累積傷害
+                        // 累積傷害
                         hero.totalDamage += hero.atk;
                     }
                 });
@@ -529,7 +537,7 @@ function showDamageText(leftPercent, topPercent, text, colorClass) {
 
 function endBattle(isWin) {
     if(onBattleEndCallback) {
-        // 🔥 將目前的英雄狀態 (包含累積傷害) 傳出去
+        // 將目前的英雄狀態 (包含累積傷害) 傳出去
         onBattleEndCallback(isWin, battleGold, heroEntities);
     }
 }

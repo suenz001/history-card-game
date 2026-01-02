@@ -230,11 +230,29 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     box-shadow: 0 0 10px rgba(0,0,0,0.5); 
     transform: translateY(-50%); 
     background-size: cover; 
-    background-position: center 15%; /* 🔥 修正：讓卡片大頭照對準臉部 */
+    background-position: center 15%; 
 }
 .hero-unit.SSR { border-color: #f1c40f; }
 .hero-unit.SR { border-color: #9b59b6; }
 .hero-unit.R { border-color: #3498db; }
+
+/* 🔥 新增：英雄職業小圖示 */
+.hero-type-badge {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    width: 20px;
+    height: 20px;
+    background: #2c3e50;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    color: #fff;
+    font-size: 0.8em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 25;
+}
 
 /* 英雄與敵人的血條 */
 .hero-hp-bar, .enemy-hp-bar { position: absolute; top: -10px; width: 35px; height: 4px; background: #555; border-radius: 2px; }
