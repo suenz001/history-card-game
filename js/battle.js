@@ -59,8 +59,10 @@ export function startPvpMatch(enemyTeamData) {
     setupBattleEnvironment();
     
     // UI 調整
-    document.getElementById('wave-notification').innerText = "⚔️ PVP 對決開始 ⚔️";
-    document.getElementById('wave-count').innerText = "PVP";
+    const waveNotif = document.getElementById('wave-notification');
+    const waveCount = document.getElementById('wave-count');
+    if(waveNotif) waveNotif.innerText = "⚔️ PVP 對決開始 ⚔️";
+    if(waveCount) waveCount.innerText = "PVP";
     
     spawnHeroes(); // 生成我方
     spawnPvpEnemies(enemyTeamData); // 生成敵方
@@ -77,17 +79,24 @@ function setupBattleEnvironment() {
     enemies = [];
     heroEntities = [];
     deadHeroes = [];
-    document.getElementById('enemy-container').innerHTML = '';
-    document.getElementById('hero-container').innerHTML = '';
+    const enemyContainer = document.getElementById('enemy-container');
+    const heroContainer = document.getElementById('hero-container');
+    if(enemyContainer) enemyContainer.innerHTML = '';
+    if(heroContainer) heroContainer.innerHTML = '';
     
     // 清空並準備監控列表
     const monitorList = document.getElementById('hero-monitor-list');
     if(monitorList) monitorList.innerHTML = '';
 
-    document.querySelector('.lanes-wrapper').style.opacity = '0.3';
+    const lanesWrapper = document.querySelector('.lanes-wrapper');
+    if(lanesWrapper) lanesWrapper.style.opacity = '0.3';
+    
     updateBattleUI();
-    document.getElementById('start-battle-btn').classList.add('btn-disabled');
-    document.getElementById('start-battle-btn').innerText = "戰鬥進行中...";
+    const startBtn = document.getElementById('start-battle-btn');
+    if(startBtn) {
+        startBtn.classList.add('btn-disabled');
+        startBtn.innerText = "戰鬥進行中...";
+    }
 }
 
 export function resetBattleState() {
@@ -102,22 +111,34 @@ export function resetBattleState() {
     enemies = [];
     heroEntities = [];
     deadHeroes = [];
-    document.getElementById('enemy-container').innerHTML = '';
-    document.getElementById('hero-container').innerHTML = '';
+    
+    const enemyContainer = document.getElementById('enemy-container');
+    const heroContainer = document.getElementById('hero-container');
+    if(enemyContainer) enemyContainer.innerHTML = '';
+    if(heroContainer) heroContainer.innerHTML = '';
     
     const monitorList = document.getElementById('hero-monitor-list');
     if(monitorList) monitorList.innerHTML = '';
 
-    document.getElementById('start-battle-btn').classList.remove('btn-disabled');
-    document.getElementById('start-battle-btn').innerText = "請先部署英雄";
-    document.getElementById('battle-screen').classList.add('hidden');
-    document.getElementById('wave-notification').classList.add('hidden');
-    document.querySelector('.lanes-wrapper').style.opacity = '1';
+    const startBtn = document.getElementById('start-battle-btn');
+    if(startBtn) {
+        startBtn.classList.remove('btn-disabled');
+        startBtn.innerText = "請先部署英雄";
+    }
+
+    const battleScreen = document.getElementById('battle-screen');
+    const waveNotif = document.getElementById('wave-notification');
+    const lanesWrapper = document.querySelector('.lanes-wrapper');
+    
+    if(battleScreen) battleScreen.classList.add('hidden');
+    if(waveNotif) waveNotif.classList.add('hidden');
+    if(lanesWrapper) lanesWrapper.style.opacity = '1';
 }
 
 function spawnHeroes() {
     const container = document.getElementById('hero-container');
     const monitorList = document.getElementById('hero-monitor-list');
+    if(!container) return;
 
     battleSlots.forEach((card, index) => {
         if(!card) return;
@@ -175,12 +196,11 @@ function spawnHeroes() {
 // 🔥 生成 PVP 敵方英雄
 function spawnPvpEnemies(enemyTeam) {
     const container = document.getElementById('enemy-container');
-    
+    if(!container) return;
+
     enemyTeam.forEach(enemyCard => {
-        // 解析敵人位置 (鏡像翻轉)
         const lane = Math.floor(enemyCard.slotIndex / 3);
         const col = enemyCard.slotIndex % 3;
-        // 敵人在右邊 (95% 往左算)
         const startPos = 95 - (col * 4); 
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
@@ -189,11 +209,9 @@ function spawnPvpEnemies(enemyTeam) {
         el.className = `enemy-unit pvp-enemy ${enemyCard.rarity}`;
         el.style.backgroundImage = `url(assets/cards/${enemyCard.id}.webp)`;
         el.style.backgroundSize = 'cover';
-        el.style.border = '2px solid #e74c3c'; // 紅框代表敵人
+        el.style.border = '2px solid #e74c3c';
         el.style.left = `${startPos}%`;
         el.style.top = `${startY}%`;
-        
-        // 敵人預設面向左邊 (scaleX -1)
         el.style.transform = 'translateY(-50%) scaleX(-1)';
 
         el.innerHTML = `<div class="enemy-hp-bar"><div style="width:100%"></div></div><div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>`;
@@ -211,13 +229,13 @@ function spawnPvpEnemies(enemyTeam) {
             atk: enemyCard.attackType === 'ranged' ? Math.floor(enemyCard.atk * 0.6) : enemyCard.atk, 
             lastAttackTime: 0,
             el: el,
-            isPvpHero: true // 標記為 PVP 英雄 (擁有 AI)
+            isPvpHero: true 
         });
     });
 }
 
 function startWave(waveNum) {
-    if(isPvpMode) return; // PVP 不跑波次
+    if(isPvpMode) return;
     battleState.wave = waveNum;
     battleState.spawned = 0;
     battleState.totalToSpawn = WAVE_CONFIG[waveNum].count;
@@ -226,16 +244,21 @@ function startWave(waveNum) {
     updateBattleUI();
     
     const waveNotif = document.getElementById('wave-notification');
-    waveNotif.innerText = waveNum === 4 ? `😈 魔王來襲 😈` : `第 ${waveNum} 波 來襲!`;
-    waveNotif.classList.remove('hidden');
-    waveNotif.style.animation = 'none';
-    waveNotif.offsetHeight; 
-    waveNotif.style.animation = 'waveFade 2s forwards';
+    if(waveNotif) {
+        waveNotif.innerText = waveNum === 4 ? `😈 魔王來襲 😈` : `第 ${waveNum} 波 來襲!`;
+        waveNotif.classList.remove('hidden');
+        waveNotif.style.animation = 'none';
+        waveNotif.offsetHeight; 
+        waveNotif.style.animation = 'waveFade 2s forwards';
+    }
 }
 
 function spawnEnemy() {
-    if(isPvpMode) return; // PVP 不生成普通怪
+    if(isPvpMode) return; 
     
+    const container = document.getElementById('enemy-container');
+    if(!container) return;
+
     const config = WAVE_CONFIG[battleState.wave];
     
     // Wave 4: 魔王
@@ -245,7 +268,7 @@ function spawnEnemy() {
         const boss = { id: Date.now(), maxHp: 30000, currentHp: 30000, atk: 500, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
         const el = document.createElement('div'); el.className = 'enemy-unit boss'; el.innerHTML = `😈<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
         el.style.top = `${boss.y}%`; el.style.left = `${boss.position}%`;
-        document.getElementById('enemy-container').appendChild(el); boss.el = el; enemies.push(boss);
+        container.appendChild(el); boss.el = el; enemies.push(boss);
         return;
     }
 
@@ -260,25 +283,32 @@ function spawnEnemy() {
     const enemy = { id: Date.now(), maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, lane: -1, position: spawnX, y: spawnY, speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 };
     const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
     el.style.top = `${enemy.y}%`; el.style.left = `${enemy.position}%`; 
-    document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
+    container.appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
 function fireBossSkill(boss) {
+    const container = document.querySelector('.battle-field-container');
+    if(!container) return;
+    
     const projectile = document.createElement('div'); projectile.className = 'boss-projectile';
     projectile.style.left = `${boss.position}%`; projectile.style.top = `${boss.y}%`;
     projectile.style.width = '80px'; projectile.style.height = '80px'; projectile.style.fontSize = '3em';
-    document.querySelector('.battle-field-container').appendChild(projectile);
+    container.appendChild(projectile);
+    
     let target = heroEntities[Math.floor(Math.random() * heroEntities.length)];
     if (!target) target = { position: 20, y: 50 };
+    
     void projectile.offsetWidth;
     projectile.style.left = `${target.position}%`; projectile.style.top = `${target.y}%`;
+    
     setTimeout(() => {
         projectile.remove();
         const effect = document.createElement('div'); effect.className = 'boss-aoe-effect';
         effect.style.left = `${target.position}%`; effect.style.top = `${target.y}%`;
-        document.querySelector('.battle-field-container').appendChild(effect);
+        if(container) container.appendChild(effect);
         setTimeout(() => effect.remove(), 600);
         playSound('dismantle');
+        
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position; const dy = hero.y - target.y; const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < 7) { 
@@ -291,14 +321,20 @@ function fireBossSkill(boss) {
 
 function fireProjectile(startEl, targetEl, type, onHitCallback) {
     if(!startEl || !targetEl) return;
+    const container = document.querySelector('.battle-field-container');
+    if(!container) return;
+
     const projectile = document.createElement('div'); projectile.className = 'projectile';
     if (type === 'arrow') projectile.innerText = '🏹'; else if (type === 'fireball') projectile.innerText = '🔥'; else if (type === 'sword') projectile.innerText = '🗡️'; else projectile.innerText = '⚔️'; 
-    const containerRect = document.querySelector('.battle-field-container').getBoundingClientRect();
+    
+    const containerRect = container.getBoundingClientRect();
     const startRect = startEl.getBoundingClientRect(); const targetRect = targetEl.getBoundingClientRect();
     const startX = startRect.left - containerRect.left + startRect.width / 2; const startY = startRect.top - containerRect.top + startRect.height / 2;
     const endX = targetRect.left - containerRect.left + targetRect.width / 2; const endY = targetRect.top - containerRect.top + targetRect.height / 2;
+    
     projectile.style.left = `${startX}px`; projectile.style.top = `${startY}px`;
-    document.querySelector('.battle-field-container').appendChild(projectile);
+    container.appendChild(projectile);
+    
     void projectile.offsetWidth; 
     projectile.style.left = `${endX}px`; projectile.style.top = `${endY}px`;
     setTimeout(() => { projectile.remove(); if(onHitCallback) { playSound('dismantle'); onHitCallback(); } }, 300);
@@ -306,6 +342,20 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
 
 function triggerHeroHit(el) { if(el) { el.classList.remove('taking-damage'); void el.offsetWidth; el.classList.add('taking-damage'); } }
 
+// 顯示飄字 (加入防呆)
+function showDamageText(x, y, text, type) {
+    const container = document.querySelector('.battle-field-container');
+    if(!container) return;
+    const el = document.createElement('div');
+    el.className = `damage-text ${type}`;
+    el.innerText = text;
+    el.style.left = `${x}%`;
+    el.style.top = `${y}%`;
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 800);
+}
+
+// 🔥 核心遊戲迴圈 (已加入 PVE 死機防護)
 function gameLoop() {
     if (!isBattleActive) return;
     const now = Date.now();
@@ -334,22 +384,29 @@ function gameLoop() {
         }
     }
     
-    // 🔥 PVP 結束判定
+    // PVP 結束判定
     if (isPvpMode && battleState.phase === 'COMBAT') {
-        if (enemies.length === 0) { // 敵方全滅 -> 勝利
-            endBattle(true); return;
-        }
-        if (heroEntities.length === 0) { // 我方全滅 -> 失敗
-            endBattle(false); return;
-        }
+        if (enemies.length === 0) { endBattle(true); return; }
+        if (heroEntities.length === 0) { endBattle(false); return; }
     }
 
     // --- 英雄邏輯 ---
     heroEntities.sort((a, b) => b.position - a.position);
-    heroEntities.forEach((hero, hIndex) => {
-        if (hero.currentHp <= 0) return; 
+    for (let i = heroEntities.length - 1; i >= 0; i--) {
+        const hero = heroEntities[i];
+
+        if (hero.currentHp <= 0) {
+            if (hero.monitorEl) { 
+                hero.monitorEl.classList.add('dead'); 
+                hero.monitorEl.querySelector('.monitor-name').innerText += " (陣亡)"; 
+                hero.monitorEl.querySelector('.monitor-hp-fill').style.width = '0%'; 
+            }
+            if(hero.el) hero.el.remove();
+            deadHeroes.push(hero); 
+            heroEntities.splice(i, 1);
+            continue;
+        }
         
-        // 🔥 更新監控條
         if (hero.monitorEl) { 
             const hpPercent = Math.max(0, (hero.currentHp / hero.maxHp) * 100); 
             const fill = hero.monitorEl.querySelector('.monitor-hp-fill'); 
@@ -357,6 +414,7 @@ function gameLoop() {
         }
 
         let blocked = false; let pushX = 0; let pushY = 0; let nearestEnemy = null; let minTotalDist = 9999; 
+        
         enemies.forEach(enemy => {
             if (enemy.currentHp > 0) {
                 const dx = enemy.position - hero.position; const dy = enemy.y - hero.y; const dist = Math.sqrt(dx*dx + dy*dy);
@@ -395,34 +453,38 @@ function gameLoop() {
             hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
             if (nearestEnemy && nearestEnemy.position < hero.position) { hero.el.style.transform = 'translateY(-50%) scaleX(-1)'; } else { hero.el.style.transform = 'translateY(-50%) scaleX(1)'; }
         }
-    });
-
-    for (let i = heroEntities.length - 1; i >= 0; i--) {
-        if (heroEntities[i].currentHp <= 0) {
-            // 更新監控為陣亡
-            if (heroEntities[i].monitorEl) { 
-                heroEntities[i].monitorEl.classList.add('dead'); 
-                heroEntities[i].monitorEl.querySelector('.monitor-name').innerText += " (陣亡)"; 
-                heroEntities[i].monitorEl.querySelector('.monitor-hp-fill').style.width = '0%'; 
-            }
-            deadHeroes.push(heroEntities[i]); heroEntities[i].el.remove(); heroEntities.splice(i, 1);
-        }
     }
 
     if (!isPvpMode && isBattleActive && heroEntities.length === 0 && battleState.spawned > 0) { endBattle(false); return; }
 
-    // --- 🔥 敵人邏輯 (大幅升級，支援 PVP 英雄行為) ---
+    // --- 🔥 敵人邏輯 (倒序遍歷) ---
     enemies.sort((a, b) => a.position - b.position);
-    enemies.forEach((enemy, eIndex) => {
-        // 魔王邏輯
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        const enemy = enemies[i];
+
+        // 1. 死亡判定
+        if (enemy.currentHp <= 0) {
+            if(enemy.el) enemy.el.remove();
+            enemies.splice(i, 1);
+            
+            // 🔥 PVE 專屬邏輯 (加入 try-catch 防止 UI 錯誤導致當機)
+            if(!isPvpMode) { 
+                try {
+                    battleGold += 50 + (battleState.wave * 10);
+                    updateBattleUI(); 
+                    showDamageText(enemy.position, enemy.y, `+50G`, 'gold-text'); 
+                } catch(err) {
+                    console.error("UI Update Error in Battle:", err);
+                }
+            }
+            playSound('dismantle');
+            continue; 
+        }
+
         if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { fireBossSkill(enemy); enemy.lastAttackTime = now; }
 
-        let blocked = false;
-        let dodgeY = 0;
-        let nearestHero = null;
-        let minTotalDist = 9999;
+        let blocked = false; let dodgeY = 0; let nearestHero = null; let minTotalDist = 9999;
 
-        // 1. 索敵
         heroEntities.forEach(hero => {
             if (hero.currentHp > 0) {
                 const dx = enemy.position - hero.position; const dy = enemy.y - hero.y; const dist = Math.sqrt(dx*dx + dy*dy);
@@ -430,7 +492,6 @@ function gameLoop() {
             }
         });
 
-        // 🔥 2. PVP 敵人攻擊判定 (模擬玩家英雄)
         if (enemy.isPvpHero && nearestHero && minTotalDist <= enemy.range) {
             blocked = true;
             if (now - enemy.lastAttackTime > 2000 / gameSpeed) {
@@ -439,14 +500,12 @@ function gameLoop() {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
                         nearestHero.currentHp -= enemy.atk;
                         triggerHeroHit(nearestHero.el);
-                        // 敵人打人飄字
                         showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
                     }
                 });
                 enemy.lastAttackTime = now;
             }
         }
-        // 普通怪物的攻擊邏輯 (近戰接觸)
         else if (!enemy.isBoss && !enemy.isPvpHero && nearestHero && minTotalDist <= 3) { 
             blocked = true;
             if (now - enemy.lastAttackTime > 800 / gameSpeed) {
@@ -459,7 +518,6 @@ function gameLoop() {
             }
         }
 
-        // 3. 敵人防重疊 (推擠)
         for (let other of enemies) {
             if (other !== enemy && other.currentHp > 0) {
                 let dist = Math.abs(enemy.position - other.position);
@@ -470,15 +528,12 @@ function gameLoop() {
             }
         }
 
-        // 4. 移動邏輯 (PVP敵人會追擊)
         if (!blocked) { 
              if (nearestHero) {
-                 // 敵人在右，要往左跑 (position 減小)
                  if (enemy.position > nearestHero.position + 2) enemy.position -= enemy.speed * gameSpeed;
                  else if (enemy.position < nearestHero.position - 2) enemy.position += enemy.speed * gameSpeed;
                  if (enemy.y < nearestHero.y) enemy.y += 0.15 * gameSpeed; else if (enemy.y > nearestHero.y) enemy.y -= 0.15 * gameSpeed;
              } else {
-                 // 沒有目標就一直往左走
                  if (enemy.position > 10) enemy.position -= enemy.speed * gameSpeed;
              }
         }
@@ -490,33 +545,26 @@ function gameLoop() {
         if (enemy.el) {
             enemy.el.style.left = `${enemy.position}%`; enemy.el.style.top = `${enemy.y}%`;
             enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
-            
-            // 🔥 PVP 敵人面向判定
             if (nearestHero && nearestHero.position > enemy.position) {
                 enemy.el.style.transform = 'translateY(-50%) scaleX(1)';
             } else {
                 enemy.el.style.transform = 'translateY(-50%) scaleX(-1)';
             }
         }
-
-        if (enemy.currentHp <= 0) {
-            enemy.el.remove(); enemies.splice(eIndex, 1);
-            if(!isPvpMode) { // PVP 不掉金幣，最後結算才算
-                battleGold += 50 + (battleState.wave * 10);
-                updateBattleUI(); 
-                showDamageText(enemy.position, enemy.y, `+50G`, 'gold-text'); 
-            }
-            playSound('dismantle');
-        } 
-    });
+    }
 
     gameLoopId = requestAnimationFrame(gameLoop);
 }
 
+// 🔥 UI 更新防呆版
 function updateBattleUI() {
-    document.getElementById('battle-gold').innerText = battleGold; 
-    document.getElementById('wave-count').innerText = isPvpMode ? "PVP" : battleState.wave;
-    document.getElementById('hero-count-display').innerText = heroEntities.length;
+    const goldEl = document.getElementById('battle-gold');
+    const waveEl = document.getElementById('wave-count');
+    const countEl = document.getElementById('hero-count-display');
+    
+    if(goldEl) goldEl.innerText = battleGold; 
+    if(waveEl) waveEl.innerText = isPvpMode ? "PVP" : battleState.wave;
+    if(countEl) countEl.innerText = heroEntities.length;
 }
 
 function endBattle(isWin) {

@@ -58,6 +58,16 @@ export function updatePvpContext(user, inventory) {
     allUserCards = inventory;
 }
 
+// 增加一個檢查函式，確保資料已載入
+function checkInventoryReady() {
+    if (!allUserCards || allUserCards.length === 0) {
+        // 嘗試提示或重新讀取，這裡簡單提示
+        console.warn("PVP Inventory not ready yet.");
+        return false;
+    }
+    return true;
+}
+
 // --- 設定防守陣容相關 ---
 async function openPvpModal() {
     if (!currentUser) return alert("請先登入");
@@ -72,15 +82,28 @@ async function openPvpModal() {
     } else { pvpDefenseSlots = new Array(9).fill(null); }
     renderPvpSlots(); updateSaveButtonState();
 }
+
 function handleSlotClick(slotElement) {
+    // 簡單檢查資料是否就緒，雖非強制但較安全
+    if (allUserCards.length === 0) console.warn("Inventory might be empty or loading.");
+
     const index = parseInt(slotElement.dataset.slot);
-    if (pvpDefenseSlots[index]) { playSound('click'); pvpDefenseSlots[index] = null; renderPvpSlots(); updateSaveButtonState(); } 
+    if (pvpDefenseSlots[index]) { 
+        playSound('click'); 
+        pvpDefenseSlots[index] = null; 
+        renderPvpSlots(); 
+        updateSaveButtonState(); 
+    } 
     else {
         const currentCount = pvpDefenseSlots.filter(x => x !== null).length;
         if (currentCount >= 6) return alert("PVP 防守隊伍最多只能上陣 6 名英雄！");
-        playSound('click'); currentDeploySlot = index; renderPvpInventory();
+        
+        playSound('click'); 
+        currentDeploySlot = index; // 確保設置當前選擇的 Slot
+        renderPvpInventory();
     }
 }
+
 function renderPvpSlots() {
     document.querySelectorAll('.pvp-defense-slot').forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = pvpDefenseSlots[index];
@@ -95,19 +118,69 @@ function renderPvpSlots() {
         } else { placeholder.style.display = 'block'; slotDiv.classList.remove('active'); }
     });
 }
+
 function renderPvpInventory() {
-    const container = document.getElementById('pvp-inventory-grid'); container.innerHTML = "";
-    document.getElementById('pvp-inventory-title').innerText = "👇 選擇防守英雄 (點擊加入)"; document.getElementById('pvp-inventory-selection').classList.remove('hidden');
-    const deployedDocIds = pvpDefenseSlots.filter(h => h).map(h => h.docId); const sortedCards = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp));
+    const container = document.getElementById('pvp-inventory-grid'); 
+    container.innerHTML = "";
+    
+    document.getElementById('pvp-inventory-title').innerText = "👇 選擇防守英雄 (點擊加入)"; 
+    document.getElementById('pvp-inventory-selection').classList.remove('hidden');
+
+    const deployedDocIds = pvpDefenseSlots.filter(h => h).map(h => h.docId); 
+    const sortedCards = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp));
+
+    if(sortedCards.length === 0) {
+        container.innerHTML = "<div style='padding:20px; text-align:center;'>背包內沒有可用的英雄</div>";
+        return;
+    }
+
     sortedCards.forEach(card => {
-        const isDeployed = deployedDocIds.includes(card.docId); const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const typeIcon = card.attackType === 'ranged' ? '🏹' : '👊';
-        cardDiv.className = `card ${card.rarity}`; if (isDeployed) cardDiv.classList.add('is-deployed');
-        cardDiv.innerHTML = `<div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" class="card-img"><div class="card-info-overlay"><div class="card-name">${card.name}</div><div class="card-stats">${typeIcon} ${card.atk}</div></div><img src="${framePath}" class="card-frame-img">`;
-        cardDiv.addEventListener('click', () => { if (isDeployed) return; selectHeroForSlot(card); }); container.appendChild(cardDiv);
+        const isDeployed = deployedDocIds.includes(card.docId); 
+        
+        const cardDiv = document.createElement('div'); 
+        const charPath = `assets/cards/${card.id}.webp`; 
+        const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; 
+        const typeIcon = card.attackType === 'ranged' ? '🏹' : '👊';
+
+        cardDiv.className = `card ${card.rarity}`; 
+        if (isDeployed) cardDiv.classList.add('is-deployed');
+        
+        // 🔥 修正：直接在這裡綁定點擊事件，並阻止冒泡，確保在任何層級下都能觸發
+        cardDiv.onclick = (e) => {
+            e.stopPropagation(); 
+            if (isDeployed) {
+                alert("該英雄已經在防守陣容中！");
+                return;
+            }
+            selectHeroForSlot(card);
+        };
+
+        // 確保內部元素不會攔截點擊 (pointer-events: none)
+        cardDiv.innerHTML = `
+            <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
+            <img src="${charPath}" class="card-img" style="pointer-events: none;">
+            <div class="card-info-overlay" style="pointer-events: none;">
+                <div class="card-name">${card.name}</div>
+                <div class="card-stats">${typeIcon} ${card.atk}</div>
+            </div>
+            <img src="${framePath}" class="card-frame-img" style="pointer-events: none;">
+        `;
+        
+        container.appendChild(cardDiv);
     });
 }
-function selectHeroForSlot(card) { if (currentDeploySlot === null) return; pvpDefenseSlots[currentDeploySlot] = { ...card }; playSound('click'); document.getElementById('pvp-inventory-selection').classList.add('hidden'); renderPvpSlots(); updateSaveButtonState(); }
+
+function selectHeroForSlot(card) { 
+    if (currentDeploySlot === null) return; 
+    pvpDefenseSlots[currentDeploySlot] = { ...card }; 
+    playSound('click'); 
+    document.getElementById('pvp-inventory-selection').classList.add('hidden'); 
+    renderPvpSlots(); 
+    updateSaveButtonState(); 
+}
+
 function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !== null).length; const btn = document.getElementById('save-pvp-team-btn'); if (count > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `💾 儲存防守陣容 (${count}/6)`; } else { btn.classList.add('btn-disabled'); btn.innerText = "請至少配置 1 名英雄"; } }
+
 async function saveDefenseTeam() {
     if (!currentUser) return;
     const count = pvpDefenseSlots.filter(x => x !== null).length; if (count === 0) return alert("請至少配置 1 名英雄！"); if (count > 6) return alert("防守英雄不能超過 6 名！"); 
