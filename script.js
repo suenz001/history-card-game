@@ -2,11 +2,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// --- 全域錯誤攔截 (方便除錯) ---
+// --- 全域錯誤監聽 (若有錯誤會跳窗提示，方便除錯) ---
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
 };
 
+// --- Firebase 設定 ---
 const firebaseConfig = {
   apiKey: "AIzaSyCaLWMEi7wNxeCjUQC86axbRsxLMDWQrq8",
   authDomain: "gacha-game-v1.firebaseapp.com",
@@ -17,18 +18,22 @@ const firebaseConfig = {
   measurementId: "G-N0EM6EJ9BK"
 };
 
+// --- 安全初始化 Firebase ---
 let app, db, auth, provider;
+let isFirebaseReady = false;
 
 try {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
     auth = getAuth(app);
     provider = new GoogleAuthProvider();
+    isFirebaseReady = true;
 } catch (e) {
-    console.error("Firebase 初始化失敗:", e);
-    alert("遊戲初始化失敗，請重新整理網頁");
+    console.error("Firebase Init Error:", e);
+    alert("遊戲初始化失敗，請檢查網路連線");
 }
 
+// --- 遊戲全域變數 ---
 let currentUser = null;
 let gems = 0;
 let gold = 0;
@@ -39,8 +44,8 @@ let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
-// 戰鬥系統變數
-let battleSlots = new Array(9).fill(null); // 9個槽位 (3x3)
+// 戰鬥變數
+let battleSlots = new Array(9).fill(null);
 let isBattleActive = false;
 let battleGold = 0;
 let baseHp = 100;
@@ -48,31 +53,24 @@ let enemies = [];
 let deployTargetSlot = null; 
 let currentDifficulty = 'normal';
 
-// 波次管理
 const WAVE_CONFIG = {
     1: { count: 6, hp: 800, atk: 50 },
     2: { count: 12, hp: 1500, atk: 100 },
     3: { count: 18, hp: 3000, atk: 200 } 
 };
 let battleState = {
-    wave: 1,
-    spawned: 0,
-    totalToSpawn: 0,
-    lastSpawnTime: 0,
-    phase: 'IDLE',
-    waitTimer: 0
+    wave: 1, spawned: 0, totalToSpawn: 0, lastSpawnTime: 0, phase: 'IDLE', waitTimer: 0
 };
 let gameLoopId = null;
 
 let isBatchMode = false;
 let selectedBatchCards = new Set();
-
 let gachaQueue = [];
 let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// --- 音效系統 ---
+// --- 音效初始化 ---
 const audioBgm = document.getElementById('bgm');
 const audioBattle = document.getElementById('bgm-battle');
 const sfxDraw = document.getElementById('sfx-draw');
@@ -85,20 +83,16 @@ const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
 try {
     audioCtx = new AudioContext();
-} catch(e) {
-    console.warn("瀏覽器不支援 Web Audio API");
-}
+} catch(e) { console.warn("Web Audio API not supported"); }
 
 let isBgmOn = true;
 let isSfxOn = true;
 let bgmVolume = 0.5;
 let sfxVolume = 1.0;
 
-if(audioBgm) {
-    audioBgm.volume = bgmVolume;
-    audioBattle.volume = bgmVolume;
-}
+if(audioBgm) { audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; }
 
+// 全域點擊啟動音效 (解決瀏覽器限制)
 document.body.addEventListener('click', () => {
     if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
     if (isBgmOn && audioBgm && audioBgm.paused && audioBattle && audioBattle.paused) {
@@ -130,9 +124,10 @@ function playSound(type) {
             sound.currentTime = 0;
             sound.play().catch(() => {});
         }
-    } catch (e) { console.log("Audio error", e); }
+    } catch (e) { console.log("Audio Error", e); }
 }
 
+// 合成音效函數
 function synthesizeClick() {
     if(!audioCtx) return;
     const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
@@ -140,7 +135,6 @@ function synthesizeClick() {
     gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
     osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
 }
-
 function synthesizeDismantle() {
     if(!audioCtx) return;
     const bufferSize = audioCtx.sampleRate * 0.5; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
@@ -148,7 +142,6 @@ function synthesizeDismantle() {
     gainNode.gain.setValueAtTime(sfxVolume * 0.8, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
     noise.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
 }
-
 function synthesizeInventory() {
     if(!audioCtx) return;
     const bufferSize = audioCtx.sampleRate * 0.3; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
@@ -156,7 +149,6 @@ function synthesizeInventory() {
     const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
     noise.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
 }
-
 function synthesizePoison() {
     if(!audioCtx) return;
     const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
@@ -165,135 +157,7 @@ function synthesizePoison() {
     osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3);
 }
 
-// --- 設定介面 ---
-const settingsModal = document.getElementById('settings-modal');
-const bgmToggle = document.getElementById('bgm-toggle');
-const sfxToggle = document.getElementById('sfx-toggle');
-const bgmSlider = document.getElementById('bgm-volume');
-const sfxSlider = document.getElementById('sfx-volume');
-const settingsNameInput = document.getElementById('settings-name-input');
-
-if(document.getElementById('settings-btn')) {
-    document.getElementById('settings-btn').addEventListener('click', () => { 
-        playSound('click'); 
-        if(settingsModal) {
-            settingsModal.classList.remove('hidden'); 
-            bgmToggle.checked = isBgmOn; 
-            sfxToggle.checked = isSfxOn; 
-            bgmSlider.value = bgmVolume; 
-            sfxSlider.value = sfxVolume; 
-        }
-    });
-}
-if(document.getElementById('close-settings-btn')) {
-    document.getElementById('close-settings-btn').addEventListener('click', () => { 
-        playSound('click'); 
-        if(settingsModal) settingsModal.classList.add('hidden'); 
-    });
-}
-
-bgmToggle.addEventListener('change', (e) => {
-    isBgmOn = e.target.checked;
-    if (isBgmOn) {
-        if(!document.getElementById('battle-screen').classList.contains('hidden')){ audioBattle.play().catch(()=>{}); } else { audioBgm.play().catch(()=>{}); }
-    } else { audioBgm.pause(); audioBattle.pause(); }
-});
-
-sfxToggle.addEventListener('change', (e) => { isSfxOn = e.target.checked; });
-bgmSlider.addEventListener('input', (e) => { bgmVolume = parseFloat(e.target.value); audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; });
-sfxSlider.addEventListener('input', (e) => { sfxVolume = parseFloat(e.target.value); });
-
-document.getElementById('settings-save-name-btn').addEventListener('click', async () => {
-    const newName = settingsNameInput.value.trim();
-    if (!newName) return alert("請輸入暱稱");
-    try { await updateProfile(currentUser, { displayName: newName }); await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); document.getElementById('user-name').innerText = `玩家：${newName}`; loadLeaderboard(); alert("改名成功！"); settingsModal.classList.add('hidden'); } catch (e) { console.error(e); alert("改名失敗"); }
-});
-
-// --- 登入邏輯 ---
-const loginSection = document.getElementById('login-section');
-const userInfo = document.getElementById('user-info');
-const gameUI = document.getElementById('game-ui');
-const userNameDisplay = document.getElementById('user-name');
-
-// Google 登入 (支援手機 Redirect)
-const googleBtn = document.getElementById('google-btn');
-if(googleBtn) {
-    googleBtn.addEventListener('click', () => {
-        playSound('click');
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        if (isMobile) {
-            signInWithRedirect(auth, provider);
-        } else {
-            signInWithPopup(auth, provider).catch(e => alert("登入失敗: " + e.message));
-        }
-    });
-}
-
-// 註冊與信箱登入
-if(document.getElementById('email-signup-btn')) {
-    document.getElementById('email-signup-btn').addEventListener('click', () => { 
-        playSound('click'); 
-        const email = document.getElementById('email-input').value; 
-        const pass = document.getElementById('pass-input').value; 
-        if(!email || !pass) return alert("請輸入帳號密碼");
-        createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { 
-            await updateProfile(res.user, { displayName: "新玩家" }); 
-            location.reload(); 
-        }).catch(e=>alert("註冊失敗: " + e.message)); 
-    });
-}
-
-if(document.getElementById('email-login-btn')) {
-    document.getElementById('email-login-btn').addEventListener('click', () => { 
-        playSound('click'); 
-        const email = document.getElementById('email-input').value; 
-        const pass = document.getElementById('pass-input').value; 
-        if(!email || !pass) return alert("請輸入帳號密碼");
-        signInWithEmailAndPassword(auth, email, pass).catch(e=>alert("登入失敗: " + e.message)); 
-    });
-}
-
-// 遊客登入
-if(document.getElementById('guest-btn')) {
-    document.getElementById('guest-btn').addEventListener('click', () => { 
-        playSound('click'); 
-        signInAnonymously(auth).then(async (res) => { 
-            await updateProfile(res.user, { displayName: "神秘客" }); 
-        }).catch(e=>alert("遊客登入失敗: " + e.message)); 
-    });
-}
-
-if(document.getElementById('logout-btn')) {
-    document.getElementById('logout-btn').addEventListener('click', () => { 
-        playSound('click'); 
-        signOut(auth).then(() => location.reload()); 
-    });
-}
-
-// 監聽登入狀態
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        currentUser = user; 
-        if(loginSection) loginSection.style.display = 'none'; 
-        if(userInfo) userInfo.style.display = 'flex'; 
-        if(userNameDisplay) userNameDisplay.innerText = `玩家：${user.displayName || '未命名'}`; 
-        if(gameUI) gameUI.classList.remove('hidden'); 
-        
-        try {
-            await loadUserData(user); 
-            await calculateTotalPowerOnly(user.uid); 
-            loadLeaderboard();
-        } catch(e) {
-            console.error("載入資料失敗", e);
-        }
-    } else { 
-        if(loginSection) loginSection.style.display = 'block'; 
-        if(userInfo) userInfo.style.display = 'none'; 
-        if(gameUI) gameUI.classList.add('hidden'); 
-    }
-});
-
-// --- 卡片資料庫 (包含 attackType) ---
+// --- 卡片資料庫 (新增 attackType) ---
 const cardDatabase = [
     { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝", attackType: "melee" },
     { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王", attackType: "melee" },
@@ -327,6 +191,113 @@ const cardDatabase = [
     { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged" }
 ];
 
+// --- 介面按鈕邏輯 (確保 DOM 存在後才綁定) ---
+const settingsModal = document.getElementById('settings-modal');
+const bgmToggle = document.getElementById('bgm-toggle');
+const sfxToggle = document.getElementById('sfx-toggle');
+const bgmSlider = document.getElementById('bgm-volume');
+const sfxSlider = document.getElementById('sfx-volume');
+const settingsNameInput = document.getElementById('settings-name-input');
+
+if(document.getElementById('settings-btn')) {
+    document.getElementById('settings-btn').addEventListener('click', () => { 
+        playSound('click'); 
+        settingsModal.classList.remove('hidden'); 
+        bgmToggle.checked = isBgmOn; 
+        sfxToggle.checked = isSfxOn; 
+        bgmSlider.value = bgmVolume; 
+        sfxSlider.value = sfxVolume; 
+    });
+}
+if(document.getElementById('close-settings-btn')) {
+    document.getElementById('close-settings-btn').addEventListener('click', () => { playSound('click'); settingsModal.classList.add('hidden'); });
+}
+
+if(bgmToggle) bgmToggle.addEventListener('change', (e) => {
+    isBgmOn = e.target.checked;
+    if (isBgmOn) {
+        if(!document.getElementById('battle-screen').classList.contains('hidden')){ audioBattle.play().catch(()=>{}); } else { audioBgm.play().catch(()=>{}); }
+    } else { audioBgm.pause(); audioBattle.pause(); }
+});
+if(sfxToggle) sfxToggle.addEventListener('change', (e) => { isSfxOn = e.target.checked; });
+if(bgmSlider) bgmSlider.addEventListener('input', (e) => { bgmVolume = parseFloat(e.target.value); audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; });
+if(sfxSlider) sfxSlider.addEventListener('input', (e) => { sfxVolume = parseFloat(e.target.value); });
+
+if(document.getElementById('settings-save-name-btn')) {
+    document.getElementById('settings-save-name-btn').addEventListener('click', async () => {
+        const newName = settingsNameInput.value.trim();
+        if (!newName) return alert("請輸入暱稱");
+        try { await updateProfile(currentUser, { displayName: newName }); await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); document.getElementById('user-name').innerText = `玩家：${newName}`; loadLeaderboard(); alert("改名成功！"); settingsModal.classList.add('hidden'); } catch (e) { console.error(e); alert("改名失敗"); }
+    });
+}
+
+// --- 登入介面 ---
+const loginSection = document.getElementById('login-section');
+const userInfo = document.getElementById('user-info');
+const gameUI = document.getElementById('game-ui');
+const userNameDisplay = document.getElementById('user-name');
+
+if(document.getElementById('google-btn')) {
+    document.getElementById('google-btn').addEventListener('click', () => {
+        if(!isFirebaseReady) return alert("Firebase 尚未初始化，請重新整理");
+        playSound('click');
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+            signInWithRedirect(auth, provider);
+        } else {
+            signInWithPopup(auth, provider).catch(e=>alert("登入失敗: " + e.message));
+        }
+    });
+}
+if(document.getElementById('email-signup-btn')) {
+    document.getElementById('email-signup-btn').addEventListener('click', () => { 
+        if(!isFirebaseReady) return alert("Firebase 尚未初始化");
+        playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; 
+        if(!email || !pass) return alert("請輸入帳號密碼");
+        createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { await updateProfile(res.user, { displayName: "新玩家" }); location.reload(); }).catch(e=>alert(e.message)); 
+    });
+}
+if(document.getElementById('email-login-btn')) {
+    document.getElementById('email-login-btn').addEventListener('click', () => { 
+        if(!isFirebaseReady) return alert("Firebase 尚未初始化");
+        playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; 
+        if(!email || !pass) return alert("請輸入帳號密碼");
+        signInWithEmailAndPassword(auth, email, pass).catch(e=>alert(e.message)); 
+    });
+}
+if(document.getElementById('guest-btn')) {
+    document.getElementById('guest-btn').addEventListener('click', () => { 
+        if(!isFirebaseReady) return alert("Firebase 尚未初始化");
+        playSound('click'); signInAnonymously(auth).then(async (res) => { await updateProfile(res.user, { displayName: "神秘客" }); }).catch(e=>alert(e.message)); 
+    });
+}
+if(document.getElementById('logout-btn')) {
+    document.getElementById('logout-btn').addEventListener('click', () => { playSound('click'); signOut(auth).then(() => location.reload()); });
+}
+
+// --- Auth 狀態監聽 (安全版) ---
+if (isFirebaseReady && auth) {
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUser = user; 
+            if(loginSection) loginSection.style.display = 'none'; 
+            if(userInfo) userInfo.style.display = 'flex'; 
+            if(userNameDisplay) userNameDisplay.innerText = `玩家：${user.displayName || '未命名'}`; 
+            if(gameUI) gameUI.classList.remove('hidden'); 
+            try {
+                await loadUserData(user); 
+                await calculateTotalPowerOnly(user.uid); 
+                loadLeaderboard();
+            } catch(e) { console.error("載入使用者資料失敗", e); }
+        } else { 
+            if(loginSection) loginSection.style.display = 'block'; 
+            if(userInfo) userInfo.style.display = 'none'; 
+            if(gameUI) gameUI.classList.add('hidden'); 
+        }
+    });
+}
+
+// --- 資料庫操作 ---
 async function loadUserData(user) {
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
@@ -337,7 +308,7 @@ async function loadUserData(user) {
 
 async function updateCurrencyCloud() { if (!currentUser) return; await updateDoc(doc(db, "users", currentUser.uid), { gems, gold, combatPower: totalPower }); }
 function updateUIDisplay() { document.getElementById('gem-count').innerText = gems; document.getElementById('gold-count').innerText = gold; document.getElementById('power-display').innerText = `🔥 戰力: ${totalPower}`; }
-document.getElementById('add-gem-btn').addEventListener('click', async () => { playSound('click'); if (!currentUser) return alert("請先登入"); gems += 5000; updateUIDisplay(); await updateCurrencyCloud(); alert("已領取 5000 鑽！"); });
+if(document.getElementById('add-gem-btn')) document.getElementById('add-gem-btn').addEventListener('click', async () => { playSound('click'); if (!currentUser) return alert("請先登入"); gems += 5000; updateUIDisplay(); await updateCurrencyCloud(); alert("已領取 5000 鑽！"); });
 
 async function calculateTotalPowerOnly(uid) {
     const q = query(collection(db, "inventory"), where("owner", "==", uid));
@@ -358,19 +329,25 @@ async function loadInventory(uid) {
         let needsUpdate = false;
         if(!data.level) { data.level = 1; needsUpdate = true; }
         if(!data.stars) { data.stars = 1; needsUpdate = true; }
-        const baseCard = cardDatabase.find(c => c.id === data.id);
+        
+        // 防呆: 使用 == 來比較 string/number 避免型別問題
+        const baseCard = cardDatabase.find(c => c.id == data.id);
+        
         if(baseCard) {
              if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; }
-             // 自動補上 attackType
              if(!data.attackType) { data.attackType = baseCard.attackType; needsUpdate = true; }
+        } else {
+             // 如果找不到基本卡片資料 (可能被刪除或改ID)，給預設值避免當機
+             if(!data.attackType) { data.attackType = 'melee'; needsUpdate = true; }
         }
+
         if(needsUpdate) updateDoc(doc(db, "inventory", docSnap.id), data);
         allUserCards.push({ ...data, docId: docSnap.id }); 
     });
     filterInventory('ALL');
 }
 
-document.getElementById('sort-select').addEventListener('change', (e) => { playSound('click'); currentSortMethod = e.target.value; filterInventory(currentFilterRarity); });
+if(document.getElementById('sort-select')) document.getElementById('sort-select').addEventListener('change', (e) => { playSound('click'); currentSortMethod = e.target.value; filterInventory(currentFilterRarity); });
 
 function filterInventory(rarity) {
     currentFilterRarity = rarity; 
@@ -443,8 +420,9 @@ if(detailModal) {
     detailModal.addEventListener('touchend', e => { touchEndX = e.changedTouches[0].screenX; if (touchEndX < touchStartX - 50) changeCard('next'); if (touchEndX > touchStartX + 50) changeCard('prev'); }, {passive: true});
 }
 
-document.getElementById('prev-card-btn').addEventListener('click', () => changeCard('prev')); document.getElementById('next-card-btn').addEventListener('click', () => changeCard('next'));
-document.getElementById('close-detail-btn').addEventListener('click', () => { playSound('click'); document.getElementById('detail-modal').classList.add('hidden'); });
+if(document.getElementById('prev-card-btn')) document.getElementById('prev-card-btn').addEventListener('click', () => changeCard('prev')); 
+if(document.getElementById('next-card-btn')) document.getElementById('next-card-btn').addEventListener('click', () => changeCard('next'));
+if(document.getElementById('close-detail-btn')) document.getElementById('close-detail-btn').addEventListener('click', () => { playSound('click'); document.getElementById('detail-modal').classList.add('hidden'); });
 document.querySelectorAll('.filter-btn').forEach(btn => { btn.addEventListener('click', (e) => { playSound('click'); document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); e.target.classList.add('active'); filterInventory(e.target.getAttribute('data-filter')); }); });
 
 async function saveCardToCloud(card) {
@@ -473,14 +451,13 @@ function drawSRorAbove() { const rand = Math.random(); let rarity = rand < 0.17 
 function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
     
-    // 判斷攻擊類型圖標
+    // 預設為近戰，避免 undefined
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '🗡️';
 
     cardDiv.className = `card ${card.rarity}`; 
     if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     
-    // 新增 typeIcon 顯示
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats"><span class="type-icon">${typeIcon}</span> ⚔️${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
     
     cardDiv.addEventListener('click', () => { 
@@ -515,18 +492,18 @@ async function closeRevealModal() {
     currentDisplayList.forEach((card) => { renderCard(card, mainContainer); }); updateUIDisplay(); await updateCurrencyCloud(); setTimeout(loadLeaderboard, 1000); 
 }
 
-document.getElementById('gacha-skip-btn').addEventListener('click', (e) => { playSound('click'); e.stopPropagation(); let nextSSRIndex = -1; for(let i = gachaIndex; i < gachaQueue.length; i++) { if(gachaQueue[i].rarity === 'SSR') { nextSSRIndex = i; break; } } if (nextSSRIndex !== -1) { gachaIndex = nextSSRIndex; showNextRevealCard(); } else { gachaIndex = gachaQueue.length; closeRevealModal(); } });
-document.getElementById('gacha-reveal-modal').addEventListener('click', showNextRevealCard);
-document.getElementById('draw-btn').addEventListener('click', async () => { playSound('click'); if (gems < 100) return alert("鑽石不足"); gems -= 100; const newCard = drawOneCard(); await playGachaAnimation(newCard.rarity); showRevealModal([newCard]); });
-document.getElementById('draw-10-btn').addEventListener('click', async () => {
+if(document.getElementById('gacha-skip-btn')) document.getElementById('gacha-skip-btn').addEventListener('click', (e) => { playSound('click'); e.stopPropagation(); let nextSSRIndex = -1; for(let i = gachaIndex; i < gachaQueue.length; i++) { if(gachaQueue[i].rarity === 'SSR') { nextSSRIndex = i; break; } } if (nextSSRIndex !== -1) { gachaIndex = nextSSRIndex; showNextRevealCard(); } else { gachaIndex = gachaQueue.length; closeRevealModal(); } });
+if(document.getElementById('gacha-reveal-modal')) document.getElementById('gacha-reveal-modal').addEventListener('click', showNextRevealCard);
+if(document.getElementById('draw-btn')) document.getElementById('draw-btn').addEventListener('click', async () => { playSound('click'); if (gems < 100) return alert("鑽石不足"); gems -= 100; const newCard = drawOneCard(); await playGachaAnimation(newCard.rarity); showRevealModal([newCard]); });
+if(document.getElementById('draw-10-btn')) document.getElementById('draw-10-btn').addEventListener('click', async () => {
      playSound('click'); if (gems < 1000) return alert("鑽石不足"); gems -= 1000; let drawnCards = []; let highestRarity = 'R'; let hasSRorAbove = false;
      for(let i=0; i<9; i++) { const c = drawOneCard(); drawnCards.push(c); if(c.rarity === 'SSR') highestRarity = 'SSR'; else if(c.rarity === 'SR') { if (highestRarity !== 'SSR') highestRarity = 'SR'; hasSRorAbove = true; } }
      let lastCard; if (hasSRorAbove || highestRarity === 'SSR') lastCard = drawOneCard(); else lastCard = drawSRorAbove(); drawnCards.push(lastCard); if (lastCard.rarity === 'SSR') highestRarity = 'SSR'; else if (lastCard.rarity === 'SR' && highestRarity !== 'SSR') highestRarity = 'SR';
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
 });
 
-document.getElementById('inventory-btn').addEventListener('click', () => { playSound('inventory'); if(!currentUser) return alert("請先登入"); deployTargetSlot = null; document.getElementById('inventory-title').innerText = "🎒 我的背包"; document.getElementById('inventory-modal').classList.remove('hidden'); loadInventory(currentUser.uid); });
-document.getElementById('close-inventory-btn').addEventListener('click', () => { playSound('click'); document.getElementById('inventory-modal').classList.add('hidden'); deployTargetSlot = null; });
+if(document.getElementById('inventory-btn')) document.getElementById('inventory-btn').addEventListener('click', () => { playSound('inventory'); if(!currentUser) return alert("請先登入"); deployTargetSlot = null; document.getElementById('inventory-title').innerText = "🎒 我的背包"; document.getElementById('inventory-modal').classList.remove('hidden'); loadInventory(currentUser.uid); });
+if(document.getElementById('close-inventory-btn')) document.getElementById('close-inventory-btn').addEventListener('click', () => { playSound('click'); document.getElementById('inventory-modal').classList.add('hidden'); deployTargetSlot = null; });
 
 async function loadLeaderboard() {
     const listDiv = document.getElementById('leaderboard-list'); const q = query(collection(db, "users"), orderBy("combatPower", "desc"), limit(10));
@@ -534,17 +511,17 @@ async function loadLeaderboard() {
 }
 
 const batchToggleBtn = document.getElementById('batch-toggle-btn'); const batchActionBar = document.getElementById('batch-action-bar'); const batchInfo = document.getElementById('batch-info'); const batchConfirmBtn = document.getElementById('batch-confirm-btn');
-batchToggleBtn.addEventListener('click', () => { playSound('click'); isBatchMode = !isBatchMode; selectedBatchCards.clear(); updateBatchUI(); filterInventory(currentFilterRarity); });
+if(batchToggleBtn) batchToggleBtn.addEventListener('click', () => { playSound('click'); isBatchMode = !isBatchMode; selectedBatchCards.clear(); updateBatchUI(); filterInventory(currentFilterRarity); });
 function updateBatchUI() { if (isBatchMode) { batchToggleBtn.classList.add('active'); batchToggleBtn.innerText = "❌ 退出批量"; batchActionBar.classList.remove('hidden'); batchConfirmBtn.innerText = "確認分解"; } else { batchToggleBtn.classList.remove('active'); batchToggleBtn.innerText = "🔧 批量分解"; batchActionBar.classList.add('hidden'); } calculateBatchTotal(); }
 function toggleBatchSelection(card, cardDiv) { if (selectedBatchCards.has(card.docId)) { selectedBatchCards.delete(card.docId); cardDiv.classList.remove('is-selected'); } else { selectedBatchCards.add(card.docId); cardDiv.classList.add('is-selected'); } calculateBatchTotal(); }
 function calculateBatchTotal() { let totalGold = 0; let count = 0; allUserCards.forEach(card => { if (selectedBatchCards.has(card.docId)) { totalGold += DISMANTLE_VALUES[card.rarity] || 0; count++; } }); batchInfo.innerHTML = `已選 <span style="color:#e74c3c">${count}</span> 張，獲得 <span style="color:#f1c40f">${totalGold} G</span>`; if (count > 0) batchConfirmBtn.classList.remove('btn-disabled'); else batchConfirmBtn.classList.add('btn-disabled'); }
-batchConfirmBtn.addEventListener('click', async () => { playSound('click'); if (selectedBatchCards.size === 0) return; if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; let totalGold = 0; const deletePromises = []; const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); cardsToRemove.forEach(card => { totalGold += DISMANTLE_VALUES[card.rarity]; if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); }); try { batchConfirmBtn.innerText = "分解中..."; await Promise.all(deletePromises); playSound('dismantle'); setTimeout(() => playSound('coin'), 300); gold += totalGold; allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); await updateCurrencyCloud(); updateUIDisplay(); selectedBatchCards.clear(); isBatchMode = false; updateBatchUI(); filterInventory(currentFilterRarity); alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
+if(batchConfirmBtn) batchConfirmBtn.addEventListener('click', async () => { playSound('click'); if (selectedBatchCards.size === 0) return; if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; let totalGold = 0; const deletePromises = []; const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); cardsToRemove.forEach(card => { totalGold += DISMANTLE_VALUES[card.rarity]; if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); }); try { batchConfirmBtn.innerText = "分解中..."; await Promise.all(deletePromises); playSound('dismantle'); setTimeout(() => playSound('coin'), 300); gold += totalGold; allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); await updateCurrencyCloud(); updateUIDisplay(); selectedBatchCards.clear(); isBatchMode = false; updateBatchUI(); filterInventory(currentFilterRarity); alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
 // ==========================================
-// 🔥 戰鬥系統核心 (Projectiles + Animation Update)
+// 🔥 戰鬥系統核心
 // ==========================================
 
-document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
+if(document.getElementById('enter-battle-mode-btn')) document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
     if(!currentUser) return alert("請先登入");
     if(allUserCards.length === 0) await loadInventory(currentUser.uid);
@@ -572,9 +549,9 @@ function resetBattleState() {
     document.getElementById('wave-notification').classList.add('hidden');
 }
 
-document.getElementById('retreat-btn').addEventListener('click', () => { playSound('click'); resetBattleState(); });
+if(document.getElementById('retreat-btn')) document.getElementById('retreat-btn').addEventListener('click', () => { playSound('click'); resetBattleState(); });
 
-document.getElementById('start-battle-btn').addEventListener('click', () => {
+if(document.getElementById('start-battle-btn')) document.getElementById('start-battle-btn').addEventListener('click', () => {
     if (isBattleActive) return;
     playSound('click');
     
@@ -598,7 +575,7 @@ document.getElementById('start-battle-btn').addEventListener('click', () => {
 });
 
 // 🔥 自動部署 🔥
-document.getElementById('auto-deploy-btn').addEventListener('click', () => {
+if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-deploy-btn').addEventListener('click', () => {
     if(isBattleActive) return;
     playSound('click');
     const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
@@ -653,20 +630,18 @@ function spawnEnemy() {
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
-// 🔥 發射飛行道具 (Projectiles) 🔥
+// 🔥 發射飛行道具 🔥
 function fireProjectile(startEl, targetEl, type, onHitCallback) {
     if(!startEl || !targetEl) return;
     
     const projectile = document.createElement('div');
     projectile.className = 'projectile';
     
-    // 根據 type 決定圖示：箭矢、火球、劍氣
     if (type === 'arrow') projectile.innerText = '🏹';
     else if (type === 'fireball') projectile.innerText = '🔥';
     else if (type === 'sword') projectile.innerText = '🗡️'; 
     else projectile.innerText = '⚔️'; 
     
-    // 取得起始點和目標點的座標 (相對於 battle-field-container)
     const containerRect = document.querySelector('.battle-field-container').getBoundingClientRect();
     const startRect = startEl.getBoundingClientRect();
     const targetRect = targetEl.getBoundingClientRect();
@@ -676,27 +651,22 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     const endX = targetRect.left - containerRect.left + targetRect.width / 2;
     const endY = targetRect.top - containerRect.top + targetRect.height / 2;
 
-    // 設定初始位置
     projectile.style.left = `${startX}px`;
     projectile.style.top = `${startY}px`;
 
     document.querySelector('.battle-field-container').appendChild(projectile);
 
-    // 強制瀏覽器重繪 (Force Reflow) 以觸發 transition
     void projectile.offsetWidth; 
 
-    // 設定目標位置 (觸發移動)
     projectile.style.left = `${endX}px`;
     projectile.style.top = `${endY}px`;
 
-    // 飛行結束後 (300ms) 執行扣血回調
     setTimeout(() => {
         projectile.remove();
         if(onHitCallback) onHitCallback();
     }, 300);
 }
 
-// 英雄受擊紅閃震動
 function triggerHeroHit(slotIdx) {
     const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"] .card`);
     if(slotDiv) {
@@ -735,7 +705,6 @@ function gameLoop() {
         }
     }
 
-    // 主堡攻擊
     baseAttackCooldown++;
     if (baseAttackCooldown > 60 && baseHp > 0) { 
         const nearest = enemies.find(e => e.position < 25);
@@ -749,7 +718,6 @@ function gameLoop() {
         }
     }
 
-    // 戰鬥邏輯 (加入 Projectile)
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
         const startSlot = enemy.lane * 3;
@@ -760,14 +728,12 @@ function gameLoop() {
                 let slotPos = 0;
                 if(i % 3 === 0) slotPos = 25; if(i % 3 === 1) slotPos = 50; if(i % 3 === 2) slotPos = 75; 
 
-                // 怪物攻擊 (距離優勢)
                 if (enemy.position <= slotPos + 15 && enemy.position >= slotPos - 5) {
                      if (now - enemy.lastAttackTime > 800) { 
-                        // 🔥 怪物發射火球 (這裡可換成噴毒)
                         fireProjectile(enemy.el, document.querySelector(`.defense-slot[data-slot="${i}"]`), 'fireball', () => {
-                             if (battleSlots[i]) { // 再次確認英雄還活著
+                             if (battleSlots[i]) { 
                                  battleSlots[i].currentHp -= enemy.atk;
-                                 triggerHeroHit(i); // 受擊特效
+                                 triggerHeroHit(i); 
                                  playSound('poison');
                                  renderBattleSlots();
                              }
@@ -776,16 +742,14 @@ function gameLoop() {
                     }
                 }
                 
-                // 英雄攻擊
                 if (enemy.position <= slotPos + 5 && enemy.position >= slotPos - 5) {
                     blocked = true;
                     if (now - battleSlots[i].lastAttackTime > 2000) { 
-                         // 🔥 根據英雄類型發射箭矢或劍氣
                          const heroType = battleSlots[i].attackType || 'melee';
                          const projType = heroType === 'ranged' ? 'arrow' : 'sword';
 
                          fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, projType, () => {
-                             if(enemy.el) { // 確保敵人還活著
+                             if(enemy.el) { 
                                  enemy.currentHp -= battleSlots[i].atk;
                              }
                          });
