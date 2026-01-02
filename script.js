@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// --- 全域錯誤監聽 (若有錯誤會跳窗提示，方便除錯) ---
+// --- 全域錯誤監聽 ---
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
 };
@@ -92,7 +92,7 @@ let sfxVolume = 1.0;
 
 if(audioBgm) { audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; }
 
-// 全域點擊啟動音效 (解決瀏覽器限制)
+// 全域點擊啟動音效
 document.body.addEventListener('click', () => {
     if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
     if (isBgmOn && audioBgm && audioBgm.paused && audioBattle && audioBattle.paused) {
@@ -157,7 +157,7 @@ function synthesizePoison() {
     osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3);
 }
 
-// --- 卡片資料庫 (新增 attackType) ---
+// --- 卡片資料庫 ---
 const cardDatabase = [
     { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝", attackType: "melee" },
     { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王", attackType: "melee" },
@@ -191,7 +191,7 @@ const cardDatabase = [
     { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged" }
 ];
 
-// --- 介面按鈕邏輯 (確保 DOM 存在後才綁定) ---
+// --- 介面按鈕邏輯 ---
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
 const sfxToggle = document.getElementById('sfx-toggle');
@@ -202,11 +202,13 @@ const settingsNameInput = document.getElementById('settings-name-input');
 if(document.getElementById('settings-btn')) {
     document.getElementById('settings-btn').addEventListener('click', () => { 
         playSound('click'); 
-        settingsModal.classList.remove('hidden'); 
-        bgmToggle.checked = isBgmOn; 
-        sfxToggle.checked = isSfxOn; 
-        bgmSlider.value = bgmVolume; 
-        sfxSlider.value = sfxVolume; 
+        if(settingsModal) {
+            settingsModal.classList.remove('hidden'); 
+            bgmToggle.checked = isBgmOn; 
+            sfxToggle.checked = isSfxOn; 
+            bgmSlider.value = bgmVolume; 
+            sfxSlider.value = sfxVolume; 
+        }
     });
 }
 if(document.getElementById('close-settings-btn')) {
@@ -275,7 +277,7 @@ if(document.getElementById('logout-btn')) {
     document.getElementById('logout-btn').addEventListener('click', () => { playSound('click'); signOut(auth).then(() => location.reload()); });
 }
 
-// --- Auth 狀態監聽 (安全版) ---
+// --- Auth 狀態監聽 ---
 if (isFirebaseReady && auth) {
     onAuthStateChanged(auth, async (user) => {
         if (user) {
@@ -330,14 +332,13 @@ async function loadInventory(uid) {
         if(!data.level) { data.level = 1; needsUpdate = true; }
         if(!data.stars) { data.stars = 1; needsUpdate = true; }
         
-        // 防呆: 使用 == 來比較 string/number 避免型別問題
+        // 防呆: 使用 == 來比較 string/number
         const baseCard = cardDatabase.find(c => c.id == data.id);
         
         if(baseCard) {
              if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; }
              if(!data.attackType) { data.attackType = baseCard.attackType; needsUpdate = true; }
         } else {
-             // 如果找不到基本卡片資料 (可能被刪除或改ID)，給預設值避免當機
              if(!data.attackType) { data.attackType = 'melee'; needsUpdate = true; }
         }
 
@@ -580,7 +581,14 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
     playSound('click');
     const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
     battleSlots = new Array(9).fill(null);
-    topHeroes.forEach((hero, index) => { battleSlots[index] = { ...hero, currentHp: hero.hp, maxHp: hero.hp, lastAttackTime = 0 }; });
+    topHeroes.forEach((hero, index) => { 
+        battleSlots[index] = { 
+            ...hero, 
+            currentHp: hero.hp, 
+            maxHp: hero.hp, 
+            lastAttackTime: 0 // <--- 之前這裡誤寫成 =，導致語法錯誤
+        }; 
+    });
     renderBattleSlots();
     updateStartButton();
 });
@@ -831,7 +839,12 @@ function deployHeroToSlot(card) {
     const isAlreadyDeployed = battleSlots.some(s => s && s.docId === card.docId);
     if(isAlreadyDeployed) { alert("這位英雄已經在場上了！"); return; }
     if (deployTargetSlot !== null) {
-        battleSlots[deployTargetSlot] = { ...card, currentHp: card.hp, maxHp: card.hp, lastAttackTime: 0 };
+        battleSlots[deployTargetSlot] = { 
+            ...card, 
+            currentHp: card.hp, 
+            maxHp: card.hp, 
+            lastAttackTime: 0 // <--- 修正處
+        };
         deployTargetSlot = null; document.getElementById('inventory-modal').classList.add('hidden'); renderBattleSlots(); updateStartButton();
     }
 }
