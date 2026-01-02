@@ -598,13 +598,14 @@ function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
     
     // 預設為近戰，避免 undefined
-    const typeIcon = card.attackType === 'ranged' ? '🏹' : '🗡️';
+    const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
 
     cardDiv.className = `card ${card.rarity}`; 
     if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     
-    cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats"><span class="type-icon">${typeIcon}</span> ⚔️${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
+    // 🔥 修改：將顯示攻擊力的符號 ⚔️ 改為 👊，避免與職業圖示混淆
+    cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats"><span class="type-icon">${typeIcon}</span> 👊${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
     
     cardDiv.addEventListener('click', () => { 
         playSound('click'); 
@@ -756,6 +757,8 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
 // 🔥 修改：處理戰鬥結束 (從 battle.js 呼叫回來)
 async function handleBattleEnd(isWin, earnedGold, heroStats) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
+    
+    // 🔥 修改：無論輸贏，都能獲得打怪掉落的金幣
     let finalGold = Math.floor(earnedGold * goldMultiplier);
     
     let gemReward = 0;
@@ -764,8 +767,8 @@ async function handleBattleEnd(isWin, earnedGold, heroStats) {
         else if (currentDifficulty === 'normal') gemReward = 350; 
         else if (currentDifficulty === 'hard') gemReward = 500; 
     } else {
-        finalGold = 0;
-        gemReward = 0;
+        // 🔥 移除 finalGold = 0; 
+        gemReward = 0; // 只有鑽石拿不到
     }
 
     const modal = document.getElementById('battle-result-modal'); const title = document.getElementById('result-title'); const goldText = document.getElementById('result-gold'); const gemText = document.getElementById('result-gems');
@@ -793,14 +796,14 @@ async function handleBattleEnd(isWin, earnedGold, heroStats) {
     await updateCurrencyCloud(); 
     updateUIDisplay();
 
-    // 🔥 生成傷害排行榜 (DPS Meter)
+    // 生成傷害排行榜 (DPS Meter)
     const dpsContainer = document.getElementById('dps-chart');
     dpsContainer.innerHTML = "";
     
     if (heroStats && heroStats.length > 0) {
         // 排序：傷害高的在上面
         const sortedHeroes = [...heroStats].sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
-        const maxDmg = sortedHeroes[0].totalDamage || 1; // 避免除以 0
+        const maxDmg = sortedHeroes[0].totalDamage || 1; 
         
         sortedHeroes.forEach(h => {
             if(!h.totalDamage) h.totalDamage = 0;
