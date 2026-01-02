@@ -185,37 +185,38 @@ onAuthStateChanged(auth, async (user) => {
     } else { loginSection.style.display = 'block'; userInfo.style.display = 'none'; gameUI.classList.add('hidden'); }
 });
 
+// 定義卡牌資料，包含攻擊類型 (melee/ranged)
 const cardDatabase = [
-    { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝" },
-    { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王" },
-    { id: 3, name: "拿破崙", rarity: "SSR", atk: 1550, hp: 2000, title: "戰爭之神" },
-    { id: 13, name: "成吉思汗", rarity: "SSR", atk: 1700, hp: 1900, title: "草原霸主" },
-    { id: 14, name: "凱撒大帝", rarity: "SSR", atk: 1500, hp: 2300, title: "羅馬獨裁者" },
-    { id: 15, name: "漢尼拔", rarity: "SSR", atk: 1580, hp: 2100, title: "戰略之父" },
-    { id: 16, name: "埃及豔后", rarity: "SSR", atk: 1400, hp: 1800, title: "尼羅河女王" },
-    { id: 17, name: "宮本武藏", rarity: "SSR", atk: 1800, hp: 1500, title: "二天一流" },
-    { id: 4, name: "諸葛亮", rarity: "SR", atk: 1200, hp: 1400, title: "臥龍先生" },
-    { id: 5, name: "聖女貞德", rarity: "SR", atk: 900, hp: 1800, title: "奧爾良少女" },
-    { id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, title: "第六天魔王" },
-    { id: 7, name: "愛因斯坦", rarity: "SR", atk: 1300, hp: 1000, title: "物理之父" },
-    { id: 18, name: "關羽", rarity: "SR", atk: 1250, hp: 1500, title: "武聖" },
-    { id: 19, name: "華盛頓", rarity: "SR", atk: 1000, hp: 1600, title: "開國元勛" },
-    { id: 20, name: "薩拉丁", rarity: "SR", atk: 1150, hp: 1450, title: "沙漠之鷹" },
-    { id: 21, name: "林肯", rarity: "SR", atk: 1100, hp: 1200, title: "解放者" },
-    { id: 22, name: "源義經", rarity: "SR", atk: 1280, hp: 1100, title: "牛若丸" },
-    { id: 23, name: "南丁格爾", rarity: "SR", atk: 500, hp: 2000, title: "提燈天使" },
-    { id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士" },
-    { id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, title: "龜甲陣列" },
-    { id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, title: "武士道" },
-    { id: 11, name: "維京海盜", rarity: "R", atk: 550, hp: 700, title: "狂戰士" },
-    { id: 12, name: "條頓騎士", rarity: "R", atk: 450, hp: 850, title: "鐵十字" },
-    { id: 24, name: "英國長弓兵", rarity: "R", atk: 600, hp: 300, title: "遠程打擊" },
-    { id: 25, name: "蒙古騎兵", rarity: "R", atk: 550, hp: 500, title: "騎射手" },
-    { id: 26, name: "忍者", rarity: "R", atk: 650, hp: 300, title: "影之軍團" },
-    { id: 27, name: "十字軍", rarity: "R", atk: 400, hp: 800, title: "聖殿騎士" },
-    { id: 28, name: "祖魯戰士", rarity: "R", atk: 500, hp: 600, title: "長矛兵" },
-    { id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, title: "熱兵器" },
-    { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風" }
+    { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝", attackType: "melee" },
+    { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王", attackType: "melee" },
+    { id: 3, name: "拿破崙", rarity: "SSR", atk: 1550, hp: 2000, title: "戰爭之神", attackType: "ranged" },
+    { id: 13, name: "成吉思汗", rarity: "SSR", atk: 1700, hp: 1900, title: "草原霸主", attackType: "ranged" },
+    { id: 14, name: "凱撒大帝", rarity: "SSR", atk: 1500, hp: 2300, title: "羅馬獨裁者", attackType: "melee" },
+    { id: 15, name: "漢尼拔", rarity: "SSR", atk: 1580, hp: 2100, title: "戰略之父", attackType: "melee" },
+    { id: 16, name: "埃及豔后", rarity: "SSR", atk: 1400, hp: 1800, title: "尼羅河女王", attackType: "ranged" },
+    { id: 17, name: "宮本武藏", rarity: "SSR", atk: 1800, hp: 1500, title: "二天一流", attackType: "melee" },
+    { id: 4, name: "諸葛亮", rarity: "SR", atk: 1200, hp: 1400, title: "臥龍先生", attackType: "ranged" },
+    { id: 5, name: "聖女貞德", rarity: "SR", atk: 900, hp: 1800, title: "奧爾良少女", attackType: "melee" },
+    { id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, title: "第六天魔王", attackType: "ranged" },
+    { id: 7, name: "愛因斯坦", rarity: "SR", atk: 1300, hp: 1000, title: "物理之父", attackType: "ranged" },
+    { id: 18, name: "關羽", rarity: "SR", atk: 1250, hp: 1500, title: "武聖", attackType: "melee" },
+    { id: 19, name: "華盛頓", rarity: "SR", atk: 1000, hp: 1600, title: "開國元勛", attackType: "ranged" },
+    { id: 20, name: "薩拉丁", rarity: "SR", atk: 1150, hp: 1450, title: "沙漠之鷹", attackType: "melee" },
+    { id: 21, name: "林肯", rarity: "SR", atk: 1100, hp: 1200, title: "解放者", attackType: "ranged" },
+    { id: 22, name: "源義經", rarity: "SR", atk: 1280, hp: 1100, title: "牛若丸", attackType: "melee" },
+    { id: 23, name: "南丁格爾", rarity: "SR", atk: 500, hp: 2000, title: "提燈天使", attackType: "ranged" },
+    { id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士", attackType: "melee" },
+    { id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, title: "龜甲陣列", attackType: "melee" },
+    { id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, title: "武士道", attackType: "melee" },
+    { id: 11, name: "維京海盜", rarity: "R", atk: 550, hp: 700, title: "狂戰士", attackType: "melee" },
+    { id: 12, name: "條頓騎士", rarity: "R", atk: 450, hp: 850, title: "鐵十字", attackType: "melee" },
+    { id: 24, name: "英國長弓兵", rarity: "R", atk: 600, hp: 300, title: "遠程打擊", attackType: "ranged" },
+    { id: 25, name: "蒙古騎兵", rarity: "R", atk: 550, hp: 500, title: "騎射手", attackType: "ranged" },
+    { id: 26, name: "忍者", rarity: "R", atk: 650, hp: 300, title: "影之軍團", attackType: "ranged" },
+    { id: 27, name: "十字軍", rarity: "R", atk: 400, hp: 800, title: "聖殿騎士", attackType: "melee" },
+    { id: 28, name: "祖魯戰士", rarity: "R", atk: 500, hp: 600, title: "長矛兵", attackType: "melee" },
+    { id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, title: "熱兵器", attackType: "ranged" },
+    { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged" }
 ];
 
 async function loadUserData(user) {
@@ -247,9 +248,18 @@ async function loadInventory(uid) {
     querySnapshot.forEach((docSnap) => { 
         let data = docSnap.data();
         let needsUpdate = false;
+        
+        // 舊資料修復邏輯
         if(!data.level) { data.level = 1; needsUpdate = true; }
         if(!data.stars) { data.stars = 1; needsUpdate = true; }
-        if(!data.baseAtk) { const baseCard = cardDatabase.find(c => c.id === data.id); if(baseCard) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; } }
+        
+        const baseCard = cardDatabase.find(c => c.id === data.id);
+        if(baseCard) {
+             if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; }
+             // 補上 attackType，如果舊資料沒有的話
+             if(!data.attackType) { data.attackType = baseCard.attackType; needsUpdate = true; }
+        }
+
         if(needsUpdate) updateDoc(doc(db, "inventory", docSnap.id), data);
         allUserCards.push({ ...data, docId: docSnap.id }); 
     });
@@ -333,7 +343,22 @@ document.querySelectorAll('.filter-btn').forEach(btn => { btn.addEventListener('
 
 async function saveCardToCloud(card) {
     if (!currentUser) return;
-    const docRef = await addDoc(collection(db, "inventory"), { name: card.name, rarity: card.rarity, atk: card.atk, hp: card.hp, title: card.title, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 1, obtainedAt: new Date(), owner: currentUser.uid, id: card.id });
+    // 確保儲存時寫入 attackType
+    const docRef = await addDoc(collection(db, "inventory"), { 
+        name: card.name, 
+        rarity: card.rarity, 
+        atk: card.atk, 
+        hp: card.hp, 
+        title: card.title, 
+        baseAtk: card.atk, 
+        baseHp: card.hp, 
+        attackType: card.attackType || 'melee', // 預設值防止空值
+        level: 1, 
+        stars: 1, 
+        obtainedAt: new Date(), 
+        owner: currentUser.uid, 
+        id: card.id 
+    });
     card.docId = docRef.id; card.baseAtk = card.atk; card.baseHp = card.hp; card.level = 1; card.stars = 1; return card;
 }
 
@@ -342,10 +367,17 @@ function drawSRorAbove() { const rand = Math.random(); let rarity = rand < 0.17 
 
 function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
+    
+    // 判斷攻擊類型圖標
+    const typeIcon = card.attackType === 'ranged' ? '🏹' : '🗡️';
+
     cardDiv.className = `card ${card.rarity}`; 
     if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
-    cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats">⚔️${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
+    
+    // 新增 typeIcon 顯示
+    cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats"><span class="type-icon">${typeIcon}</span> ⚔️${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
+    
     cardDiv.addEventListener('click', () => { 
         playSound('click'); 
         if (cardDiv.classList.contains('is-deployed')) return; 
@@ -466,7 +498,7 @@ document.getElementById('auto-deploy-btn').addEventListener('click', () => {
     playSound('click');
     const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
     battleSlots = new Array(9).fill(null);
-    topHeroes.forEach((hero, index) => { battleSlots[index] = { ...hero, currentHp: hero.hp, maxHp: hero.hp, lastAttackTime: 0 }; });
+    topHeroes.forEach((hero, index) => { battleSlots[index] = { ...hero, currentHp: hero.hp, maxHp: hero.hp, lastAttackTime = 0 }; });
     renderBattleSlots();
     updateStartButton();
 });
@@ -522,7 +554,12 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     
     const projectile = document.createElement('div');
     projectile.className = 'projectile';
-    projectile.innerText = type === 'arrow' ? '🏹' : (type === 'fireball' ? '🔥' : '⚔️'); // 根據類型換圖
+    
+    // 根據 type 決定圖示：箭矢、火球、劍氣
+    if (type === 'arrow') projectile.innerText = '🏹';
+    else if (type === 'fireball') projectile.innerText = '🔥';
+    else if (type === 'sword') projectile.innerText = '🗡️'; 
+    else projectile.innerText = '⚔️'; 
     
     // 取得起始點和目標點的座標 (相對於 battle-field-container)
     const containerRect = document.querySelector('.battle-field-container').getBoundingClientRect();
@@ -623,10 +660,12 @@ function gameLoop() {
                      if (now - enemy.lastAttackTime > 800) { 
                         // 🔥 怪物發射火球 (這裡可換成噴毒)
                         fireProjectile(enemy.el, document.querySelector(`.defense-slot[data-slot="${i}"]`), 'fireball', () => {
-                             battleSlots[i].currentHp -= enemy.atk;
-                             triggerHeroHit(i); // 受擊特效
-                             playSound('poison');
-                             renderBattleSlots();
+                             if (battleSlots[i]) { // 再次確認英雄還活著
+                                 battleSlots[i].currentHp -= enemy.atk;
+                                 triggerHeroHit(i); // 受擊特效
+                                 playSound('poison');
+                                 renderBattleSlots();
+                             }
                         });
                         enemy.lastAttackTime = now;
                     }
@@ -636,8 +675,11 @@ function gameLoop() {
                 if (enemy.position <= slotPos + 5 && enemy.position >= slotPos - 5) {
                     blocked = true;
                     if (now - battleSlots[i].lastAttackTime > 2000) { 
-                         // 🔥 英雄發射箭矢 (這裡可換成揮劍)
-                         fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, 'arrow', () => {
+                         // 🔥 根據英雄類型發射箭矢或劍氣
+                         const heroType = battleSlots[i].attackType || 'melee';
+                         const projType = heroType === 'ranged' ? 'arrow' : 'sword';
+
+                         fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, projType, () => {
                              if(enemy.el) { // 確保敵人還活著
                                  enemy.currentHp -= battleSlots[i].atk;
                              }

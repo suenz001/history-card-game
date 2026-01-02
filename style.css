@@ -66,8 +66,9 @@ input[type="text"], input[type="email"], input[type="password"] {
 }
 .card-title { font-size: 0.65em; color: #bdc3c7; margin-bottom: 1px; text-shadow: 1px 1px 2px #000; letter-spacing: 1px; }
 .card-name { font-size: 0.9em; font-weight: bold; color: #fff; margin-bottom: 2px; text-shadow: 0 0 5px #000, 1px 1px 2px black; line-height: 1.1; }
-.card-stats { font-size: 0.75em; color: #f1c40f; display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; background: rgba(0,0,0,0.3); padding: 2px 0; margin-top: 2px; }
+.card-stats { font-size: 0.75em; color: #f1c40f; display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; background: rgba(0,0,0,0.3); padding: 2px 0; margin-top: 2px; align-items: center;}
 .card-level-star { font-size: 0.7em; color: #00d2d3; margin-bottom: 1px; }
+.type-icon { font-size: 1.1em; margin-right: 2px; }
 
 img[src=""], img:not([src]) { display: none; }
 
