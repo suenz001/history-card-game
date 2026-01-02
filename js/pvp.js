@@ -72,6 +72,15 @@ export function initPvp(database, user, inventory, openInventoryCallback) {
         });
     }
 
+    // 🔥 新增：綁定手動儲存按鈕
+    const saveAttackBtn = document.getElementById('save-attack-team-btn');
+    if (saveAttackBtn) {
+        saveAttackBtn.addEventListener('click', () => {
+            playSound('click');
+            manualSaveAttackTeam();
+        });
+    }
+
     // 綁定開戰按鈕
     document.getElementById('start-pvp-battle-btn').addEventListener('click', () => {
         playSound('click');
@@ -123,7 +132,7 @@ export function setPvpHero(slotIndex, card, type) {
         updateSaveButtonState();
         document.getElementById('pvp-setup-modal').classList.remove('hidden');
     } else {
-        // 🔥 進攻模式：自動存檔
+        // 🔥 進攻模式：自動存檔 (默默執行)
         saveAttackTeam();
         document.getElementById('pvp-arena-modal').classList.remove('hidden');
     }
@@ -215,6 +224,23 @@ async function saveAttackTeam() {
         await updateDoc(userRef, { lastAttackTeam: teamData });
     } catch (e) {
         console.warn("Auto-save attack team failed:", e);
+    }
+}
+
+// 🔥 手動儲存按鈕功能 (跳 Alert 提示)
+async function manualSaveAttackTeam() {
+    if (!currentUser) return;
+    const btn = document.getElementById('save-attack-team-btn');
+    if(btn) btn.innerText = "儲存中...";
+    
+    try {
+        await saveAttackTeam(); // 呼叫共用的儲存邏輯
+        alert("✅ 進攻陣容已儲存！下次將自動帶入。");
+    } catch(e) {
+        console.error(e);
+        alert("儲存失敗，請檢查網路");
+    } finally {
+        if(btn) btn.innerText = "💾 儲存陣容";
     }
 }
 
@@ -476,11 +502,12 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
             // 執行交易
             const stolenGold = await executeStealTransaction(currentUser.uid, currentEnemyData.uid);
             goldText.innerText = `💰 搶奪 +${stolenGold} G`;
-            // alert 已移除
+            // 🔥 已移除 Alert
         } catch (e) {
             console.error("結算交易失敗", e);
             goldText.innerText = "💰 結算異常";
-            alert("結算失敗，請檢查權限或連線。錯誤代碼：" + e.message);
+            // 這裡保留錯誤提示，方便除錯
+            console.warn("結算失敗: " + e.message);
         }
 
     } else {
