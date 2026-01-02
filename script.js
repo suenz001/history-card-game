@@ -55,7 +55,7 @@ const WAVE_CONFIG = {
     1: { count: 8, hp: 800, atk: 50 },
     2: { count: 16, hp: 1500, atk: 100 },
     3: { count: 30, hp: 3000, atk: 200 },
-    4: { count: 1, hp: 30000, atk: 500 } 
+    4: { count: 1, hp: 30000, atk: 500 } // Boss
 };
 let battleState = {
     wave: 1, spawned: 0, totalToSpawn: 0, lastSpawnTime: 0, phase: 'IDLE', waitTimer: 0
@@ -592,6 +592,9 @@ if(document.getElementById('speed-btn')) {
         if(gameSpeed === 1) {
             gameSpeed = 2;
             document.getElementById('speed-btn').innerText = "⏩ 2x";
+        } else if(gameSpeed === 2) {
+            gameSpeed = 2.5;
+            document.getElementById('speed-btn').innerText = "⏩ 2.5x";
         } else {
             gameSpeed = 1;
             document.getElementById('speed-btn').innerText = "⏩ 1x";
@@ -890,9 +893,12 @@ function spawnHeroes() {
     
     sortedSlots.forEach(({card, index}) => {
         const lane = Math.floor(index / 3);
-        const col = index % 3; 
+        const col = index % 3; // 0, 1, 2
         
+        // 修正：左右反轉 (右邊=前排)
         const startPos = 5 + (col * 4); 
+        
+        // 初始位置
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
 
         const el = document.createElement('div');
@@ -904,6 +910,7 @@ function spawnHeroes() {
         
         container.appendChild(el);
 
+        // 弱化遠攻體質
         let finalHp = card.hp;
         if(card.attackType === 'ranged') finalHp = Math.floor(card.hp * 0.7);
 
@@ -972,10 +979,10 @@ function spawnEnemy() {
         const boss = {
              id: Date.now(),
              maxHp: 30000, currentHp: 30000, atk: 500,
-             lane: 1, 
+             lane: 1, // 中路
              position: 80, 
              y: 50,
-             speed: 0.02, 
+             speed: 0.02, // 慢速
              el: null, lastAttackTime: 0,
              isBoss: true
         };
@@ -989,15 +996,20 @@ function spawnEnemy() {
     if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
     else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
 
-    // 🔥 隨機出生點 (25~75)
-    const randomY = 25 + Math.random() * 50; 
+    // 🔥 修正：從上方或下方出生，留出中間
+    let spawnY;
+    if (Math.random() < 0.5) {
+        spawnY = 10 + Math.random() * 30; // 10-40 (上)
+    } else {
+        spawnY = 60 + Math.random() * 30; // 60-90 (下)
+    }
     
     const enemy = { 
         id: Date.now(), 
         maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, 
         lane: -1, 
-        position: 80, // 修正：出生內縮
-        y: randomY, 
+        position: 80, // 🔥 修正：內縮出生點 (80%)
+        y: spawnY, 
         speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 
     };
     
@@ -1008,7 +1020,7 @@ function spawnEnemy() {
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
-// 🔥 魔王技能 🔥
+// 🔥 魔王技能 (先發射火球再爆炸) 🔥
 function fireBossSkill(boss) {
     const projectile = document.createElement('div');
     projectile.className = 'boss-projectile';
@@ -1041,11 +1053,12 @@ function fireBossSkill(boss) {
             const dy = hero.y - target.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
             
-            if (dist < 30) {
+            if (dist < 30) { // 範圍 30
                 hero.currentHp -= 300;
                 triggerHeroHit(hero.el);
                 showDamageText(hero.position, hero.y, `-300`, 'hero-dmg');
                 
+                // 擊退效果
                 if(hero.position < boss.position) hero.position -= 5;
                 else hero.position += 5;
             }
@@ -1054,7 +1067,7 @@ function fireBossSkill(boss) {
     }, 500); 
 }
 
-// 🔥 發射飛行道具 🔥
+// 🔥 發射飛行道具 (加入傷害飄字回調) 🔥
 function fireProjectile(startEl, targetEl, type, onHitCallback) {
     if(!startEl || !targetEl) return;
     
@@ -1094,6 +1107,7 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     }, 300);
 }
 
+// 修正受擊觸發 logic
 function triggerHeroHit(el) {
     if(el) {
         el.classList.remove('taking-damage');
@@ -1131,7 +1145,7 @@ function gameLoop() {
         }
     }
 
-    // 🔥 英雄邏輯 (防卡死升級)
+    // 🔥 英雄邏輯 (Active Hunting)
     heroEntities.sort((a, b) => b.position - a.position);
 
     heroEntities.forEach((hero, hIndex) => {
@@ -1143,11 +1157,13 @@ function gameLoop() {
         let nearestEnemy = null;
         let minTotalDist = 9999; 
 
+        // 1. 尋找最近敵人 (全場掃描)
         enemies.forEach(enemy => {
             if (enemy.currentHp > 0) {
                 const dx = enemy.position - hero.position;
                 const dy = enemy.y - hero.y; 
                 const dist = Math.sqrt(dx*dx + dy*dy);
+                
                 if (dist < minTotalDist) {
                     minTotalDist = dist;
                     nearestEnemy = enemy;
@@ -1155,9 +1171,9 @@ function gameLoop() {
             }
         });
 
-        // 攻擊
+        // 2. 攻擊判定
         if (nearestEnemy && minTotalDist <= hero.range) {
-            blocked = true; 
+            blocked = true; // 進入射程，停止移動
             if (now - hero.lastAttackTime > 2000 / gameSpeed) {
                 const heroType = hero.attackType || 'melee';
                 const projType = heroType === 'ranged' ? 'arrow' : 'sword';
@@ -1173,21 +1189,25 @@ function gameLoop() {
             }
         }
 
-        // 🔥 防卡死 (流體移動)
-        // 不需要 "stop"，而是產生推力
+        // 3. 🔥 流體防卡死 (Liquid Anti-Stuck)
+        // 檢查附近的隊友，如果太近，產生一個斥力 (dodgeY)
         for (let other of heroEntities) {
             if (other !== hero && other.currentHp > 0) {
                 let dist = Math.abs(other.position - hero.position);
-                if (dist < 2.5 && Math.abs(other.y - hero.y) < 5) {
-                    // 如果太近，往上下滑動
-                    let push = (Math.random() * 0.3) + 0.1; 
+                let vDist = Math.abs(other.y - hero.y);
+                
+                // 距離太近 (重疊過多)
+                if (dist < 2.5 && vDist < 5) {
+                    // 如果對方在我上方，我往下移；對方在下方，我往上移
+                    // 加入隨機擾動防止死鎖
+                    let push = 0.2 + Math.random() * 0.1;
                     if (hero.y <= other.y) dodgeY -= push; 
                     else dodgeY += push; 
                 }
             }
         }
 
-        // 移動 & 索敵
+        // 4. 移動邏輯 (包含索敵 + 閃避)
         if (!blocked) {
              if (nearestEnemy) {
                  // 追殺
@@ -1209,16 +1229,23 @@ function gameLoop() {
         // 疊加滑動力
         hero.y += dodgeY * gameSpeed;
 
-        // 邊界限制
+        // 🔥 5. 嚴格邊界限制 (Boundary Clamp)
         hero.y = Math.max(10, Math.min(90, hero.y));
         hero.position = Math.max(0, Math.min(100, hero.position));
 
+        // 更新 UI (修正面相邏輯)
         if (hero.el) {
             hero.el.style.left = `${hero.position}%`;
             hero.el.style.top = `${hero.y}%`; 
             hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
-            // 修正：永遠面向右 (不翻轉)
-             hero.el.style.transform = 'translateY(-50%) scaleX(1)';
+            
+            // 🔥 面相邏輯：只有鎖定的敵人在左邊時才轉頭
+            if (nearestEnemy && nearestEnemy.position < hero.position) {
+                 hero.el.style.transform = 'translateY(-50%) scaleX(-1)';
+            } else {
+                 // 巡邏往左走時，不轉頭 (保持警戒)
+                 hero.el.style.transform = 'translateY(-50%) scaleX(1)';
+            }
         }
     });
 
@@ -1234,7 +1261,7 @@ function gameLoop() {
         return;
     }
 
-    // 🔥 敵人邏輯
+    // 🔥 敵人邏輯 (同理：全方位索敵 + 流體移動)
     enemies.sort((a, b) => a.position - b.position);
 
     enemies.forEach((enemy, eIndex) => {
@@ -1261,6 +1288,7 @@ function gameLoop() {
             }
         });
 
+        // 攻擊
         if (!enemy.isBoss && nearestHero && minTotalDist <= 3) { 
             blocked = true;
             if (now - enemy.lastAttackTime > 800 / gameSpeed) {
@@ -1276,18 +1304,19 @@ function gameLoop() {
             }
         }
 
-        // 防卡死
+        // 防追撞
         for (let other of enemies) {
             if (other !== enemy && other.currentHp > 0) {
                 let dist = Math.abs(enemy.position - other.position);
                 if (dist < 2.5 && Math.abs(other.y - enemy.y) < 5) {
-                        let push = (Math.random() * 0.3) + 0.1;
-                        if (enemy.y <= other.y) dodgeY -= push;
-                        else dodgeY += push;
+                        let jitter = (Math.random() * 0.2) + 0.1;
+                        if (enemy.y <= other.y) dodgeY -= jitter;
+                        else dodgeY += jitter;
                 }
             }
         }
 
+        // 移動 & 索敵
         if (!blocked) { 
              if (nearestHero) {
                  if (enemy.position > nearestHero.position + 2) enemy.position -= enemy.speed * gameSpeed;
@@ -1347,11 +1376,12 @@ async function endBattle(isWin) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     let finalGold = Math.floor(battleGold * goldMultiplier);
     
+    // 💎 新增：通關獎勵
     let gemReward = 0;
     if (isWin) {
-        if (currentDifficulty === 'easy') gemReward = 200; // 修正
-        else if (currentDifficulty === 'normal') gemReward = 350; // 修正
-        else if (currentDifficulty === 'hard') gemReward = 500; // 修正
+        if (currentDifficulty === 'easy') gemReward = 200; 
+        else if (currentDifficulty === 'normal') gemReward = 350; 
+        else if (currentDifficulty === 'hard') gemReward = 500; 
     } else {
         finalGold = 0;
         gemReward = 0;
