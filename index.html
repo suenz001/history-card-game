@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=40">
+    <link rel="stylesheet" href="style.css?v=42">
 </head>
 <body>
 
@@ -99,7 +99,8 @@
 
             <div id="hero-container"></div>
 
-            <div class="lanes-wrapper" style="opacity: 0.3;"> <div class="lane-row" id="lane-0">
+            <div class="lanes-wrapper" style="opacity: 0.3;">
+                <div class="lane-row" id="lane-0">
                     <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
                     <div class="defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
                     <div class="defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
@@ -130,8 +131,9 @@
                 <button class="difficulty-btn" data-diff="hard" style="background:#e74c3c;">🔴 困難</button>
             </div>
             
-            <div style="display: flex; gap: 10px; width: 90%; margin: 0 auto;">
-                <button id="auto-deploy-btn" class="btn-secondary" style="flex: 1; padding: 10px; font-size: 1.1em; background: #8e44ad;">⚡ 自動部署</button>
+            <div style="display: flex; gap: 10px; width: 90%; margin: 0 auto; align-items: center;">
+                <button id="auto-deploy-btn" class="btn-secondary" style="flex: 1; padding: 10px; font-size: 1em; background: #8e44ad;">⚡ 自動</button>
+                <button id="clear-deploy-btn" class="btn-secondary" style="flex: 0.5; padding: 10px; font-size: 1em; background: #95a5a6;">🗑️ 清空</button>
                 <button id="start-battle-btn" class="btn-primary btn-disabled" style="flex: 2; padding: 10px; font-size: 1.2em;">請先部署英雄</button>
             </div>
         </div>
@@ -149,16 +151,18 @@
     <div id="inventory-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                    <h2 id="inventory-title">🎒 我的背包</h2>
-                    <button id="auto-star-btn" class="btn-secondary" style="background:#2ecc71; font-size: 0.9em; padding: 5px 10px;">⚡ 一鍵升星</button>
+                <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                    <h2 id="inventory-title">🎒 背包</h2>
+                    <button id="auto-star-btn" class="btn-secondary" style="background:#2ecc71; font-size: 0.8em; padding: 5px;">⚡ 一鍵升星</button>
+                    <button id="inventory-clear-btn" class="btn-secondary" style="background:#e74c3c; font-size: 0.8em; padding: 5px;">🗑️ 解除全軍</button>
+                    
                     <select id="sort-select" class="sort-dropdown">
-                        <option value="time_desc">📅 獲得時間 (新→舊)</option>
-                        <option value="power_desc">🔥 依戰力 (高→低)</option>
-                        <option value="rarity_desc">💎 依稀有度 (高→低)</option>
-                        <option value="id_asc">🔢 卡片序號 (1→30)</option>
+                        <option value="time_desc">📅 獲得時間</option>
+                        <option value="power_desc">🔥 依戰力</option>
+                        <option value="rarity_desc">💎 依稀有度</option>
+                        <option value="id_asc">🔢 卡片序號</option>
                     </select>
-                    <button id="batch-toggle-btn">🔧 批量分解</button>
+                    <button id="batch-toggle-btn" style="font-size: 0.8em;">🔧 批量</button>
                 </div>
                 <button id="close-inventory-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
             </div>
@@ -245,6 +249,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=40"></script>
+    <script type="module" src="script.js?v=42"></script>
 </body>
 </html>
