@@ -205,8 +205,14 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .difficulty-btn { border: none; padding: 5px 15px; border-radius: 20px; color: white; font-weight: bold; cursor: pointer; opacity: 0.5; transition: 0.2s; }
 .difficulty-btn.active { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px white; }
 
-/* 傷害飄字 */
-.damage-text { position: absolute; color: #ffeb3b; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #c0392b; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; }
+/* 傷害飄字 - 基礎樣式 */
+.damage-text { position: absolute; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #000; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; color: #fff; }
+
+/* 傷害飄字 - 顏色變體 (新功能) */
+.damage-text.hero-dmg { color: #e74c3c; font-size: 1.5em; /* 怪物打英雄：紅色，大字 */ }
+.damage-text.enemy-dmg { color: #f1c40f; font-size: 1.3em; /* 英雄打怪物：黃色 */ }
+.damage-text.gold-text { color: #f39c12; font-size: 1.2em; text-shadow: 0 0 5px gold; /* 金幣 */ }
+
 @keyframes floatUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }
 
 /* 🔥 飛行道具 (Projectile) 🔥 */
