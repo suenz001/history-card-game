@@ -1,565 +1,389 @@
-// js/pvp.js
-import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, limit, orderBy, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
-import { startPvpMatch, setOnBattleEnd, resetBattleState } from './battle.js';
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>歷史英靈：策略對決</title>
+    <link rel="stylesheet" href="style.css?v=118">
+</head>
+<body>
 
-let db;
-let currentUser;
-let allUserCards = [];
-
-// 兩組陣列：防守用、進攻用
-let pvpDefenseSlots = new Array(9).fill(null);
-let pvpAttackSlots = new Array(9).fill(null);
-
-export let currentEnemyData = null;
-
-// 回調函式，用來請求主程式打開背包
-let requestOpenInventory = null;
-
-export function initPvp(database, user, inventory, openInventoryCallback) {
-    db = database;
-    currentUser = user;
-    allUserCards = inventory;
-    requestOpenInventory = openInventoryCallback; 
-
-    const pvpBtn = document.getElementById('pvp-menu-btn');
-    if (pvpBtn) {
-        pvpBtn.addEventListener('click', () => { playSound('click'); openPvpModal(); });
-    }
-
-    const searchBtn = document.getElementById('pvp-search-btn');
-    if (searchBtn) {
-        searchBtn.addEventListener('click', () => { playSound('click'); openPvpArena(); });
-    }
-
-    // 防守格點擊
-    document.querySelectorAll('.pvp-defense-slot').forEach(slot => {
-        slot.addEventListener('click', () => handleSlotClick(slot, 'defense'));
-    });
-
-    // 進攻格點擊
-    document.querySelectorAll('.pvp-attack-slot').forEach(slot => {
-        slot.addEventListener('click', () => handleSlotClick(slot, 'attack'));
-    });
-
-    document.getElementById('save-pvp-team-btn').addEventListener('click', saveDefenseTeam);
+    <audio id="bgm" loop><source src="assets/sounds/bgm.mp3" type="audio/mpeg"></audio>
+    <audio id="bgm-battle" loop><source src="assets/sounds/bgm-battle.mp3" type="audio/mpeg"></audio>
     
-    document.getElementById('close-pvp-modal-btn').addEventListener('click', () => {
-        playSound('click');
-        document.getElementById('pvp-setup-modal').classList.add('hidden');
-    });
-
-    document.getElementById('close-arena-btn').addEventListener('click', () => {
-        playSound('click');
-        document.getElementById('pvp-arena-modal').classList.add('hidden');
-    });
-
-    // 綁定刷新按鈕
-    const refreshBtn = document.getElementById('refresh-opponent-btn');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', () => {
-            playSound('click');
-            searchOpponent();
-        });
-    }
-
-    // 返回列表按鈕
-    const backBtn = document.getElementById('back-to-list-btn');
-    if (backBtn) {
-        backBtn.addEventListener('click', () => {
-            playSound('click');
-            resetToOpponentList();
-        });
-    }
-
-    // 🔥 新增：綁定手動儲存按鈕
-    const saveAttackBtn = document.getElementById('save-attack-team-btn');
-    if (saveAttackBtn) {
-        saveAttackBtn.addEventListener('click', () => {
-            playSound('click');
-            manualSaveAttackTeam();
-        });
-    }
-
-    // 綁定開戰按鈕
-    document.getElementById('start-pvp-battle-btn').addEventListener('click', () => {
-        playSound('click');
-        startActualPvp();
-    });
-}
-
-export function updatePvpContext(user, inventory) {
-    currentUser = user;
-    allUserCards = inventory;
-}
-
-// --- 設定防守陣容相關 ---
-async function openPvpModal() {
-    if (!currentUser) return alert("請先登入");
-    document.getElementById('pvp-setup-modal').classList.remove('hidden');
+    <audio id="sfx-draw"><source src="assets/sounds/draw.mp3" type="audio/mpeg"></audio>
+    <audio id="sfx-ssr"><source src="assets/sounds/ssr.mp3" type="audio/mpeg"></audio>
+    <audio id="sfx-reveal"><source src="assets/sounds/reveal.mp3" type="audio/mpeg"></audio>
+    <audio id="sfx-coin"><source src="assets/sounds/coin.mp3" type="audio/mpeg"></audio>
+    <audio id="sfx-upgrade"><source src="assets/sounds/upgrade.mp3" type="audio/mpeg"></audio>
     
-    // 讀取防守陣容
-    const userRef = doc(db, "users", currentUser.uid);
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists() && userSnap.data().defenseTeam) {
-        const savedTeam = userSnap.data().defenseTeam;
-        pvpDefenseSlots = new Array(9).fill(null);
-        savedTeam.forEach(hero => { if (hero.slotIndex !== undefined) pvpDefenseSlots[hero.slotIndex] = hero; });
-    } else { pvpDefenseSlots = new Array(9).fill(null); }
-    
-    renderPvpSlots('defense'); 
-    updateSaveButtonState();
-}
+    <div class="game-container">
+        <h1>⚔️ 歷史英靈：策略對決</h1>
 
-// 🔥 當 main.js 選擇好卡片後，呼叫此函式寫入 PVP 欄位
-// type = 'defense' (防守) 或 'attack' (進攻)
-export function setPvpHero(slotIndex, card, type) {
-    const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
-
-    // 檢查卡片是否已經在該陣容中
-    const isAlreadyDeployed = targetArray.some(h => h && h.docId === card.docId);
-    if(isAlreadyDeployed) {
-        alert("該英雄已經在此陣容中！");
-        return false;
-    }
-
-    targetArray[slotIndex] = { ...card };
-    
-    // 渲染對應的格子
-    renderPvpSlots(type);
-    
-    if(type === 'defense') {
-        updateSaveButtonState();
-        document.getElementById('pvp-setup-modal').classList.remove('hidden');
-    } else {
-        // 🔥 進攻模式：自動存檔 (默默執行)
-        saveAttackTeam();
-        document.getElementById('pvp-arena-modal').classList.remove('hidden');
-    }
-    
-    return true;
-}
-
-function handleSlotClick(slotElement, type) {
-    const index = parseInt(slotElement.dataset.slot);
-    const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
-    
-    // 如果該位置已有卡片，點擊則移除
-    if (targetArray[index]) { 
-        playSound('click'); 
-        targetArray[index] = null; 
-        renderPvpSlots(type); 
-        
-        if(type === 'defense') {
-            updateSaveButtonState();
-        } else {
-            // 🔥 進攻模式：移除時也要自動存檔
-            saveAttackTeam();
-        }
-    } 
-    else {
-        // 檢查上限
-        const currentCount = targetArray.filter(x => x !== null).length;
-        if (currentCount >= 6) return alert("PVP 隊伍最多只能上陣 6 名英雄！");
-        
-        playSound('click'); 
-        
-        // 隱藏對應視窗
-        if(type === 'defense') document.getElementById('pvp-setup-modal').classList.add('hidden');
-        else document.getElementById('pvp-arena-modal').classList.add('hidden');
-
-        // 通知 main.js 打開背包
-        if(requestOpenInventory) {
-            requestOpenInventory(index, type);
-        }
-    }
-}
-
-// 渲染 PVP 格子 (通用)
-function renderPvpSlots(type) {
-    const selector = (type === 'attack') ? '.pvp-attack-slot' : '.pvp-defense-slot';
-    const sourceArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
-
-    document.querySelectorAll(selector).forEach(slotDiv => {
-        const index = parseInt(slotDiv.dataset.slot); const hero = sourceArray[index];
-        const placeholder = slotDiv.querySelector('.slot-placeholder'); const existingCard = slotDiv.querySelector('.card');
-        if (existingCard) existingCard.remove();
-        if (hero) {
-            placeholder.style.display = 'none'; slotDiv.classList.add('active');
-            const cardDiv = document.createElement('div'); const charPath = `assets/cards/${hero.id}.webp`; const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
-            cardDiv.className = `card ${hero.rarity}`; cardDiv.style.transform = 'scale(0.45)'; cardDiv.style.position = 'absolute'; cardDiv.style.top = '50%'; cardDiv.style.left = '50%'; cardDiv.style.translate = '-50% -50%'; cardDiv.style.margin = '0'; cardDiv.style.pointerEvents = 'none'; 
-            cardDiv.innerHTML = `<img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
-            slotDiv.appendChild(cardDiv);
-        } else { placeholder.style.display = 'block'; slotDiv.classList.remove('active'); }
-    });
-}
-
-function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !== null).length; const btn = document.getElementById('save-pvp-team-btn'); if (count > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `💾 儲存防守陣容 (${count}/6)`; } else { btn.classList.add('btn-disabled'); btn.innerText = "請至少配置 1 名英雄"; } }
-
-async function saveDefenseTeam() {
-    if (!currentUser) return;
-    const count = pvpDefenseSlots.filter(x => x !== null).length; if (count === 0) return alert("請至少配置 1 名英雄！"); if (count > 6) return alert("防守英雄不能超過 6 名！"); 
-    const btn = document.getElementById('save-pvp-team-btn'); btn.innerText = "儲存中..."; btn.classList.add('btn-disabled');
-    try {
-        const teamData = []; pvpDefenseSlots.forEach((hero, index) => { if (hero) { teamData.push({ id: hero.id, docId: hero.docId, name: hero.name, rarity: hero.rarity, level: hero.level, stars: hero.stars, atk: hero.atk, hp: hero.hp, maxHp: hero.hp, currentHp: hero.hp, attackType: hero.attackType || 'melee', slotIndex: index }); } });
-        const userRef = doc(db, "users", currentUser.uid); await updateDoc(userRef, { defenseTeam: teamData });
-        playSound('upgrade'); alert("✅ 防守陣容已更新！"); document.getElementById('pvp-setup-modal').classList.add('hidden');
-    } catch (e) { console.error("儲存失敗", e); alert("儲存失敗，請檢查網路連線"); } finally { btn.classList.remove('btn-disabled'); updateSaveButtonState(); }
-}
-
-// 自動儲存進攻隊伍 (不跳 Alert)
-async function saveAttackTeam() {
-    if (!currentUser) return;
-    try {
-        const teamData = [];
-        pvpAttackSlots.forEach((hero, index) => {
-            if (hero) {
-                teamData.push({
-                    id: hero.id, docId: hero.docId,
-                    slotIndex: index
-                });
-            }
-        });
-        const userRef = doc(db, "users", currentUser.uid);
-        await updateDoc(userRef, { lastAttackTeam: teamData });
-    } catch (e) {
-        console.warn("Auto-save attack team failed:", e);
-    }
-}
-
-// 🔥 手動儲存按鈕功能 (跳 Alert 提示)
-async function manualSaveAttackTeam() {
-    if (!currentUser) return;
-    const btn = document.getElementById('save-attack-team-btn');
-    if(btn) btn.innerText = "儲存中...";
-    
-    try {
-        await saveAttackTeam(); // 呼叫共用的儲存邏輯
-        alert("✅ 進攻陣容已儲存！下次將自動帶入。");
-    } catch(e) {
-        console.error(e);
-        alert("儲存失敗，請檢查網路");
-    } finally {
-        if(btn) btn.innerText = "💾 儲存陣容";
-    }
-}
-
-// --- PVP 搜尋與對決邏輯 ---
-
-function openPvpArena() {
-    if (!currentUser) return alert("請先登入");
-    
-    // 初始化 UI 狀態：顯示 Loading，隱藏其他
-    document.getElementById('pvp-arena-modal').classList.remove('hidden');
-    document.getElementById('pvp-loading').classList.remove('hidden');
-    document.getElementById('pvp-opponent-list-view').classList.add('hidden');
-    document.getElementById('pvp-match-content').classList.add('hidden');
-
-    searchOpponent();
-}
-
-function resetToOpponentList() {
-    document.getElementById('pvp-match-content').classList.add('hidden');
-    document.getElementById('pvp-opponent-list-view').classList.remove('hidden');
-    currentEnemyData = null; // 清除選擇
-}
-
-// 搜尋邏輯 (高 10 名 + 低 10 名)
-async function searchOpponent() {
-    const loadingDiv = document.getElementById('pvp-loading');
-    const listView = document.getElementById('pvp-opponent-list-view');
-    const listContainer = document.getElementById('pvp-opponent-list');
-
-    loadingDiv.classList.remove('hidden');
-    listView.classList.add('hidden');
-    listContainer.innerHTML = ""; // 清空列表
-
-    try {
-        const myPower = currentUser.combatPower || 0;
-
-        // 查詢比我強的 10 個
-        const qHigh = query(
-            collection(db, "users"), 
-            where("combatPower", ">=", myPower), 
-            orderBy("combatPower", "asc"), 
-            limit(15) 
-        );
-
-        // 查詢比我弱的 10 個
-        const qLow = query(
-            collection(db, "users"), 
-            where("combatPower", "<", myPower), 
-            orderBy("combatPower", "desc"), 
-            limit(15)
-        );
-
-        const [snapHigh, snapLow] = await Promise.all([getDocs(qHigh), getDocs(qLow)]);
-        
-        let candidates = [];
-        
-        // 合併結果並過濾
-        const processDoc = (doc) => {
-            if (doc.id === currentUser.uid) return; // 排除自己
-            const data = doc.data();
-            // 不論有無防守陣容都加入
-            candidates.push({ ...data, uid: doc.id });
-        };
-
-        snapHigh.forEach(processDoc);
-        snapLow.forEach(processDoc);
-
-        // 去除重複
-        candidates = candidates.filter((item, index, self) => 
-            index === self.findIndex((t) => (t.uid === item.uid))
-        );
-
-        // 排序：戰力由高到低
-        candidates.sort((a, b) => b.combatPower - a.combatPower);
-
-        // 截取前 20 個顯示
-        candidates = candidates.slice(0, 20);
-
-        if (candidates.length === 0) { 
-            listContainer.innerHTML = "<p>目前找不到合適的對手，請稍後再試！</p>";
-        } else {
-            renderOpponentList(candidates);
-        }
-        
-        // 完成，切換 UI
-        loadingDiv.classList.add('hidden');
-        listView.classList.remove('hidden');
-
-    } catch (e) { 
-        console.error("搜尋對手失敗", e); 
-        alert("搜尋失敗，請檢查網路"); 
-        document.getElementById('pvp-arena-modal').classList.add('hidden'); 
-    }
-}
-
-// 渲染對手列表
-function renderOpponentList(opponents) {
-    const container = document.getElementById('pvp-opponent-list');
-    const myPower = currentUser.combatPower || 0;
-
-    opponents.forEach(opp => {
-        const div = document.createElement('div');
-        div.className = 'opponent-list-item';
-
-        const isStronger = opp.combatPower > myPower;
-        const tag = isStronger ? `<span class="opp-tag tag-strong">強敵</span>` : `<span class="opp-tag tag-weak">可欺</span>`;
-        const diff = opp.combatPower - myPower;
-        const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
-
-        div.innerHTML = `
-            <div class="opp-info">
-                <div class="opp-name">${opp.name || "神秘客"} ${tag}</div>
-                <div class="opp-power">🔥 戰力: ${opp.combatPower} (${diffStr})</div>
+        <div id="login-section">
+            <h3>請選擇登入方式：</h3>
+            
+            <div style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
+                <input type="email" id="email-input" placeholder="電子信箱">
+                <input type="password" id="pass-input" placeholder="密碼 (6位以上)">
             </div>
-            <button class="btn-danger challenge-btn">挑戰</button>
-        `;
+            <div style="display: flex; justify-content: center;">
+                <button id="email-login-btn" class="btn-secondary">信箱登入</button>
+                <button id="email-signup-btn" class="btn-secondary" style="background:#2ecc71;">註冊新帳號</button>
+            </div>
+            <hr style="margin: 20px 0; border-color: #555;">
+            <button id="guest-btn" class="btn-secondary" style="background:#95a5a6; width: 100%;">👻 遊客試玩 (匿名)</button>
+        </div>
 
-        div.querySelector('.challenge-btn').addEventListener('click', () => {
-            playSound('click');
-            selectOpponent(opp);
-        });
-
-        container.appendChild(div);
-    });
-}
-
-// 選擇對手後的處理
-function selectOpponent(enemyData) {
-    currentEnemyData = enemyData;
-    
-    // 隱藏列表，顯示備戰介面
-    document.getElementById('pvp-opponent-list-view').classList.add('hidden');
-    document.getElementById('pvp-match-content').classList.remove('hidden');
-
-    // 渲染雙方資料
-    renderMatchup();
-    
-    // 讀取我方上次陣容
-    loadLastAttackTeam();
-}
-
-
-async function loadLastAttackTeam() {
-    if(!currentUser) return;
-    try {
-        const userRef = doc(db, "users", currentUser.uid);
-        const userSnap = await getDoc(userRef);
+        <div id="user-info" style="display:none; flex-direction:column; gap:10px;">
+            <div style="display:flex; justify-content:space-between; width:100%; align-items:center; flex-wrap: wrap; gap: 10px;">
+                <span id="user-name" style="font-size:1.2em; font-weight:bold;">玩家：載入中...</span>
+                <div style="display: flex; gap: 5px;">
+                    <button id="notification-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #e67e22;">🔔 通知</button>
+                    <button id="settings-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">⚙️ 設定</button>
+                    <button id="logout-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">登出</button>
+                </div>
+            </div>
+            <div><span id="power-display">🔥 戰力: 0</span></div>
+        </div>
         
-        pvpAttackSlots = new Array(9).fill(null);
+        <div id="game-ui" class="hidden">
+            <div class="main-layout">
+                <div class="game-area">
+                    <div class="status-bar">
+                        <div style="display:flex; flex-direction:column; gap:5px; width:100%;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <span>💎 <span id="gem-count">0</span></span>
+                                <span>💰 <span id="gold-count">0</span></span>
+                            </div>
+                            <button id="inventory-btn" class="btn-secondary" style="background:#8e44ad; width:100%; margin:0;">🎒 打開我的背包 (查看所有卡片)</button>
+                        </div>
+                    </div>
 
-        if (userSnap.exists() && userSnap.data().lastAttackTeam) {
-            const savedTeam = userSnap.data().lastAttackTeam;
-            savedTeam.forEach(hero => { 
-                if (hero.slotIndex !== undefined) {
-                    // 確保卡片還在背包裡 (防止已被分解)
-                    const existInBag = allUserCards.find(c => c.docId === hero.docId);
-                    if(existInBag) {
-                        pvpAttackSlots[hero.slotIndex] = { ...existInBag }; // 使用背包裡的最新數據
-                    }
-                }
-            });
-        }
-        renderPvpSlots('attack');
-    } catch(e) {
-        console.warn("讀取進攻陣容失敗", e);
-    }
-}
+                    <button id="enter-battle-mode-btn" class="btn-danger" style="width: 100%; margin-bottom: 10px; font-size: 1.2em; border: 2px solid #fff; box-shadow: 0 0 10px #c0392b;">⚔️ 前往戰場 (賺金幣/鑽石)</button>
 
-function renderMatchup() {
-    if (!currentEnemyData) return;
-    document.getElementById('arena-my-name').innerText = currentUser.displayName || "我方";
-    let myPower = 0; allUserCards.forEach(c => myPower += (c.atk + c.hp)); 
-    document.getElementById('arena-my-power').innerText = myPower;
-    document.getElementById('arena-enemy-name').innerText = currentEnemyData.name || "神秘客";
-    document.getElementById('arena-enemy-power').innerText = currentEnemyData.combatPower || "???";
-    
-    const grid = document.getElementById('enemy-preview-grid'); grid.innerHTML = ""; 
-    
-    // 防呆：如果沒有防守陣容，就給空陣列
-    const enemyTeam = currentEnemyData.defenseTeam || [];
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <button id="pvp-menu-btn" class="btn-primary" style="flex: 1; background: #2980b9; border: 2px solid #fff;">🛡️ 設定防守隊伍</button>
+                        <button id="pvp-search-btn" class="btn-danger" style="flex: 1; background: #c0392b; border: 2px solid #fff; box-shadow: 0 0 10px #e74c3c;">⚔️ 尋找對手</button>
+                    </div>
 
-    for(let r=0; r<3; r++) {
-        const rowDiv = document.createElement('div'); rowDiv.className = 'lane-row';
-        for(let c=0; c<3; c++) {
-            const slotIndex = r * 3 + c; const slotDiv = document.createElement('div'); slotDiv.className = 'defense-slot'; slotDiv.style.borderColor = '#e74c3c'; 
+                    <div class="gacha-section">
+                        <button id="draw-btn" class="btn-primary">單抽 (100鑽)</button>
+                        <button id="draw-10-btn" class="btn-secondary" style="display:flex; flex-direction:column; align-items:center; line-height:1.2;">
+                            <span>十連 (1000鑽)</span>
+                            <span style="font-size:0.7em; color:#ffeaa7;">(必得1張SR以上卡片)</span>
+                        </button>
+                    </div>
+
+                    <h3 style="margin-bottom:5px; color:#ccc;">最新獲得：</h3>
+                    <div id="card-display-area" class="card-container"></div>
+                </div>
+
+                <div class="leaderboard-area">
+                    <h2 style="margin-top:0; color:#f1c40f; text-align: center;">🏆 全服戰力榜</h2>
+                    <div id="leaderboard-list"><p style="text-align:center;">載入中...</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="battle-screen" class="hidden">
+        <div class="battle-header">
+            <div class="battle-info">
+                <span>⚔️ 存活: <span id="hero-count-display">0</span></span>
+                <span>💀 波次: <span id="wave-count">1</span>/4</span>
+                <span>💰 <span id="battle-gold">0</span> G</span>
+            </div>
+            <button id="retreat-btn" class="btn-danger" style="padding: 5px 15px; font-size: 0.9em;">🏳️ 撤退</button>
+        </div>
+
+        <div class="battle-content-wrapper" style="flex: 1; display: flex; overflow: hidden; position: relative;">
             
-            const enemyHero = enemyTeam.find(h => h.slotIndex === slotIndex);
+            <div class="battle-field-container">
+                <div id="wave-notification" class="hidden">第 1 波</div>
+                <div class="spawn-line left"></div>
+                <div id="hero-container"></div>
+
+                <div class="lanes-wrapper" style="opacity: 0.3;">
+                    <div class="lane-row" id="lane-0">
+                        <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
+                    </div>
+                    <div class="lane-row" id="lane-1">
+                        <div class="defense-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
+                    </div>
+                    <div class="lane-row" id="lane-2">
+                        <div class="defense-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
+                    </div>
+                </div>
+
+                <div id="enemy-container"></div>
+            </div>
+
+            <div class="battle-monitor-sidebar">
+                <h3 style="margin: 0 0 10px 0; color: #f1c40f; border-bottom: 1px solid #555; padding-bottom: 5px;">
+                    🛡️ 英雄狀態
+                </h3>
+                <div id="hero-monitor-list"></div>
+            </div>
+        </div>
+
+        <div class="battle-deck">
+            <div style="display:flex; justify-content:center; gap:10px; margin-bottom:5px;">
+                <button class="difficulty-btn" data-diff="easy" style="background:#2ecc71;">🟢 簡單</button>
+                <button class="difficulty-btn active" data-diff="normal" style="background:#f39c12;">🟡 普通</button>
+                <button class="difficulty-btn" data-diff="hard" style="background:#e74c3c;">🔴 困難</button>
+            </div>
             
-            if (enemyHero) {
-                slotDiv.classList.add('active'); slotDiv.style.background = 'rgba(231, 76, 60, 0.2)';
-                const cardDiv = document.createElement('div'); const charPath = `assets/cards/${enemyHero.id}.webp`; const framePath = `assets/frames/${enemyHero.rarity.toLowerCase()}.png`;
-                cardDiv.className = `card ${enemyHero.rarity}`; cardDiv.style.transform = 'scale(0.45)'; cardDiv.style.position = 'absolute'; cardDiv.style.top = '50%'; cardDiv.style.left = '50%'; cardDiv.style.translate = '-50% -50%'; cardDiv.style.margin = '0'; cardDiv.style.pointerEvents = 'none';
-                cardDiv.innerHTML = `<img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
-                slotDiv.appendChild(cardDiv);
-            } else { slotDiv.innerHTML = `<div class="slot-placeholder" style="color:#555;">+</div>`; }
-            rowDiv.appendChild(slotDiv);
-        }
-        grid.appendChild(rowDiv);
-    }
-}
+            <div style="display: flex; gap: 10px; width: 95%; margin: 0 auto; align-items: center;">
+                <button id="auto-deploy-btn" class="btn-secondary" style="flex: 1; padding: 10px; font-size: 1em; background: #8e44ad;">⚡ 自動</button>
+                <button id="clear-deploy-btn" class="btn-secondary" style="flex: 0.5; padding: 10px; font-size: 1em; background: #95a5a6;">🗑️ 清空</button>
+                <button id="speed-btn" class="btn-secondary" style="flex: 0.5; padding: 10px; font-size: 1em; background: #f39c12;">⏩ 1x</button>
+                <button id="start-battle-btn" class="btn-primary btn-disabled" style="flex: 2; padding: 10px; font-size: 1.2em;">請先部署英雄</button>
+            </div>
+        </div>
+    </div>
 
-// 開始戰鬥 (儲存陣容 -> 呼叫 battle.js)
-async function startActualPvp() {
-    if (!currentEnemyData) return;
-
-    // 檢查是否有配置英雄
-    const myCount = pvpAttackSlots.filter(x => x !== null).length;
-    if (myCount === 0) return alert("請至少配置 1 名進攻英雄！");
-    if (myCount > 6) return alert("進攻英雄不能超過 6 名！");
-    
-    // 雖然有自動存檔，但開戰前再存一次保險
-    saveAttackTeam();
-
-    document.getElementById('pvp-arena-modal').classList.add('hidden');
-    document.getElementById('battle-screen').classList.remove('hidden');
-    
-    if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
-
-    setOnBattleEnd(handlePvpResult);
-
-    // 傳入敵方陣容 (空陣容防呆) + 我方進攻陣容
-    startPvpMatch(currentEnemyData.defenseTeam || [], pvpAttackSlots);
-}
-
-// PVP 結算邏輯
-async function handlePvpResult(isWin, _unusedGold, heroStats) {
-    const resultModal = document.getElementById('battle-result-modal');
-    const title = document.getElementById('result-title');
-    const goldText = document.getElementById('result-gold');
-    const gemText = document.getElementById('result-gems');
-    const btn = document.getElementById('close-result-btn');
-
-    // 生成 DPS 排行榜
-    const dpsContainer = document.getElementById('dps-chart');
-    dpsContainer.innerHTML = "";
-    if (heroStats && heroStats.length > 0) {
-        const sortedHeroes = [...heroStats].sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
-        const maxDmg = sortedHeroes[0].totalDamage || 1; 
-        sortedHeroes.forEach(h => {
-            if(!h.totalDamage) h.totalDamage = 0;
-            const percent = (h.totalDamage / maxDmg) * 100;
-            const row = document.createElement('div'); row.className = 'dps-row';
-            row.innerHTML = `<div class="dps-icon" style="background-image: url('assets/cards/${h.id}.webp');"></div><div class="dps-bar-container"><div class="dps-info"><span>${h.name}</span><span>${h.totalDamage}</span></div><div class="dps-bar-bg"><div class="dps-bar-fill" style="width: ${percent}%;"></div></div></div>`;
-            dpsContainer.appendChild(row);
-        });
-    }
-
-    resultModal.classList.remove('hidden');
-    gemText.style.display = 'none'; // PVP 不給鑽石
-
-    if (isWin) {
-        title.innerText = "VICTORY";
-        title.className = "result-title win-text";
-        playSound('reveal');
-        
-        goldText.innerText = "計算戰利品中...";
-        
-        try {
-            // 執行交易
-            const stolenGold = await executeStealTransaction(currentUser.uid, currentEnemyData.uid);
-            goldText.innerText = `💰 搶奪 +${stolenGold} G`;
-            // 🔥 已移除 Alert
-        } catch (e) {
-            console.error("結算交易失敗", e);
-            goldText.innerText = "💰 結算異常";
-            // 這裡保留錯誤提示，方便除錯
-            console.warn("結算失敗: " + e.message);
-        }
-
-    } else {
-        title.innerText = "DEFEAT";
-        title.className = "result-title lose-text";
-        playSound('dismantle');
-        goldText.innerText = "💰 搶奪失敗 (0 G)";
-    }
-
-    // 按下離開後，重置並重新整理頁面(或更新UI)
-    btn.onclick = () => {
-        playSound('click');
-        resultModal.classList.add('hidden');
-        resetBattleState();
-        location.reload(); 
-    };
-}
-
-// 金幣掠奪交易 (Firebase Transaction)
-async function executeStealTransaction(myUid, enemyUid) {
-    const myRef = doc(db, "users", myUid);
-    const enemyRef = doc(db, "users", enemyUid);
-
-    try {
-        const stolenAmount = await runTransaction(db, async (transaction) => {
-            // 1. 先進行所有讀取 (Reads MUST come before Writes)
-            const enemyDoc = await transaction.get(enemyRef);
-            const myDoc = await transaction.get(myRef);
-
-            if (!enemyDoc.exists()) throw new Error("Enemy does not exist!");
-            if (!myDoc.exists()) throw new Error("User does not exist!");
-
-            // 2. 邏輯計算
-            const enemyGold = enemyDoc.data().gold || 0;
-            const myGold = myDoc.data().gold || 0;
+    <div id="battle-result-modal" class="hidden">
+        <div class="result-content">
+            <div id="result-title" class="result-title">VICTORY</div>
+            <div id="result-desc" style="color:#ccc; margin-bottom:5px;">戰鬥獎勵</div>
+            <div id="result-gold" class="result-gold">💰 +0</div>
+            <div id="result-gems" class="result-gold" style="color:#2ecc71;">💎 +0</div>
             
-            // 計算 5%
-            let amount = Math.floor(enemyGold * 0.05);
-            if(amount < 0) amount = 0;
+            <div id="dps-chart" class="dps-container"></div>
 
-            const newEnemyGold = Math.max(0, enemyGold - amount);
-            const newMyGold = myGold + amount;
+            <button id="close-result-btn" class="btn-primary" style="width:100%; margin-top: 15px;">回到大廳</button>
+        </div>
+    </div>
 
-            // 3. 執行寫入
-            transaction.update(enemyRef, { gold: newEnemyGold });
-            transaction.update(myRef, { gold: newMyGold });
+    <div id="inventory-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                    <h2 id="inventory-title">🎒 背包</h2>
+                    <button id="auto-star-btn" class="btn-secondary" style="background:#2ecc71; font-size: 0.8em; padding: 5px;">⚡ 一鍵升星</button>
+                    <button id="inventory-clear-btn" class="btn-secondary" style="background:#e74c3c; font-size: 0.8em; padding: 5px;">🗑️ 解除全軍</button>
+                    <select id="sort-select" class="sort-dropdown">
+                        <option value="time_desc">📅 獲得時間</option>
+                        <option value="power_desc">🔥 依戰力</option>
+                        <option value="rarity_desc">💎 依稀有度</option>
+                        <option value="id_asc">🔢 卡片序號</option>
+                    </select>
+                    <button id="batch-toggle-btn" style="font-size: 0.8em;">🔧 批量</button>
+                </div>
+                <button id="close-inventory-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
+            </div>
+            <div class="filter-bar">
+                <button class="filter-btn active" data-filter="ALL">全部</button>
+                <button class="filter-btn" data-filter="SSR" style="color:#f1c40f; border-color:#f1c40f;">SSR</button>
+                <button class="filter-btn" data-filter="SR" style="color:#9b59b6; border-color:#9b59b6;">SR</button>
+                <button class="filter-btn" data-filter="R" style="color:#3498db; border-color:#3498db;">R</button>
+            </div>
+            <div id="inventory-grid" class="card-container" style="justify-content: flex-start;"></div>
+            
+            <div id="batch-action-bar" class="hidden">
+                <div id="batch-info">已選 0 張，獲得 0 G</div>
+                <button id="batch-confirm-btn">確認分解</button>
+            </div>
+        </div>
+    </div>
 
-            return amount; // 回傳搶到的金額
-        });
-        return stolenAmount;
-    } catch (e) {
-        console.error("Transaction failed: ", e);
-        throw e;
-    }
-}
+    <div id="notification-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px; height: auto; max-height: 80vh;">
+            <div class="modal-header">
+                <h2>🔔 系統通知</h2>
+                <button id="close-notification-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
+            </div>
+            <div id="notification-list" style="overflow-y: auto; text-align: left;"></div>
+        </div>
+    </div>
+
+    <div id="detail-modal" class="modal hidden" style="background: rgba(0,0,0,0.95);">
+        <button id="close-detail-btn" class="btn-close-circle">✕</button>
+        <button id="prev-card-btn" class="nav-arrow left">❮</button>
+        <button id="next-card-btn" class="nav-arrow right">❯</button>
+        <div id="large-card-view" class="large-card-container"></div>
+        <div class="upgrade-controls">
+            <div class="upgrade-box">
+                <div class="upgrade-title">提升等級 (Lv.30 Max)</div>
+                <button id="upgrade-level-btn" class="btn-upgrade">⬆️ 升級 <span id="upgrade-cost" style="font-size:0.8em;">(500G)</span></button>
+            </div>
+            <div class="upgrade-box">
+                <div class="upgrade-title">提升星級 (5★ Max)</div>
+                <div style="font-size:0.8em; color:#aaa; margin-bottom:5px;">需消耗 1 張同名卡片</div>
+                <button id="upgrade-star-btn" class="btn-star">⭐ 升星</button>
+            </div>
+        </div>
+        <div style="margin-top: 15px; z-index: 102;">
+            <button id="dismantle-btn" class="btn-danger">💰 分解此卡</button>
+        </div>
+    </div>
+
+    <div id="gacha-reveal-modal" class="modal hidden" style="background: rgba(0,0,0,0.98); z-index: 2000;">
+        <div style="position: absolute; top: 20px; right: 20px; z-index: 2005;">
+            <button id="gacha-skip-btn" class="btn-secondary" style="font-size: 1.2em; padding: 10px 20px; border: 2px solid white;">⏩ 跳過 (Skip)</button>
+        </div>
+        <div id="gacha-reveal-container" class="large-card-container"></div>
+        <div id="gacha-next-hint" style="margin-top: 30px; color: white; animation: blink 1s infinite;">點擊螢幕顯示下一張</div>
+    </div>
+
+    <div id="gacha-overlay" class="hidden">
+        <div id="summon-burst"></div>
+        <div id="summon-circle"></div>
+        <h2 id="summon-text" style="color: white; margin-top: 20px; letter-spacing: 5px;">召喚中...</h2>
+    </div>
+
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px; height: auto;">
+            <div class="modal-header">
+                <h2>⚙️ 遊戲設定</h2>
+                <button id="close-settings-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
+            </div>
+            <div class="settings-body">
+                <div class="setting-item">
+                    <label>玩家暱稱</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="text" id="settings-name-input" placeholder="輸入新暱稱" style="flex:1;">
+                        <button id="settings-save-name-btn" class="btn-primary">儲存</button>
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <label>🎁 輸入序號</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="text" id="redeem-code-input" placeholder="輸入序號領獎" style="flex:1;">
+                        <button id="redeem-btn" class="btn-secondary" style="background:#8e44ad;">兌換</button>
+                    </div>
+                </div>
+
+                <hr style="border-color: #555; margin: 15px 0;">
+                <div class="setting-item">
+                    <label>背景音樂 (BGM)</label>
+                    <div class="control-row">
+                        <input type="checkbox" id="bgm-toggle" checked> <span id="bgm-status">開啟</span>
+                    </div>
+                    <input type="range" id="bgm-volume" min="0" max="1" step="0.1" value="0.5" style="width:100%;">
+                </div>
+                <div class="setting-item">
+                    <label>遊戲音效 (SFX)</label>
+                    <div class="control-row">
+                        <input type="checkbox" id="sfx-toggle" checked> <span id="sfx-status">開啟</span>
+                    </div>
+                    <input type="range" id="sfx-volume" min="0" max="1" step="0.1" value="1.0" style="width:100%;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="pvp-setup-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>🛡️ 佈署防守軍隊</h2>
+                <button id="close-pvp-modal-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
+            </div>
+            
+            <div style="color: #ccc; font-size: 0.9em; margin-bottom: 10px; text-align: center;">
+                請在 3x3 的方格中配置您的防守陣型 (最多 6 人)<br>
+                <span style="color: #f1c40f;">左側為前排，右側為後排</span>
+            </div>
+
+            <div class="pvp-grid-container" style="background: #34495e; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                <div class="lane-row">
+                    <div class="defense-slot pvp-defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
+                </div>
+                <div class="lane-row" style="margin: 10px 0;">
+                    <div class="defense-slot pvp-defense-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
+                </div>
+                <div class="lane-row">
+                    <div class="defense-slot pvp-defense-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
+                </div>
+            </div>
+
+            <button id="save-pvp-team-btn" class="btn-upgrade" style="width: 100%; font-size: 1.2em; padding: 15px;">💾 儲存防守陣容</button>
+        </div>
+    </div>
+
+    <div id="pvp-arena-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 800px; background: #2c3e50; border: 3px solid #e74c3c; height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2 style="color: #e74c3c;">⚔️ PVP 競技場</h2>
+                <button id="close-arena-btn" class="btn-primary" style="background:#7f8c8d;">離開</button>
+            </div>
+
+            <div id="pvp-loading" class="hidden" style="text-align: center; padding: 50px;">
+                <div style="font-size: 3em; animation: spin 1s infinite linear;">🔍</div>
+                <h3>正在搜尋旗鼓相當的對手...</h3>
+            </div>
+
+            <div id="pvp-opponent-list-view" class="hidden" style="padding: 10px;">
+                <button id="refresh-opponent-btn" class="btn-secondary" style="margin-bottom:15px; width: 100%;">🔄 刷新列表</button>
+                <h3 style="text-align:center; color:#f1c40f; margin-top: 0;">請選擇挑戰對手</h3>
+                <div id="pvp-opponent-list" class="opponent-list-container">
+                    </div>
+            </div>
+
+            <div id="pvp-match-content" class="hidden" style="padding-bottom: 20px;">
+                <div class="vs-container" style="padding: 10px;">
+                    <div class="player-card self">
+                        <div class="p-name" id="arena-my-name">我方</div>
+                        <div class="p-power">戰力: <span id="arena-my-power">0</span></div>
+                    </div>
+                    <div class="vs-logo" style="font-size: 2em; margin: 0 10px;">VS</div>
+                    <div class="player-card enemy">
+                        <div class="p-name" id="arena-enemy-name">???</div>
+                        <div class="p-power">戰力: <span id="arena-enemy-power">???</span></div>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px;">
+                    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; border: 1px solid #e74c3c;">
+                        <h3 style="text-align: center; color: #e74c3c; margin: 0 0 10px 0;">⚠️ 敵方防守佈署</h3>
+                        <div id="enemy-preview-grid" class="pvp-grid-container readonly"></div>
+                    </div>
+
+                    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; border: 1px solid #3498db;">
+                        <h3 style="text-align: center; color: #3498db; margin: 0 0 10px 0;">⚔️ 我方進攻佈署 (點擊配置)</h3>
+                        <div class="pvp-grid-container" id="my-attack-grid" style="background: #2c3e50;">
+                            <div class="lane-row">
+                                <div class="defense-slot pvp-attack-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
+                                <div class="defense-slot pvp-attack-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
+                                <div class="defense-slot pvp-attack-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
+                            </div>
+                            <div class="lane-row" style="margin: 10px 0;">
+                                <div class="defense-slot pvp-attack-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
+                                <div class="defense-slot pvp-attack-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
+                                <div class="defense-slot pvp-attack-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
+                            </div>
+                            <div class="lane-row">
+                                <div class="defense-slot pvp-attack-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
+                                <div class="defense-slot pvp-attack-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
+                                <div class="defense-slot pvp-attack-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button id="back-to-list-btn" class="btn-secondary" style="flex: 1;">⬅️ 返回列表</button>
+                    <button id="save-attack-team-btn" class="btn-secondary" style="flex: 1; background: #8e44ad;">💾 儲存陣容</button> 
+                    <button id="start-pvp-battle-btn" class="btn-danger" style="flex: 2; font-size: 1.2em;">⚔️ 開戰 (奪取 5% 金幣)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
