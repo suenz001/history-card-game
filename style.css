@@ -1,4 +1,8 @@
-/* 全域設定 */
+/* style.css - 完整版 */
+
+/* =========================================
+   1. 全域設定 (Global)
+   ========================================= */
 body {
     font-family: 'Arial', 'Microsoft JhengHei', sans-serif;
     background-color: #2c3e50;
@@ -7,19 +11,91 @@ body {
     margin: 0;
     padding: 10px;
     overflow-x: hidden;
+    user-select: none; /* 防止手機上長按選取文字 */
 }
 
-.game-container { max-width: 1200px; margin: 0 auto; }
+.game-container { 
+    max-width: 1200px; 
+    margin: 0 auto; 
+}
 
-/* 區塊 */
+/* 隱藏元素 */
+.hidden { display: none !important; }
+
+/* 按鈕基礎樣式 */
+button { 
+    cursor: pointer; 
+    border: none; 
+    border-radius: 5px; 
+    color: white; 
+    transition: 0.2s; 
+    font-weight: bold; 
+    font-family: inherit;
+}
+button:active { transform: scale(0.95); }
+
+.btn-primary { background: #3498db; padding: 10px 20px; }
+.btn-primary:hover { background: #2980b9; }
+
+.btn-secondary { background: #95a5a6; padding: 8px 15px; }
+.btn-secondary:hover { background: #7f8c8d; }
+
+.btn-danger { background: #e74c3c; padding: 10px 20px; }
+.btn-danger:hover { background: #c0392b; }
+
+.btn-upgrade { background: #2ecc71; width: 100%; padding: 8px; }
+.btn-star { background: #f1c40f; color: #2c3e50; width: 100%; padding: 8px; }
+
+.btn-disabled { 
+    background: #555 !important; 
+    cursor: not-allowed; 
+    color: #888 !important; 
+}
+
+.btn-close-circle {
+    position: absolute; top: 10px; right: 10px; width: 30px; height: 30px;
+    border-radius: 50%; background: #e74c3c; color: white; font-size: 1.2em; line-height: 30px; padding: 0; z-index: 200;
+}
+
+/* =========================================
+   2. 登入與大廳 (Lobby)
+   ========================================= */
 #login-section, #user-info {
-    background: #34495e; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-}
-input[type="text"], input[type="email"], input[type="password"] {
-    background: #ecf0f1; border: none; padding: 8px; border-radius: 4px; margin: 5px 0;
+    background: #34495e; 
+    padding: 15px; 
+    border-radius: 10px; 
+    margin-bottom: 20px; 
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
 }
 
-/* 抽卡區塊佈局修正 */
+input[type="text"], input[type="email"], input[type="password"] {
+    background: #ecf0f1; border: none; padding: 8px; border-radius: 4px; margin: 5px 0; width: 90%;
+}
+
+.main-layout { display: flex; flex-direction: column; gap: 20px; }
+.game-area { 
+    flex: 2; 
+    background: #34495e; 
+    padding: 15px; 
+    border-radius: 10px; 
+    min-height: 500px; 
+    position: relative; 
+}
+.leaderboard-area { 
+    flex: 1; 
+    background: #2c3e50; 
+    padding: 15px; 
+    border-radius: 10px; 
+    border: 1px solid #7f8c8d; 
+    max-height: 400px; 
+    overflow-y: auto; 
+}
+
+/* 排行榜項目 */
+.rank-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #555; font-size: 0.9em; }
+.rank-item:last-child { border-bottom: none; }
+
+/* 抽卡區塊佈局 */
 .gacha-section {
     display: flex;
     justify-content: center;
@@ -37,17 +113,11 @@ input[type="text"], input[type="email"], input[type="password"] {
     padding: 15px;
 }
 
-/* 戰鬥區域 */
-.main-layout { display: flex; flex-direction: column; gap: 20px; }
-.game-area { flex: 2; background: #34495e; padding: 15px; border-radius: 10px; min-height: 500px; position: relative; }
-.leaderboard-area { flex: 1; background: #2c3e50; padding: 15px; border-radius: 10px; border: 1px solid #7f8c8d; max-height: 400px; overflow-y: auto; }
-
-/* 排行榜 */
-.rank-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #555; font-size: 0.9em; }
-.rank-item:last-child { border-bottom: none; }
-
-/* 卡片 */
+/* =========================================
+   3. 卡片樣式 (Cards)
+   ========================================= */
 .card-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 15px; }
+
 .card { 
     width: 100px; height: 150px; 
     background-size: cover; background-position: center; border-radius: 8px; 
@@ -55,36 +125,13 @@ input[type="text"], input[type="email"], input[type="password"] {
     cursor: pointer; transition: transform 0.2s; overflow: hidden;
 }
 .card:hover { transform: scale(1.05); z-index: 10; }
+
+/* 稀有度邊框 */
 .card.SSR { border: 2px solid #f1c40f; box-shadow: 0 0 10px #f1c40f; }
 .card.SR { border: 2px solid #9b59b6; box-shadow: 0 0 8px #9b59b6; }
 .card.R { border: 2px solid #3498db; }
 
-/* 批量選擇樣式 */
-.card.is-selected {
-    transform: scale(0.95);
-    filter: brightness(0.6);
-}
-.card.is-selected::after {
-    content: '✔';
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 2em;
-    color: #2ecc71;
-    text-shadow: 0 0 5px black;
-}
-
-/* 已部署樣式 */
-.card.is-deployed::before {
-    content: '戰鬥中';
-    position: absolute;
-    top: 5px; left: 0; width: 100%;
-    background: rgba(231, 76, 60, 0.8);
-    font-size: 0.8em;
-    padding: 2px 0;
-    z-index: 2;
-}
-
+/* 卡片圖片 */
 .card-img { width: 100%; height: 100%; object-fit: cover; }
 .card-frame-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
 
@@ -101,6 +148,7 @@ input[type="text"], input[type="email"], input[type="password"] {
 .card-level-star { font-size: 0.7em; margin-left: 4px; display: flex; justify-content: space-between; padding-right: 4px; }
 .card-stats { font-size: 0.7em; margin-left: 4px; color: #bdc3c7; }
 
+/* Badges */
 .card-id-badge {
     position: absolute; top: 2px; left: 4px;
     background: rgba(0,0,0,0.6); padding: 1px 3px; border-radius: 3px;
@@ -115,7 +163,33 @@ input[type="text"], input[type="email"], input[type="password"] {
 .card-rarity-badge.SR { color: #9b59b6; }
 .card-rarity-badge.R { color: #3498db; }
 
-/* 大卡片檢視 */
+/* 批量選擇樣式 */
+.card.is-selected {
+    transform: scale(0.95);
+    filter: brightness(0.6);
+}
+.card.is-selected::after {
+    content: '✔';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2em;
+    color: #2ecc71;
+    text-shadow: 0 0 5px black;
+}
+
+/* 已部署/戰鬥中樣式 */
+.card.is-deployed::before {
+    content: '戰鬥中';
+    position: absolute;
+    top: 5px; left: 0; width: 100%;
+    background: rgba(231, 76, 60, 0.8);
+    font-size: 0.8em;
+    padding: 2px 0;
+    z-index: 2;
+}
+
+/* 大卡片檢視 (Modal) */
 .large-card-container { display: flex; justify-content: center; margin: 10px 0; }
 .large-card {
     width: 240px; height: 360px;
@@ -140,23 +214,6 @@ input[type="text"], input[type="email"], input[type="password"] {
 }
 .upgrade-title { font-size: 0.8em; color: #ccc; margin-bottom: 5px; }
 
-/* 按鈕樣式 */
-button { cursor: pointer; border: none; border-radius: 5px; color: white; transition: 0.2s; font-weight: bold; }
-button:active { transform: scale(0.95); }
-.btn-primary { background: #3498db; padding: 10px 20px; }
-.btn-primary:hover { background: #2980b9; }
-.btn-secondary { background: #95a5a6; padding: 8px 15px; }
-.btn-secondary:hover { background: #7f8c8d; }
-.btn-danger { background: #e74c3c; padding: 10px 20px; }
-.btn-danger:hover { background: #c0392b; }
-.btn-upgrade { background: #2ecc71; width: 100%; padding: 8px; }
-.btn-star { background: #f1c40f; color: #2c3e50; width: 100%; padding: 8px; }
-.btn-close-circle {
-    position: absolute; top: 10px; right: 10px; width: 30px; height: 30px;
-    border-radius: 50%; background: #e74c3c; color: white; font-size: 1.2em; line-height: 30px; padding: 0; z-index: 200;
-}
-.btn-disabled { background: #555 !important; cursor: not-allowed; color: #888 !important; }
-
 /* 導航箭頭 */
 .nav-arrow {
     position: absolute; top: 50%; transform: translateY(-50%);
@@ -165,7 +222,9 @@ button:active { transform: scale(0.95); }
 .nav-arrow.left { left: 10px; }
 .nav-arrow.right { right: 10px; }
 
-/* 模態視窗 */
+/* =========================================
+   4. 模態視窗 (Modals)
+   ========================================= */
 .modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 1000;
@@ -174,7 +233,6 @@ button:active { transform: scale(0.95); }
     background: #2c3e50; padding: 20px; border-radius: 10px; width: 90%; max-width: 900px; height: 80vh; display: flex; flex-direction: column; position: relative;
     border: 1px solid #7f8c8d;
 }
-.modal.hidden { display: none; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #555; padding-bottom: 10px; }
 
 /* 篩選與排序 */
@@ -183,7 +241,18 @@ button:active { transform: scale(0.95); }
 .filter-btn.active { background: #ecf0f1; color: #2c3e50; }
 .sort-dropdown { background: #34495e; color: white; border: 1px solid #7f8c8d; padding: 5px; border-radius: 4px; margin-left: auto; }
 
-/* 戰鬥畫面 */
+/* 設定與通知 */
+.setting-item { text-align: left; margin-bottom: 15px; }
+.notification-item {
+    background: #34495e; padding: 10px; margin-bottom: 10px; border-radius: 5px;
+    display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid #555;
+}
+.notification-item:hover { background: #3e5871; }
+.notification-item.claimed { opacity: 0.5; cursor: default; }
+
+/* =========================================
+   5. 戰鬥畫面 (Battle Screen)
+   ========================================= */
 #battle-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: #222; z-index: 500; display: flex; flex-direction: column;
@@ -230,6 +299,7 @@ button:active { transform: scale(0.95); }
 .boss { width: 120px; height: 120px; border: 4px solid #e74c3c; font-size: 3em; display:flex; justify-content:center; align-items:center; }
 .pvp-enemy { border: 2px solid #e74c3c !important; }
 
+/* 血條與類型 */
 .hero-hp-bar, .enemy-hp-bar {
     position: absolute; bottom: -8px; left: 0; width: 100%; height: 4px; background: #555;
 }
@@ -242,7 +312,7 @@ button:active { transform: scale(0.95); }
     display: flex; justify-content: center; align-items: center; color: white;
 }
 
-/* 戰鬥側邊欄 */
+/* 戰鬥側邊欄 (Monitor) */
 .battle-monitor-sidebar {
     width: 180px; background: #222; border-left: 1px solid #444; padding: 10px; overflow-y: auto;
     display: flex; flex-direction: column; gap: 8px;
@@ -257,7 +327,9 @@ button:active { transform: scale(0.95); }
 .monitor-hp-bg { width: 100%; height: 4px; background: #555; }
 .monitor-hp-fill { height: 100%; background: #2ecc71; transition: width 0.2s; }
 
-/* 特效 */
+/* =========================================
+   6. 特效與動畫 (Effects)
+   ========================================= */
 .projectile {
     position: absolute; font-size: 1.5em; pointer-events: none; z-index: 20; transition: left 0.3s linear, top 0.3s linear;
 }
@@ -284,7 +356,9 @@ button:active { transform: scale(0.95); }
     pointer-events: none; opacity: 0;
 }
 
-/* 戰鬥結算 */
+/* =========================================
+   7. 結算畫面 (Results)
+   ========================================= */
 #battle-result-modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.8); z-index: 2000;
@@ -311,9 +385,7 @@ button:active { transform: scale(0.95); }
 .dps-icon {
     width: 30px; height: 30px; border-radius: 50%; background-size: cover; margin-right: 10px; flex-shrink: 0;
 }
-.dps-bar-container {
-    flex: 1;
-}
+.dps-bar-container { flex: 1; }
 .dps-info {
     display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px;
 }
@@ -324,7 +396,9 @@ button:active { transform: scale(0.95); }
     height: 100%; background: #f1c40f; transition: width 0.5s ease-out;
 }
 
-/* style.css (PVP 新增樣式) */
+/* =========================================
+   8. PVP 專屬樣式 (New PVP Features)
+   ========================================= */
 
 /* PVP VS 介面 */
 .vs-container {
