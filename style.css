@@ -208,9 +208,19 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 傷害飄字 - 基礎樣式 */
 .damage-text { position: absolute; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #000; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; color: #fff; }
 
-/* 傷害飄字 - 顏色變體 (新功能) */
-.damage-text.hero-dmg { color: #e74c3c; font-size: 1.5em; /* 怪物打英雄：紅色，大字 */ }
-.damage-text.enemy-dmg { color: #f1c40f; font-size: 1.3em; /* 英雄打怪物：黃色 */ }
+/* 傷害飄字 - 顏色變體 (🔥 優化重點) */
+.damage-text.hero-dmg { 
+    color: #ffffff; 
+    font-size: 1.6em; 
+    text-shadow: 
+        2px 0 0 #000, -2px 0 0 #000, 
+        0 2px 0 #000, 0 -2px 0 #000, 
+        1px 1px #000, -1px -1px #000, 
+        1px -1px #000, -1px 1px #000;
+    font-weight: 900;
+    z-index: 200;
+}
+.damage-text.enemy-dmg { color: #e74c3c; font-size: 1.3em; /* 怪物打英雄：紅色 */ }
 .damage-text.gold-text { color: #f39c12; font-size: 1.2em; text-shadow: 0 0 5px gold; /* 金幣 */ }
 
 @keyframes floatUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }

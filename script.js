@@ -339,6 +339,110 @@ function updateInventoryCounts() {
     });
 }
 
+// 🔥 新功能：一鍵自動升星 🔥
+async function autoStarUp() {
+    if (!currentUser) return alert("請先登入");
+    if (isBatchMode) return alert("請先關閉批量分解模式");
+    if (allUserCards.length < 2) return alert("卡片數量不足以進行升星");
+
+    const confirmed = confirm("⚡ 一鍵升星會自動合併重複的卡片，將每種英雄等級最高的卡片升到最高星數。\n\n確定要執行嗎？");
+    if (!confirmed) return;
+
+    // 將卡片按 ID 分組
+    const groups = {};
+    allUserCards.forEach(card => {
+        if (!groups[card.id]) groups[card.id] = [];
+        groups[card.id].push(card);
+    });
+
+    let upgradedCount = 0;
+    let consumedCount = 0;
+    const deletePromises = [];
+    const updatePromises = [];
+    const newCardsState = [];
+
+    // 處理每一組英雄
+    for (const id in groups) {
+        let cards = groups[id];
+        if (cards.length < 2) {
+            newCardsState.push(...cards);
+            continue;
+        }
+
+        // 排序：先比星數高，再比等級高
+        cards.sort((a, b) => {
+            if (b.stars !== a.stars) return b.stars - a.stars;
+            return b.level - a.level;
+        });
+
+        // 第一張是主卡 (保留)
+        let mainCard = cards[0];
+        const fodders = cards.slice(1);
+        let fodderIndex = 0;
+
+        // 模擬升星過程
+        while (mainCard.stars < 5 && fodderIndex < fodders.length) {
+            // 吃掉一張素材
+            const fodder = fodders[fodderIndex];
+            deletePromises.push(deleteDoc(doc(db, "inventory", fodder.docId)));
+            consumedCount++;
+            
+            // 主卡升級
+            mainCard.stars++;
+            calculateCardStats(mainCard);
+            fodderIndex++;
+        }
+
+        if (fodderIndex > 0) {
+            upgradedCount++;
+            // 更新主卡資料
+            updatePromises.push(updateDoc(doc(db, "inventory", mainCard.docId), {
+                stars: mainCard.stars,
+                atk: mainCard.atk,
+                hp: mainCard.hp
+            }));
+        }
+
+        newCardsState.push(mainCard); // 加回主卡
+        // 剩下的素材如果沒被吃掉，也要加回去
+        for (let i = fodderIndex; i < fodders.length; i++) {
+            newCardsState.push(fodders[i]);
+        }
+    }
+
+    if (upgradedCount === 0) {
+        return alert("目前沒有可升星的卡片組合 (需有重複卡片)");
+    }
+
+    // 執行資料庫操作
+    try {
+        document.getElementById('auto-star-btn').innerText = "處理中...";
+        await Promise.all([...deletePromises, ...updatePromises]);
+        
+        playSound('upgrade');
+        allUserCards = newCardsState; // 更新本地狀態
+        updateInventoryCounts();
+        filterInventory(currentFilterRarity);
+        await updateCurrencyCloud();
+        updateUIDisplay();
+        
+        alert(`升星完成！\n共升級了 ${upgradedCount} 位英雄\n消耗了 ${consumedCount} 張素材卡`);
+    } catch (e) {
+        console.error("自動升星失敗", e);
+        alert("升星過程中發生錯誤，請重試");
+    } finally {
+        document.getElementById('auto-star-btn').innerText = "⚡ 一鍵升星";
+    }
+}
+
+// 綁定一鍵升星按鈕
+if(document.getElementById('auto-star-btn')) {
+    document.getElementById('auto-star-btn').addEventListener('click', () => {
+        playSound('click');
+        autoStarUp();
+    });
+}
+
 async function loadInventory(uid) {
     const container = document.getElementById('inventory-grid');
     container.innerHTML = "讀取中...";
