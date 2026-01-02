@@ -18,7 +18,9 @@ let battleState = {
 let gameLoopId = null;
 let onBattleEndCallback = null;
 
+// 🔥 這行非常重要，pvp.js 會呼叫它來設定進攻隊伍
 export function setBattleSlots(slots) { battleSlots = slots; }
+
 export function setDifficulty(diff) { currentDifficulty = diff; }
 export function setGameSpeed(speed) { gameSpeed = speed; }
 export function setOnBattleEnd(callback) { onBattleEndCallback = callback; }
@@ -417,10 +419,7 @@ function gameLoop() {
         // 魔王邏輯
         if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { fireBossSkill(enemy); enemy.lastAttackTime = now; }
 
-        let blocked = false;
-        let dodgeY = 0;
-        let nearestHero = null;
-        let minTotalDist = 9999;
+        let blocked = false; let dodgeY = 0; let nearestHero = null; let minTotalDist = 9999;
 
         // 1. 索敵
         heroEntities.forEach(hero => {
@@ -517,6 +516,16 @@ function updateBattleUI() {
     document.getElementById('battle-gold').innerText = battleGold; 
     document.getElementById('wave-count').innerText = isPvpMode ? "PVP" : battleState.wave;
     document.getElementById('hero-count-display').innerText = heroEntities.length;
+}
+
+function showDamageText(leftPercent, topPercent, text, colorClass) {
+    const el = document.createElement('div'); 
+    el.className = `damage-text ${colorClass || ''}`; 
+    el.innerText = text;
+    el.style.left = `${leftPercent}%`; 
+    el.style.top = `${topPercent}%`; 
+    document.querySelector('.battle-field-container').appendChild(el); 
+    setTimeout(() => el.remove(), 800);
 }
 
 function endBattle(isWin) {
