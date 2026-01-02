@@ -6,6 +6,7 @@ export let isBattleActive = false;
 export let battleGold = 0;
 export let battleSlots = new Array(9).fill(null);
 export let heroEntities = [];
+export let deadHeroes = []; // 🔥 新增：用來儲存陣亡英雄的數據
 export let enemies = [];
 export let currentDifficulty = 'normal';
 export let gameSpeed = 1;
@@ -50,6 +51,7 @@ function startBattle() {
     battleGold = 0;
     enemies = [];
     heroEntities = [];
+    deadHeroes = []; // 🔥 重置陣亡名單
     document.getElementById('enemy-container').innerHTML = '';
     document.getElementById('hero-container').innerHTML = '';
     
@@ -75,6 +77,7 @@ export function resetBattleState() {
     battleState.phase = 'IDLE'; 
     enemies = [];
     heroEntities = [];
+    deadHeroes = [];
     document.getElementById('enemy-container').innerHTML = '';
     document.getElementById('hero-container').innerHTML = '';
     document.getElementById('start-battle-btn').classList.remove('btn-disabled');
@@ -97,7 +100,6 @@ function spawnHeroes() {
         const startPos = 5 + (col * 4); 
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
 
-        // 🔥 新增：根據攻擊類型決定圖示
         const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
 
         const el = document.createElement('div');
@@ -106,7 +108,6 @@ function spawnHeroes() {
         el.style.left = `${startPos}%`;
         el.style.top = `${startY}%`;
         
-        // 🔥 新增：在 innerHTML 中加入 .hero-type-badge
         el.innerHTML = `
             <div class="hero-hp-bar"><div style="width:100%"></div></div>
             <div class="hero-type-badge">${typeIcon}</div>
@@ -153,7 +154,6 @@ function startWave(waveNum) {
 function spawnEnemy() {
     const config = WAVE_CONFIG[battleState.wave];
     
-    // Wave 4: 魔王
     if(battleState.wave === 4) {
         const bossX = 10 + Math.random() * 80; 
         const bossY = 10 + Math.random() * 80;
@@ -178,7 +178,6 @@ function spawnEnemy() {
     if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
     else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
 
-    // 普通怪物
     const spawnX = 40 + (Math.random() * 55);
     let spawnY;
     if (Math.random() < 0.5) {
@@ -226,7 +225,6 @@ function fireBossSkill(boss) {
     setTimeout(() => {
         projectile.remove();
         
-        // 爆炸特效
         const effect = document.createElement('div');
         effect.className = 'boss-aoe-effect';
         effect.style.left = `${target.position}%`;
@@ -236,7 +234,6 @@ function fireBossSkill(boss) {
         
         playSound('dismantle');
 
-        // 🔥 修改：大幅縮小判定範圍 (從 15 縮小到 7)
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position;
             const dy = hero.y - target.y;
@@ -246,7 +243,6 @@ function fireBossSkill(boss) {
                 hero.currentHp -= 300;
                 triggerHeroHit(hero.el);
                 showDamageText(hero.position, hero.y, `-300`, 'hero-dmg');
-                // 🔥 修改：大幅縮小擊退距離 (從 5 縮小到 2)
                 if(hero.position < boss.position) hero.position -= 2;
                 else hero.position += 2;
             }
@@ -424,6 +420,8 @@ function gameLoop() {
 
     for (let i = heroEntities.length - 1; i >= 0; i--) {
         if (heroEntities[i].currentHp <= 0) {
+            // 🔥 修改：陣亡處理，先存入 deadHeroes
+            deadHeroes.push(heroEntities[i]);
             heroEntities[i].el.remove();
             heroEntities.splice(i, 1);
         }
@@ -537,7 +535,8 @@ function showDamageText(leftPercent, topPercent, text, colorClass) {
 
 function endBattle(isWin) {
     if(onBattleEndCallback) {
-        // 將目前的英雄狀態 (包含累積傷害) 傳出去
-        onBattleEndCallback(isWin, battleGold, heroEntities);
+        // 🔥 修改：將存活的與陣亡的合併回傳
+        const allHeroes = [...heroEntities, ...deadHeroes];
+        onBattleEndCallback(isWin, battleGold, allHeroes);
     }
 }
