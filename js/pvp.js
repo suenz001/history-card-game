@@ -6,17 +6,21 @@ import { startPvpMatch, setOnBattleEnd, resetBattleState } from './battle.js';
 let db;
 let currentUser;
 let allUserCards = [];
+
+// 兩組陣列：防守用、進攻用
 let pvpDefenseSlots = new Array(9).fill(null);
+let pvpAttackSlots = new Array(9).fill(null);
+
 export let currentEnemyData = null;
 
-// 新增：回調函式，用來請求主程式打開背包
+// 回調函式，用來請求主程式打開背包
 let requestOpenInventory = null;
 
 export function initPvp(database, user, inventory, openInventoryCallback) {
     db = database;
     currentUser = user;
     allUserCards = inventory;
-    requestOpenInventory = openInventoryCallback; // 保存回調
+    requestOpenInventory = openInventoryCallback; 
 
     const pvpBtn = document.getElementById('pvp-menu-btn');
     if (pvpBtn) {
@@ -28,8 +32,14 @@ export function initPvp(database, user, inventory, openInventoryCallback) {
         searchBtn.addEventListener('click', () => { playSound('click'); openPvpArena(); });
     }
 
+    // 防守格點擊
     document.querySelectorAll('.pvp-defense-slot').forEach(slot => {
-        slot.addEventListener('click', () => handleSlotClick(slot));
+        slot.addEventListener('click', () => handleSlotClick(slot, 'defense'));
+    });
+
+    // 進攻格點擊
+    document.querySelectorAll('.pvp-attack-slot').forEach(slot => {
+        slot.addEventListener('click', () => handleSlotClick(slot, 'attack'));
     });
 
     document.getElementById('save-pvp-team-btn').addEventListener('click', saveDefenseTeam);
@@ -66,7 +76,7 @@ async function openPvpModal() {
     if (!currentUser) return alert("請先登入");
     document.getElementById('pvp-setup-modal').classList.remove('hidden');
     
-    // 每次打開都讀取一次最新的，避免沒同步
+    // 讀取防守陣容
     const userRef = doc(db, "users", currentUser.uid);
     const userSnap = await getDoc(userRef);
     if (userSnap.exists() && userSnap.data().defenseTeam) {
@@ -75,56 +85,74 @@ async function openPvpModal() {
         savedTeam.forEach(hero => { if (hero.slotIndex !== undefined) pvpDefenseSlots[hero.slotIndex] = hero; });
     } else { pvpDefenseSlots = new Array(9).fill(null); }
     
-    renderPvpSlots(); 
+    renderPvpSlots('defense'); 
     updateSaveButtonState();
 }
 
 // 🔥 新增：當 main.js 選擇好卡片後，呼叫此函式寫入 PVP 欄位
-export function setPvpHero(slotIndex, card) {
-    // 檢查卡片是否已經在其他 PVP 欄位
-    const isAlreadyDeployed = pvpDefenseSlots.some(h => h && h.docId === card.docId);
+// type = 'defense' (防守) 或 'attack' (進攻)
+export function setPvpHero(slotIndex, card, type) {
+    const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
+
+    // 檢查卡片是否已經在該陣容中
+    const isAlreadyDeployed = targetArray.some(h => h && h.docId === card.docId);
     if(isAlreadyDeployed) {
-        alert("該英雄已經在 PVP 防守陣容中！");
+        alert("該英雄已經在此陣容中！");
         return false;
     }
 
-    pvpDefenseSlots[slotIndex] = { ...card };
-    renderPvpSlots();
-    updateSaveButtonState();
+    targetArray[slotIndex] = { ...card };
     
-    // 重新顯示 PVP 視窗 (因為選擇卡片時被隱藏了)
-    document.getElementById('pvp-setup-modal').classList.remove('hidden');
+    // 渲染對應的格子
+    renderPvpSlots(type);
+    
+    if(type === 'defense') {
+        updateSaveButtonState();
+        document.getElementById('pvp-setup-modal').classList.remove('hidden');
+    } else {
+        // 進攻模式不需要 "Save" 按鈕，直接顯示在 UI 上即可
+        document.getElementById('pvp-arena-modal').classList.remove('hidden');
+    }
+    
     return true;
 }
 
-function handleSlotClick(slotElement) {
+function handleSlotClick(slotElement, type) {
     const index = parseInt(slotElement.dataset.slot);
+    const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
     
     // 如果該位置已有卡片，點擊則移除
-    if (pvpDefenseSlots[index]) { 
+    if (targetArray[index]) { 
         playSound('click'); 
-        pvpDefenseSlots[index] = null; 
-        renderPvpSlots(); 
-        updateSaveButtonState(); 
+        targetArray[index] = null; 
+        renderPvpSlots(type); 
+        if(type === 'defense') updateSaveButtonState();
     } 
     else {
         // 檢查上限
-        const currentCount = pvpDefenseSlots.filter(x => x !== null).length;
-        if (currentCount >= 6) return alert("PVP 防守隊伍最多只能上陣 6 名英雄！");
+        const currentCount = targetArray.filter(x => x !== null).length;
+        if (currentCount >= 6) return alert("PVP 隊伍最多只能上陣 6 名英雄！");
         
         playSound('click'); 
         
-        // 🔥 核心修改：隱藏 PVP 視窗，並通知 main.js 打開背包
-        document.getElementById('pvp-setup-modal').classList.add('hidden');
+        // 隱藏對應視窗
+        if(type === 'defense') document.getElementById('pvp-setup-modal').classList.add('hidden');
+        else document.getElementById('pvp-arena-modal').classList.add('hidden');
+
+        // 通知 main.js 打開背包
         if(requestOpenInventory) {
-            requestOpenInventory(index);
+            requestOpenInventory(index, type);
         }
     }
 }
 
-function renderPvpSlots() {
-    document.querySelectorAll('.pvp-defense-slot').forEach(slotDiv => {
-        const index = parseInt(slotDiv.dataset.slot); const hero = pvpDefenseSlots[index];
+// 渲染 PVP 格子 (通用)
+function renderPvpSlots(type) {
+    const selector = (type === 'attack') ? '.pvp-attack-slot' : '.pvp-defense-slot';
+    const sourceArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
+
+    document.querySelectorAll(selector).forEach(slotDiv => {
+        const index = parseInt(slotDiv.dataset.slot); const hero = sourceArray[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); const existingCard = slotDiv.querySelector('.card');
         if (existingCard) existingCard.remove();
         if (hero) {
@@ -155,8 +183,39 @@ async function saveDefenseTeam() {
 function openPvpArena() {
     if (!currentUser) return alert("請先登入");
     document.getElementById('pvp-arena-modal').classList.remove('hidden');
+    
+    // 🔥 自動讀取上次的攻擊隊伍
+    loadLastAttackTeam();
+
     searchOpponent();
 }
+
+async function loadLastAttackTeam() {
+    if(!currentUser) return;
+    try {
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        pvpAttackSlots = new Array(9).fill(null);
+
+        if (userSnap.exists() && userSnap.data().lastAttackTeam) {
+            const savedTeam = userSnap.data().lastAttackTeam;
+            savedTeam.forEach(hero => { 
+                if (hero.slotIndex !== undefined) {
+                    // 確保卡片還在背包裡 (防止已被分解)
+                    const existInBag = allUserCards.find(c => c.docId === hero.docId);
+                    if(existInBag) {
+                        pvpAttackSlots[hero.slotIndex] = { ...existInBag }; // 使用背包裡的最新數據
+                    }
+                }
+            });
+        }
+        renderPvpSlots('attack');
+    } catch(e) {
+        console.warn("讀取進攻陣容失敗", e);
+    }
+}
+
 
 async function searchOpponent() {
     const loadingDiv = document.getElementById('pvp-loading'); const contentDiv = document.getElementById('pvp-match-content');
@@ -208,20 +267,41 @@ function renderMatchup() {
     }
 }
 
-// 🔥 開始戰鬥 (切換 UI -> 呼叫 battle.js)
-function startActualPvp() {
+// 🔥 開始戰鬥 (儲存陣容 -> 呼叫 battle.js)
+async function startActualPvp() {
     if (!currentEnemyData) return;
+
+    // 檢查是否有配置英雄
+    const myCount = pvpAttackSlots.filter(x => x !== null).length;
+    if (myCount === 0) return alert("請至少配置 1 名進攻英雄！");
+    if (myCount > 6) return alert("進攻英雄不能超過 6 名！");
     
+    // 儲存進攻陣容 (lastAttackTeam)
+    try {
+        const teamData = [];
+        pvpAttackSlots.forEach((hero, index) => { 
+            if (hero) { 
+                teamData.push({ 
+                    id: hero.id, docId: hero.docId, 
+                    slotIndex: index 
+                    // 只存 ID 和位置，讀取時再對照背包，確保數據最新
+                }); 
+            } 
+        });
+        const userRef = doc(db, "users", currentUser.uid);
+        // 不等待儲存完成，直接開戰 (非同步儲存)
+        updateDoc(userRef, { lastAttackTeam: teamData }).catch(e=>console.warn("儲存進攻陣容失敗",e));
+    } catch(e) { console.warn(e); }
+
     document.getElementById('pvp-arena-modal').classList.add('hidden');
     document.getElementById('battle-screen').classList.remove('hidden');
     
     if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
 
-    // 設定回調：當戰鬥結束時，執行 PVP 結算
     setOnBattleEnd(handlePvpResult);
 
-    // 呼叫 battle.js 開始模擬
-    startPvpMatch(currentEnemyData.defenseTeam);
+    // 🔥 傳入敵方陣容 + 我方進攻陣容
+    startPvpMatch(currentEnemyData.defenseTeam, pvpAttackSlots);
 }
 
 // 🔥 PVP 結算邏輯

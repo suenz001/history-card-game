@@ -6,7 +6,7 @@ import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, s
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
 import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive } from './js/battle.js';
-import { initPvp, updatePvpContext, setPvpHero } from './js/pvp.js'; // 🔥 Import setPvpHero
+import { initPvp, updatePvpContext, setPvpHero } from './js/pvp.js'; 
 
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
@@ -52,8 +52,8 @@ let selectedBatchCards = new Set();
 let gachaQueue = [];
 let gachaIndex = 0;
 
-// 🔥 新增：PVP 選擇英雄的目標欄位
-let pvpTargetSlot = null;
+// 🔥 修改：PVP 選擇英雄的目標資訊 (包含位置與類型)
+let pvpTargetInfo = { index: null, type: null };
 
 const SYSTEM_NOTIFICATIONS = [
     { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 } }
@@ -66,10 +66,12 @@ setOnBattleEnd(handleBattleEnd);
 // 🔥 初始化 PVP 模組 (傳入回調函式)
 setTimeout(() => {
     if(document.getElementById('pvp-menu-btn')) {
-        initPvp(db, currentUser, allUserCards, (slotIndex) => {
+        initPvp(db, currentUser, allUserCards, (slotIndex, type) => {
             // 當 PVP 請求打開背包時
-            pvpTargetSlot = slotIndex;
-            document.getElementById('inventory-title').innerText = "👇 選擇 PVP 防守英雄"; 
+            pvpTargetInfo = { index: slotIndex, type: type };
+            
+            const title = type === 'defense' ? "👇 選擇 PVP 防守英雄" : "👇 選擇 PVP 進攻英雄";
+            document.getElementById('inventory-title').innerText = title; 
             document.getElementById('inventory-modal').classList.remove('hidden');
             
             // 確保有資料
@@ -619,7 +621,7 @@ function renderCard(card, targetContainer) {
     // 顯示攻擊力的符號為 👊
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats"><span class="type-icon">${typeIcon}</span> 👊${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
     
-    // 🔥 修改：卡片點擊事件 (新增 PVP 選角判斷)
+    // 🔥 修改：卡片點擊事件 (支援 PVP 選角)
     cardDiv.addEventListener('click', () => { 
         playSound('click'); 
         if (cardDiv.classList.contains('is-deployed')) return; 
@@ -628,11 +630,12 @@ function renderCard(card, targetContainer) {
         // 1. PVE 部署
         if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } 
 
-        // 2. PVP 部署 (新增)
-        if (pvpTargetSlot !== null) {
-            const success = setPvpHero(pvpTargetSlot, card);
+        // 2. PVP 部署 (進攻或防守)
+        if (pvpTargetInfo.index !== null) {
+            const success = setPvpHero(pvpTargetInfo.index, card, pvpTargetInfo.type);
             if(success) {
-                pvpTargetSlot = null; // 重置
+                // 重置
+                pvpTargetInfo = { index: null, type: null };
                 document.getElementById('inventory-modal').classList.add('hidden'); // 關閉背包
             }
             return;
@@ -682,7 +685,7 @@ if(document.getElementById('inventory-btn')) document.getElementById('inventory-
     
     // 重置所有選角狀態
     deployTargetSlot = null; 
-    pvpTargetSlot = null; 
+    pvpTargetInfo = { index: null, type: null }; 
     
     document.getElementById('inventory-title').innerText = "🎒 我的背包"; 
     document.getElementById('inventory-modal').classList.remove('hidden'); 
@@ -691,11 +694,17 @@ if(document.getElementById('inventory-btn')) document.getElementById('inventory-
 if(document.getElementById('close-inventory-btn')) document.getElementById('close-inventory-btn').addEventListener('click', () => { 
     playSound('click'); 
     document.getElementById('inventory-modal').classList.add('hidden'); 
-    deployTargetSlot = null; 
-    pvpTargetSlot = null;
     
-    // 如果是從 PVP 跳過來的，關閉背包要重新顯示 PVP 視窗
-    // 但為了簡單起見，使用者手動關閉代表取消選擇，就不特別處理了
+    deployTargetSlot = null; 
+    
+    // 如果是 PVP 模式下關閉背包，應該回到對應的 PVP 視窗
+    if (pvpTargetInfo.type === 'defense') {
+        document.getElementById('pvp-setup-modal').classList.remove('hidden');
+    } else if (pvpTargetInfo.type === 'attack') {
+        document.getElementById('pvp-arena-modal').classList.remove('hidden');
+    }
+    
+    pvpTargetInfo = { index: null, type: null };
 });
 
 async function loadLeaderboard() {
@@ -730,8 +739,7 @@ let deployTargetSlot = null;
 
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
-        // 排除 PVP 視窗的 slot (因為它們也有 defense-slot class，但在 PVP modal 內)
-        // 這裡透過檢查 parent 是否為 game-area 或 lanes-wrapper 來區分
+        // 排除 PVP 視窗的 slot
         if(slot.closest('#pvp-setup-modal') || slot.closest('#pvp-match-content')) return;
 
         if(isBattleActive) return; playSound('click'); const slotIndex = parseInt(slot.dataset.slot);
@@ -766,7 +774,7 @@ function deployHeroToSlot(card) {
 }
 
 function renderBattleSlots() {
-    // 只選取 PVE 戰場的 slot
+    // 只選取 PVE 戰場的 slot (透過父容器區分)
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
     battleSlotsEl.forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
