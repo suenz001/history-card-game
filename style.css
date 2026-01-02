@@ -507,3 +507,51 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     background: #f1c40f;
     transition: width 0.5s ease-out;
 }
+/* style.css (請追加在檔案最後面) */
+
+/* PVP VS 介面 */
+.vs-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.player-card {
+    text-align: center;
+    flex: 1;
+}
+.player-card.self { color: #3498db; }
+.player-card.enemy { color: #e74c3c; }
+
+.p-name { font-size: 1.5em; font-weight: bold; margin-bottom: 5px; }
+.p-power { font-size: 1em; color: #f1c40f; }
+.p-avatar { font-size: 4em; margin-top: 10px; }
+
+.vs-logo {
+    font-size: 3em;
+    font-weight: 900;
+    font-style: italic;
+    color: #fff;
+    text-shadow: 0 0 10px #e74c3c, 0 0 20px #e74c3c;
+    margin: 0 20px;
+    animation: pulse 0.5s infinite alternate;
+}
+
+/* 敵方陣容預覽 (唯讀) */
+.pvp-grid-container.readonly {
+    background: #212121;
+    pointer-events: none; /* 禁止點擊操作 */
+    opacity: 0.9;
+    transform: scale(0.9); /* 稍微縮小一點 */
+}
+
+.pvp-grid-container.readonly .defense-slot {
+    border-color: #e74c3c; /* 紅色框代表敵人 */
+}
+
+/* 旋轉動畫 (搜尋用) */
+@keyframes spin { 100% { transform: rotate(360deg); } }

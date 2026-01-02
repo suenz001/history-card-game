@@ -6,6 +6,7 @@ import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, s
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
 import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive } from './js/battle.js';
+import { initPvp, updatePvpContext } from './js/pvp.js'; // 🔥 Import PVP
 
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
@@ -58,6 +59,13 @@ const SYSTEM_NOTIFICATIONS = [
 // 初始化戰鬥模組
 initBattle();
 setOnBattleEnd(handleBattleEnd);
+
+// 🔥 初始化 PVP 模組
+setTimeout(() => {
+    if(document.getElementById('pvp-menu-btn')) {
+        initPvp(db, currentUser, allUserCards);
+    }
+}, 500);
 
 // 設定介面相關
 const settingsModal = document.getElementById('settings-modal');
@@ -240,6 +248,8 @@ if (isFirebaseReady && auth) {
                 await loadUserData(user); 
                 await calculateTotalPowerOnly(user.uid); 
                 loadLeaderboard();
+                // 🔥 同步 PVP 資料
+                updatePvpContext(currentUser, allUserCards);
             } catch(e) { console.error("載入使用者資料失敗", e); }
         } else { 
             if(loginSection) loginSection.style.display = 'block'; 
@@ -465,6 +475,9 @@ async function loadInventory(uid) {
     
     updateInventoryCounts();
     filterInventory('ALL');
+    
+    // 🔥 同步到 PVP
+    updatePvpContext(currentUser, allUserCards);
 }
 
 if(document.getElementById('sort-select')) document.getElementById('sort-select').addEventListener('change', (e) => { playSound('click'); currentSortMethod = e.target.value; filterInventory(currentFilterRarity); });

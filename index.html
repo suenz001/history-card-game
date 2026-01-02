@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=112">
+    <link rel="stylesheet" href="style.css?v=113">
 </head>
 <body>
 
@@ -60,7 +60,12 @@
                         </div>
                     </div>
 
-                    <button id="enter-battle-mode-btn" class="btn-danger" style="width: 100%; margin-bottom: 20px; font-size: 1.2em; border: 2px solid #fff; box-shadow: 0 0 10px #c0392b;">⚔️ 前往戰場 (賺金幣/鑽石)</button>
+                    <button id="enter-battle-mode-btn" class="btn-danger" style="width: 100%; margin-bottom: 10px; font-size: 1.2em; border: 2px solid #fff; box-shadow: 0 0 10px #c0392b;">⚔️ 前往戰場 (賺金幣/鑽石)</button>
+
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <button id="pvp-menu-btn" class="btn-primary" style="flex: 1; background: #2980b9; border: 2px solid #fff;">🛡️ 設定防守</button>
+                        <button id="pvp-search-btn" class="btn-danger" style="flex: 1; background: #c0392b; border: 2px solid #fff; box-shadow: 0 0 10px #e74c3c;">⚔️ 尋找對手</button>
+                    </div>
 
                     <div class="gacha-section">
                         <button id="draw-btn" class="btn-primary">單抽 (100鑽)</button>
@@ -96,9 +101,7 @@
             
             <div class="battle-field-container">
                 <div id="wave-notification" class="hidden">第 1 波</div>
-
                 <div class="spawn-line left"></div>
-
                 <div id="hero-container"></div>
 
                 <div class="lanes-wrapper" style="opacity: 0.3;">
@@ -126,8 +129,7 @@
                 <h3 style="margin: 0 0 10px 0; color: #f1c40f; border-bottom: 1px solid #555; padding-bottom: 5px;">
                     🛡️ 英雄狀態
                 </h3>
-                <div id="hero-monitor-list">
-                    </div>
+                <div id="hero-monitor-list"></div>
             </div>
         </div>
 
@@ -274,6 +276,86 @@
                         <input type="checkbox" id="sfx-toggle" checked> <span id="sfx-status">開啟</span>
                     </div>
                     <input type="range" id="sfx-volume" min="0" max="1" step="0.1" value="1.0" style="width:100%;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="pvp-setup-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>🛡️ 佈署防守軍隊</h2>
+                <button id="close-pvp-modal-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
+            </div>
+            
+            <div style="color: #ccc; font-size: 0.9em; margin-bottom: 10px; text-align: center;">
+                請在 3x3 的方格中配置您的防守陣型 (最多 6 人)<br>
+                <span style="color: #f1c40f;">左側為前排，右側為後排</span>
+            </div>
+
+            <div class="pvp-grid-container" style="background: #34495e; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                <div class="lane-row">
+                    <div class="defense-slot pvp-defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
+                </div>
+                <div class="lane-row" style="margin: 10px 0;">
+                    <div class="defense-slot pvp-defense-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
+                </div>
+                <div class="lane-row">
+                    <div class="defense-slot pvp-defense-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
+                </div>
+            </div>
+
+            <button id="save-pvp-team-btn" class="btn-upgrade" style="width: 100%; font-size: 1.2em; padding: 15px;">💾 儲存防守陣容</button>
+
+            <div id="pvp-inventory-selection" class="hidden" style="margin-top: 20px; border-top: 1px solid #555; padding-top: 10px; flex: 1; display: flex; flex-direction: column;">
+                <h3 id="pvp-inventory-title">👇 選擇英雄</h3>
+                <div id="pvp-inventory-grid" class="card-container" style="justify-content: flex-start; overflow-y: auto; max-height: 250px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="pvp-arena-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 800px; background: #2c3e50; border: 3px solid #e74c3c;">
+            <div class="modal-header">
+                <h2 style="color: #e74c3c;">⚔️ PVP 競技場</h2>
+                <button id="close-arena-btn" class="btn-primary" style="background:#7f8c8d;">離開</button>
+            </div>
+
+            <div id="pvp-loading" class="hidden" style="text-align: center; padding: 50px;">
+                <div style="font-size: 3em; animation: spin 1s infinite linear;">🔍</div>
+                <h3>正在搜尋旗鼓相當的對手...</h3>
+            </div>
+
+            <div id="pvp-match-content" class="hidden">
+                <div class="vs-container">
+                    <div class="player-card self">
+                        <div class="p-name" id="arena-my-name">我方</div>
+                        <div class="p-power">戰力: <span id="arena-my-power">0</span></div>
+                        <div class="p-avatar">😎</div>
+                    </div>
+
+                    <div class="vs-logo">VS</div>
+
+                    <div class="player-card enemy">
+                        <div class="p-name" id="arena-enemy-name">???</div>
+                        <div class="p-power">戰力: <span id="arena-enemy-power">???</span></div>
+                        <div class="p-avatar">😈</div>
+                    </div>
+                </div>
+
+                <h3 style="text-align: center; color: #f1c40f; margin-top: 10px;">⚠️ 敵方防守佈署</h3>
+                <div id="enemy-preview-grid" class="pvp-grid-container readonly">
+                    </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button id="search-again-btn" class="btn-secondary" style="flex: 1;">🔄 換一個對手</button>
+                    <button id="start-pvp-battle-btn" class="btn-danger" style="flex: 2; font-size: 1.2em;">⚔️ 開戰 (奪取 5% 金幣)</button>
                 </div>
             </div>
         </div>
