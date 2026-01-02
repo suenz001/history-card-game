@@ -15,7 +15,7 @@ let battleState = {
 };
 let gameLoopId = null;
 
-// 設置戰鬥相關的 Callback (結束戰鬥時呼叫主程式)
+// 設置戰鬥相關的 Callback
 let onBattleEndCallback = null;
 
 export function setBattleSlots(slots) { battleSlots = slots; }
@@ -24,8 +24,11 @@ export function setGameSpeed(speed) { gameSpeed = speed; }
 export function setOnBattleEnd(callback) { onBattleEndCallback = callback; }
 
 export function initBattle() {
-    document.getElementById('start-battle-btn').addEventListener('click', startBattle);
-    document.getElementById('retreat-btn').addEventListener('click', () => { playSound('click'); resetBattleState(); });
+    const startBtn = document.getElementById('start-battle-btn');
+    if(startBtn) startBtn.addEventListener('click', startBattle);
+    
+    const retreatBtn = document.getElementById('retreat-btn');
+    if(retreatBtn) retreatBtn.addEventListener('click', () => { playSound('click'); resetBattleState(); });
     
     // 難度選擇監聽
     document.querySelectorAll('.difficulty-btn').forEach(btn => {
@@ -117,7 +120,8 @@ function spawnHeroes() {
             atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.6) : card.atk, 
             lastAttackTime: 0,
             el: el,
-            patrolDir: 1 
+            patrolDir: 1,
+            totalDamage: 0 // 🔥 新增：傷害統計
         });
     });
 }
@@ -141,7 +145,7 @@ function startWave(waveNum) {
 function spawnEnemy() {
     const config = WAVE_CONFIG[battleState.wave];
     
-    // 🔥 修改：Wave 4 魔王 (全地圖隨機生成)
+    // Wave 4: 魔王
     if(battleState.wave === 4) {
         const bossX = 10 + Math.random() * 80; 
         const bossY = 10 + Math.random() * 80;
@@ -166,7 +170,7 @@ function spawnEnemy() {
     if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
     else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
 
-    // 🔥 修改：普通怪物 X軸(40-95%), Y軸上下分流
+    // 普通怪物
     const spawnX = 40 + (Math.random() * 55);
     let spawnY;
     if (Math.random() < 0.5) {
@@ -197,7 +201,6 @@ function fireBossSkill(boss) {
     projectile.style.left = `${boss.position}%`;
     projectile.style.top = `${boss.y}%`;
     
-    // 🔥 修改：投射物變大
     projectile.style.width = '80px';
     projectile.style.height = '80px';
     projectile.style.fontSize = '3em';
@@ -215,6 +218,7 @@ function fireBossSkill(boss) {
     setTimeout(() => {
         projectile.remove();
         
+        // 爆炸特效
         const effect = document.createElement('div');
         effect.className = 'boss-aoe-effect';
         effect.style.left = `${target.position}%`;
@@ -224,15 +228,17 @@ function fireBossSkill(boss) {
         
         playSound('dismantle');
 
+        // 🔥 修改：縮小判定範圍 (15%)，只對爆炸點附近的英雄造成傷害
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position;
             const dy = hero.y - target.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
             
-            if (dist < 30) {
+            if (dist < 15) { 
                 hero.currentHp -= 300;
                 triggerHeroHit(hero.el);
                 showDamageText(hero.position, hero.y, `-300`, 'hero-dmg');
+                // 擊退
                 if(hero.position < boss.position) hero.position -= 5;
                 else hero.position += 5;
             }
@@ -349,13 +355,15 @@ function gameLoop() {
                         nearestEnemy.currentHp -= hero.atk;
                         showDamageText(nearestEnemy.position, nearestEnemy.y, `-${hero.atk}`, 'hero-dmg');
                         triggerHeroHit(nearestEnemy.el);
+                        // 🔥 累積傷害
+                        hero.totalDamage += hero.atk;
                     }
                 });
                 hero.lastAttackTime = now;
             }
         }
 
-        // 🔥 修改：防重疊推擠邏輯
+        // 英雄推擠邏輯
         for (let other of heroEntities) {
             if (other !== hero && other.currentHp > 0) {
                 const dx = hero.position - other.position;
@@ -520,5 +528,8 @@ function showDamageText(leftPercent, topPercent, text, colorClass) {
 }
 
 function endBattle(isWin) {
-    if(onBattleEndCallback) onBattleEndCallback(isWin, battleGold);
+    if(onBattleEndCallback) {
+        // 🔥 將目前的英雄狀態 (包含累積傷害) 傳出去
+        onBattleEndCallback(isWin, battleGold, heroEntities);
+    }
 }

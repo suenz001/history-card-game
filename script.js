@@ -1,11 +1,6 @@
-// main.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
-import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
-import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive } from './js/battle.js';
 
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
@@ -47,20 +42,154 @@ let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
+let battleSlots = new Array(9).fill(null);
+let heroEntities = []; 
+let isBattleActive = false;
+let battleGold = 0;
+let enemies = [];
+let deployTargetSlot = null; 
+let currentDifficulty = 'normal';
+let gameSpeed = 1;
+
+const WAVE_CONFIG = {
+    1: { count: 8, hp: 800, atk: 50 },
+    2: { count: 16, hp: 1500, atk: 100 },
+    3: { count: 30, hp: 3000, atk: 200 },
+    4: { count: 1, hp: 30000, atk: 500 } // Boss
+};
+let battleState = {
+    wave: 1, spawned: 0, totalToSpawn: 0, lastSpawnTime: 0, phase: 'IDLE', waitTimer: 0
+};
+let gameLoopId = null;
+
 let isBatchMode = false;
 let selectedBatchCards = new Set();
 let gachaQueue = [];
 let gachaIndex = 0;
+const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
+const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
 const SYSTEM_NOTIFICATIONS = [
     { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 } }
 ];
 
-// 初始化戰鬥模組
-initBattle();
-setOnBattleEnd(handleBattleEnd);
+const audioBgm = document.getElementById('bgm');
+const audioBattle = document.getElementById('bgm-battle');
+const sfxDraw = document.getElementById('sfx-draw');
+const sfxSsr = document.getElementById('sfx-ssr');
+const sfxReveal = document.getElementById('sfx-reveal');
+const sfxCoin = document.getElementById('sfx-coin');
+const sfxUpgrade = document.getElementById('sfx-upgrade');
 
-// 設定介面相關
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+try {
+    audioCtx = new AudioContext();
+} catch(e) { console.warn("Web Audio API not supported"); }
+
+let isBgmOn = true;
+let isSfxOn = true;
+let bgmVolume = 0.5;
+let sfxVolume = 1.0;
+
+if(audioBgm) { audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; }
+
+document.body.addEventListener('click', () => {
+    if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
+    if (isBgmOn && audioBgm && audioBgm.paused && audioBattle && audioBattle.paused) {
+        if(!document.getElementById('battle-screen').classList.contains('hidden')){
+            audioBattle.play().catch(()=>{});
+        } else {
+            audioBgm.play().catch(()=>{});
+        }
+    }
+}, { once: true });
+
+function playSound(type) {
+    if (!isSfxOn || !audioCtx) return;
+    try {
+        if (type === 'click') { synthesizeClick(); return; }
+        else if (type === 'dismantle') { synthesizeDismantle(); return; }
+        else if (type === 'inventory') { synthesizeInventory(); return; }
+        else if (type === 'poison') { synthesizePoison(); return; } 
+
+        let sound;
+        if (type === 'draw') sound = sfxDraw;
+        else if (type === 'ssr') sound = sfxSsr;
+        else if (type === 'reveal') sound = sfxReveal;
+        else if (type === 'coin') sound = sfxCoin;
+        else if (type === 'upgrade') sound = sfxUpgrade;
+        
+        if (sound) {
+            sound.volume = sfxVolume;
+            sound.currentTime = 0;
+            sound.play().catch(() => {});
+        }
+    } catch (e) { console.log("Audio Error", e); }
+}
+
+function synthesizeClick() {
+    if(!audioCtx) return;
+    const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
+    gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+}
+function synthesizeDismantle() {
+    if(!audioCtx) return;
+    const bufferSize = audioCtx.sampleRate * 0.5; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const gainNode = audioCtx.createGain();
+    gainNode.gain.setValueAtTime(sfxVolume * 0.8, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+    noise.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
+}
+function synthesizeInventory() {
+    if(!audioCtx) return;
+    const bufferSize = audioCtx.sampleRate * 0.3; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 800; 
+    const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+    noise.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination); noise.start();
+}
+function synthesizePoison() {
+    if(!audioCtx) return;
+    const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3);
+    gainNode.gain.setValueAtTime(sfxVolume * 0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+    osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+}
+
+const cardDatabase = [
+    { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝", attackType: "melee" },
+    { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王", attackType: "melee" },
+    { id: 3, name: "拿破崙", rarity: "SSR", atk: 1550, hp: 2000, title: "戰爭之神", attackType: "ranged" },
+    { id: 13, name: "成吉思汗", rarity: "SSR", atk: 1700, hp: 1900, title: "草原霸主", attackType: "ranged" },
+    { id: 14, name: "凱撒大帝", rarity: "SSR", atk: 1500, hp: 2300, title: "羅馬獨裁者", attackType: "melee" },
+    { id: 15, name: "漢尼拔", rarity: "SSR", atk: 1580, hp: 2100, title: "戰略之父", attackType: "melee" },
+    { id: 16, name: "埃及豔后", rarity: "SSR", atk: 1400, hp: 1800, title: "尼羅河女王", attackType: "ranged" },
+    { id: 17, name: "宮本武藏", rarity: "SSR", atk: 1800, hp: 1500, title: "二天一流", attackType: "melee" },
+    { id: 4, name: "諸葛亮", rarity: "SR", atk: 1200, hp: 1400, title: "臥龍先生", attackType: "ranged" },
+    { id: 5, name: "聖女貞德", rarity: "SR", atk: 900, hp: 1800, title: "奧爾良少女", attackType: "melee" },
+    { id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, title: "第六天魔王", attackType: "ranged" },
+    { id: 7, name: "愛因斯坦", rarity: "SR", atk: 1300, hp: 1000, title: "物理之父", attackType: "ranged" },
+    { id: 18, name: "關羽", rarity: "SR", atk: 1250, hp: 1500, title: "武聖", attackType: "melee" },
+    { id: 19, name: "華盛頓", rarity: "SR", atk: 1000, hp: 1600, title: "開國元勛", attackType: "ranged" },
+    { id: 20, name: "薩拉丁", rarity: "SR", atk: 1150, hp: 1450, title: "沙漠之鷹", attackType: "melee" },
+    { id: 21, name: "林肯", rarity: "SR", atk: 1100, hp: 1200, title: "解放者", attackType: "ranged" },
+    { id: 22, name: "源義經", rarity: "SR", atk: 1280, hp: 1100, title: "牛若丸", attackType: "melee" },
+    { id: 23, name: "南丁格爾", rarity: "SR", atk: 500, hp: 2000, title: "提燈天使", attackType: "ranged" },
+    { id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士", attackType: "melee" },
+    { id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, title: "龜甲陣列", attackType: "melee" },
+    { id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, title: "武士道", attackType: "melee" },
+    { id: 11, name: "維京海盜", rarity: "R", atk: 550, hp: 700, title: "狂戰士", attackType: "melee" },
+    { id: 12, name: "條頓騎士", rarity: "R", atk: 450, hp: 850, title: "鐵十字", attackType: "melee" },
+    { id: 24, name: "英國長弓兵", rarity: "R", atk: 600, hp: 300, title: "遠程打擊", attackType: "ranged" },
+    { id: 25, name: "蒙古騎兵", rarity: "R", atk: 550, hp: 500, title: "騎射手", attackType: "ranged" },
+    { id: 26, name: "忍者", rarity: "R", atk: 650, hp: 300, title: "影之軍團", attackType: "ranged" },
+    { id: 27, name: "十字軍", rarity: "R", atk: 400, hp: 800, title: "聖殿騎士", attackType: "melee" },
+    { id: 28, name: "祖魯戰士", rarity: "R", atk: 500, hp: 600, title: "長矛兵", attackType: "melee" },
+    { id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, title: "熱兵器", attackType: "ranged" },
+    { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged" }
+];
+
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
 const sfxToggle = document.getElementById('sfx-toggle');
@@ -85,14 +214,14 @@ if(document.getElementById('close-settings-btn')) {
 }
 
 if(bgmToggle) bgmToggle.addEventListener('change', (e) => {
-    setBgmState(e.target.checked);
-    if (e.target.checked) {
+    isBgmOn = e.target.checked;
+    if (isBgmOn) {
         if(!document.getElementById('battle-screen').classList.contains('hidden')){ audioBattle.play().catch(()=>{}); } else { audioBgm.play().catch(()=>{}); }
     } else { audioBgm.pause(); audioBattle.pause(); }
 });
-if(sfxToggle) sfxToggle.addEventListener('change', (e) => { setSfxState(e.target.checked); });
-if(bgmSlider) bgmSlider.addEventListener('input', (e) => { setBgmVolume(parseFloat(e.target.value)); });
-if(sfxSlider) sfxSlider.addEventListener('input', (e) => { setSfxVolume(parseFloat(e.target.value)); });
+if(sfxToggle) sfxToggle.addEventListener('change', (e) => { isSfxOn = e.target.checked; });
+if(bgmSlider) bgmSlider.addEventListener('input', (e) => { bgmVolume = parseFloat(e.target.value); audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; });
+if(sfxSlider) sfxSlider.addEventListener('input', (e) => { sfxVolume = parseFloat(e.target.value); });
 
 if(document.getElementById('settings-save-name-btn')) {
     document.getElementById('settings-save-name-btn').addEventListener('click', async () => {
@@ -417,7 +546,7 @@ if(document.getElementById('auto-star-btn')) {
 }
 
 function clearDeployment() {
-    setBattleSlots(new Array(9).fill(null));
+    battleSlots.fill(null);
     renderBattleSlots();
     updateStartButton();
     if (!document.getElementById('inventory-modal').classList.contains('hidden')) {
@@ -438,16 +567,38 @@ if(document.getElementById('inventory-clear-btn')) {
     });
 }
 
+// 難度選擇
+document.querySelectorAll('.difficulty-btn').forEach(btn => {
+    if(btn.getAttribute('data-diff') === currentDifficulty) {
+        btn.classList.add('active');
+    } else {
+        btn.classList.remove('active');
+    }
+
+    btn.addEventListener('click', (e) => {
+        if(isBattleActive) return; 
+        playSound('click');
+        document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        currentDifficulty = e.target.getAttribute('data-diff');
+        localStorage.setItem('battleDifficulty', currentDifficulty);
+    });
+});
+
 // 倍速按鈕
 if(document.getElementById('speed-btn')) {
     document.getElementById('speed-btn').addEventListener('click', () => {
         playSound('click');
-        let currentSpeed = 1; 
-        const btn = document.getElementById('speed-btn');
-        if(btn.innerText.includes("1x")) { currentSpeed = 2; btn.innerText = "⏩ 2x"; }
-        else if(btn.innerText.includes("2x")) { currentSpeed = 2.5; btn.innerText = "⏩ 2.5x"; }
-        else { currentSpeed = 1; btn.innerText = "⏩ 1x"; }
-        setGameSpeed(currentSpeed);
+        if(gameSpeed === 1) {
+            gameSpeed = 2;
+            document.getElementById('speed-btn').innerText = "⏩ 2x";
+        } else if(gameSpeed === 2) {
+            gameSpeed = 2.5;
+            document.getElementById('speed-btn').innerText = "⏩ 2.5x";
+        } else {
+            gameSpeed = 1;
+            document.getElementById('speed-btn').innerText = "⏩ 1x";
+        }
     });
 }
 
@@ -662,11 +813,12 @@ function updateBatchUI() { if (isBatchMode) { batchToggleBtn.classList.add('acti
 function toggleBatchSelection(card, cardDiv) { if (selectedBatchCards.has(card.docId)) { selectedBatchCards.delete(card.docId); cardDiv.classList.remove('is-selected'); } else { selectedBatchCards.add(card.docId); cardDiv.classList.add('is-selected'); } calculateBatchTotal(); }
 function calculateBatchTotal() { let totalGold = 0; let count = 0; allUserCards.forEach(card => { if (selectedBatchCards.has(card.docId)) { totalGold += DISMANTLE_VALUES[card.rarity] || 0; count++; } }); batchInfo.innerHTML = `已選 <span style="color:#e74c3c">${count}</span> 張，獲得 <span style="color:#f1c40f">${totalGold} G</span>`; if (count > 0) batchConfirmBtn.classList.remove('btn-disabled'); else batchConfirmBtn.classList.add('btn-disabled'); }
 if(batchConfirmBtn) batchConfirmBtn.addEventListener('click', async () => { playSound('click'); if (selectedBatchCards.size === 0) return; if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; let totalGold = 0; const deletePromises = []; const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); cardsToRemove.forEach(card => { totalGold += DISMANTLE_VALUES[card.rarity]; if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); }); try { batchConfirmBtn.innerText = "分解中..."; await Promise.all(deletePromises); playSound('dismantle'); setTimeout(() => playSound('coin'), 300); gold += totalGold; allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); await updateCurrencyCloud(); updateUIDisplay(); selectedBatchCards.clear(); isBatchMode = false; updateBatchUI(); filterInventory(currentFilterRarity); 
+// 更新數量
 updateInventoryCounts();
 alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
 // ==========================================
-// 整合戰鬥模組的回調函式
+// 🔥 戰鬥系統核心
 // ==========================================
 
 if(document.getElementById('enter-battle-mode-btn')) document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
@@ -679,85 +831,560 @@ if(document.getElementById('enter-battle-mode-btn')) document.getElementById('en
     updateStartButton();
 });
 
-let deployTargetSlot = null;
+function stopBattleMusic() {
+    audioBattle.pause();
+    if(isBgmOn) { audioBgm.currentTime = 0; audioBgm.play().catch(()=>{}); }
+}
 
-document.querySelectorAll('.defense-slot').forEach(slot => {
-    slot.addEventListener('click', () => {
-        if(isBattleActive) return; playSound('click'); const slotIndex = parseInt(slot.dataset.slot);
-        if (battleSlots[slotIndex]) { 
-            const newSlots = [...battleSlots];
-            newSlots[slotIndex] = null;
-            setBattleSlots(newSlots); 
-            renderBattleSlots(); 
-            updateStartButton(); 
-        } 
-        else {
-            deployTargetSlot = slotIndex; document.getElementById('inventory-title').innerText = "👇 請選擇出戰英雄"; document.getElementById('inventory-modal').classList.remove('hidden');
-            if(allUserCards.length === 0) loadInventory(currentUser.uid); else filterInventory('ALL'); 
-        }
-    });
+function resetBattleState() {
+    isBattleActive = false;
+    if(gameLoopId) cancelAnimationFrame(gameLoopId);
+    stopBattleMusic();
+    battleState.phase = 'IDLE'; 
+    enemies = [];
+    heroEntities = []; // 🔥 重置英雄實體
+    document.getElementById('enemy-container').innerHTML = '';
+    document.getElementById('hero-container').innerHTML = ''; // 清空英雄容器
+    document.getElementById('start-battle-btn').classList.remove('btn-disabled');
+    document.getElementById('start-battle-btn').innerText = "請先部署英雄";
+    document.getElementById('battle-screen').classList.add('hidden');
+    document.getElementById('wave-notification').classList.add('hidden');
+    
+    // 恢復格子透明度
+    document.querySelector('.lanes-wrapper').style.opacity = '1';
+}
+
+if(document.getElementById('retreat-btn')) document.getElementById('retreat-btn').addEventListener('click', () => { playSound('click'); resetBattleState(); });
+
+if(document.getElementById('start-battle-btn')) document.getElementById('start-battle-btn').addEventListener('click', () => {
+    if (isBattleActive) return;
+    playSound('click');
+    
+    isBattleActive = true;
+    // baseHp = 100; // 移除主堡
+    battleGold = 0;
+    enemies = [];
+    heroEntities = [];
+    document.getElementById('enemy-container').innerHTML = '';
+    document.getElementById('hero-container').innerHTML = '';
+    
+    // 讓部署區格子變淡
+    document.querySelector('.lanes-wrapper').style.opacity = '0.3';
+    
+    updateBattleUI();
+    
+    document.getElementById('start-battle-btn').classList.add('btn-disabled');
+    document.getElementById('start-battle-btn').innerText = "戰鬥進行中...";
+    
+    // 🔥 生成英雄
+    spawnHeroes();
+    startWave(1); 
+    gameLoop();
 });
 
-function deployHeroToSlot(card) {
-    const isAlreadyDeployed = battleSlots.some(s => s && s.docId === card.docId);
-    if(isAlreadyDeployed) { alert("這位英雄已經在場上了！"); return; }
-    if (deployTargetSlot !== null) {
-        const newSlots = [...battleSlots];
-        newSlots[deployTargetSlot] = { 
-            ...card, 
-            currentHp: card.hp, 
-            maxHp: card.hp, 
-            lastAttackTime: 0 
-        };
-        setBattleSlots(newSlots);
-        deployTargetSlot = null; document.getElementById('inventory-modal').classList.add('hidden'); renderBattleSlots(); updateStartButton();
-    }
-}
+// 🔥 新增：生成英雄實體 🔥
+function spawnHeroes() {
+    const container = document.getElementById('hero-container');
+    
+    const sortedSlots = [];
+    battleSlots.forEach((card, index) => {
+        if(card) sortedSlots.push({card, index});
+    });
+    
+    sortedSlots.forEach(({card, index}) => {
+        const lane = Math.floor(index / 3);
+        const col = index % 3; // 0, 1, 2
+        
+        // 修正：左右反轉 (右邊=前排)
+        const startPos = 5 + (col * 4); 
+        
+        // 初始位置
+        const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
 
-function renderBattleSlots() {
-    document.querySelectorAll('.defense-slot').forEach(slotDiv => {
-        const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
-        const placeholder = slotDiv.querySelector('.slot-placeholder'); 
+        const el = document.createElement('div');
+        el.className = `hero-unit ${card.rarity}`;
+        el.style.backgroundImage = `url(assets/cards/${card.id}.webp)`;
+        el.style.left = `${startPos}%`;
+        el.style.top = `${startY}%`;
+        el.innerHTML = `<div class="hero-hp-bar"><div style="width:100%"></div></div>`;
         
-        const existingCard = slotDiv.querySelector('.card'); if (existingCard) existingCard.remove();
-        
-        if (hero) {
-            placeholder.style.display = 'none'; 
-            slotDiv.classList.add('active');
-            const cardDiv = document.createElement('div'); const charPath = `assets/cards/${hero.id}.webp`; const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
-            cardDiv.className = `card ${hero.rarity}`; cardDiv.innerHTML = `<img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
-            slotDiv.appendChild(cardDiv); 
-        } else { 
-            placeholder.style.display = 'block'; 
-            slotDiv.classList.remove('active'); 
-        }
+        container.appendChild(el);
+
+        // 弱化遠攻體質
+        let finalHp = card.hp;
+        if(card.attackType === 'ranged') finalHp = Math.floor(card.hp * 0.7);
+
+        heroEntities.push({
+            ...card,
+            maxHp: finalHp,
+            currentHp: finalHp,
+            lane: lane,
+            position: startPos,
+            y: startY,
+            speed: 0.05,
+            range: card.attackType === 'ranged' ? 12 : 4, 
+            atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.6) : card.atk, 
+            lastAttackTime: 0,
+            el: el,
+            patrolDir: 1 
+        });
     });
 }
 
-function updateStartButton() {
-    const btn = document.getElementById('start-battle-btn'); const deployedCount = battleSlots.filter(s => s !== null).length;
-    if (deployedCount > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `⚔️ 開始戰鬥 (${deployedCount}/9)`; } 
-    else { btn.classList.add('btn-disabled'); btn.innerText = `請先部署英雄`; }
-}
-
+// 🔥 自動部署 🔥
 if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-deploy-btn').addEventListener('click', () => {
     if(isBattleActive) return;
     playSound('click');
     const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
-    const newSlots = new Array(9).fill(null);
+    battleSlots = new Array(9).fill(null);
     topHeroes.forEach((hero, index) => { 
-        newSlots[index] = { ...hero }; 
+        battleSlots[index] = { ...hero }; 
     });
-    setBattleSlots(newSlots);
     renderBattleSlots();
     updateStartButton();
 });
 
-// 🔥 修改：處理戰鬥結束 (從 battle.js 呼叫回來)
-async function handleBattleEnd(isWin, earnedGold, heroStats) {
-    let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
-    let finalGold = Math.floor(earnedGold * goldMultiplier);
+// 🔥 難度選擇 🔥
+document.querySelectorAll('.difficulty-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        if(isBattleActive) return; 
+        playSound('click');
+        document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        currentDifficulty = e.target.getAttribute('data-diff');
+    });
+});
+
+function startWave(waveNum) {
+    battleState.wave = waveNum;
+    battleState.spawned = 0;
+    battleState.totalToSpawn = WAVE_CONFIG[waveNum].count;
+    battleState.lastSpawnTime = Date.now();
+    battleState.phase = 'SPAWNING'; 
+    updateBattleUI();
     
+    const waveNotif = document.getElementById('wave-notification');
+    waveNotif.innerText = waveNum === 4 ? `😈 魔王來襲 😈` : `第 ${waveNum} 波 來襲!`;
+    waveNotif.classList.remove('hidden');
+    waveNotif.style.animation = 'none';
+    waveNotif.offsetHeight; 
+    waveNotif.style.animation = 'waveFade 2s forwards';
+}
+
+function spawnEnemy() {
+    const config = WAVE_CONFIG[battleState.wave];
+    
+    // Wave 4: 魔王 (全地圖隨機生成)
+    if(battleState.wave === 4) {
+        // 全地圖隨機座標 (保留一點邊距)
+        const bossX = 10 + Math.random() * 80; 
+        const bossY = 10 + Math.random() * 80;
+
+        const boss = {
+             id: Date.now(),
+             maxHp: 30000, currentHp: 30000, atk: 500,
+             lane: -1, 
+             position: bossX, 
+             y: bossY,
+             speed: 0.02, 
+             el: null, lastAttackTime: 0,
+             isBoss: true
+        };
+        const el = document.createElement('div'); el.className = 'enemy-unit boss'; el.innerHTML = `😈<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
+        el.style.top = `${boss.y}%`; el.style.left = `${boss.position}%`;
+        document.getElementById('enemy-container').appendChild(el); boss.el = el; enemies.push(boss);
+        return;
+    }
+
+    let multHp = 1, multAtk = 1;
+    if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
+    else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
+
+    // 普通怪物生成區域邏輯
+    // X軸: 中間(約40%) 到 終點(95%) 之間隨機
+    const spawnX = 40 + (Math.random() * 55);
+    
+    // Y軸: 上方區域(10-40) 或 下方區域(60-90)
+    let spawnY;
+    if (Math.random() < 0.5) {
+        spawnY = 10 + Math.random() * 30; // 上
+    } else {
+        spawnY = 60 + Math.random() * 30; // 下
+    }
+    
+    const enemy = { 
+        id: Date.now(), 
+        maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, 
+        lane: -1, 
+        position: spawnX, 
+        y: spawnY, 
+        speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 
+    };
+    
+    const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
+    el.style.top = `${enemy.y}%`;
+    el.style.left = `${enemy.position}%`; 
+    
+    document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
+}
+
+// 🔥 魔王技能 (先發射火球再爆炸) 🔥
+function fireBossSkill(boss) {
+    const projectile = document.createElement('div');
+    projectile.className = 'boss-projectile';
+    projectile.style.left = `${boss.position}%`;
+    projectile.style.top = `${boss.y}%`;
+    
+    // 🔥 修改：讓投射物變大，符合範圍攻擊視覺
+    projectile.style.width = '80px';
+    projectile.style.height = '80px';
+    projectile.style.fontSize = '3em'; // 讓光暈或內容物變大
+    
+    document.querySelector('.battle-field-container').appendChild(projectile);
+
+    let target = heroEntities[Math.floor(Math.random() * heroEntities.length)];
+    if (!target) target = { position: 20, y: 50 };
+
+    void projectile.offsetWidth;
+
+    projectile.style.left = `${target.position}%`;
+    projectile.style.top = `${target.y}%`;
+
+    setTimeout(() => {
+        projectile.remove();
+        
+        const effect = document.createElement('div');
+        effect.className = 'boss-aoe-effect';
+        effect.style.left = `${target.position}%`;
+        effect.style.top = `${target.y}%`;
+        document.querySelector('.battle-field-container').appendChild(effect);
+        setTimeout(() => effect.remove(), 600);
+        
+        playSound('dismantle');
+
+        heroEntities.forEach(hero => {
+            const dx = hero.position - target.position;
+            const dy = hero.y - target.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < 30) { // 範圍 30
+                hero.currentHp -= 300;
+                triggerHeroHit(hero.el);
+                showDamageText(hero.position, hero.y, `-300`, 'hero-dmg');
+                
+                // 擊退效果
+                if(hero.position < boss.position) hero.position -= 5;
+                else hero.position += 5;
+            }
+        });
+
+    }, 500); 
+}
+
+// 🔥 發射飛行道具 (加入傷害飄字回調) 🔥
+function fireProjectile(startEl, targetEl, type, onHitCallback) {
+    if(!startEl || !targetEl) return;
+    
+    const projectile = document.createElement('div');
+    projectile.className = 'projectile';
+    
+    if (type === 'arrow') projectile.innerText = '🏹';
+    else if (type === 'fireball') projectile.innerText = '🔥';
+    else if (type === 'sword') projectile.innerText = '🗡️'; 
+    else projectile.innerText = '⚔️'; 
+    
+    const containerRect = document.querySelector('.battle-field-container').getBoundingClientRect();
+    const startRect = startEl.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+
+    const startX = startRect.left - containerRect.left + startRect.width / 2;
+    const startY = startRect.top - containerRect.top + startRect.height / 2;
+    const endX = targetRect.left - containerRect.left + targetRect.width / 2;
+    const endY = targetRect.top - containerRect.top + targetRect.height / 2;
+
+    projectile.style.left = `${startX}px`;
+    projectile.style.top = `${startY}px`;
+
+    document.querySelector('.battle-field-container').appendChild(projectile);
+
+    void projectile.offsetWidth; 
+
+    projectile.style.left = `${endX}px`;
+    projectile.style.top = `${endY}px`;
+
+    setTimeout(() => {
+        projectile.remove();
+        if(onHitCallback) {
+            playSound('dismantle'); // 命中音效
+            onHitCallback();
+        }
+    }, 300);
+}
+
+// 修正受擊觸發 logic
+function triggerHeroHit(el) {
+    if(el) {
+        el.classList.remove('taking-damage');
+        void el.offsetWidth; 
+        el.classList.add('taking-damage');
+    }
+}
+
+let baseAttackCooldown = 0;
+
+function gameLoop() {
+    if (!isBattleActive) return;
+    const now = Date.now();
+
+    if (battleState.phase === 'SPAWNING') {
+        if (battleState.spawned < battleState.totalToSpawn) {
+            if (now - battleState.lastSpawnTime > 1500 / gameSpeed) { 
+                spawnEnemy();
+                battleState.spawned++;
+                battleState.lastSpawnTime = now;
+            }
+        } else { battleState.phase = 'COMBAT'; }
+    } 
+    else if (battleState.phase === 'COMBAT') {
+        if (enemies.length === 0) {
+            battleState.phase = 'WAITING';
+            battleState.waitTimer = now;
+            if (battleState.wave < 4) showDamageText(50, 40, "3秒後 下一波...", '');
+        }
+    }
+    else if (battleState.phase === 'WAITING') {
+        if (now - battleState.waitTimer > 3000 / gameSpeed) {
+            if (battleState.wave < 4) { startWave(battleState.wave + 1); } 
+            else { endBattle(true); return; } 
+        }
+    }
+
+// 🔥 英雄邏輯 (Active Hunting)
+    heroEntities.sort((a, b) => b.position - a.position);
+
+    heroEntities.forEach((hero, hIndex) => {
+        if (hero.currentHp <= 0) return; 
+
+        let blocked = false;
+        let pushX = 0;
+        let pushY = 0;
+        
+        let nearestEnemy = null;
+        let minTotalDist = 9999; 
+
+        // 1. 尋找最近敵人
+        enemies.forEach(enemy => {
+            if (enemy.currentHp > 0) {
+                const dx = enemy.position - hero.position;
+                const dy = enemy.y - hero.y; 
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist < minTotalDist) {
+                    minTotalDist = dist;
+                    nearestEnemy = enemy;
+                }
+            }
+        });
+
+        // 2. 攻擊判定
+        if (nearestEnemy && minTotalDist <= hero.range) {
+            blocked = true; 
+            if (now - hero.lastAttackTime > 2000 / gameSpeed) {
+                const heroType = hero.attackType || 'melee';
+                const projType = heroType === 'ranged' ? 'arrow' : 'sword';
+                
+                fireProjectile(hero.el, nearestEnemy.el, projType, () => {
+                    if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
+                        nearestEnemy.currentHp -= hero.atk;
+                        showDamageText(nearestEnemy.position, nearestEnemy.y, `-${hero.atk}`, 'hero-dmg');
+                        triggerHeroHit(nearestEnemy.el);
+                    }
+                });
+                hero.lastAttackTime = now;
+            }
+        }
+
+        // 3. 🔥 英雄防重疊推擠邏輯 (Collision Push)
+        for (let other of heroEntities) {
+            if (other !== hero && other.currentHp > 0) {
+                const dx = hero.position - other.position;
+                const dy = hero.y - other.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                const minDist = 5; // 設定最小保持距離
+
+                // 如果太近，產生推力
+                if (dist < minDist && dist > 0.1) {
+                    const force = (minDist - dist) / minDist; // 距離越近推力越大
+                    const pushStrength = 0.5 * gameSpeed; // 推力係數
+                    
+                    // 計算單位向量並施加推力
+                    pushX += (dx / dist) * force * pushStrength;
+                    pushY += (dy / dist) * force * pushStrength;
+                } else if (dist <= 0.1) {
+                    // 完全重疊時的隨機擾動
+                    pushX += (Math.random() - 0.5);
+                    pushY += (Math.random() - 0.5);
+                }
+            }
+        }
+
+        // 4. 移動邏輯
+        if (!blocked) {
+             if (nearestEnemy) {
+                 // 追殺
+                 if (hero.position < nearestEnemy.position - 2) hero.position += hero.speed * gameSpeed;
+                 else if (hero.position > nearestEnemy.position + 2) hero.position -= hero.speed * gameSpeed;
+                 
+                 if (hero.y < nearestEnemy.y) hero.y += 0.15 * gameSpeed;
+                 else if (hero.y > nearestEnemy.y) hero.y -= 0.15 * gameSpeed;
+             } else {
+                 // 巡邏
+                 if (hero.position >= 80) hero.patrolDir = -1;
+                 if (hero.position <= 10) hero.patrolDir = 1;
+                 if(!hero.patrolDir) hero.patrolDir = 1;
+                 
+                 hero.position += hero.speed * hero.patrolDir * gameSpeed;
+             }
+        }
+        
+        // 5. 應用推擠力與位置更新
+        hero.position += pushX;
+        hero.y += pushY;
+
+        // 邊界限制
+        hero.y = Math.max(10, Math.min(90, hero.y));
+        hero.position = Math.max(0, Math.min(100, hero.position));
+
+        // 更新 UI
+        if (hero.el) {
+            hero.el.style.left = `${hero.position}%`;
+            hero.el.style.top = `${hero.y}%`; 
+            hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
+            
+            if (nearestEnemy && nearestEnemy.position < hero.position) {
+                 hero.el.style.transform = 'translateY(-50%) scaleX(-1)';
+            } else {
+                 hero.el.style.transform = 'translateY(-50%) scaleX(1)';
+            }
+        }
+    });
+
+    // 🔥 敵人邏輯 (同理：全方位索敵 + 流體移動)
+    enemies.sort((a, b) => a.position - b.position);
+
+    enemies.forEach((enemy, eIndex) => {
+        if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) {
+            fireBossSkill(enemy);
+            enemy.lastAttackTime = now;
+        }
+
+        let blocked = false;
+        let dodgeY = 0;
+        
+        let nearestHero = null;
+        let minTotalDist = 9999;
+
+        heroEntities.forEach(hero => {
+            if (hero.currentHp > 0) {
+                const dx = enemy.position - hero.position;
+                const dy = enemy.y - hero.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < minTotalDist) {
+                    minTotalDist = dist;
+                    nearestHero = hero;
+                }
+            }
+        });
+
+        // 攻擊
+        if (!enemy.isBoss && nearestHero && minTotalDist <= 3) { 
+            blocked = true;
+            if (now - enemy.lastAttackTime > 800 / gameSpeed) {
+                fireProjectile(enemy.el, nearestHero.el, 'fireball', () => {
+                    if (nearestHero.el && nearestHero.currentHp > 0) {
+                        nearestHero.currentHp -= enemy.atk;
+                        triggerHeroHit(nearestHero.el);
+                        playSound('poison');
+                        showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
+                    }
+                });
+                enemy.lastAttackTime = now;
+            }
+        }
+
+        // 防追撞
+        for (let other of enemies) {
+            if (other !== enemy && other.currentHp > 0) {
+                let dist = Math.abs(enemy.position - other.position);
+                if (dist < 2.5 && Math.abs(other.y - enemy.y) < 5) {
+                        let jitter = (Math.random() * 0.2) + 0.1;
+                        if (enemy.y <= other.y) dodgeY -= jitter;
+                        else dodgeY += jitter;
+                }
+            }
+        }
+
+        // 移動 & 索敵
+        if (!blocked) { 
+             if (nearestHero) {
+                 if (enemy.position > nearestHero.position + 2) enemy.position -= enemy.speed * gameSpeed;
+                 else if (enemy.position < nearestHero.position - 2) enemy.position += enemy.speed * gameSpeed;
+                 
+                 if (enemy.y < nearestHero.y) enemy.y += 0.15 * gameSpeed;
+                 else if (enemy.y > nearestHero.y) enemy.y -= 0.15 * gameSpeed;
+             } else {
+                 if (enemy.position > 10) enemy.position -= enemy.speed * gameSpeed;
+             }
+        }
+        
+        enemy.y += dodgeY * gameSpeed;
+        
+        enemy.y = Math.max(10, Math.min(90, enemy.y));
+        enemy.position = Math.max(0, Math.min(100, enemy.position));
+
+        if (enemy.el) {
+            enemy.el.style.left = `${enemy.position}%`;
+            enemy.el.style.top = `${enemy.y}%`;
+            enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
+        }
+
+        if (enemy.currentHp <= 0) {
+            enemy.el.remove(); enemies.splice(eIndex, 1);
+            battleGold += 50 + (battleState.wave * 10);
+            updateBattleUI(); 
+            showDamageText(enemy.position, enemy.y, `+50G`, 'gold-text'); 
+            playSound('dismantle');
+        } 
+    });
+
+    if (enemies.length === 0 && battleState.phase === 'COMBAT') {
+        // Wait
+    }
+
+    gameLoopId = requestAnimationFrame(gameLoop);
+}
+
+function updateBattleUI() {
+    document.getElementById('battle-gold').innerText = battleGold; 
+    document.getElementById('wave-count').innerText = battleState.wave;
+    document.getElementById('hero-count-display').innerText = heroEntities.length;
+}
+
+function showDamageText(leftPercent, topPercent, text, colorClass) {
+    const el = document.createElement('div'); 
+    el.className = `damage-text ${colorClass || ''}`; 
+    el.innerText = text;
+    el.style.left = `${leftPercent}%`; 
+    el.style.top = `${topPercent}%`; 
+    document.querySelector('.battle-field-container').appendChild(el); 
+    setTimeout(() => el.remove(), 800);
+}
+
+async function endBattle(isWin) {
+    let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
+    let finalGold = Math.floor(battleGold * goldMultiplier);
+    
+    // 💎 新增：通關獎勵
     let gemReward = 0;
     if (isWin) {
         if (currentDifficulty === 'easy') gemReward = 200; 
@@ -792,37 +1419,57 @@ async function handleBattleEnd(isWin, earnedGold, heroStats) {
     gems += gemReward;
     await updateCurrencyCloud(); 
     updateUIDisplay();
-
-    // 🔥 生成傷害排行榜 (DPS Meter)
-    const dpsContainer = document.getElementById('dps-chart');
-    dpsContainer.innerHTML = "";
-    
-    if (heroStats && heroStats.length > 0) {
-        // 排序：傷害高的在上面
-        const sortedHeroes = [...heroStats].sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
-        const maxDmg = sortedHeroes[0].totalDamage || 1; // 避免除以 0
-        
-        sortedHeroes.forEach(h => {
-            if(!h.totalDamage) h.totalDamage = 0;
-            const percent = (h.totalDamage / maxDmg) * 100;
-            
-            const row = document.createElement('div');
-            row.className = 'dps-row';
-            row.innerHTML = `
-                <div class="dps-icon" style="background-image: url('assets/cards/${h.id}.webp');"></div>
-                <div class="dps-bar-container">
-                    <div class="dps-info">
-                        <span>${h.name}</span>
-                        <span>${h.totalDamage}</span>
-                    </div>
-                    <div class="dps-bar-bg">
-                        <div class="dps-bar-fill" style="width: ${percent}%;"></div>
-                    </div>
-                </div>
-            `;
-            dpsContainer.appendChild(row);
-        });
-    }
     
     btn.onclick = () => { playSound('click'); modal.classList.add('hidden'); resetBattleState(); };
+}
+
+document.querySelectorAll('.defense-slot').forEach(slot => {
+    slot.addEventListener('click', () => {
+        if(isBattleActive) return; playSound('click'); const slotIndex = parseInt(slot.dataset.slot);
+        if (battleSlots[slotIndex]) { battleSlots[slotIndex] = null; renderBattleSlots(); updateStartButton(); } 
+        else {
+            deployTargetSlot = slotIndex; document.getElementById('inventory-title').innerText = "👇 請選擇出戰英雄"; document.getElementById('inventory-modal').classList.remove('hidden');
+            if(allUserCards.length === 0) loadInventory(currentUser.uid); else filterInventory('ALL'); 
+        }
+    });
+});
+
+function deployHeroToSlot(card) {
+    const isAlreadyDeployed = battleSlots.some(s => s && s.docId === card.docId);
+    if(isAlreadyDeployed) { alert("這位英雄已經在場上了！"); return; }
+    if (deployTargetSlot !== null) {
+        battleSlots[deployTargetSlot] = { 
+            ...card, 
+            currentHp: card.hp, 
+            maxHp: card.hp, 
+            lastAttackTime: 0 
+        };
+        deployTargetSlot = null; document.getElementById('inventory-modal').classList.add('hidden'); renderBattleSlots(); updateStartButton();
+    }
+}
+
+function renderBattleSlots() {
+    document.querySelectorAll('.defense-slot').forEach(slotDiv => {
+        const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
+        const placeholder = slotDiv.querySelector('.slot-placeholder'); 
+        
+        const existingCard = slotDiv.querySelector('.card'); if (existingCard) existingCard.remove();
+        
+        if (hero) {
+            placeholder.style.display = 'none'; 
+            slotDiv.classList.add('active');
+            const cardDiv = document.createElement('div'); const charPath = `assets/cards/${hero.id}.webp`; const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
+            cardDiv.className = `card ${hero.rarity}`; cardDiv.innerHTML = `<img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
+            slotDiv.appendChild(cardDiv); 
+        } else { 
+            placeholder.style.display = 'block'; 
+            slotDiv.classList.remove('active'); 
+        }
+    });
+}
+
+function updateStartButton() {
+    const btn = document.getElementById('start-battle-btn'); const deployedCount = battleSlots.filter(s => s !== null).length;
+    if (deployedCount > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `⚔️ 開始戰鬥 (${deployedCount}/9)`; } 
+    else { btn.classList.add('btn-disabled'); btn.innerText = `請先部署英雄`; }
 }
