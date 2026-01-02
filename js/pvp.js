@@ -54,10 +54,19 @@ export function initPvp(database, user, inventory, openInventoryCallback) {
         document.getElementById('pvp-arena-modal').classList.add('hidden');
     });
 
-    document.getElementById('search-again-btn').addEventListener('click', () => {
-        playSound('click');
-        searchOpponent();
-    });
+    // 搜尋對手 (這裡的按鈕現在會重新執行搜尋流程)
+    if(document.getElementById('search-again-btn')) {
+        document.getElementById('search-again-btn').remove(); // 移除舊按鈕事件綁定 (如果有)
+    }
+
+    // 🔥 返回列表按鈕
+    const backBtn = document.getElementById('back-to-list-btn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            playSound('click');
+            resetToOpponentList();
+        });
+    }
 
     // 🔥 綁定開戰按鈕
     document.getElementById('start-pvp-battle-btn').addEventListener('click', () => {
@@ -89,7 +98,7 @@ async function openPvpModal() {
     updateSaveButtonState();
 }
 
-// 🔥 新增：當 main.js 選擇好卡片後，呼叫此函式寫入 PVP 欄位
+// 🔥 當 main.js 選擇好卡片後，呼叫此函式寫入 PVP 欄位
 // type = 'defense' (防守) 或 'attack' (進攻)
 export function setPvpHero(slotIndex, card, type) {
     const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
@@ -182,13 +191,140 @@ async function saveDefenseTeam() {
 
 function openPvpArena() {
     if (!currentUser) return alert("請先登入");
-    document.getElementById('pvp-arena-modal').classList.remove('hidden');
     
-    // 🔥 自動讀取上次的攻擊隊伍
-    loadLastAttackTeam();
+    // 初始化 UI 狀態：顯示 Loading，隱藏其他
+    document.getElementById('pvp-arena-modal').classList.remove('hidden');
+    document.getElementById('pvp-loading').classList.remove('hidden');
+    document.getElementById('pvp-opponent-list-view').classList.add('hidden');
+    document.getElementById('pvp-match-content').classList.add('hidden');
 
     searchOpponent();
 }
+
+function resetToOpponentList() {
+    document.getElementById('pvp-match-content').classList.add('hidden');
+    document.getElementById('pvp-opponent-list-view').classList.remove('hidden');
+    currentEnemyData = null; // 清除選擇
+}
+
+// 🔥 修改：搜尋邏輯 (高 10 名 + 低 10 名)
+async function searchOpponent() {
+    const loadingDiv = document.getElementById('pvp-loading');
+    const listView = document.getElementById('pvp-opponent-list-view');
+    const listContainer = document.getElementById('pvp-opponent-list');
+
+    listContainer.innerHTML = ""; // 清空列表
+
+    try {
+        const myPower = currentUser.combatPower || 0;
+
+        // 查詢比我強的 10 個 (排除自己比較麻煩，所以多抓一點再濾)
+        const qHigh = query(
+            collection(db, "users"), 
+            where("combatPower", ">=", myPower), 
+            orderBy("combatPower", "asc"), 
+            limit(15)
+        );
+
+        // 查詢比我弱的 10 個
+        const qLow = query(
+            collection(db, "users"), 
+            where("combatPower", "<", myPower), 
+            orderBy("combatPower", "desc"), 
+            limit(15)
+        );
+
+        const [snapHigh, snapLow] = await Promise.all([getDocs(qHigh), getDocs(qLow)]);
+        
+        let candidates = [];
+        
+        // 合併結果並過濾
+        const processDoc = (doc) => {
+            if (doc.id === currentUser.uid) return; // 排除自己
+            const data = doc.data();
+            // 必須有防守陣容
+            if (data.defenseTeam && data.defenseTeam.length > 0) {
+                candidates.push({ ...data, uid: doc.id });
+            }
+        };
+
+        snapHigh.forEach(processDoc);
+        snapLow.forEach(processDoc);
+
+        // 去除重複 (理論上 >= 和 < 不會重複，但若有正好等於 myPower 的可能出現在 High)
+        candidates = candidates.filter((item, index, self) => 
+            index === self.findIndex((t) => (t.uid === item.uid))
+        );
+
+        // 排序：戰力由高到低
+        candidates.sort((a, b) => b.combatPower - a.combatPower);
+
+        // 截取前 20 個顯示
+        candidates = candidates.slice(0, 20);
+
+        if (candidates.length === 0) { 
+            listContainer.innerHTML = "<p>目前找不到合適的對手，請稍後再試！</p>";
+        } else {
+            renderOpponentList(candidates);
+        }
+        
+        // 完成，切換 UI
+        loadingDiv.classList.add('hidden');
+        listView.classList.remove('hidden');
+
+    } catch (e) { 
+        console.error("搜尋對手失敗", e); 
+        alert("搜尋失敗，請檢查網路"); 
+        document.getElementById('pvp-arena-modal').classList.add('hidden'); 
+    }
+}
+
+// 🔥 新增：渲染對手列表
+function renderOpponentList(opponents) {
+    const container = document.getElementById('pvp-opponent-list');
+    const myPower = currentUser.combatPower || 0;
+
+    opponents.forEach(opp => {
+        const div = document.createElement('div');
+        div.className = 'opponent-list-item';
+
+        const isStronger = opp.combatPower > myPower;
+        const tag = isStronger ? `<span class="opp-tag tag-strong">強敵</span>` : `<span class="opp-tag tag-weak">可欺</span>`;
+        const diff = opp.combatPower - myPower;
+        const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
+
+        div.innerHTML = `
+            <div class="opp-info">
+                <div class="opp-name">${opp.name || "神秘客"} ${tag}</div>
+                <div class="opp-power">🔥 戰力: ${opp.combatPower} (${diffStr})</div>
+            </div>
+            <button class="btn-danger challenge-btn">挑戰</button>
+        `;
+
+        div.querySelector('.challenge-btn').addEventListener('click', () => {
+            playSound('click');
+            selectOpponent(opp);
+        });
+
+        container.appendChild(div);
+    });
+}
+
+// 🔥 新增：選擇對手後的處理
+function selectOpponent(enemyData) {
+    currentEnemyData = enemyData;
+    
+    // 隱藏列表，顯示備戰介面
+    document.getElementById('pvp-opponent-list-view').classList.add('hidden');
+    document.getElementById('pvp-match-content').classList.remove('hidden');
+
+    // 渲染雙方資料
+    renderMatchup();
+    
+    // 讀取我方上次陣容
+    loadLastAttackTeam();
+}
+
 
 async function loadLastAttackTeam() {
     if(!currentUser) return;
@@ -214,30 +350,6 @@ async function loadLastAttackTeam() {
     } catch(e) {
         console.warn("讀取進攻陣容失敗", e);
     }
-}
-
-
-async function searchOpponent() {
-    const loadingDiv = document.getElementById('pvp-loading'); const contentDiv = document.getElementById('pvp-match-content');
-    loadingDiv.classList.remove('hidden'); contentDiv.classList.add('hidden');
-    try {
-        // 搜尋邏輯：找戰力前 20 名，且不是自己，且有防守陣容
-        const q = query(collection(db, "users"), orderBy("combatPower", "desc"), limit(20));
-        const querySnapshot = await getDocs(q);
-        const candidates = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (doc.id !== currentUser.uid && data.defenseTeam && data.defenseTeam.length > 0) { candidates.push({ ...data, uid: doc.id }); }
-        });
-        if (candidates.length === 0) { alert("目前找不到其他對手，請稍後再試！"); document.getElementById('pvp-arena-modal').classList.add('hidden'); return; }
-        
-        // 隨機選一個
-        const randomIndex = Math.floor(Math.random() * candidates.length);
-        currentEnemyData = candidates[randomIndex];
-        
-        // 模擬一點延遲
-        setTimeout(() => { renderMatchup(); loadingDiv.classList.add('hidden'); contentDiv.classList.remove('hidden'); playSound('reveal'); }, 1500);
-    } catch (e) { console.error("搜尋對手失敗", e); alert("搜尋失敗，請檢查網路"); document.getElementById('pvp-arena-modal').classList.add('hidden'); }
 }
 
 function renderMatchup() {
@@ -284,7 +396,6 @@ async function startActualPvp() {
                 teamData.push({ 
                     id: hero.id, docId: hero.docId, 
                     slotIndex: index 
-                    // 只存 ID 和位置，讀取時再對照背包，確保數據最新
                 }); 
             } 
         });
