@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=35">
+    <link rel="stylesheet" href="style.css?v=40">
 </head>
 <body>
 
@@ -97,21 +97,22 @@
                 <div class="base-health-bar"><div id="base-hp-bar" style="width: 100%;"></div></div>
             </div>
 
-            <div class="lanes-wrapper">
-                <div class="lane-row" id="lane-0">
-                    <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
-                    <div class="defense-slot" data-slot="1"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
-                    <div class="defense-slot" data-slot="2"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
+            <div id="hero-container"></div>
+
+            <div class="lanes-wrapper" style="opacity: 0.3;"> <div class="lane-row" id="lane-0">
+                    <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
                 </div>
                 <div class="lane-row" id="lane-1">
-                    <div class="defense-slot" data-slot="3"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
-                    <div class="defense-slot" data-slot="4"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
-                    <div class="defense-slot" data-slot="5"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
+                    <div class="defense-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
                 </div>
                 <div class="lane-row" id="lane-2">
-                    <div class="defense-slot" data-slot="6"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
-                    <div class="defense-slot" data-slot="7"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
-                    <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div><div class="hero-hp-bar hidden"><div></div></div></div>
+                    <div class="defense-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
                 </div>
             </div>
 
@@ -244,6 +245,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=35"></script>
+    <script type="module" src="script.js?v=40"></script>
 </body>
 </html>

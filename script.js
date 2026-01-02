@@ -46,6 +46,7 @@ let currentSortMethod = 'time_desc';
 
 // 戰鬥變數
 let battleSlots = new Array(9).fill(null);
+let heroEntities = []; // 🔥 新增：移動中的英雄實體
 let isBattleActive = false;
 let battleGold = 0;
 let baseHp = 100;
@@ -687,11 +688,16 @@ function resetBattleState() {
     stopBattleMusic();
     battleState.phase = 'IDLE'; 
     enemies = [];
+    heroEntities = []; // 🔥 重置英雄實體
     document.getElementById('enemy-container').innerHTML = '';
+    document.getElementById('hero-container').innerHTML = ''; // 清空英雄容器
     document.getElementById('start-battle-btn').classList.remove('btn-disabled');
     document.getElementById('start-battle-btn').innerText = "請先部署英雄";
     document.getElementById('battle-screen').classList.add('hidden');
     document.getElementById('wave-notification').classList.add('hidden');
+    
+    // 恢復格子透明度
+    document.querySelector('.lanes-wrapper').style.opacity = '1';
 }
 
 if(document.getElementById('retreat-btn')) document.getElementById('retreat-btn').addEventListener('click', () => { playSound('click'); resetBattleState(); });
@@ -704,20 +710,63 @@ if(document.getElementById('start-battle-btn')) document.getElementById('start-b
     baseHp = 100;
     battleGold = 0;
     enemies = [];
+    heroEntities = [];
     document.getElementById('enemy-container').innerHTML = '';
+    document.getElementById('hero-container').innerHTML = '';
     
-    battleSlots.forEach(hero => { 
-        if(hero) { hero.currentHp = hero.hp; hero.maxHp = hero.hp; hero.lastAttackTime = 0; } 
-    });
-    renderBattleSlots();
+    // 讓部署區格子變淡
+    document.querySelector('.lanes-wrapper').style.opacity = '0.3';
+    
     updateBattleUI();
     
     document.getElementById('start-battle-btn').classList.add('btn-disabled');
     document.getElementById('start-battle-btn').innerText = "戰鬥進行中...";
     
+    // 🔥 生成英雄
+    spawnHeroes();
     startWave(1); 
     gameLoop();
 });
+
+// 🔥 新增：生成英雄實體 🔥
+function spawnHeroes() {
+    const container = document.getElementById('hero-container');
+    battleSlots.forEach((card, index) => {
+        if (!card) return;
+        
+        // 根據 slot 計算初始位置 (Lane 0, 1, 2)
+        const lane = Math.floor(index / 3);
+        const col = index % 3; // 0, 1, 2 (前面, 中間, 後面)
+        
+        // 初始位置偏移：讓他們稍微錯開，不要全疊在一起
+        // Front (0) starts at 12%, Mid (1) at 9%, Back (2) at 6%
+        const startPos = 12 - (col * 3); 
+        
+        // 計算垂直位置 Lane 0: 15%, Lane 1: 50%, Lane 2: 85%
+        const topPos = (lane === 0 ? 15 : (lane === 1 ? 50 : 85));
+
+        const el = document.createElement('div');
+        el.className = `hero-unit ${card.rarity}`;
+        el.style.backgroundImage = `url(assets/cards/${card.id}.webp)`;
+        el.style.left = `${startPos}%`;
+        el.style.top = `${topPos}%`;
+        el.innerHTML = `<div class="hero-hp-bar"><div style="width:100%"></div></div>`;
+        
+        container.appendChild(el);
+
+        heroEntities.push({
+            ...card, // 繼承卡片數值 (atk, hp, etc)
+            maxHp: card.hp,
+            currentHp: card.hp,
+            lane: lane,
+            position: startPos,
+            speed: 0.05, // 移動速度
+            range: card.attackType === 'ranged' ? 25 : 10, // 射程
+            lastAttackTime: 0,
+            el: el
+        });
+    });
+}
 
 // 🔥 自動部署 🔥
 if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-deploy-btn').addEventListener('click', () => {
@@ -726,12 +775,7 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
     const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
     battleSlots = new Array(9).fill(null);
     topHeroes.forEach((hero, index) => { 
-        battleSlots[index] = { 
-            ...hero, 
-            currentHp: hero.hp, 
-            maxHp: hero.hp, 
-            lastAttackTime: 0 
-        }; 
+        battleSlots[index] = { ...hero }; 
     });
     renderBattleSlots();
     updateStartButton();
@@ -774,7 +818,7 @@ function spawnEnemy() {
     const enemy = { 
         id: Date.now(), 
         maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, 
-        lane: lane, position: 100, speed: 0.1 + (battleState.wave * 0.02), el: null, lastAttackTime: 0 
+        lane: lane, position: 100, speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 
     };
     
     const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
@@ -819,12 +863,11 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     }, 300);
 }
 
-function triggerHeroHit(slotIdx) {
-    const slotDiv = document.querySelector(`.defense-slot[data-slot="${slotIdx}"] .card`);
-    if(slotDiv) {
-        slotDiv.classList.remove('taking-damage');
-        void slotDiv.offsetWidth; 
-        slotDiv.classList.add('taking-damage');
+function triggerHeroHit(el) {
+    if(el) {
+        el.classList.remove('taking-damage');
+        void el.offsetWidth; 
+        el.classList.add('taking-damage');
     }
 }
 
@@ -870,72 +913,109 @@ function gameLoop() {
         }
     }
 
-    enemies.forEach((enemy, eIndex) => {
+    // 🔥 英雄邏輯 (移動 + 攻擊)
+    heroEntities.forEach((hero, hIndex) => {
+        if (hero.currentHp <= 0) return; // 已死亡
+
         let blocked = false;
-        const startSlot = enemy.lane * 3;
-        const endSlot = startSlot + 2;
+        let target = null;
 
-        for(let i = startSlot; i <= endSlot; i++) {
-             if (battleSlots[i] && battleSlots[i].currentHp > 0) {
-                let slotPos = 0;
-                if(i % 3 === 0) slotPos = 25; if(i % 3 === 1) slotPos = 50; if(i % 3 === 2) slotPos = 75; 
+        // 尋找同一路的最近敵人
+        let nearestEnemy = null;
+        let minDist = 999;
 
-                // 怪物攻擊
-                if (enemy.position <= slotPos + 15 && enemy.position >= slotPos - 5) {
-                     if (now - enemy.lastAttackTime > 800) { 
-                        // 🔥 傷害飄字 (怪物攻擊 -> 英雄)
-                        // 計算垂直位置： Lane 0: 15%, Lane 1: 50%, Lane 2: 85%
-                        const lane = Math.floor(i / 3);
-                        const topPos = (lane === 0 ? 15 : (lane === 1 ? 50 : 85));
-                        
-                        fireProjectile(enemy.el, document.querySelector(`.defense-slot[data-slot="${i}"]`), 'fireball', () => {
-                             if (battleSlots[i]) { 
-                                 const dmg = enemy.atk;
-                                 battleSlots[i].currentHp -= dmg;
-                                 triggerHeroHit(i); 
-                                 playSound('poison');
-                                 // 紅色傷害字
-                                 showDamageText(slotPos, topPos, `-${dmg}`, 'hero-dmg');
-                                 renderBattleSlots();
-                             }
-                        });
-                        enemy.lastAttackTime = now;
-                    }
+        enemies.forEach(enemy => {
+            if (enemy.lane === hero.lane && enemy.currentHp > 0) {
+                // 距離: 敵人位置 - 英雄位置
+                let dist = enemy.position - hero.position;
+                if (dist > 0 && dist < minDist) {
+                    minDist = dist;
+                    nearestEnemy = enemy;
                 }
-                
-                // 英雄攻擊
-                if (enemy.position <= slotPos + 5 && enemy.position >= slotPos - 5) {
-                    blocked = true;
-                    if (now - battleSlots[i].lastAttackTime > 2000) { 
-                         const heroType = battleSlots[i].attackType || 'melee';
-                         const projType = heroType === 'ranged' ? 'arrow' : 'sword';
+            }
+        });
 
-                         // 🔥 傷害飄字 (英雄攻擊 -> 怪物)
-                         // 這裡需要用閉包捕捉 enemy 的位置
-                         const currentEnemy = enemy; 
-                         const damage = battleSlots[i].atk;
-                         const lane = Math.floor(i / 3);
-                         const topPos = (lane === 0 ? 15 : (lane === 1 ? 50 : 85));
+        // 攻擊判定
+        if (nearestEnemy && minDist <= hero.range) {
+            blocked = true; // 停止移動
+            if (now - hero.lastAttackTime > 2000) {
+                const heroType = hero.attackType || 'melee';
+                const projType = heroType === 'ranged' ? 'arrow' : 'sword';
+                const topPos = (hero.lane === 0 ? 15 : (hero.lane === 1 ? 50 : 85));
 
-                         fireProjectile(document.querySelector(`.defense-slot[data-slot="${i}"]`), enemy.el, projType, () => {
-                             if(currentEnemy.el) { 
-                                 currentEnemy.currentHp -= damage;
-                                 // 黃色/白色傷害字，位置跟著怪物
-                                 showDamageText(currentEnemy.position, topPos, `-${damage}`, 'enemy-dmg');
-                             }
-                         });
-                         battleSlots[i].lastAttackTime = now;
+                fireProjectile(hero.el, nearestEnemy.el, projType, () => {
+                    if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
+                        nearestEnemy.currentHp -= hero.atk;
+                        showDamageText(nearestEnemy.position, topPos, `-${hero.atk}`, 'hero-dmg');
+                        triggerHeroHit(nearestEnemy.el);
                     }
-                }
-             }
+                });
+                hero.lastAttackTime = now;
+            }
         }
 
+        // 移動 (如果沒被阻擋且未到終點)
+        if (!blocked && hero.position < 90) {
+            hero.position += hero.speed;
+        }
+
+        // 更新 UI
+        if (hero.el) {
+            hero.el.style.left = `${hero.position}%`;
+            hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
+        }
+    });
+
+    // 清除死亡英雄
+    for (let i = heroEntities.length - 1; i >= 0; i--) {
+        if (heroEntities[i].currentHp <= 0) {
+            heroEntities[i].el.remove();
+            heroEntities.splice(i, 1);
+        }
+    }
+
+    // 🔥 敵人邏輯 (移動 + 攻擊)
+    enemies.forEach((enemy, eIndex) => {
+        let blocked = false;
+        
+        // 尋找同一路的最近英雄
+        let nearestHero = null;
+        let minDist = 999;
+
+        heroEntities.forEach(hero => {
+            if (hero.lane === enemy.lane && hero.currentHp > 0) {
+                let dist = enemy.position - hero.position;
+                if (dist > 0 && dist < minDist) {
+                    minDist = dist;
+                    nearestHero = hero;
+                }
+            }
+        });
+
+        // 攻擊判定 (怪物射程固定短一點，假設 10)
+        if (nearestHero && minDist <= 10) {
+            blocked = true;
+            if (now - enemy.lastAttackTime > 800) {
+                const topPos = (enemy.lane === 0 ? 15 : (enemy.lane === 1 ? 50 : 85));
+                fireProjectile(enemy.el, nearestHero.el, 'fireball', () => {
+                    if (nearestHero.el && nearestHero.currentHp > 0) {
+                        nearestHero.currentHp -= enemy.atk;
+                        triggerHeroHit(nearestHero.el);
+                        playSound('poison');
+                        showDamageText(nearestHero.position, topPos, `-${enemy.atk}`, 'enemy-dmg');
+                    }
+                });
+                enemy.lastAttackTime = now;
+            }
+        }
+
+        // 主堡攻擊
         if (enemy.position <= 12) {
             blocked = true;
             if (now - enemy.lastAttackTime > 1000) { 
                 baseHp -= 5;
                 enemy.lastAttackTime = now;
-                showDamageText(10, 50, "-5 HP", 'hero-dmg');
+                showDamageText(10, 50, "-5 HP", 'enemy-dmg');
                 playSound('dismantle');
                 updateBattleUI();
                 const gameBody = document.body;
@@ -954,15 +1034,13 @@ function gameLoop() {
             enemy.el.remove(); enemies.splice(eIndex, 1);
             battleGold += 50 + (battleState.wave * 10);
             updateBattleUI(); 
-            // 獲得金幣飄字 (金色)
-            // 計算垂直位置
             const topPos = (enemy.lane === 0 ? 15 : (enemy.lane === 1 ? 50 : 85));
             showDamageText(enemy.position, topPos, `+50G`, 'gold-text'); 
             playSound('dismantle');
         } 
     });
 
-    battleSlots.forEach((hero, idx) => { if (hero && hero.currentHp <= 0) { battleSlots[idx] = null; renderBattleSlots(); updateStartButton(); } });
+    // 檢查全滅 (英雄全死) -> 目前邏輯英雄死光不算輸，主堡爆才輸，但如果要更嚴格可以加條件
     if (baseHp <= 0) { endBattle(false); return; }
 
     gameLoopId = requestAnimationFrame(gameLoop);
@@ -1012,12 +1090,7 @@ function deployHeroToSlot(card) {
     const isAlreadyDeployed = battleSlots.some(s => s && s.docId === card.docId);
     if(isAlreadyDeployed) { alert("這位英雄已經在場上了！"); return; }
     if (deployTargetSlot !== null) {
-        battleSlots[deployTargetSlot] = { 
-            ...card, 
-            currentHp: card.hp, 
-            maxHp: card.hp, 
-            lastAttackTime: 0 
-        };
+        battleSlots[deployTargetSlot] = { ...card }; // 這裡不需要戰鬥屬性，因為 spawnHeroes 會處理
         deployTargetSlot = null; document.getElementById('inventory-modal').classList.add('hidden'); renderBattleSlots(); updateStartButton();
     }
 }
@@ -1025,14 +1098,21 @@ function deployHeroToSlot(card) {
 function renderBattleSlots() {
     document.querySelectorAll('.defense-slot').forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
-        const placeholder = slotDiv.querySelector('.slot-placeholder'); const hpBar = slotDiv.querySelector('.hero-hp-bar');
+        const placeholder = slotDiv.querySelector('.slot-placeholder'); 
+        
+        // 移除舊的卡片
         const existingCard = slotDiv.querySelector('.card'); if (existingCard) existingCard.remove();
+        
         if (hero) {
-            placeholder.style.display = 'none'; hpBar.classList.remove('hidden'); slotDiv.classList.add('active');
+            placeholder.style.display = 'none'; 
+            slotDiv.classList.add('active');
             const cardDiv = document.createElement('div'); const charPath = `assets/cards/${hero.id}.webp`; const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
             cardDiv.className = `card ${hero.rarity}`; cardDiv.innerHTML = `<img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
-            slotDiv.appendChild(cardDiv); const hpPercent = (hero.currentHp / hero.maxHp) * 100; hpBar.children[0].style.width = `${Math.max(0, hpPercent)}%`;
-        } else { placeholder.style.display = 'block'; hpBar.classList.add('hidden'); slotDiv.classList.remove('active'); }
+            slotDiv.appendChild(cardDiv); 
+        } else { 
+            placeholder.style.display = 'block'; 
+            slotDiv.classList.remove('active'); 
+        }
     });
 }
 

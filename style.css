@@ -185,20 +185,28 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .lane-row { flex: 1; display: flex; justify-content: space-around; align-items: center; border-bottom: 1px dashed rgba(255,255,255,0.1); position: relative; }
 .lane-row:last-child { border-bottom: none; }
 
-/* 防禦槽位 */
+/* 防禦槽位 (現在變為部署區) */
 .defense-slot { width: 70px; height: 90px; border: 2px dashed #7f8c8d; border-radius: 6px; background: rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; transition: 0.2s; cursor: pointer; }
 .defense-slot.active { border-style: solid; border-color: #f1c40f; background: rgba(241, 196, 15, 0.1); }
 .defense-slot .card { transform: scale(0.45); pointer-events: none; margin: 0; border-width: 2px; box-shadow: none; position: absolute; top: 50%; left: 50%; translate: -50% -50%; } 
 .slot-placeholder { color: #aaa; font-size: 0.8em; text-align: center; pointer-events: none; }
-.hero-hp-bar { position: absolute; bottom: -5px; left: 0; width: 100%; height: 4px; background: #c0392b; border-radius: 2px; overflow: hidden; z-index: 20; }
-.hero-hp-bar > div { height: 100%; background: #2ecc71; }
 
 /* 敵人出生區 */
 .enemy-spawn-zone { width: 50px; height: 100%; background: rgba(0,0,0,0.3); border-left: 4px dashed #c0392b; display: flex; justify-content: center; align-items: center; color: #e74c3c; font-weight: bold; writing-mode: vertical-lr; z-index: 10; }
+
+/* 🔥 新增：英雄單位 (跑動中) */
+.hero-unit { position: absolute; width: 45px; height: 45px; border-radius: 50%; border: 3px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.2em; z-index: 20; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: translateY(-50%); background-size: cover; background-position: center; }
+.hero-unit.SSR { border-color: #f1c40f; }
+.hero-unit.SR { border-color: #9b59b6; }
+.hero-unit.R { border-color: #3498db; }
+
+/* 英雄與敵人的血條 */
+.hero-hp-bar, .enemy-hp-bar { position: absolute; top: -10px; width: 35px; height: 4px; background: #555; border-radius: 2px; }
+.hero-hp-bar > div { height: 100%; background: #2ecc71; }
+.enemy-hp-bar > div { height: 100%; background: #e74c3c; }
+
 /* 敵人實體 */
 .enemy-unit { position: absolute; width: 40px; height: 40px; background: #e74c3c; border-radius: 50%; border: 2px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.2em; z-index: 5; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: translateY(-50%); }
-.enemy-hp-bar { position: absolute; top: -8px; width: 30px; height: 4px; background: #555; border-radius: 2px; }
-.enemy-hp-bar > div { height: 100%; background: #f1c40f; }
 
 /* 底部 */
 .battle-deck { background: #2c3e50; border-top: 2px solid #f1c40f; padding: 10px; display: flex; flex-direction: column; }
@@ -250,7 +258,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 }
 
 /* 🔥 英雄受擊紅閃震動 (修正版) 🔥 */
-.card.taking-damage {
+.card.taking-damage, .hero-unit.taking-damage {
     animation: damageShake 0.4s ease-out;
 }
 @keyframes damageShake {
