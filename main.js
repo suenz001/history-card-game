@@ -6,7 +6,7 @@ import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, s
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
 import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive } from './js/battle.js';
-import { initPvp, updatePvpContext } from './js/pvp.js'; // 🔥 Import PVP
+import { initPvp, updatePvpContext, setPvpHero } from './js/pvp.js'; // 🔥 Import setPvpHero
 
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
@@ -52,6 +52,9 @@ let selectedBatchCards = new Set();
 let gachaQueue = [];
 let gachaIndex = 0;
 
+// 🔥 新增：PVP 選擇英雄的目標欄位
+let pvpTargetSlot = null;
+
 const SYSTEM_NOTIFICATIONS = [
     { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 } }
 ];
@@ -60,10 +63,19 @@ const SYSTEM_NOTIFICATIONS = [
 initBattle();
 setOnBattleEnd(handleBattleEnd);
 
-// 🔥 初始化 PVP 模組
+// 🔥 初始化 PVP 模組 (傳入回調函式)
 setTimeout(() => {
     if(document.getElementById('pvp-menu-btn')) {
-        initPvp(db, currentUser, allUserCards);
+        initPvp(db, currentUser, allUserCards, (slotIndex) => {
+            // 當 PVP 請求打開背包時
+            pvpTargetSlot = slotIndex;
+            document.getElementById('inventory-title').innerText = "👇 選擇 PVP 防守英雄"; 
+            document.getElementById('inventory-modal').classList.remove('hidden');
+            
+            // 確保有資料
+            if(allUserCards.length === 0 && currentUser) loadInventory(currentUser.uid); 
+            else filterInventory('ALL');
+        });
     }
 }, 500);
 
@@ -607,11 +619,26 @@ function renderCard(card, targetContainer) {
     // 顯示攻擊力的符號為 👊
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats"><span class="type-icon">${typeIcon}</span> 👊${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
     
+    // 🔥 修改：卡片點擊事件 (新增 PVP 選角判斷)
     cardDiv.addEventListener('click', () => { 
         playSound('click'); 
         if (cardDiv.classList.contains('is-deployed')) return; 
         if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } 
+        
+        // 1. PVE 部署
         if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } 
+
+        // 2. PVP 部署 (新增)
+        if (pvpTargetSlot !== null) {
+            const success = setPvpHero(pvpTargetSlot, card);
+            if(success) {
+                pvpTargetSlot = null; // 重置
+                document.getElementById('inventory-modal').classList.add('hidden'); // 關閉背包
+            }
+            return;
+        }
+
+        // 3. 詳情頁
         let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); 
     });
     targetContainer.appendChild(cardDiv); return cardDiv;
@@ -649,8 +676,27 @@ if(document.getElementById('draw-10-btn')) document.getElementById('draw-10-btn'
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
 });
 
-if(document.getElementById('inventory-btn')) document.getElementById('inventory-btn').addEventListener('click', () => { playSound('inventory'); if(!currentUser) return alert("請先登入"); deployTargetSlot = null; document.getElementById('inventory-title').innerText = "🎒 我的背包"; document.getElementById('inventory-modal').classList.remove('hidden'); loadInventory(currentUser.uid); });
-if(document.getElementById('close-inventory-btn')) document.getElementById('close-inventory-btn').addEventListener('click', () => { playSound('click'); document.getElementById('inventory-modal').classList.add('hidden'); deployTargetSlot = null; });
+if(document.getElementById('inventory-btn')) document.getElementById('inventory-btn').addEventListener('click', () => { 
+    playSound('inventory'); 
+    if(!currentUser) return alert("請先登入"); 
+    
+    // 重置所有選角狀態
+    deployTargetSlot = null; 
+    pvpTargetSlot = null; 
+    
+    document.getElementById('inventory-title').innerText = "🎒 我的背包"; 
+    document.getElementById('inventory-modal').classList.remove('hidden'); 
+    loadInventory(currentUser.uid); 
+});
+if(document.getElementById('close-inventory-btn')) document.getElementById('close-inventory-btn').addEventListener('click', () => { 
+    playSound('click'); 
+    document.getElementById('inventory-modal').classList.add('hidden'); 
+    deployTargetSlot = null; 
+    pvpTargetSlot = null;
+    
+    // 如果是從 PVP 跳過來的，關閉背包要重新顯示 PVP 視窗
+    // 但為了簡單起見，使用者手動關閉代表取消選擇，就不特別處理了
+});
 
 async function loadLeaderboard() {
     const listDiv = document.getElementById('leaderboard-list'); const q = query(collection(db, "users"), orderBy("combatPower", "desc"), limit(10));
@@ -684,6 +730,10 @@ let deployTargetSlot = null;
 
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
+        // 排除 PVP 視窗的 slot (因為它們也有 defense-slot class，但在 PVP modal 內)
+        // 這裡透過檢查 parent 是否為 game-area 或 lanes-wrapper 來區分
+        if(slot.closest('#pvp-setup-modal') || slot.closest('#pvp-match-content')) return;
+
         if(isBattleActive) return; playSound('click'); const slotIndex = parseInt(slot.dataset.slot);
         if (battleSlots[slotIndex]) { 
             const newSlots = [...battleSlots];
@@ -716,7 +766,9 @@ function deployHeroToSlot(card) {
 }
 
 function renderBattleSlots() {
-    document.querySelectorAll('.defense-slot').forEach(slotDiv => {
+    // 只選取 PVE 戰場的 slot
+    const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
+    battleSlotsEl.forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); 
         
