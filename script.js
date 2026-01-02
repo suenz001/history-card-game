@@ -42,6 +42,7 @@ let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
+// 戰鬥變數
 let battleSlots = new Array(9).fill(null);
 let heroEntities = []; 
 let isBattleActive = false;
@@ -50,10 +51,11 @@ let enemies = [];
 let deployTargetSlot = null; 
 let currentDifficulty = 'normal';
 
+// 🔥 平衡調整：增加怪物數量 🔥
 const WAVE_CONFIG = {
-    1: { count: 6, hp: 800, atk: 50 },
-    2: { count: 12, hp: 1500, atk: 100 },
-    3: { count: 18, hp: 3000, atk: 200 } 
+    1: { count: 8, hp: 800, atk: 50 },   // 原 6 -> 8
+    2: { count: 16, hp: 1500, atk: 100 }, // 原 12 -> 16
+    3: { count: 30, hp: 3000, atk: 200 }  // 原 18 -> 30 (大決戰感)
 };
 let battleState = {
     wave: 1, spawned: 0, totalToSpawn: 0, lastSpawnTime: 0, phase: 'IDLE', waitTimer: 0
@@ -849,16 +851,9 @@ function spawnHeroes() {
         const col = index % 3; // 0, 1, 2
         
         // 修正：左右反轉 (右邊=前排)
-        // col=0 (Left) -> 5%
-        // col=1 (Mid)  -> 9%
-        // col=2 (Right)-> 13%
         const startPos = 5 + (col * 4); 
         
-        // 🔥 密集方陣集結點
-        // Lane 0 -> 42%, Lane 1 -> 50%, Lane 2 -> 58%
-        const targetY = (lane === 0 ? 42 : (lane === 1 ? 50 : 58));
-        
-        // 初始位置還是分散的 (為了視覺效果)
+        // 初始位置
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
 
         const el = document.createElement('div');
@@ -877,7 +872,6 @@ function spawnHeroes() {
             lane: lane,
             position: startPos,
             y: startY,
-            targetY: targetY, // 目標集結點
             speed: 0.05,
             range: card.attackType === 'ranged' ? 16 : 4, 
             atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.8) : card.atk, 
@@ -942,7 +936,6 @@ function spawnEnemy() {
         lane: lane, 
         position: 80, // 修正：生成位置內縮
         y: (lane === 0 ? 20 : (lane === 1 ? 50 : 80)), // 初始位置
-        targetY: (lane === 0 ? 42 : (lane === 1 ? 50 : 58)), // 集結位置
         speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 
     };
     
@@ -1028,7 +1021,7 @@ function gameLoop() {
         }
     }
 
-    // 🔥 英雄邏輯
+    // 🔥 英雄邏輯 (Active Hunting)
     heroEntities.sort((a, b) => b.position - a.position);
 
     heroEntities.forEach((hero, hIndex) => {
@@ -1042,11 +1035,13 @@ function gameLoop() {
 
         enemies.forEach(enemy => {
             if (enemy.currentHp > 0) {
+                // 計算歐幾里得距離
                 const dx = enemy.position - hero.position;
                 const dy = enemy.y - hero.y; 
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                if (dx > -5 && dist < minTotalDist) {
+                // 尋找最近的敵人 (不限制前方，全場搜尋)
+                if (dist < minTotalDist) {
                     minTotalDist = dist;
                     nearestEnemy = enemy;
                 }
@@ -1071,38 +1066,41 @@ function gameLoop() {
             }
         }
 
-        // 🔥 防追撞 + 繞路邏輯 (Smart AI)
+        // 🔥 防追撞 + 繞路邏輯 (20% overlap allowed)
         if (!blocked) {
             for (let other of heroEntities) {
                 if (other !== hero && other.currentHp > 0) {
                     let dist = other.position - hero.position;
-                    // 如果在前方 (dist > 0) 且水平距離 < 2.5 (20% overlap allowed)，且垂直距離也很近 (< 5)
-                    if (dist > 0 && dist < 2.5 && Math.abs(other.y - hero.y) < 5) {
+                    // 如果在前方 (dist > 0) 且水平距離 < 2 (允許重疊) 且垂直距離很近 (< 5)
+                    if (dist > 0 && dist < 2 && Math.abs(other.y - hero.y) < 5) {
                         blocked = true;
                         // 決定繞路方向
-                        if (hero.y <= other.y) dodgeY = -0.3; // 往上繞
-                        else dodgeY = 0.3; // 往下繞
+                        if (hero.y <= other.y) dodgeY = -0.3; 
+                        else dodgeY = 0.3; 
                         break;
                     }
                 }
             }
         }
 
-        // 移動 & 集結
+        // 移動 & 索敵
         if (!blocked) {
-            if (hero.position < 75) { // 修正：終點 75
-                hero.position += hero.speed;
-                // 往目標 Y 軸靠攏
-                let targetY = nearestEnemy ? nearestEnemy.y : hero.targetY;
-                if (Math.abs(hero.y - targetY) > 1) { // 只有距離大於1才修正，避免抖動
-                     if (hero.y < targetY) hero.y += 0.1;
-                     else hero.y -= 0.1;
-                }
-            }
+             // 如果有敵人，往敵人移動
+             if (nearestEnemy) {
+                 // X 軸移動
+                 if (hero.position < nearestEnemy.position - 1) hero.position += hero.speed;
+                 else if (hero.position > nearestEnemy.position + 1) hero.position -= hero.speed;
+                 
+                 // Y 軸移動
+                 if (hero.y < nearestEnemy.y) hero.y += 0.15;
+                 else if (hero.y > nearestEnemy.y) hero.y -= 0.15;
+             } else {
+                 // 沒敵人時，往右前方待命 (但不超過 80)
+                 if (hero.position < 80) hero.position += hero.speed;
+             }
         } else if (dodgeY !== 0) {
-            // 被擋住時，嘗試繞路 (只動 Y 軸)
+             // 繞路
              hero.y += dodgeY;
-             // 限制邊界
              hero.y = Math.max(15, Math.min(85, hero.y));
         }
 
@@ -1120,13 +1118,13 @@ function gameLoop() {
         }
     }
 
-    // 敗北判定：英雄全滅 (且已生成過)
+    // 敗北判定
     if (isBattleActive && heroEntities.length === 0 && battleState.spawned > 0) {
         endBattle(false);
         return;
     }
 
-    // 🔥 敵人邏輯
+    // 🔥 敵人邏輯 (Active Hunting)
     enemies.sort((a, b) => a.position - b.position);
 
     enemies.forEach((enemy, eIndex) => {
@@ -1142,14 +1140,14 @@ function gameLoop() {
                 const dy = enemy.y - hero.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                if (dx > -5 && dist < minTotalDist) {
+                if (dist < minTotalDist) {
                     minTotalDist = dist;
                     nearestHero = hero;
                 }
             }
         });
 
-        // 攻擊
+        // 攻擊 (射程修正為 3)
         if (nearestHero && minTotalDist <= 3) { 
             blocked = true;
             if (now - enemy.lastAttackTime > 800) {
@@ -1165,43 +1163,43 @@ function gameLoop() {
             }
         }
 
-        if (enemy.position <= 12) {
-            blocked = true;
-            if (now - enemy.lastAttackTime > 1000) { 
-                // baseHp -= 5; // 移除扣血
-                enemy.lastAttackTime = now;
-                // showDamageText(10, 50, "-5 HP", 'enemy-dmg'); // 移除飄字
-                // playSound('dismantle');
-                // updateBattleUI();
-            }
-        }
-
-        // 防追撞 (Anti-Stacking)
+        // 防追撞
         if (!blocked) {
             for (let other of enemies) {
                 if (other !== enemy && other.currentHp > 0) {
-                    let dist = enemy.position - other.position;
-                    // 如果距離大於 0 (other 在我左邊/前面) 且 小於 2.5
-                    if (dist > 0 && dist < 2.5 && Math.abs(other.y - enemy.y) < 5) {
-                        blocked = true;
-                         if (enemy.y <= other.y) dodgeY = -0.3; 
-                         else dodgeY = 0.3;
-                        break;
+                    // 敵人往左走，所以位置比較小的是在"前方"(左方)? 不對，位置比較小的是靠近左邊
+                    // 這裡簡化邏輯：檢查兩者距離是否太近
+                    let dist = Math.abs(enemy.position - other.position);
+                    let vDist = Math.abs(other.y - enemy.y);
+                    
+                    if (dist < 2 && vDist < 5) {
+                         // 簡單的推擠邏輯：如果對方在我前面擋著
+                         if ((enemy.position > other.position && nearestHero && nearestHero.position < enemy.position) ||
+                             (enemy.position < other.position && nearestHero && nearestHero.position > enemy.position)) {
+                                blocked = true;
+                                if (enemy.y <= other.y) dodgeY = -0.3;
+                                else dodgeY = 0.3;
+                                break;
+                         }
                     }
                 }
             }
         }
 
-        // 移動 & 集結
+        // 移動 & 索敵
         if (!blocked) { 
-            enemy.position -= enemy.speed;
-            
-            let targetY = nearestHero ? nearestHero.y : enemy.targetY;
-            
-            if (Math.abs(enemy.y - targetY) > 1) {
-                if (enemy.y < targetY) enemy.y += 0.15;
-                if (enemy.y > targetY) enemy.y -= 0.15;
-            }
+             if (nearestHero) {
+                 // X 軸移動
+                 if (enemy.position > nearestHero.position + 1) enemy.position -= enemy.speed;
+                 else if (enemy.position < nearestHero.position - 1) enemy.position += enemy.speed;
+                 
+                 // Y 軸移動
+                 if (enemy.y < nearestHero.y) enemy.y += 0.15;
+                 else if (enemy.y > nearestHero.y) enemy.y -= 0.15;
+             } else {
+                 // 沒英雄時，往左進攻
+                 if (enemy.position > 10) enemy.position -= enemy.speed;
+             }
         } else if (dodgeY !== 0) {
              enemy.y += dodgeY;
              enemy.y = Math.max(15, Math.min(85, enemy.y));
@@ -1213,15 +1211,10 @@ function gameLoop() {
             enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
         }
 
-        if (enemy.currentHp <= 0) {
-            enemy.el.remove(); enemies.splice(eIndex, 1);
-            battleGold += 50 + (battleState.wave * 10);
-            updateBattleUI(); 
-            showDamageText(enemy.position, enemy.y, `+50G`, 'gold-text'); 
-            playSound('dismantle');
-        } 
+        // 移除主堡傷害邏輯，改為到達終點就停下或消失? 這裡保持在左邊聚集
     });
 
+    // 勝利判定
     if (enemies.length === 0 && battleState.phase === 'COMBAT') {
         // Wait
     }
@@ -1317,6 +1310,7 @@ function renderBattleSlots() {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); 
         
+        // 移除舊的卡片
         const existingCard = slotDiv.querySelector('.card'); if (existingCard) existingCard.remove();
         
         if (hero) {
