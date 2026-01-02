@@ -55,7 +55,7 @@ const WAVE_CONFIG = {
     1: { count: 8, hp: 800, atk: 50 },
     2: { count: 16, hp: 1500, atk: 100 },
     3: { count: 30, hp: 3000, atk: 200 },
-    4: { count: 1, hp: 30000, atk: 500 } 
+    4: { count: 1, hp: 30000, atk: 500 } // Boss
 };
 let battleState = {
     wave: 1, spawned: 0, totalToSpawn: 0, lastSpawnTime: 0, phase: 'IDLE', waitTimer: 0
@@ -443,7 +443,6 @@ function updateInventoryCounts() {
     });
 }
 
-// 🔥 修正：一鍵自動升星 (修復計數 bug) 🔥
 async function autoStarUp() {
     if (!currentUser) return alert("請先登入");
     if (isBatchMode) return alert("請先關閉批量分解模式");
@@ -997,7 +996,7 @@ function spawnEnemy() {
     if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
     else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
 
-    // 🔥 修正：從上方或下方出生，留出中間，且X軸隨機
+    // 🔥 修正：從上方或下方出生，留出中間
     let spawnY;
     if (Math.random() < 0.5) {
         spawnY = 10 + Math.random() * 30; // 10-40 (上)
@@ -1005,21 +1004,18 @@ function spawnEnemy() {
         spawnY = 60 + Math.random() * 30; // 60-90 (下)
     }
     
-    // X軸 50~90
-    const spawnX = 50 + Math.random() * 40;
-    
     const enemy = { 
         id: Date.now(), 
         maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, 
         lane: -1, 
-        position: spawnX, 
+        position: 80, // 🔥 修正：內縮出生點 (80%)
         y: spawnY, 
         speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 
     };
     
     const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
     el.style.top = `${enemy.y}%`;
-    el.style.left = `${enemy.position}%`; 
+    el.style.left = `80%`; 
     
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
@@ -1212,37 +1208,44 @@ function gameLoop() {
         }
 
         // 4. 移動邏輯 (包含索敵 + 閃避)
-        // 🔥 重要修正：Blocked 不代表不能動，只是不能往前衝，但可以往旁邊滑 (Dodge)
-        if (nearestEnemy && !blocked) {
-             // 追殺
-             if (hero.position < nearestEnemy.position - 2) hero.position += hero.speed * gameSpeed;
-             else if (hero.position > nearestEnemy.position + 2) hero.position -= hero.speed * gameSpeed;
-             
-             if (hero.y < nearestEnemy.y) hero.y += 0.15 * gameSpeed;
-             else if (hero.y > nearestEnemy.y) hero.y -= 0.15 * gameSpeed;
-        } else if (!nearestEnemy && !blocked) {
-             // 巡邏
-             if (hero.position >= 80) hero.patrolDir = -1;
-             if (hero.position <= 10) hero.patrolDir = 1;
-             if(!hero.patrolDir) hero.patrolDir = 1;
-             
-             hero.position += hero.speed * hero.patrolDir * gameSpeed;
+        if (!blocked) {
+             if (nearestEnemy) {
+                 // 追殺
+                 if (hero.position < nearestEnemy.position - 2) hero.position += hero.speed * gameSpeed;
+                 else if (hero.position > nearestEnemy.position + 2) hero.position -= hero.speed * gameSpeed;
+                 
+                 if (hero.y < nearestEnemy.y) hero.y += 0.15 * gameSpeed;
+                 else if (hero.y > nearestEnemy.y) hero.y -= 0.15 * gameSpeed;
+             } else {
+                 // 巡邏
+                 if (hero.position >= 80) hero.patrolDir = -1;
+                 if (hero.position <= 10) hero.patrolDir = 1;
+                 if(!hero.patrolDir) hero.patrolDir = 1;
+                 
+                 hero.position += hero.speed * hero.patrolDir * gameSpeed;
+             }
         }
         
-        // 疊加閃避向量 (即使 blocked 也可以滑動，避免攻擊時卡住)
+        // 疊加滑動力
         hero.y += dodgeY * gameSpeed;
 
         // 🔥 5. 嚴格邊界限制 (Boundary Clamp)
         hero.y = Math.max(10, Math.min(90, hero.y));
         hero.position = Math.max(0, Math.min(100, hero.position));
 
-        // 更新 UI (不翻轉)
+        // 更新 UI (修正面相邏輯)
         if (hero.el) {
             hero.el.style.left = `${hero.position}%`;
             hero.el.style.top = `${hero.y}%`; 
             hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
-            // 確保永遠不轉頭
-            hero.el.style.transform = 'translateY(-50%) scaleX(1)';
+            
+            // 🔥 面相邏輯：只有鎖定的敵人在左邊時才轉頭
+            if (nearestEnemy && nearestEnemy.position < hero.position) {
+                 hero.el.style.transform = 'translateY(-50%) scaleX(-1)';
+            } else {
+                 // 巡邏往左走時，不轉頭 (保持警戒)
+                 hero.el.style.transform = 'translateY(-50%) scaleX(1)';
+            }
         }
     });
 
@@ -1373,6 +1376,7 @@ async function endBattle(isWin) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     let finalGold = Math.floor(battleGold * goldMultiplier);
     
+    // 💎 新增：通關獎勵
     let gemReward = 0;
     if (isWin) {
         if (currentDifficulty === 'easy') gemReward = 200; 
