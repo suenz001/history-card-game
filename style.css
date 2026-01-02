@@ -251,8 +251,15 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     box-shadow: 0 0 20px #8e44ad;
     z-index: 10;
     font-size: 3em;
+    animation: bossPulse 1s infinite alternate;
 }
 .enemy-unit.boss .enemy-hp-bar { top: -15px; width: 60px; height: 6px; }
+
+/* 🔥 魔王呼吸燈動畫 */
+@keyframes bossPulse {
+    from { box-shadow: 0 0 20px #8e44ad; transform: translateY(-50%) scale(1); }
+    to { box-shadow: 0 0 40px #9b59b6; transform: translateY(-50%) scale(1.05); }
+}
 
 /* 底部 */
 .battle-deck { background: #2c3e50; border-top: 2px solid #f1c40f; padding: 10px; display: flex; flex-direction: column; }
@@ -292,12 +299,14 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .boss-projectile {
     position: absolute; z-index: 60;
     width: 30px; height: 30px;
-    background: radial-gradient(circle, #fff, #8e44ad);
+    background: radial-gradient(circle, #fff, #4a0072);
     border-radius: 50%;
     box-shadow: 0 0 15px #8e44ad;
     transition: all 0.5s linear; /* 飛行時間 */
     pointer-events: none;
+    animation: spin 0.5s linear infinite;
 }
+@keyframes spin { 100% { transform: rotate(360deg); } }
 
 /* 🔥 噴毒動畫 (放大、顯眼) 🔥 */
 .poison-effect {
