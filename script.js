@@ -46,7 +46,7 @@ let currentSortMethod = 'time_desc';
 
 // 戰鬥變數
 let battleSlots = new Array(9).fill(null);
-let heroEntities = []; 
+let heroEntities = []; // 移動中的英雄實體
 let isBattleActive = false;
 let battleGold = 0;
 let baseHp = 100;
@@ -93,6 +93,7 @@ let sfxVolume = 1.0;
 
 if(audioBgm) { audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; }
 
+// 全域點擊啟動音效
 document.body.addEventListener('click', () => {
     if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
     if (isBgmOn && audioBgm && audioBgm.paused && audioBattle && audioBattle.paused) {
@@ -127,6 +128,7 @@ function playSound(type) {
     } catch (e) { console.log("Audio Error", e); }
 }
 
+// 合成音效函數
 function synthesizeClick() {
     if(!audioCtx) return;
     const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
@@ -871,7 +873,7 @@ function spawnEnemy() {
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
-// 🔥 發射飛行道具 🔥
+// 🔥 發射飛行道具 (加入傷害飄字回調) 🔥
 function fireProjectile(startEl, targetEl, type, onHitCallback) {
     if(!startEl || !targetEl) return;
     
@@ -908,6 +910,7 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     }, 300);
 }
 
+// 修正受擊觸發 logic
 function triggerHeroHit(el) {
     if(el) {
         el.classList.remove('taking-damage');
@@ -973,7 +976,6 @@ function gameLoop() {
 
         enemies.forEach(enemy => {
             if (enemy.currentHp > 0) {
-                // 垂直距離判斷 (微聚攏模式下，大家都在中間附近)
                 const yDiff = Math.abs(hero.y - enemy.y);
                 
                 if (yDiff < 20) { 
@@ -1018,7 +1020,7 @@ function gameLoop() {
         }
 
         // 移動 & 集結
-        if (!blocked && hero.position < 90) {
+        if (!blocked && hero.position < 80) { // <--- 修改這裡：改成 80，留出右邊 20% 給怪物
             hero.position += hero.speed;
             
             // 往目標 Y 軸靠攏
@@ -1221,6 +1223,8 @@ function renderBattleSlots() {
     document.querySelectorAll('.defense-slot').forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); 
+        
+        // 移除舊的卡片
         const existingCard = slotDiv.querySelector('.card'); if (existingCard) existingCard.remove();
         
         if (hero) {

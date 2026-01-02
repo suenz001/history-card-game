@@ -185,7 +185,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .lane-row { flex: 1; display: flex; justify-content: space-around; align-items: center; border-bottom: 1px dashed rgba(255,255,255,0.1); position: relative; }
 .lane-row:last-child { border-bottom: none; }
 
-/* 防禦槽位 (現在變為部署區) */
+/* 防禦槽位 */
 .defense-slot { width: 70px; height: 90px; border: 2px dashed #7f8c8d; border-radius: 6px; background: rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; transition: 0.2s; cursor: pointer; }
 .defense-slot.active { border-style: solid; border-color: #f1c40f; background: rgba(241, 196, 15, 0.1); }
 .defense-slot .card { transform: scale(0.45); pointer-events: none; margin: 0; border-width: 2px; box-shadow: none; position: absolute; top: 50%; left: 50%; translate: -50% -50%; } 
@@ -257,16 +257,28 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
 }
 
-/* 🔥 英雄受擊紅閃震動 (修正版) 🔥 */
-.card.taking-damage, .hero-unit.taking-damage {
-    animation: damageShake 0.4s ease-out;
+/* 🔥 1. 背包卡片專用 (維持 0.45) */
+.card.taking-damage {
+    animation: cardDamageShake 0.4s ease-out;
 }
-@keyframes damageShake {
+@keyframes cardDamageShake {
     0% { transform: translate(-50%, -50%) scale(0.45) rotate(0deg); filter: none; }
     20% { transform: translate(-55%, -50%) scale(0.5) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); }
     40% { transform: translate(-45%, -50%) scale(0.45) rotate(10deg); }
     60% { transform: translate(-55%, -50%) scale(0.5) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); }
     100% { transform: translate(-50%, -50%) scale(0.45) rotate(0deg); filter: none; }
+}
+
+/* 🔥 2. 戰場單位專用 (維持 ~1.0, 微縮至 0.9) */
+.hero-unit.taking-damage, .enemy-unit.taking-damage {
+    animation: unitDamageShake 0.4s ease-out;
+}
+@keyframes unitDamageShake {
+    0% { transform: translateY(-50%) scale(1) rotate(0deg); filter: none; }
+    20% { transform: translateY(-50%) scale(0.9) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); } /* Red flash */
+    40% { transform: translateY(-50%) scale(1.05) rotate(10deg); }
+    60% { transform: translateY(-50%) scale(0.9) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); }
+    100% { transform: translateY(-50%) scale(1) rotate(0deg); filter: none; }
 }
 
 /* 螢幕震動 */
