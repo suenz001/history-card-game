@@ -72,7 +72,7 @@ export function initPvp(database, user, inventory, openInventoryCallback) {
         });
     }
 
-    // 🔥 新增：綁定手動儲存按鈕
+    // 綁定手動儲存按鈕
     const saveAttackBtn = document.getElementById('save-attack-team-btn');
     if (saveAttackBtn) {
         saveAttackBtn.addEventListener('click', () => {
@@ -112,7 +112,6 @@ async function openPvpModal() {
 }
 
 // 🔥 當 main.js 選擇好卡片後，呼叫此函式寫入 PVP 欄位
-// type = 'defense' (防守) 或 'attack' (進攻)
 export function setPvpHero(slotIndex, card, type) {
     const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
 
@@ -132,7 +131,7 @@ export function setPvpHero(slotIndex, card, type) {
         updateSaveButtonState();
         document.getElementById('pvp-setup-modal').classList.remove('hidden');
     } else {
-        // 🔥 進攻模式：自動存檔 (默默執行)
+        // 🔥 進攻模式：自動存檔
         saveAttackTeam();
         document.getElementById('pvp-arena-modal').classList.remove('hidden');
     }
@@ -158,7 +157,6 @@ function handleSlotClick(slotElement, type) {
         }
     } 
     else {
-        // 檢查上限
         const currentCount = targetArray.filter(x => x !== null).length;
         if (currentCount >= 6) return alert("PVP 隊伍最多只能上陣 6 名英雄！");
         
@@ -175,7 +173,7 @@ function handleSlotClick(slotElement, type) {
     }
 }
 
-// 渲染 PVP 格子 (通用)
+// 渲染 PVP 格子
 function renderPvpSlots(type) {
     const selector = (type === 'attack') ? '.pvp-attack-slot' : '.pvp-defense-slot';
     const sourceArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
@@ -207,7 +205,7 @@ async function saveDefenseTeam() {
     } catch (e) { console.error("儲存失敗", e); alert("儲存失敗，請檢查網路連線"); } finally { btn.classList.remove('btn-disabled'); updateSaveButtonState(); }
 }
 
-// 自動儲存進攻隊伍 (不跳 Alert)
+// 自動儲存進攻隊伍 (靜默模式)
 async function saveAttackTeam() {
     if (!currentUser) return;
     try {
@@ -227,14 +225,14 @@ async function saveAttackTeam() {
     }
 }
 
-// 🔥 手動儲存按鈕功能 (跳 Alert 提示)
+// 🔥 手動儲存按鈕 (有提示)
 async function manualSaveAttackTeam() {
     if (!currentUser) return;
     const btn = document.getElementById('save-attack-team-btn');
     if(btn) btn.innerText = "儲存中...";
     
     try {
-        await saveAttackTeam(); // 呼叫共用的儲存邏輯
+        await saveAttackTeam();
         alert("✅ 進攻陣容已儲存！下次將自動帶入。");
     } catch(e) {
         console.error(e);
@@ -248,8 +246,6 @@ async function manualSaveAttackTeam() {
 
 function openPvpArena() {
     if (!currentUser) return alert("請先登入");
-    
-    // 初始化 UI 狀態：顯示 Loading，隱藏其他
     document.getElementById('pvp-arena-modal').classList.remove('hidden');
     document.getElementById('pvp-loading').classList.remove('hidden');
     document.getElementById('pvp-opponent-list-view').classList.add('hidden');
@@ -261,10 +257,10 @@ function openPvpArena() {
 function resetToOpponentList() {
     document.getElementById('pvp-match-content').classList.add('hidden');
     document.getElementById('pvp-opponent-list-view').classList.remove('hidden');
-    currentEnemyData = null; // 清除選擇
+    currentEnemyData = null;
 }
 
-// 搜尋邏輯 (高 10 名 + 低 10 名)
+// 搜尋對手
 async function searchOpponent() {
     const loadingDiv = document.getElementById('pvp-loading');
     const listView = document.getElementById('pvp-opponent-list-view');
@@ -272,51 +268,28 @@ async function searchOpponent() {
 
     loadingDiv.classList.remove('hidden');
     listView.classList.add('hidden');
-    listContainer.innerHTML = ""; // 清空列表
+    listContainer.innerHTML = ""; 
 
     try {
         const myPower = currentUser.combatPower || 0;
 
-        // 查詢比我強的 10 個
-        const qHigh = query(
-            collection(db, "users"), 
-            where("combatPower", ">=", myPower), 
-            orderBy("combatPower", "asc"), 
-            limit(15) 
-        );
-
-        // 查詢比我弱的 10 個
-        const qLow = query(
-            collection(db, "users"), 
-            where("combatPower", "<", myPower), 
-            orderBy("combatPower", "desc"), 
-            limit(15)
-        );
+        const qHigh = query(collection(db, "users"), where("combatPower", ">=", myPower), orderBy("combatPower", "asc"), limit(15));
+        const qLow = query(collection(db, "users"), where("combatPower", "<", myPower), orderBy("combatPower", "desc"), limit(15));
 
         const [snapHigh, snapLow] = await Promise.all([getDocs(qHigh), getDocs(qLow)]);
         
         let candidates = [];
-        
-        // 合併結果並過濾
         const processDoc = (doc) => {
-            if (doc.id === currentUser.uid) return; // 排除自己
+            if (doc.id === currentUser.uid) return;
             const data = doc.data();
-            // 不論有無防守陣容都加入
             candidates.push({ ...data, uid: doc.id });
         };
 
         snapHigh.forEach(processDoc);
         snapLow.forEach(processDoc);
 
-        // 去除重複
-        candidates = candidates.filter((item, index, self) => 
-            index === self.findIndex((t) => (t.uid === item.uid))
-        );
-
-        // 排序：戰力由高到低
+        candidates = candidates.filter((item, index, self) => index === self.findIndex((t) => (t.uid === item.uid)));
         candidates.sort((a, b) => b.combatPower - a.combatPower);
-
-        // 截取前 20 個顯示
         candidates = candidates.slice(0, 20);
 
         if (candidates.length === 0) { 
@@ -325,7 +298,6 @@ async function searchOpponent() {
             renderOpponentList(candidates);
         }
         
-        // 完成，切換 UI
         loadingDiv.classList.add('hidden');
         listView.classList.remove('hidden');
 
@@ -336,7 +308,6 @@ async function searchOpponent() {
     }
 }
 
-// 渲染對手列表
 function renderOpponentList(opponents) {
     const container = document.getElementById('pvp-opponent-list');
     const myPower = currentUser.combatPower || 0;
@@ -367,43 +338,57 @@ function renderOpponentList(opponents) {
     });
 }
 
-// 選擇對手後的處理
+// 選擇對手後，準備進入佈署畫面
 function selectOpponent(enemyData) {
     currentEnemyData = enemyData;
     
-    // 隱藏列表，顯示備戰介面
     document.getElementById('pvp-opponent-list-view').classList.add('hidden');
     document.getElementById('pvp-match-content').classList.remove('hidden');
 
-    // 渲染雙方資料
     renderMatchup();
     
-    // 讀取我方上次陣容
+    // 🔥 讀取我方上次陣容 (這裡最重要)
     loadLastAttackTeam();
 }
 
-
+// 🔥 讀取上次進攻陣容 (包含防呆與重新抓取背包)
 async function loadLastAttackTeam() {
     if(!currentUser) return;
+    
+    // 確保背包資料已同步，若為空則嘗試重新抓取
+    if (!allUserCards || allUserCards.length === 0) {
+        // console.log("Inventory empty, refetching...");
+        try {
+            const q = query(collection(db, "inventory"), where("owner", "==", currentUser.uid));
+            const querySnapshot = await getDocs(q);
+            allUserCards = [];
+            querySnapshot.forEach((doc) => {
+                allUserCards.push({ ...doc.data(), docId: doc.id });
+            });
+        } catch(e) {
+            console.error("Refetch inventory failed", e);
+        }
+    }
+
     try {
         const userRef = doc(db, "users", currentUser.uid);
         const userSnap = await getDoc(userRef);
         
-        pvpAttackSlots = new Array(9).fill(null);
+        pvpAttackSlots = new Array(9).fill(null); // 先清空
 
         if (userSnap.exists() && userSnap.data().lastAttackTeam) {
             const savedTeam = userSnap.data().lastAttackTeam;
             savedTeam.forEach(hero => { 
                 if (hero.slotIndex !== undefined) {
-                    // 確保卡片還在背包裡 (防止已被分解)
+                    // 從背包找回對應卡片 (確保卡片還存在且數據最新)
                     const existInBag = allUserCards.find(c => c.docId === hero.docId);
                     if(existInBag) {
-                        pvpAttackSlots[hero.slotIndex] = { ...existInBag }; // 使用背包裡的最新數據
+                        pvpAttackSlots[hero.slotIndex] = { ...existInBag };
                     }
                 }
             });
         }
-        renderPvpSlots('attack');
+        renderPvpSlots('attack'); // 渲染
     } catch(e) {
         console.warn("讀取進攻陣容失敗", e);
     }
@@ -418,8 +403,6 @@ function renderMatchup() {
     document.getElementById('arena-enemy-power').innerText = currentEnemyData.combatPower || "???";
     
     const grid = document.getElementById('enemy-preview-grid'); grid.innerHTML = ""; 
-    
-    // 防呆：如果沒有防守陣容，就給空陣列
     const enemyTeam = currentEnemyData.defenseTeam || [];
 
     for(let r=0; r<3; r++) {
@@ -442,17 +425,14 @@ function renderMatchup() {
     }
 }
 
-// 開始戰鬥 (儲存陣容 -> 呼叫 battle.js)
 async function startActualPvp() {
     if (!currentEnemyData) return;
 
-    // 檢查是否有配置英雄
     const myCount = pvpAttackSlots.filter(x => x !== null).length;
     if (myCount === 0) return alert("請至少配置 1 名進攻英雄！");
     if (myCount > 6) return alert("進攻英雄不能超過 6 名！");
     
-    // 雖然有自動存檔，但開戰前再存一次保險
-    saveAttackTeam();
+    saveAttackTeam(); // 開戰前再存一次
 
     document.getElementById('pvp-arena-modal').classList.add('hidden');
     document.getElementById('battle-screen').classList.remove('hidden');
@@ -460,12 +440,9 @@ async function startActualPvp() {
     if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
 
     setOnBattleEnd(handlePvpResult);
-
-    // 傳入敵方陣容 (空陣容防呆) + 我方進攻陣容
     startPvpMatch(currentEnemyData.defenseTeam || [], pvpAttackSlots);
 }
 
-// PVP 結算邏輯
 async function handlePvpResult(isWin, _unusedGold, heroStats) {
     const resultModal = document.getElementById('battle-result-modal');
     const title = document.getElementById('result-title');
@@ -473,7 +450,6 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
     const gemText = document.getElementById('result-gems');
     const btn = document.getElementById('close-result-btn');
 
-    // 生成 DPS 排行榜
     const dpsContainer = document.getElementById('dps-chart');
     dpsContainer.innerHTML = "";
     if (heroStats && heroStats.length > 0) {
@@ -489,7 +465,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
     }
 
     resultModal.classList.remove('hidden');
-    gemText.style.display = 'none'; // PVP 不給鑽石
+    gemText.style.display = 'none';
 
     if (isWin) {
         title.innerText = "VICTORY";
@@ -499,15 +475,12 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
         goldText.innerText = "計算戰利品中...";
         
         try {
-            // 執行交易
             const stolenGold = await executeStealTransaction(currentUser.uid, currentEnemyData.uid);
             goldText.innerText = `💰 搶奪 +${stolenGold} G`;
-            // 🔥 已移除 Alert
+            // 🔥 已移除 Alert 對話框
         } catch (e) {
             console.error("結算交易失敗", e);
             goldText.innerText = "💰 結算異常";
-            // 這裡保留錯誤提示，方便除錯
-            console.warn("結算失敗: " + e.message);
         }
 
     } else {
@@ -517,7 +490,6 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
         goldText.innerText = "💰 搶奪失敗 (0 G)";
     }
 
-    // 按下離開後，重置並重新整理頁面(或更新UI)
     btn.onclick = () => {
         playSound('click');
         resultModal.classList.add('hidden');
@@ -526,36 +498,31 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
     };
 }
 
-// 金幣掠奪交易 (Firebase Transaction)
 async function executeStealTransaction(myUid, enemyUid) {
     const myRef = doc(db, "users", myUid);
     const enemyRef = doc(db, "users", enemyUid);
 
     try {
         const stolenAmount = await runTransaction(db, async (transaction) => {
-            // 1. 先進行所有讀取 (Reads MUST come before Writes)
             const enemyDoc = await transaction.get(enemyRef);
             const myDoc = await transaction.get(myRef);
 
             if (!enemyDoc.exists()) throw new Error("Enemy does not exist!");
             if (!myDoc.exists()) throw new Error("User does not exist!");
 
-            // 2. 邏輯計算
             const enemyGold = enemyDoc.data().gold || 0;
             const myGold = myDoc.data().gold || 0;
             
-            // 計算 5%
             let amount = Math.floor(enemyGold * 0.05);
             if(amount < 0) amount = 0;
 
             const newEnemyGold = Math.max(0, enemyGold - amount);
             const newMyGold = myGold + amount;
 
-            // 3. 執行寫入
             transaction.update(enemyRef, { gold: newEnemyGold });
             transaction.update(myRef, { gold: newMyGold });
 
-            return amount; // 回傳搶到的金額
+            return amount; 
         });
         return stolenAmount;
     } catch (e) {
