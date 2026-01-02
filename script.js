@@ -442,7 +442,7 @@ function updateInventoryCounts() {
     });
 }
 
-// 🔥 修正：一鍵自動升星 (支援多張重複升星) 🔥
+// 🔥 修正：一鍵自動升星 (修復計數 bug) 🔥
 async function autoStarUp() {
     if (!currentUser) return alert("請先登入");
     if (isBatchMode) return alert("請先關閉批量分解模式");
@@ -451,7 +451,6 @@ async function autoStarUp() {
     const confirmed = confirm("⚡ 一鍵升星會自動合併重複的卡片，將每種英雄等級最高的卡片升到最高星數。\n\n確定要執行嗎？");
     if (!confirmed) return;
 
-    // 將卡片按 ID 分組
     const groups = {};
     allUserCards.forEach(card => {
         if (!groups[card.id]) groups[card.id] = [];
@@ -463,7 +462,6 @@ async function autoStarUp() {
     const deletePromises = [];
     const updatePromises = [];
     const newCardsState = [];
-    // 記錄已經被刪除的 docId，避免重複處理
     const deletedDocIds = new Set();
 
     for (const id in groups) {
@@ -473,45 +471,40 @@ async function autoStarUp() {
             continue;
         }
 
-        // 排序：先比星數高，再比等級高
         cards.sort((a, b) => {
             if (b.stars !== a.stars) return b.stars - a.stars;
             return b.level - a.level;
         });
 
-        // 迭代每一張卡，看它能不能當主卡
         for (let i = 0; i < cards.length; i++) {
             let mainCard = cards[i];
             
-            // 如果這張卡已經被標記刪除了，就跳過
             if (deletedDocIds.has(mainCard.docId)) continue;
             
-            // 如果已經滿星，就保留，找下一張當主卡
             if (mainCard.stars >= 5) {
                 newCardsState.push(mainCard);
                 continue;
             }
 
-            // 開始找素材 (從主卡後面開始找)
+            // 🔥 關鍵修正：先記錄原始星數，用於比較
+            let originalStars = mainCard.stars;
+
             for (let j = i + 1; j < cards.length; j++) {
                 let fodder = cards[j];
                 
-                // 如果素材已經被刪除，或主卡已經滿星，就停
                 if (deletedDocIds.has(fodder.docId)) continue;
                 if (mainCard.stars >= 5) break;
 
-                // 吃掉素材
                 deletedDocIds.add(fodder.docId);
                 deletePromises.push(deleteDoc(doc(db, "inventory", fodder.docId)));
                 consumedCount++;
 
-                // 主卡升級
                 mainCard.stars++;
                 calculateCardStats(mainCard);
             }
 
-            // 處理完後，如果主卡有變動，加入更新清單
-            if (mainCard.stars > cards[i].stars) { // 注意這裡邏輯，其實 stars 已經變了
+            // 🔥 關鍵修正：比較原始星數
+            if (mainCard.stars > originalStars) {
                 upgradedCount++;
                 updatePromises.push(updateDoc(doc(db, "inventory", mainCard.docId), {
                     stars: mainCard.stars,
@@ -519,7 +512,6 @@ async function autoStarUp() {
                     hp: mainCard.hp
                 }));
             }
-            // 保留主卡
             newCardsState.push(mainCard);
         }
     }
@@ -857,7 +849,7 @@ if(document.getElementById('start-battle-btn')) document.getElementById('start-b
     gameLoop();
 });
 
-// 🔥 新增：生成英雄實體 🔥
+// 🔥 新增：生成英雄實體 (加入巡邏初始方向) 🔥
 function spawnHeroes() {
     const container = document.getElementById('hero-container');
     
@@ -873,7 +865,7 @@ function spawnHeroes() {
         // 修正：左右反轉 (右邊=前排)
         const startPos = 5 + (col * 4); 
         
-        // 初始位置還是分散的 (為了視覺效果)
+        // 初始位置
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
 
         const el = document.createElement('div');
@@ -896,7 +888,8 @@ function spawnHeroes() {
             range: card.attackType === 'ranged' ? 16 : 4, 
             atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.8) : card.atk, 
             lastAttackTime: 0,
-            el: el
+            el: el,
+            patrolDir: 1 // 1=Right, -1=Left (Default moving right)
         });
     });
 }
@@ -954,14 +947,14 @@ function spawnEnemy() {
         id: Date.now(), 
         maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, 
         lane: lane, 
-        position: 80, // 修正：生成位置內縮
+        position: 40 + Math.floor(Math.random() * 40), // 🔥 隨機出生點 (40-80)
         y: (lane === 0 ? 20 : (lane === 1 ? 50 : 80)), // 初始位置
         speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 
     };
     
     const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
     el.style.top = `${enemy.y}%`;
-    el.style.left = `80%`; 
+    el.style.left = `${enemy.position}%`; 
     
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
@@ -1055,12 +1048,12 @@ function gameLoop() {
 
         enemies.forEach(enemy => {
             if (enemy.currentHp > 0) {
-                // 計算歐幾里得距離 (直線距離)
+                // 計算歐幾里得距離
                 const dx = enemy.position - hero.position;
                 const dy = enemy.y - hero.y; 
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                // 尋找最近的敵人 (不限制前方，全場搜尋)
+                // 尋找最近的敵人 (全場搜尋)
                 if (dist < minTotalDist) {
                     minTotalDist = dist;
                     nearestEnemy = enemy;
@@ -1086,7 +1079,7 @@ function gameLoop() {
             }
         }
 
-        // 🔥 防追撞 + 繞路邏輯 (Smart AI)
+        // 🔥 防追撞 + 繞路邏輯 (20% overlap allowed)
         if (!blocked) {
             for (let other of heroEntities) {
                 if (other !== hero && other.currentHp > 0) {
@@ -1103,7 +1096,7 @@ function gameLoop() {
             }
         }
 
-        // 移動 & 索敵 (Free roam)
+        // 移動 & 索敵 & 巡邏
         if (!blocked) {
              // 如果有敵人，往敵人移動
              if (nearestEnemy) {
@@ -1115,8 +1108,12 @@ function gameLoop() {
                  if (hero.y < nearestEnemy.y) hero.y += 0.15;
                  else if (hero.y > nearestEnemy.y) hero.y -= 0.15;
              } else {
-                 // 沒敵人時，往右前方待命 (但不超過 80)
-                 if (hero.position < 80) hero.position += hero.speed;
+                 // 🔥 巡邏模式 (Patrol)
+                 hero.position += hero.speed * hero.patrolDir;
+                 
+                 // 碰到邊界折返
+                 if (hero.position >= 80) hero.patrolDir = -1;
+                 if (hero.position <= 10) hero.patrolDir = 1;
              }
         } else if (dodgeY !== 0) {
              // 繞路
@@ -1144,7 +1141,7 @@ function gameLoop() {
         return;
     }
 
-    // 🔥 敵人邏輯 (Smart AI for Enemies too)
+    // 🔥 敵人邏輯 (Active Hunting)
     enemies.sort((a, b) => a.position - b.position);
 
     enemies.forEach((enemy, eIndex) => {
