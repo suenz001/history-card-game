@@ -12,6 +12,9 @@ export let enemies = [];
 export let currentDifficulty = 'normal';
 export let gameSpeed = 1;
 
+// 暫存 PVP 玩家隊伍
+let pvpPlayerTeamData = [];
+
 let battleState = {
     wave: 1, spawned: 0, totalToSpawn: 0, lastSpawnTime: 0, phase: 'IDLE', waitTimer: 0
 };
@@ -59,9 +62,12 @@ function startBattle() {
     gameLoop();
 }
 
-export function startPvpMatch(enemyTeamData) {
+// 接收玩家的進攻隊伍
+export function startPvpMatch(enemyTeamData, playerTeamData) {
     if (isBattleActive) return;
     isPvpMode = true; 
+    pvpPlayerTeamData = playerTeamData; 
+
     setupBattleEnvironment();
     
     const waveNotif = document.getElementById('wave-notification');
@@ -145,9 +151,13 @@ function spawnHeroes() {
     const monitorList = document.getElementById('hero-monitor-list');
     if(!container) return;
 
-    battleSlots.forEach((card, index) => {
+    // 如果是 PVP 模式，使用傳入的隊伍；否則使用 PVE battleSlots
+    const currentTeam = isPvpMode ? pvpPlayerTeamData : battleSlots;
+
+    currentTeam.forEach((card, index) => {
         if(!card) return;
         
+        // PVP 進攻隊伍的 index 也是 0~8，直接對應位置
         const lane = Math.floor(index / 3);
         const col = index % 3;
         const startPos = 5 + (col * 4); 
@@ -169,6 +179,7 @@ function spawnHeroes() {
         if(monitorList) {
             monitorItem = document.createElement('div');
             monitorItem.className = 'monitor-item';
+            // 🔥 這邊的 HTML 結構必須對應 CSS 的 .monitor-hp-bg
             monitorItem.innerHTML = `
                 <div class="monitor-icon" style="background-image: url('assets/cards/${card.id}.webp');"></div>
                 <div class="monitor-info">

@@ -197,7 +197,8 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 戰場容器 */
 .battle-field-container {
     flex: 1; position: relative; background: #34495e; overflow: hidden; border-top: 2px solid #555; border-bottom: 2px solid #555;
-    background-image: linear-gradient(#2c3e50 1px, transparent 1px), linear-gradient(90deg, #2c3e50 1px, transparent 1px); background-size: 20px 20px; display: flex;
+    background-image: linear-gradient(#2c3e50 1px, transparent 1px), linear-gradient(90deg, #2c3e50 1px, transparent 1px);
+    background-size: 40px 40px; background-color: #1a252f;
 }
 
 /* 主堡 (改為出擊線) */
@@ -220,7 +221,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 敵人出生區 */
 .enemy-spawn-zone { width: 50px; height: 100%; background: rgba(0,0,0,0.3); border-left: 4px dashed #c0392b; display: flex; justify-content: center; align-items: center; color: #e74c3c; font-weight: bold; writing-mode: vertical-lr; z-index: 10; }
 
-/* 🔥 新增：英雄單位 (跑動中) */
+/* 🔥 英雄單位 (跑動中) */
 .hero-unit { 
     position: absolute; width: 45px; height: 45px; 
     border-radius: 50%; border: 3px solid #fff; 
@@ -230,7 +231,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     box-shadow: 0 0 10px rgba(0,0,0,0.5); 
     transform: translateY(-50%); 
     background-size: cover; 
-    background-position: center 15%; /* 🔥 修正：讓卡片大頭照對準臉部 */
+    background-position: center 15%;
 }
 .hero-unit.SSR { border-color: #f1c40f; }
 .hero-unit.SR { border-color: #9b59b6; }
@@ -269,7 +270,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 傷害飄字 - 基礎樣式 */
 .damage-text { position: absolute; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 3px #000; pointer-events: none; z-index: 100; animation: floatUp 0.8s forwards; color: #fff; }
 
-/* 傷害飄字 - 顏色變體 (🔥 優化重點) */
+/* 傷害飄字 - 顏色變體 */
 .damage-text.hero-dmg { 
     color: #ffffff; 
     font-size: 1.6em; 
@@ -281,8 +282,8 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     font-weight: 900;
     z-index: 200;
 }
-.damage-text.enemy-dmg { color: #e74c3c; font-size: 1.3em; /* 怪物打英雄：紅色 */ }
-.damage-text.gold-text { color: #f39c12; font-size: 1.2em; text-shadow: 0 0 5px gold; /* 金幣 */ }
+.damage-text.enemy-dmg { color: #e74c3c; font-size: 1.3em; }
+.damage-text.gold-text { color: #f39c12; font-size: 1.2em; text-shadow: 0 0 5px gold; }
 
 @keyframes floatUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }
 
@@ -290,9 +291,9 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .projectile {
     position: absolute;
     z-index: 50;
-    transition: all 0.3s linear; /* 飛行速度 */
+    transition: all 0.3s linear;
     pointer-events: none;
-    font-size: 2em; /* Emoji 大小 */
+    font-size: 2em;
     filter: drop-shadow(0 0 5px white);
 }
 /* 🔥 魔王投射物 (火球/暗黑球) */
@@ -302,13 +303,13 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     background: radial-gradient(circle, #fff, #4a0072);
     border-radius: 50%;
     box-shadow: 0 0 15px #8e44ad;
-    transition: all 0.5s linear; /* 飛行時間 */
+    transition: all 0.5s linear;
     pointer-events: none;
     animation: spin 0.5s linear infinite;
 }
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
-/* 🔥 噴毒動畫 (放大、顯眼) 🔥 */
+/* 🔥 噴毒動畫 */
 .poison-effect {
     position: absolute; width: 100px; height: 100px; 
     background: radial-gradient(circle, #00ff00, transparent); 
@@ -336,7 +337,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
 }
 
-/* 🔥 1. 背包卡片專用 (維持 0.45) */
+/* 受傷震動 */
 .card.taking-damage {
     animation: cardDamageShake 0.4s ease-out;
 }
@@ -348,13 +349,12 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: translate(-50%, -50%) scale(0.45) rotate(0deg); filter: none; }
 }
 
-/* 🔥 2. 戰場單位專用 (維持 ~1.0, 微縮至 0.9) */
 .hero-unit.taking-damage, .enemy-unit.taking-damage {
     animation: unitDamageShake 0.4s ease-out;
 }
 @keyframes unitDamageShake {
     0% { transform: translateY(-50%) scale(1) rotate(0deg); filter: none; }
-    20% { transform: translateY(-50%) scale(0.9) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); } /* Red flash */
+    20% { transform: translateY(-50%) scale(0.9) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); }
     40% { transform: translateY(-50%) scale(1.05) rotate(10deg); }
     60% { transform: translateY(-50%) scale(0.9) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.5); }
     100% { transform: translateY(-50%) scale(1) rotate(0deg); filter: none; }
@@ -414,6 +414,33 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .dps-bar-fill {
     height: 100%; background: #f1c40f; transition: width 0.5s ease-out;
 }
+
+/* 🔥 修正 1：兵種圖示改到右下角，避免擋住人物 */
+.hero-type-badge {
+    position: absolute; 
+    bottom: -5px; /* 改為 bottom */
+    right: -5px; 
+    top: auto;    /* 取消 top */
+    width: 20px; height: 20px;
+    background: #3498db; border-radius: 50%; font-size: 12px;
+    display: flex; justify-content: center; align-items: center; color: white;
+    z-index: 25;
+}
+
+/* 🔥 修正 2：補回缺失的戰鬥側邊欄 (Monitor) 樣式 */
+.battle-monitor-sidebar {
+    width: 180px; background: #222; border-left: 1px solid #444; padding: 10px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.monitor-item {
+    display: flex; align-items: center; gap: 8px; background: #333; padding: 5px; border-radius: 5px;
+}
+.monitor-item.dead { opacity: 0.4; filter: grayscale(1); }
+.monitor-icon { width: 30px; height: 30px; border-radius: 50%; background-size: cover; flex-shrink: 0; border: 1px solid #777; }
+.monitor-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.monitor-name { font-size: 0.75em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.monitor-hp-bg { width: 100%; height: 6px; background: #555; border-radius: 3px; overflow: hidden; }
+.monitor-hp-fill { height: 100%; background: #2ecc71; transition: width 0.2s; width: 100%; }
 
 /* =========================================
    === 新增 PVP 功能樣式 (請保留) ===
