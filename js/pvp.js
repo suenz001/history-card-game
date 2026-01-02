@@ -211,7 +211,7 @@ function resetToOpponentList() {
     currentEnemyData = null; // 清除選擇
 }
 
-// 🔥 修改：搜尋邏輯 (高 10 名 + 低 10 名)
+// 🔥 修改：搜尋邏輯 (高 10 名 + 低 10 名，不論有無防守)
 async function searchOpponent() {
     const loadingDiv = document.getElementById('pvp-loading');
     const listView = document.getElementById('pvp-opponent-list-view');
@@ -229,7 +229,7 @@ async function searchOpponent() {
             collection(db, "users"), 
             where("combatPower", ">=", myPower), 
             orderBy("combatPower", "asc"), 
-            limit(15)
+            limit(15) // 多抓一點做緩衝
         );
 
         // 查詢比我弱的 10 個
@@ -244,20 +244,18 @@ async function searchOpponent() {
         
         let candidates = [];
         
-        // 合併結果並過濾
+        // 合併結果並過濾 (只排除自己)
         const processDoc = (doc) => {
             if (doc.id === currentUser.uid) return; // 排除自己
             const data = doc.data();
-            // 必須有防守陣容
-            if (data.defenseTeam && data.defenseTeam.length > 0) {
-                candidates.push({ ...data, uid: doc.id });
-            }
+            // 🔥 移除：if (data.defenseTeam && data.defenseTeam.length > 0)
+            candidates.push({ ...data, uid: doc.id });
         };
 
         snapHigh.forEach(processDoc);
         snapLow.forEach(processDoc);
 
-        // 去除重複
+        // 去除重複 (理論上 >= 和 < 不會重複，但若有正好等於 myPower 的可能出現在 High)
         candidates = candidates.filter((item, index, self) => 
             index === self.findIndex((t) => (t.uid === item.uid))
         );
@@ -367,11 +365,17 @@ function renderMatchup() {
     document.getElementById('arena-enemy-power').innerText = currentEnemyData.combatPower || "???";
     
     const grid = document.getElementById('enemy-preview-grid'); grid.innerHTML = ""; 
+    
+    // 🔥 防呆：如果沒有防守陣容，就給空陣列
+    const enemyTeam = currentEnemyData.defenseTeam || [];
+
     for(let r=0; r<3; r++) {
         const rowDiv = document.createElement('div'); rowDiv.className = 'lane-row';
         for(let c=0; c<3; c++) {
             const slotIndex = r * 3 + c; const slotDiv = document.createElement('div'); slotDiv.className = 'defense-slot'; slotDiv.style.borderColor = '#e74c3c'; 
-            const enemyHero = currentEnemyData.defenseTeam.find(h => h.slotIndex === slotIndex);
+            
+            const enemyHero = enemyTeam.find(h => h.slotIndex === slotIndex);
+            
             if (enemyHero) {
                 slotDiv.classList.add('active'); slotDiv.style.background = 'rgba(231, 76, 60, 0.2)';
                 const cardDiv = document.createElement('div'); const charPath = `assets/cards/${enemyHero.id}.webp`; const framePath = `assets/frames/${enemyHero.rarity.toLowerCase()}.png`;
@@ -417,8 +421,8 @@ async function startActualPvp() {
 
     setOnBattleEnd(handlePvpResult);
 
-    // 🔥 傳入敵方陣容 + 我方進攻陣容
-    startPvpMatch(currentEnemyData.defenseTeam, pvpAttackSlots);
+    // 🔥 傳入敵方陣容 (空陣容防呆) + 我方進攻陣容
+    startPvpMatch(currentEnemyData.defenseTeam || [], pvpAttackSlots);
 }
 
 // 🔥 PVP 結算邏輯
