@@ -54,9 +54,13 @@ export function initPvp(database, user, inventory, openInventoryCallback) {
         document.getElementById('pvp-arena-modal').classList.add('hidden');
     });
 
-    // 搜尋對手 (這裡的按鈕現在會重新執行搜尋流程)
-    if(document.getElementById('search-again-btn')) {
-        document.getElementById('search-again-btn').remove(); // 移除舊按鈕事件綁定 (如果有)
+    // 🔥 綁定刷新按鈕
+    const refreshBtn = document.getElementById('refresh-opponent-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            playSound('click');
+            searchOpponent();
+        });
     }
 
     // 🔥 返回列表按鈕
@@ -213,12 +217,14 @@ async function searchOpponent() {
     const listView = document.getElementById('pvp-opponent-list-view');
     const listContainer = document.getElementById('pvp-opponent-list');
 
+    loadingDiv.classList.remove('hidden');
+    listView.classList.add('hidden');
     listContainer.innerHTML = ""; // 清空列表
 
     try {
         const myPower = currentUser.combatPower || 0;
 
-        // 查詢比我強的 10 個 (排除自己比較麻煩，所以多抓一點再濾)
+        // 查詢比我強的 10 個
         const qHigh = query(
             collection(db, "users"), 
             where("combatPower", ">=", myPower), 
@@ -251,7 +257,7 @@ async function searchOpponent() {
         snapHigh.forEach(processDoc);
         snapLow.forEach(processDoc);
 
-        // 去除重複 (理論上 >= 和 < 不會重複，但若有正好等於 myPower 的可能出現在 High)
+        // 去除重複
         candidates = candidates.filter((item, index, self) => 
             index === self.findIndex((t) => (t.uid === item.uid))
         );
@@ -456,6 +462,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
         } catch (e) {
             console.error("結算交易失敗", e);
             goldText.innerText = "💰 結算異常";
+            alert("結算失敗，請檢查權限或連線。錯誤代碼：" + e.message);
         }
 
     } else {
@@ -474,35 +481,36 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
     };
 }
 
-// 🔥 核心：金幣掠奪交易 (Firebase Transaction)
+// 🔥 核心修正：金幣掠奪交易 (Firebase Transaction)
 async function executeStealTransaction(myUid, enemyUid) {
     const myRef = doc(db, "users", myUid);
     const enemyRef = doc(db, "users", enemyUid);
 
-    let stolenAmount = 0;
-
     try {
-        await runTransaction(db, async (transaction) => {
+        const stolenAmount = await runTransaction(db, async (transaction) => {
+            // 1. 先進行所有讀取 (Reads MUST come before Writes)
             const enemyDoc = await transaction.get(enemyRef);
-            if (!enemyDoc.exists()) throw "Enemy does not exist!";
+            const myDoc = await transaction.get(myRef);
 
+            if (!enemyDoc.exists()) throw new Error("Enemy does not exist!");
+            if (!myDoc.exists()) throw new Error("User does not exist!");
+
+            // 2. 邏輯計算
             const enemyGold = enemyDoc.data().gold || 0;
+            const myGold = myDoc.data().gold || 0;
             
             // 計算 5%
-            stolenAmount = Math.floor(enemyGold * 0.05);
-            if(stolenAmount < 0) stolenAmount = 0;
+            let amount = Math.floor(enemyGold * 0.05);
+            if(amount < 0) amount = 0;
 
-            const newEnemyGold = Math.max(0, enemyGold - stolenAmount);
+            const newEnemyGold = Math.max(0, enemyGold - amount);
+            const newMyGold = myGold + amount;
 
-            // 扣對手的錢
+            // 3. 執行寫入
             transaction.update(enemyRef, { gold: newEnemyGold });
-
-            // 讀取自己的錢並增加
-            const myDoc = await transaction.get(myRef);
-            const myGold = myDoc.data().gold || 0;
-            const newMyGold = myGold + stolenAmount;
-
             transaction.update(myRef, { gold: newMyGold });
+
+            return amount; // 回傳搶到的金額
         });
         return stolenAmount;
     } catch (e) {
