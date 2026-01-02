@@ -18,6 +18,15 @@ let battleState = {
 let gameLoopId = null;
 let onBattleEndCallback = null;
 
+// --- 安全音效播放 (防止音效報錯卡死遊戲) ---
+function safePlaySound(type) {
+    try {
+        playSound(type);
+    } catch (e) {
+        console.warn(`音效播放失敗 [${type}]:`, e);
+    }
+}
+
 export function setBattleSlots(slots) { battleSlots = slots; }
 export function setDifficulty(diff) { currentDifficulty = diff; }
 export function setGameSpeed(speed) { gameSpeed = speed; }
@@ -28,13 +37,12 @@ export function initBattle() {
     if(startBtn) startBtn.addEventListener('click', startBattle);
     
     const retreatBtn = document.getElementById('retreat-btn');
-    if(retreatBtn) retreatBtn.addEventListener('click', () => { playSound('click'); resetBattleState(); });
+    if(retreatBtn) retreatBtn.addEventListener('click', () => { safePlaySound('click'); resetBattleState(); });
     
-    // 難度選擇監聽
     document.querySelectorAll('.difficulty-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             if(isBattleActive) return; 
-            playSound('click');
+            safePlaySound('click');
             document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             currentDifficulty = e.target.getAttribute('data-diff');
@@ -42,56 +50,53 @@ export function initBattle() {
     });
 }
 
-// 一般 PVE 戰鬥入口
 function startBattle() {
     if (isBattleActive) return;
-    isPvpMode = false; // 標記為 PVE
+    isPvpMode = false; 
     setupBattleEnvironment();
     spawnHeroes();
     startWave(1); 
     gameLoop();
 }
 
-// 🔥 PVP 戰鬥入口 (被 pvp.js 呼叫)
 export function startPvpMatch(enemyTeamData) {
     if (isBattleActive) return;
-    isPvpMode = true; // 標記為 PVP
+    isPvpMode = true; 
     setupBattleEnvironment();
     
-    // UI 調整
     const waveNotif = document.getElementById('wave-notification');
     const waveCount = document.getElementById('wave-count');
     if(waveNotif) waveNotif.innerText = "⚔️ PVP 對決開始 ⚔️";
     if(waveCount) waveCount.innerText = "PVP";
     
-    spawnHeroes(); // 生成我方
-    spawnPvpEnemies(enemyTeamData); // 生成敵方
+    spawnHeroes(); 
+    spawnPvpEnemies(enemyTeamData); 
     
-    battleState.phase = 'COMBAT'; // 直接進入戰鬥
+    battleState.phase = 'COMBAT'; 
     gameLoop();
 }
 
-// 共用環境設定
 function setupBattleEnvironment() {
-    playSound('click');
+    safePlaySound('click');
     isBattleActive = true;
     battleGold = 0;
     enemies = [];
     heroEntities = [];
     deadHeroes = [];
+    
     const enemyContainer = document.getElementById('enemy-container');
     const heroContainer = document.getElementById('hero-container');
+    const monitorList = document.getElementById('hero-monitor-list');
+    
     if(enemyContainer) enemyContainer.innerHTML = '';
     if(heroContainer) heroContainer.innerHTML = '';
-    
-    // 清空並準備監控列表
-    const monitorList = document.getElementById('hero-monitor-list');
     if(monitorList) monitorList.innerHTML = '';
 
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) lanesWrapper.style.opacity = '0.3';
     
     updateBattleUI();
+    
     const startBtn = document.getElementById('start-battle-btn');
     if(startBtn) {
         startBtn.classList.add('btn-disabled');
@@ -160,7 +165,6 @@ function spawnHeroes() {
         let finalHp = card.hp;
         if(card.attackType === 'ranged') finalHp = Math.floor(card.hp * 0.7);
 
-        // 🔥 建立監控面板項目
         let monitorItem = null;
         if(monitorList) {
             monitorItem = document.createElement('div');
@@ -186,14 +190,13 @@ function spawnHeroes() {
             atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.6) : card.atk, 
             lastAttackTime: 0, 
             el: el, 
-            monitorEl: monitorItem, // 綁定監控元素
+            monitorEl: monitorItem, 
             patrolDir: 1, 
             totalDamage: 0
         });
     });
 }
 
-// 🔥 生成 PVP 敵方英雄
 function spawnPvpEnemies(enemyTeam) {
     const container = document.getElementById('enemy-container');
     if(!container) return;
@@ -261,7 +264,6 @@ function spawnEnemy() {
 
     const config = WAVE_CONFIG[battleState.wave];
     
-    // Wave 4: 魔王
     if(battleState.wave === 4) {
         const bossX = 10 + Math.random() * 80; 
         const bossY = 10 + Math.random() * 80;
@@ -287,7 +289,7 @@ function spawnEnemy() {
 }
 
 function fireBossSkill(boss) {
-    const container = document.querySelector('.battle-field-container');
+    const container = getBattleContainer();
     if(!container) return;
     
     const projectile = document.createElement('div'); projectile.className = 'boss-projectile';
@@ -307,7 +309,7 @@ function fireBossSkill(boss) {
         effect.style.left = `${target.position}%`; effect.style.top = `${target.y}%`;
         if(container) container.appendChild(effect);
         setTimeout(() => effect.remove(), 600);
-        playSound('dismantle');
+        safePlaySound('dismantle');
         
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position; const dy = hero.y - target.y; const dist = Math.sqrt(dx*dx + dy*dy);
@@ -321,8 +323,8 @@ function fireBossSkill(boss) {
 
 function fireProjectile(startEl, targetEl, type, onHitCallback) {
     if(!startEl || !targetEl) return;
-    const container = document.querySelector('.battle-field-container');
-    if(!container) return;
+    const container = getBattleContainer();
+    if(!container) return; // 安全檢查
 
     const projectile = document.createElement('div'); projectile.className = 'projectile';
     if (type === 'arrow') projectile.innerText = '🏹'; else if (type === 'fireball') projectile.innerText = '🔥'; else if (type === 'sword') projectile.innerText = '🗡️'; else projectile.innerText = '⚔️'; 
@@ -337,30 +339,55 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     
     void projectile.offsetWidth; 
     projectile.style.left = `${endX}px`; projectile.style.top = `${endY}px`;
-    setTimeout(() => { projectile.remove(); if(onHitCallback) { playSound('dismantle'); onHitCallback(); } }, 300);
+    setTimeout(() => { projectile.remove(); if(onHitCallback) { safePlaySound('dismantle'); onHitCallback(); } }, 300);
 }
 
 function triggerHeroHit(el) { if(el) { el.classList.remove('taking-damage'); void el.offsetWidth; el.classList.add('taking-damage'); } }
 
-// 顯示飄字 (加入防呆)
+// 🔥 取得戰鬥容器的輔助函式 (多重備案，防止找不到容器)
+function getBattleContainer() {
+    return document.querySelector('.battle-field-container') || 
+           document.getElementById('battle-screen') || 
+           document.body; // 最後手段：直接貼在 body 上，確保不報錯
+}
+
+// 🔥 顯示飄字 (絕對防禦版)
 function showDamageText(x, y, text, type) {
-    const container = document.querySelector('.battle-field-container');
-    if(!container) return;
+    const container = getBattleContainer();
+    if(!container) return; // 真的找不到就算了，不要當機
+
     const el = document.createElement('div');
     el.className = `damage-text ${type}`;
     el.innerText = text;
     el.style.left = `${x}%`;
     el.style.top = `${y}%`;
+    el.style.position = 'absolute'; // 確保一定是絕對定位
+    el.style.zIndex = '9999'; // 確保在最上層
+    
     container.appendChild(el);
     setTimeout(() => el.remove(), 800);
 }
 
-// 🔥 核心遊戲迴圈 (已加入 PVE 死機防護)
+// 🔥 UI 更新 (絕對防禦版)
+function updateBattleUI() {
+    try {
+        const goldEl = document.getElementById('battle-gold');
+        if(goldEl) goldEl.innerText = battleGold; 
+        
+        const waveEl = document.getElementById('wave-count');
+        if(waveEl) waveEl.innerText = isPvpMode ? "PVP" : battleState.wave;
+        
+        const countEl = document.getElementById('hero-count-display');
+        if(countEl) countEl.innerText = heroEntities.length;
+    } catch(e) {
+        console.warn("UI Update Warning:", e); // 只警告，不當機
+    }
+}
+
 function gameLoop() {
     if (!isBattleActive) return;
     const now = Date.now();
 
-    // PVE 生成邏輯
     if (!isPvpMode && battleState.phase === 'SPAWNING') {
         if (battleState.spawned < battleState.totalToSpawn) {
             if (now - battleState.lastSpawnTime > 1500 / gameSpeed) { 
@@ -384,13 +411,11 @@ function gameLoop() {
         }
     }
     
-    // PVP 結束判定
     if (isPvpMode && battleState.phase === 'COMBAT') {
         if (enemies.length === 0) { endBattle(true); return; }
         if (heroEntities.length === 0) { endBattle(false); return; }
     }
 
-    // --- 英雄邏輯 ---
     heroEntities.sort((a, b) => b.position - a.position);
     for (let i = heroEntities.length - 1; i >= 0; i--) {
         const hero = heroEntities[i];
@@ -457,7 +482,6 @@ function gameLoop() {
 
     if (!isPvpMode && isBattleActive && heroEntities.length === 0 && battleState.spawned > 0) { endBattle(false); return; }
 
-    // --- 🔥 敵人邏輯 (倒序遍歷) ---
     enemies.sort((a, b) => a.position - b.position);
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
@@ -467,17 +491,17 @@ function gameLoop() {
             if(enemy.el) enemy.el.remove();
             enemies.splice(i, 1);
             
-            // 🔥 PVE 專屬邏輯 (加入 try-catch 防止 UI 錯誤導致當機)
+            // 🔥 PVE 專屬邏輯 (絕對防禦區塊)
             if(!isPvpMode) { 
                 try {
                     battleGold += 50 + (battleState.wave * 10);
-                    updateBattleUI(); 
+                    updateBattleUI(); // 如果這裡找不到 ID，只會 console.warn，不會卡死
                     showDamageText(enemy.position, enemy.y, `+50G`, 'gold-text'); 
                 } catch(err) {
-                    console.error("UI Update Error in Battle:", err);
+                    console.error("Critical Error in PVE Death Logic:", err);
                 }
             }
-            playSound('dismantle');
+            safePlaySound('dismantle'); // 防止音效錯誤卡死
             continue; 
         }
 
@@ -511,7 +535,7 @@ function gameLoop() {
             if (now - enemy.lastAttackTime > 800 / gameSpeed) {
                 fireProjectile(enemy.el, nearestHero.el, 'fireball', () => {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
-                        nearestHero.currentHp -= enemy.atk; triggerHeroHit(nearestHero.el); playSound('poison'); showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
+                        nearestHero.currentHp -= enemy.atk; triggerHeroHit(nearestHero.el); safePlaySound('poison'); showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
                     }
                 });
                 enemy.lastAttackTime = now;
@@ -554,17 +578,6 @@ function gameLoop() {
     }
 
     gameLoopId = requestAnimationFrame(gameLoop);
-}
-
-// 🔥 UI 更新防呆版
-function updateBattleUI() {
-    const goldEl = document.getElementById('battle-gold');
-    const waveEl = document.getElementById('wave-count');
-    const countEl = document.getElementById('hero-count-display');
-    
-    if(goldEl) goldEl.innerText = battleGold; 
-    if(waveEl) waveEl.innerText = isPvpMode ? "PVP" : battleState.wave;
-    if(countEl) countEl.innerText = heroEntities.length;
 }
 
 function endBattle(isWin) {
