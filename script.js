@@ -234,6 +234,32 @@ if(document.getElementById('settings-save-name-btn')) {
     });
 }
 
+// 🔥 新增：序號兌換邏輯 🔥
+if(document.getElementById('redeem-btn')) {
+    document.getElementById('redeem-btn').addEventListener('click', async () => {
+        const codeInput = document.getElementById('redeem-code-input');
+        const code = codeInput.value.trim().toLowerCase();
+        
+        if (!code) return alert("請輸入序號");
+        if (!currentUser) return alert("請先登入");
+
+        if (code === 'make diamond') {
+            gems += 5000;
+            alert("💎 獲得 5000 鑽石！");
+        } else if (code === 'make gold') {
+            gold += 50000;
+            alert("💰 獲得 50000 金幣！");
+        } else {
+            return alert("無效的序號");
+        }
+
+        playSound('coin');
+        await updateCurrencyCloud();
+        updateUIDisplay();
+        codeInput.value = ""; // 清空輸入框
+    });
+}
+
 // --- 登入介面 ---
 const loginSection = document.getElementById('login-section');
 const userInfo = document.getElementById('user-info');
@@ -311,7 +337,6 @@ async function loadUserData(user) {
 
 async function updateCurrencyCloud() { if (!currentUser) return; await updateDoc(doc(db, "users", currentUser.uid), { gems, gold, combatPower: totalPower }); }
 function updateUIDisplay() { document.getElementById('gem-count').innerText = gems; document.getElementById('gold-count').innerText = gold; document.getElementById('power-display').innerText = `🔥 戰力: ${totalPower}`; }
-if(document.getElementById('add-gem-btn')) document.getElementById('add-gem-btn').addEventListener('click', async () => { playSound('click'); if (!currentUser) return alert("請先登入"); gems += 5000; updateUIDisplay(); await updateCurrencyCloud(); alert("已領取 5000 鑽！"); });
 
 async function calculateTotalPowerOnly(uid) {
     const q = query(collection(db, "inventory"), where("owner", "==", uid));
@@ -756,19 +781,24 @@ if(document.getElementById('start-battle-btn')) document.getElementById('start-b
 // 🔥 新增：生成英雄實體 🔥
 function spawnHeroes() {
     const container = document.getElementById('hero-container');
+    
+    // 確保單位從前排開始生成，避免視覺遮擋
+    const sortedSlots = [];
     battleSlots.forEach((card, index) => {
-        if (!card) return;
-        
-        // 根據 slot 計算初始位置 (Lane 0, 1, 2)
+        if(card) sortedSlots.push({card, index});
+    });
+    
+    // 這裡我們不需要特別排序，因為 DOM 順序會決定疊加層級
+    
+    sortedSlots.forEach(({card, index}) => {
         const lane = Math.floor(index / 3);
         const col = index % 3; // 0, 1, 2 (前面, 中間, 後面)
         
-        // 初始位置偏移：讓他們稍微錯開，不要全疊在一起
-        // Front (0) starts at 12%, Mid (1) at 9%, Back (2) at 6%
         const startPos = 12 - (col * 3); 
         
-        // 計算垂直位置 Lane 0: 15%, Lane 1: 50%, Lane 2: 85%
-        const topPos = (lane === 0 ? 15 : (lane === 1 ? 50 : 85));
+        // 修正：嚴格區分上中下路，不進行斜向移動
+        // Lane 0: 20%, Lane 1: 50%, Lane 2: 80% (拉開間距)
+        const topPos = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
 
         const el = document.createElement('div');
         el.className = `hero-unit ${card.rarity}`;
@@ -780,14 +810,14 @@ function spawnHeroes() {
         container.appendChild(el);
 
         heroEntities.push({
-            ...card, // 繼承卡片數值 (atk, hp, etc)
+            ...card,
             maxHp: card.hp,
             currentHp: card.hp,
             lane: lane,
             position: startPos,
-            y: topPos, // 新增：垂直座標追蹤
-            speed: 0.05, // 移動速度
-            // 🔥 平衡：調整射程
+            y: topPos,
+            speed: 0.05,
+            // 修正：近戰 4, 遠攻 16
             range: card.attackType === 'ranged' ? 16 : 4, 
             atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.8) : card.atk, // 遠攻傷害 8折
             lastAttackTime: 0,
@@ -848,7 +878,7 @@ function spawnEnemy() {
         maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, 
         lane: lane, 
         position: 100, 
-        y: (lane === 0 ? 15 : (lane === 1 ? 50 : 85)), // 新增：垂直座標
+        y: (lane === 0 ? 20 : (lane === 1 ? 50 : 80)), // 嚴格分路
         speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 
     };
     
@@ -940,33 +970,34 @@ function gameLoop() {
             nearest.currentHp -= 300; 
             baseAttackCooldown = 0;
             const laser = document.createElement('div'); laser.className = 'base-laser'; laser.style.width = `${nearest.position}%`;
-            if(nearest.lane === 0) laser.style.top = '15%'; else if(nearest.lane === 1) laser.style.top = '50%'; else if(nearest.lane === 2) laser.style.top = '85%';
+            // 主堡攻擊位置修正
+            let targetLaneY = (nearest.lane === 0 ? 20 : (nearest.lane === 1 ? 50 : 80));
+            laser.style.top = `${targetLaneY}%`;
+            
             document.querySelector('.battle-field-container').appendChild(laser); setTimeout(() => laser.remove(), 150);
             playSound('dismantle');
         }
     }
 
-    // 🔥 英雄邏輯 (移動 + 集結 + 攻擊)
+    // 🔥 英雄邏輯
+    // 先排序，讓前面的英雄先移動，避免後面推擠前面
+    heroEntities.sort((a, b) => b.position - a.position);
+
     heroEntities.forEach((hero, hIndex) => {
         if (hero.currentHp <= 0) return; // 已死亡
 
         let blocked = false;
         
-        // 尋找最近敵人 (跨線索敵)
+        // 尋找最近敵人 (同路)
         let nearestEnemy = null;
         let minDistX = 999;
 
         enemies.forEach(enemy => {
-            if (enemy.currentHp > 0) {
-                // 判斷是否在"同一水平面" (集結完成或本來就在附近)
-                const yDiff = Math.abs(hero.y - enemy.y);
-                
-                if (yDiff < 20) { // 垂直距離夠近才視為可攻擊
-                    let dist = enemy.position - hero.position;
-                    if (dist > 0 && dist < minDistX) {
-                        minDistX = dist;
-                        nearestEnemy = enemy;
-                    }
+            if (enemy.currentHp > 0 && enemy.lane === hero.lane) {
+                let dist = enemy.position - hero.position;
+                if (dist > 0 && dist < minDistX) {
+                    minDistX = dist;
+                    nearestEnemy = enemy;
                 }
             }
         });
@@ -989,21 +1020,30 @@ function gameLoop() {
             }
         }
 
-        // 移動邏輯 (包含集結到中路 Y=50)
+        // 🔥 防疊加邏輯 (隊友碰撞)
+        // 檢查同一路的隊友，是否有位置比我大 (在我前面) 且距離很近的
+        if (!blocked) {
+            for (let other of heroEntities) {
+                if (other !== hero && other.lane === hero.lane && other.currentHp > 0) {
+                    let dist = other.position - hero.position;
+                    // 如果距離大於 0 (在前面) 且 小於 5 (太近)，就停下
+                    if (dist > 0 && dist < 5) {
+                        blocked = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 移動邏輯 (直行)
         if (!blocked && hero.position < 90) {
             hero.position += hero.speed;
-            
-            // 往中路 (Y=50) 靠攏
-            if (hero.y < 50) hero.y += 0.15; // 向下走
-            if (hero.y > 50) hero.y -= 0.15; // 向上走
-            // 修正
-            if(Math.abs(hero.y - 50) < 0.5) hero.y = 50;
         }
 
         // 更新 UI
         if (hero.el) {
             hero.el.style.left = `${hero.position}%`;
-            hero.el.style.top = `${hero.y}%`; // 更新垂直位置
+            hero.el.style.top = `${hero.y}%`; 
             hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
         }
     });
@@ -1016,7 +1056,9 @@ function gameLoop() {
         }
     }
 
-    // 🔥 敵人邏輯 (移動 + 集結 + 攻擊)
+    // 🔥 敵人邏輯 (Sort enemies as well)
+    enemies.sort((a, b) => a.position - b.position); // 敵人是往左走，所以位置小的在前面(離終點近)嗎？不，敵人從100走到0
+
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
         
@@ -1024,14 +1066,11 @@ function gameLoop() {
         let minDistX = 999;
 
         heroEntities.forEach(hero => {
-            if (hero.currentHp > 0) {
-                const yDiff = Math.abs(hero.y - enemy.y);
-                if (yDiff < 20) {
-                    let dist = enemy.position - hero.position;
-                    if (dist > 0 && dist < minDistX) {
-                        minDistX = dist;
-                        nearestHero = hero;
-                    }
+            if (hero.currentHp > 0 && hero.lane === enemy.lane) {
+                let dist = enemy.position - hero.position;
+                if (dist > 0 && dist < minDistX) {
+                    minDistX = dist;
+                    nearestHero = hero;
                 }
             }
         });
@@ -1067,14 +1106,24 @@ function gameLoop() {
             }
         }
 
-        // 移動邏輯 (包含集結)
+        // 🔥 防疊加 (敵人)
+        if (!blocked) {
+            for (let other of enemies) {
+                if (other !== enemy && other.lane === enemy.lane && other.currentHp > 0) {
+                    // 敵人是往左走 (position 減少)，所以前面的敵人 position 比較小
+                    let dist = enemy.position - other.position;
+                    // 如果距離大於 0 (other 在我左邊/前面) 且 小於 5
+                    if (dist > 0 && dist < 5) {
+                        blocked = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 移動邏輯 (直行)
         if (!blocked) { 
             enemy.position -= enemy.speed;
-            
-            // 往中路 (Y=50) 靠攏
-            if (enemy.y < 50) enemy.y += 0.15;
-            if (enemy.y > 50) enemy.y -= 0.15;
-            if(Math.abs(enemy.y - 50) < 0.5) enemy.y = 50;
         }
         
         if (enemy.el) {
@@ -1118,11 +1167,42 @@ function showDamageText(leftPercent, topPercent, text, colorClass) {
 async function endBattle(isWin) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     let finalGold = Math.floor(battleGold * goldMultiplier);
-    const modal = document.getElementById('battle-result-modal'); const title = document.getElementById('result-title'); const goldText = document.getElementById('result-gold'); const btn = document.getElementById('close-result-btn');
+    
+    // 💎 新增：通關獎勵 (鑽石)
+    let gemReward = 0;
+    if (isWin) {
+        if (currentDifficulty === 'easy') gemReward = 50;
+        else if (currentDifficulty === 'normal') gemReward = 100;
+        else if (currentDifficulty === 'hard') gemReward = 200;
+    }
+
+    const modal = document.getElementById('battle-result-modal'); const title = document.getElementById('result-title'); const goldText = document.getElementById('result-gold'); const gemText = document.getElementById('result-gems'); // 需要在HTML加這個ID
+    const btn = document.getElementById('close-result-btn');
+    
     modal.classList.remove('hidden');
-    if (isWin) { title.innerText = "VICTORY"; title.className = "result-title win-text"; playSound('reveal'); } else { title.innerText = "DEFEAT"; title.className = "result-title lose-text"; finalGold = Math.floor(finalGold / 2); playSound('dismantle'); }
+    
+    if (isWin) { 
+        title.innerText = "VICTORY"; 
+        title.className = "result-title win-text"; 
+        playSound('reveal'); 
+        gemText.style.display = 'block';
+        gemText.innerText = `💎 +${gemReward}`;
+    } else { 
+        title.innerText = "DEFEAT"; 
+        title.className = "result-title lose-text"; 
+        finalGold = Math.floor(finalGold / 2); 
+        gemText.style.display = 'none'; // 輸了沒鑽石
+        playSound('dismantle'); 
+    }
+    
     goldText.innerText = `💰 +${finalGold}`;
-    gold += finalGold; await updateCurrencyCloud(); updateUIDisplay();
+    
+    // 更新雲端
+    gold += finalGold; 
+    gems += gemReward;
+    await updateCurrencyCloud(); 
+    updateUIDisplay();
+    
     btn.onclick = () => { playSound('click'); modal.classList.add('hidden'); resetBattleState(); };
 }
 

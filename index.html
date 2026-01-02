@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=42">
+    <link rel="stylesheet" href="style.css?v=50">
 </head>
 <body>
 
@@ -53,14 +53,14 @@
                     <div class="status-bar">
                         <div style="display:flex; flex-direction:column; gap:5px; width:100%;">
                             <div style="display:flex; justify-content:space-between;">
-                                <span>💎 <span id="gem-count">0</span> <button id="add-gem-btn" class="btn-mini">➕</button></span>
+                                <span>💎 <span id="gem-count">0</span></span>
                                 <span>💰 <span id="gold-count">0</span></span>
                             </div>
                             <button id="inventory-btn" class="btn-secondary" style="background:#8e44ad; width:100%; margin:0;">🎒 打開我的背包 (查看所有卡片)</button>
                         </div>
                     </div>
 
-                    <button id="enter-battle-mode-btn" class="btn-danger" style="width: 100%; margin-bottom: 20px; font-size: 1.2em; border: 2px solid #fff; box-shadow: 0 0 10px #c0392b;">⚔️ 前往戰場 (賺金幣)</button>
+                    <button id="enter-battle-mode-btn" class="btn-danger" style="width: 100%; margin-bottom: 20px; font-size: 1.2em; border: 2px solid #fff; box-shadow: 0 0 10px #c0392b;">⚔️ 前往戰場 (賺金幣/鑽石)</button>
 
                     <div class="gacha-section">
                         <button id="draw-btn" class="btn-primary">單抽 (100鑽)</button>
@@ -144,6 +144,7 @@
             <div id="result-title" class="result-title">VICTORY</div>
             <div id="result-desc" style="color:#ccc; margin-bottom:5px;">戰鬥獎勵</div>
             <div id="result-gold" class="result-gold">💰 +0</div>
+            <div id="result-gems" class="result-gold" style="color:#2ecc71;">💎 +0</div>
             <button id="close-result-btn" class="btn-primary" style="width:100%;">回到大廳</button>
         </div>
     </div>
@@ -230,6 +231,15 @@
                         <button id="settings-save-name-btn" class="btn-primary">儲存</button>
                     </div>
                 </div>
+                
+                <div class="setting-item">
+                    <label>🎁 輸入序號</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="text" id="redeem-code-input" placeholder="輸入序號領獎" style="flex:1;">
+                        <button id="redeem-btn" class="btn-secondary" style="background:#8e44ad;">兌換</button>
+                    </div>
+                </div>
+
                 <hr style="border-color: #555; margin: 15px 0;">
                 <div class="setting-item">
                     <label>背景音樂 (BGM)</label>
@@ -249,6 +259,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=42"></script>
+    <script type="module" src="script.js?v=50"></script>
 </body>
 </html>
