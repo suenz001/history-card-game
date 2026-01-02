@@ -2,12 +2,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// --- 全域錯誤監聽 ---
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
 };
 
-// --- Firebase 設定 ---
 const firebaseConfig = {
   apiKey: "AIzaSyCaLWMEi7wNxeCjUQC86axbRsxLMDWQrq8",
   authDomain: "gacha-game-v1.firebaseapp.com",
@@ -18,7 +16,6 @@ const firebaseConfig = {
   measurementId: "G-N0EM6EJ9BK"
 };
 
-// --- 安全初始化 Firebase ---
 let app, db, auth, provider;
 let isFirebaseReady = false;
 
@@ -33,12 +30,13 @@ try {
     alert("遊戲初始化失敗，請檢查網路連線");
 }
 
-// --- 遊戲全域變數 ---
 let currentUser = null;
 let gems = 0;
 let gold = 0;
 let totalPower = 0;
 let allUserCards = [];
+let claimedNotifs = []; // 已領取通知 ID 列表
+
 let currentDisplayList = [];
 let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
@@ -46,10 +44,10 @@ let currentSortMethod = 'time_desc';
 
 // 戰鬥變數
 let battleSlots = new Array(9).fill(null);
-let heroEntities = []; // 移動中的英雄實體
+let heroEntities = []; 
 let isBattleActive = false;
 let battleGold = 0;
-let baseHp = 100;
+// let baseHp = 100; // 移除主堡血量
 let enemies = [];
 let deployTargetSlot = null; 
 let currentDifficulty = 'normal';
@@ -71,7 +69,11 @@ let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// --- 音效初始化 ---
+// 系統通知資料
+const SYSTEM_NOTIFICATIONS = [
+    { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 } }
+];
+
 const audioBgm = document.getElementById('bgm');
 const audioBattle = document.getElementById('bgm-battle');
 const sfxDraw = document.getElementById('sfx-draw');
@@ -93,7 +95,6 @@ let sfxVolume = 1.0;
 
 if(audioBgm) { audioBgm.volume = bgmVolume; audioBattle.volume = bgmVolume; }
 
-// 全域點擊啟動音效
 document.body.addEventListener('click', () => {
     if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
     if (isBgmOn && audioBgm && audioBgm.paused && audioBattle && audioBattle.paused) {
@@ -128,7 +129,6 @@ function playSound(type) {
     } catch (e) { console.log("Audio Error", e); }
 }
 
-// 合成音效函數
 function synthesizeClick() {
     if(!audioCtx) return;
     const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
@@ -158,7 +158,6 @@ function synthesizePoison() {
     osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3);
 }
 
-// --- 卡片資料庫 ---
 const cardDatabase = [
     { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝", attackType: "melee" },
     { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王", attackType: "melee" },
@@ -192,7 +191,6 @@ const cardDatabase = [
     { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged" }
 ];
 
-// --- 介面按鈕邏輯 ---
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
 const sfxToggle = document.getElementById('sfx-toggle');
@@ -258,6 +256,79 @@ if(document.getElementById('redeem-btn')) {
         updateUIDisplay();
         codeInput.value = ""; 
     });
+}
+
+// --- 系統通知邏輯 ---
+const notificationModal = document.getElementById('notification-modal');
+const notificationList = document.getElementById('notification-list');
+
+if(document.getElementById('notification-btn')) {
+    document.getElementById('notification-btn').addEventListener('click', () => {
+        playSound('click');
+        openNotificationModal();
+    });
+}
+if(document.getElementById('close-notification-btn')) {
+    document.getElementById('close-notification-btn').addEventListener('click', () => {
+        playSound('click');
+        notificationModal.classList.add('hidden');
+    });
+}
+
+function openNotificationModal() {
+    notificationModal.classList.remove('hidden');
+    renderNotifications();
+}
+
+function renderNotifications() {
+    notificationList.innerHTML = "";
+    
+    SYSTEM_NOTIFICATIONS.forEach(notif => {
+        const isClaimed = claimedNotifs.includes(notif.id);
+        const item = document.createElement('div');
+        item.className = `notification-item ${isClaimed ? 'claimed' : ''}`;
+        
+        item.innerHTML = `
+            <div>
+                <div class="notif-title">${notif.title}</div>
+                <div style="font-size:0.8em; color:#ccc;">${isClaimed ? '已領取' : '點擊領取獎勵'}</div>
+            </div>
+            <div class="notif-status">${isClaimed ? '✔' : '🎁'}</div>
+        `;
+        
+        if (!isClaimed) {
+            item.addEventListener('click', () => claimReward(notif));
+        }
+        
+        notificationList.appendChild(item);
+    });
+}
+
+async function claimReward(notif) {
+    if (!currentUser) return alert("請先登入");
+    
+    try {
+        if (notif.reward.type === 'gems') {
+            gems += notif.reward.amount;
+        }
+        
+        claimedNotifs.push(notif.id);
+        
+        // 更新雲端
+        await updateDoc(doc(db, "users", currentUser.uid), {
+            gems: gems,
+            claimedNotifs: claimedNotifs
+        });
+        
+        playSound('coin');
+        alert(`領取成功！獲得 ${notif.reward.amount} ${notif.reward.type === 'gems' ? '鑽石' : '金幣'}`);
+        updateUIDisplay();
+        renderNotifications(); // 刷新列表狀態
+        
+    } catch (e) {
+        console.error("領取失敗", e);
+        alert("領取失敗，請稍後再試");
+    }
 }
 
 // --- 登入介面 ---
@@ -330,12 +401,29 @@ if (isFirebaseReady && auth) {
 async function loadUserData(user) {
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) { const data = userSnap.data(); gems = data.gems; gold = data.gold; } 
-    else { gems = 1000; gold = 5000; await setDoc(userRef, { name: user.displayName||"未命名", gems, gold, combatPower: 0, createdAt: new Date() }); }
+    if (userSnap.exists()) { 
+        const data = userSnap.data(); 
+        gems = data.gems; 
+        gold = data.gold;
+        // 載入已領取的通知 ID
+        claimedNotifs = data.claimedNotifs || [];
+    } else { 
+        gems = 1000; 
+        gold = 5000; 
+        claimedNotifs = [];
+        await setDoc(userRef, { 
+            name: user.displayName||"未命名", 
+            gems, 
+            gold, 
+            combatPower: 0, 
+            claimedNotifs: [],
+            createdAt: new Date() 
+        }); 
+    }
     updateUIDisplay();
 }
 
-async function updateCurrencyCloud() { if (!currentUser) return; await updateDoc(doc(db, "users", currentUser.uid), { gems, gold, combatPower: totalPower }); }
+async function updateCurrencyCloud() { if (!currentUser) return; await updateDoc(doc(db, "users", currentUser.uid), { gems, gold, combatPower: totalPower, claimedNotifs: claimedNotifs }); }
 function updateUIDisplay() { document.getElementById('gem-count').innerText = gems; document.getElementById('gold-count').innerText = gold; document.getElementById('power-display').innerText = `🔥 戰力: ${totalPower}`; }
 
 async function calculateTotalPowerOnly(uid) {
@@ -346,7 +434,6 @@ async function calculateTotalPowerOnly(uid) {
     totalPower = tempPower; updateUIDisplay(); updateCurrencyCloud();
 }
 
-// 更新背包數量顯示
 function updateInventoryCounts() {
     const counts = { ALL: 0, SSR: 0, SR: 0, R: 0 };
     counts.ALL = allUserCards.length;
@@ -364,7 +451,6 @@ function updateInventoryCounts() {
     });
 }
 
-// 一鍵自動升星
 async function autoStarUp() {
     if (!currentUser) return alert("請先登入");
     if (isBatchMode) return alert("請先關閉批量分解模式");
@@ -457,7 +543,6 @@ if(document.getElementById('auto-star-btn')) {
     });
 }
 
-// 一鍵清空部署
 function clearDeployment() {
     battleSlots.fill(null);
     renderBattleSlots();
@@ -563,7 +648,6 @@ async function upgradeCardStar() {
     await deleteDoc(doc(db, "inventory", duplicate.docId)); allUserCards = allUserCards.filter(c => c.docId !== duplicate.docId); card.stars++; calculateCardStats(card); playSound('upgrade'); 
     await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
     
-    // 更新數量
     updateInventoryCounts();
     if(!document.getElementById('inventory-modal').classList.contains('hidden')){ filterInventory(currentFilterRarity); const newIndex = currentDisplayList.findIndex(c => c.docId === currentDocId); if(newIndex !== -1) currentCardIndex = newIndex; } renderDetailCard(); alert(`升星成功！目前 ${card.stars} ★`);
 }
@@ -579,7 +663,6 @@ async function dismantleCurrentCard() {
         gold += value; 
         allUserCards = allUserCards.filter(c => c !== card); 
         
-        // 更新數量
         updateInventoryCounts();
         
         document.getElementById('detail-modal').classList.add('hidden'); 
@@ -628,7 +711,6 @@ function drawSRorAbove() { const rand = Math.random(); let rarity = rand < 0.17 
 function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
     
-    // 預設為近戰，避免 undefined
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '🗡️';
 
     cardDiv.className = `card ${card.rarity}`; 
@@ -741,7 +823,7 @@ if(document.getElementById('start-battle-btn')) document.getElementById('start-b
     playSound('click');
     
     isBattleActive = true;
-    baseHp = 100;
+    // baseHp = 100; // 移除主堡
     battleGold = 0;
     enemies = [];
     heroEntities = [];
@@ -948,21 +1030,6 @@ function gameLoop() {
         }
     }
 
-    baseAttackCooldown++;
-    if (baseAttackCooldown > 60 && baseHp > 0) { 
-        const nearest = enemies.find(e => e.position < 25);
-        if (nearest) {
-            nearest.currentHp -= 300; 
-            baseAttackCooldown = 0;
-            const laser = document.createElement('div'); laser.className = 'base-laser'; laser.style.width = `${nearest.position}%`;
-            let targetLaneY = (nearest.lane === 0 ? 20 : (nearest.lane === 1 ? 50 : 80));
-            laser.style.top = `${targetLaneY}%`;
-            
-            document.querySelector('.battle-field-container').appendChild(laser); setTimeout(() => laser.remove(), 150);
-            playSound('dismantle');
-        }
-    }
-
     // 🔥 英雄邏輯
     heroEntities.sort((a, b) => b.position - a.position);
 
@@ -972,24 +1039,25 @@ function gameLoop() {
         let blocked = false;
         
         let nearestEnemy = null;
-        let minDistX = 999;
+        let minTotalDist = 9999; // 找絕對距離最近的
 
         enemies.forEach(enemy => {
             if (enemy.currentHp > 0) {
-                const yDiff = Math.abs(hero.y - enemy.y);
+                // 計算歐幾里得距離 (直線距離)
+                const dx = enemy.position - hero.position;
+                const dy = enemy.y - hero.y; // Y軸也是百分比，但視為單位距離
+                const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                if (yDiff < 20) { 
-                    let dist = enemy.position - hero.position;
-                    if (dist > 0 && dist < minDistX) {
-                        minDistX = dist;
-                        nearestEnemy = enemy;
-                    }
+                // 必須是前方或附近的敵人 (dx > -5)
+                if (dx > -5 && dist < minTotalDist) {
+                    minTotalDist = dist;
+                    nearestEnemy = enemy;
                 }
             }
         });
 
         // 攻擊
-        if (nearestEnemy && minDistX <= hero.range) {
+        if (nearestEnemy && minTotalDist <= hero.range) {
             blocked = true; 
             if (now - hero.lastAttackTime > 2000) {
                 const heroType = hero.attackType || 'melee';
@@ -1020,7 +1088,7 @@ function gameLoop() {
         }
 
         // 移動 & 集結
-        if (!blocked && hero.position < 80) { // <--- 修改這裡：改成 80，留出右邊 20% 給怪物
+        if (!blocked && hero.position < 80) { 
             hero.position += hero.speed;
             
             // 往目標 Y 軸靠攏
@@ -1042,6 +1110,12 @@ function gameLoop() {
         }
     }
 
+    // 敗北判定：英雄全滅 (且已生成過)
+    if (isBattleActive && heroEntities.length === 0 && battleState.spawned > 0) {
+        endBattle(false);
+        return;
+    }
+
     // 🔥 敵人邏輯
     enemies.sort((a, b) => a.position - b.position);
 
@@ -1049,23 +1123,23 @@ function gameLoop() {
         let blocked = false;
         
         let nearestHero = null;
-        let minDistX = 999;
+        let minTotalDist = 9999;
 
         heroEntities.forEach(hero => {
             if (hero.currentHp > 0) {
-                const yDiff = Math.abs(hero.y - enemy.y);
-                if (yDiff < 20) {
-                    let dist = enemy.position - hero.position;
-                    if (dist > 0 && dist < minDistX) {
-                        minDistX = dist;
-                        nearestHero = hero;
-                    }
+                const dx = enemy.position - hero.position;
+                const dy = enemy.y - hero.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dx > -5 && dist < minTotalDist) {
+                    minTotalDist = dist;
+                    nearestHero = hero;
                 }
             }
         });
 
         // 攻擊
-        if (nearestHero && minDistX <= 10) { 
+        if (nearestHero && minTotalDist <= 10) { 
             blocked = true;
             if (now - enemy.lastAttackTime > 800) {
                 fireProjectile(enemy.el, nearestHero.el, 'fireball', () => {
@@ -1077,20 +1151,6 @@ function gameLoop() {
                     }
                 });
                 enemy.lastAttackTime = now;
-            }
-        }
-
-        if (enemy.position <= 12) {
-            blocked = true;
-            if (now - enemy.lastAttackTime > 1000) { 
-                baseHp -= 5;
-                enemy.lastAttackTime = now;
-                showDamageText(10, 50, "-5 HP", 'enemy-dmg');
-                playSound('dismantle');
-                updateBattleUI();
-                const gameBody = document.body;
-                gameBody.classList.remove('shake-screen-effect');
-                void gameBody.offsetWidth; gameBody.classList.add('shake-screen-effect');
             }
         }
 
@@ -1131,16 +1191,18 @@ function gameLoop() {
         } 
     });
 
-    if (baseHp <= 0) { endBattle(false); return; }
+    // 勝利判定：敵人全滅 且 波次結束
+    if (enemies.length === 0 && battleState.phase === 'COMBAT') {
+        // 等待下一波或結束
+    }
 
     gameLoopId = requestAnimationFrame(gameLoop);
 }
 
 function updateBattleUI() {
-    const hpEl = document.getElementById('base-hp'); const barEl = document.getElementById('base-hp-bar');
-    hpEl.innerText = Math.max(0, Math.floor(baseHp)); barEl.style.width = `${Math.max(0, baseHp)}%`;
-    barEl.className = ''; if (baseHp < 30) barEl.classList.add('hp-low'); else if (baseHp < 60) barEl.classList.add('hp-mid');
-    document.getElementById('battle-gold').innerText = battleGold; document.getElementById('wave-count').innerText = battleState.wave;
+    document.getElementById('battle-gold').innerText = battleGold; 
+    document.getElementById('wave-count').innerText = battleState.wave;
+    document.getElementById('hero-count-display').innerText = heroEntities.length;
 }
 
 function showDamageText(leftPercent, topPercent, text, colorClass) {
@@ -1157,12 +1219,15 @@ async function endBattle(isWin) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     let finalGold = Math.floor(battleGold * goldMultiplier);
     
-    // 💎 新增：通關獎勵
     let gemReward = 0;
     if (isWin) {
         if (currentDifficulty === 'easy') gemReward = 50;
         else if (currentDifficulty === 'normal') gemReward = 100;
         else if (currentDifficulty === 'hard') gemReward = 200;
+    } else {
+        // 失敗時無獎勵
+        finalGold = 0;
+        gemReward = 0;
     }
 
     const modal = document.getElementById('battle-result-modal'); const title = document.getElementById('result-title'); const goldText = document.getElementById('result-gold'); const gemText = document.getElementById('result-gems');
@@ -1179,7 +1244,6 @@ async function endBattle(isWin) {
     } else { 
         title.innerText = "DEFEAT"; 
         title.className = "result-title lose-text"; 
-        finalGold = Math.floor(finalGold / 2); 
         gemText.style.display = 'none'; 
         playSound('dismantle'); 
     }

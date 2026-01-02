@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=50">
+    <link rel="stylesheet" href="style.css?v=60">
 </head>
 <body>
 
@@ -40,6 +40,7 @@
             <div style="display:flex; justify-content:space-between; width:100%; align-items:center; flex-wrap: wrap; gap: 10px;">
                 <span id="user-name" style="font-size:1.2em; font-weight:bold;">玩家：載入中...</span>
                 <div style="display: flex; gap: 5px;">
+                    <button id="notification-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #e67e22;">🔔 通知</button>
                     <button id="settings-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">⚙️ 設定</button>
                     <button id="logout-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">登出</button>
                 </div>
@@ -64,7 +65,10 @@
 
                     <div class="gacha-section">
                         <button id="draw-btn" class="btn-primary">單抽 (100鑽)</button>
-                        <button id="draw-10-btn" class="btn-secondary">十連 (1000鑽)</button>
+                        <button id="draw-10-btn" class="btn-secondary" style="display:flex; flex-direction:column; align-items:center; line-height:1.2;">
+                            <span>十連 (1000鑽)</span>
+                            <span style="font-size:0.7em; color:#ffeaa7;">(必得1張SR以上卡片)</span>
+                        </button>
                     </div>
 
                     <h3 style="margin-bottom:5px; color:#ccc;">最新獲得：</h3>
@@ -82,7 +86,7 @@
     <div id="battle-screen" class="hidden">
         <div class="battle-header">
             <div class="battle-info">
-                <span>❤️ 主堡: <span id="base-hp">100</span>%</span>
+                <span>⚔️ 英雄存活: <span id="hero-count-display">0</span></span>
                 <span>💀 波次: <span id="wave-count">1</span>/3</span>
                 <span>💰 <span id="battle-gold">0</span> G</span>
             </div>
@@ -92,10 +96,7 @@
         <div class="battle-field-container">
             <div id="wave-notification" class="hidden">第 1 波</div>
 
-            <div class="base-zone">
-                <div class="base-castle">🏰</div>
-                <div class="base-health-bar"><div id="base-hp-bar" style="width: 100%;"></div></div>
-            </div>
+            <div class="spawn-line left"></div>
 
             <div id="hero-container"></div>
 
@@ -182,6 +183,17 @@
         </div>
     </div>
 
+    <div id="notification-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px; height: auto; max-height: 80vh;">
+            <div class="modal-header">
+                <h2>🔔 系統通知</h2>
+                <button id="close-notification-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
+            </div>
+            <div id="notification-list" style="overflow-y: auto; text-align: left;">
+                </div>
+        </div>
+    </div>
+
     <div id="detail-modal" class="modal hidden" style="background: rgba(0,0,0,0.95);">
         <button id="close-detail-btn" class="btn-close-circle">✕</button>
         <button id="prev-card-btn" class="nav-arrow left">❮</button>
@@ -259,6 +271,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=50"></script>
+    <script type="module" src="script.js?v=60"></script>
 </body>
 </html>

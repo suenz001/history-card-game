@@ -95,6 +95,14 @@ img[src=""], img:not([src]) { display: none; }
 .filter-btn.active { background: #fff; color: #2c3e50 !important; border-color: #fff !important; }
 .sort-dropdown { background: #34495e; color: white; border: 1px solid #7f8c8d; padding: 5px; border-radius: 5px; font-size: 0.9em; }
 
+/* 通知列表樣式 */
+.notification-item { background: #34495e; border: 1px solid #7f8c8d; padding: 15px; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+.notification-item:hover { background: #2c3e50; border-color: #f1c40f; }
+.notification-item.claimed { opacity: 0.5; filter: grayscale(1); pointer-events: none; border-color: #555; }
+.notif-title { font-weight: bold; font-size: 1.1em; color: #f1c40f; }
+.notif-status { font-size: 0.9em; background: #e74c3c; padding: 3px 8px; border-radius: 4px; }
+.notification-item.claimed .notif-status { background: #7f8c8d; }
+
 /* 設定 */
 .settings-body { text-align: left; padding: 10px; }
 .setting-item { margin-bottom: 15px; }
@@ -174,11 +182,11 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     background-image: linear-gradient(#2c3e50 1px, transparent 1px), linear-gradient(90deg, #2c3e50 1px, transparent 1px); background-size: 20px 20px; display: flex;
 }
 
-/* 主堡 (優化視覺) */
-.base-zone { width: 100px; height: 100%; background: #2c3e50; border-right: 8px solid #7f8c8d; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
-.base-castle { font-size: 5em; display: flex; align-items: center; justify-content: center; height: 100%; filter: drop-shadow(0 0 10px #000); }
-.base-health-bar { width: 80px; height: 10px; background: #c0392b; border-radius: 4px; position: absolute; bottom: 20px; overflow: hidden; }
-#base-hp-bar { height: 100%; background: #2ecc71; transition: width 0.2s; }
+/* 主堡 (改為出擊線) */
+.spawn-line { position: absolute; top: 0; bottom: 0; width: 5px; border-right: 2px dashed rgba(255,255,255,0.2); }
+.spawn-line.left { left: 10px; }
+
+.base-health-bar { display: none; } /* 隱藏血條 */
 
 /* 三條路線 */
 .lanes-wrapper { flex: 1; display: flex; flex-direction: column; height: 100%; }
