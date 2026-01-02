@@ -145,7 +145,7 @@ function renderPvpInventory() {
         cardDiv.className = `card ${card.rarity}`; 
         if (isDeployed) cardDiv.classList.add('is-deployed');
         
-        // 🔥 修正：直接在這裡綁定點擊事件，並阻止冒泡
+        // 🔥 修正：直接在這裡綁定點擊事件，並阻止冒泡，確保在任何層級下都能觸發
         cardDiv.onclick = (e) => {
             e.stopPropagation(); 
             if (isDeployed) {
