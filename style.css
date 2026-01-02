@@ -19,13 +19,22 @@ input[type="text"], input[type="email"], input[type="password"] {
     background: #ecf0f1; border: none; padding: 8px; border-radius: 4px; margin: 5px 0;
 }
 
-/* 抽卡區塊佈局修正 */
+/* 抽卡區塊佈局修正 (等寬按鈕) */
 .gacha-section {
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: stretch; /* 讓高度一致 */
     gap: 15px;
     margin-bottom: 20px;
+    width: 100%;
+}
+.gacha-section button {
+    flex: 1; /* 平分寬度 */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
 }
 
 /* 按鈕 */

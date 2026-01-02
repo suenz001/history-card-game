@@ -35,19 +35,17 @@ let gems = 0;
 let gold = 0;
 let totalPower = 0;
 let allUserCards = [];
-let claimedNotifs = []; // 已領取通知 ID 列表
+let claimedNotifs = []; 
 
 let currentDisplayList = [];
 let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 let currentSortMethod = 'time_desc';
 
-// 戰鬥變數
 let battleSlots = new Array(9).fill(null);
 let heroEntities = []; 
 let isBattleActive = false;
 let battleGold = 0;
-// let baseHp = 100; // 移除主堡血量
 let enemies = [];
 let deployTargetSlot = null; 
 let currentDifficulty = 'normal';
@@ -69,7 +67,6 @@ let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// 系統通知資料
 const SYSTEM_NOTIFICATIONS = [
     { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 } }
 ];
@@ -191,7 +188,6 @@ const cardDatabase = [
     { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged" }
 ];
 
-// --- 介面按鈕邏輯 ---
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
 const sfxToggle = document.getElementById('sfx-toggle');
@@ -233,7 +229,6 @@ if(document.getElementById('settings-save-name-btn')) {
     });
 }
 
-// 序號兌換邏輯
 if(document.getElementById('redeem-btn')) {
     document.getElementById('redeem-btn').addEventListener('click', async () => {
         const codeInput = document.getElementById('redeem-code-input');
@@ -259,7 +254,6 @@ if(document.getElementById('redeem-btn')) {
     });
 }
 
-// --- 系統通知邏輯 ---
 const notificationModal = document.getElementById('notification-modal');
 const notificationList = document.getElementById('notification-list');
 
@@ -315,7 +309,6 @@ async function claimReward(notif) {
         
         claimedNotifs.push(notif.id);
         
-        // 更新雲端
         await updateDoc(doc(db, "users", currentUser.uid), {
             gems: gems,
             claimedNotifs: claimedNotifs
@@ -324,7 +317,7 @@ async function claimReward(notif) {
         playSound('coin');
         alert(`領取成功！獲得 ${notif.reward.amount} ${notif.reward.type === 'gems' ? '鑽石' : '金幣'}`);
         updateUIDisplay();
-        renderNotifications(); // 刷新列表狀態
+        renderNotifications(); 
         
     } catch (e) {
         console.error("領取失敗", e);
@@ -332,7 +325,6 @@ async function claimReward(notif) {
     }
 }
 
-// --- 登入介面 ---
 const loginSection = document.getElementById('login-section');
 const userInfo = document.getElementById('user-info');
 const gameUI = document.getElementById('game-ui');
@@ -376,7 +368,6 @@ if(document.getElementById('logout-btn')) {
     document.getElementById('logout-btn').addEventListener('click', () => { playSound('click'); signOut(auth).then(() => location.reload()); });
 }
 
-// --- Auth 狀態監聽 ---
 if (isFirebaseReady && auth) {
     onAuthStateChanged(auth, async (user) => {
         if (user) {
@@ -398,7 +389,6 @@ if (isFirebaseReady && auth) {
     });
 }
 
-// --- 資料庫操作 ---
 async function loadUserData(user) {
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
@@ -406,7 +396,6 @@ async function loadUserData(user) {
         const data = userSnap.data(); 
         gems = data.gems; 
         gold = data.gold;
-        // 載入已領取的通知 ID
         claimedNotifs = data.claimedNotifs || [];
     } else { 
         gems = 1000; 
@@ -435,7 +424,6 @@ async function calculateTotalPowerOnly(uid) {
     totalPower = tempPower; updateUIDisplay(); updateCurrencyCloud();
 }
 
-// 更新背包數量顯示
 function updateInventoryCounts() {
     const counts = { ALL: 0, SSR: 0, SR: 0, R: 0 };
     counts.ALL = allUserCards.length;
@@ -453,7 +441,6 @@ function updateInventoryCounts() {
     });
 }
 
-// 一鍵自動升星
 async function autoStarUp() {
     if (!currentUser) return alert("請先登入");
     if (isBatchMode) return alert("請先關閉批量分解模式");
@@ -546,7 +533,6 @@ if(document.getElementById('auto-star-btn')) {
     });
 }
 
-// 一鍵清空部署
 function clearDeployment() {
     battleSlots.fill(null);
     renderBattleSlots();
@@ -862,7 +848,10 @@ function spawnHeroes() {
         const lane = Math.floor(index / 3);
         const col = index % 3; // 0, 1, 2
         
-        const startPos = 12 - (col * 3); 
+        // 修正：讓網格位置符合視覺 (右邊是前排)
+        // Col 2 (右) -> 前排 (Start 13%)
+        // Col 0 (左) -> 後排 (Start 5%)
+        const startPos = 5 + (col * 4); 
         
         // 🔥 密集方陣集結點
         // Lane 0 -> 42%, Lane 1 -> 50%, Lane 2 -> 58%
@@ -943,12 +932,14 @@ function spawnEnemy() {
     if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
     else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
 
-    const lane = Math.floor(Math.random() * 3); 
+    // 修正：只從上(0)或下(2)出怪
+    const lane = Math.random() < 0.5 ? 0 : 2;
+    
     const enemy = { 
         id: Date.now(), 
         maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, 
         lane: lane, 
-        position: 85, // 修正：生成位置
+        position: 80, // 修正：生成位置內縮
         y: (lane === 0 ? 20 : (lane === 1 ? 50 : 80)), // 初始位置
         targetY: (lane === 0 ? 42 : (lane === 1 ? 50 : 58)), // 集結位置
         speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 
@@ -956,7 +947,7 @@ function spawnEnemy() {
     
     const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
     el.style.top = `${enemy.y}%`;
-    el.style.left = `85%`; // 初始
+    el.style.left = `80%`; 
     
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
@@ -1080,12 +1071,16 @@ function gameLoop() {
             }
         }
 
-        // 防追撞 (4單位間距)
+        // 🔥 防追撞 (Anti-Stacking)
+        // 修正：加入垂直距離檢查
         if (!blocked) {
             for (let other of heroEntities) {
-                if (other !== hero && other.lane === hero.lane && other.currentHp > 0) {
+                if (other !== hero && other.currentHp > 0) {
                     let dist = other.position - hero.position;
-                    if (dist > 0 && dist < 4) {
+                    let vDist = Math.abs(other.y - hero.y);
+                    
+                    // 如果在前方 (dist > 0) 且水平距離 < 4，且垂直距離也很近 (< 5)
+                    if (dist > 0 && dist < 4 && vDist < 5) {
                         blocked = true;
                         break;
                     }
@@ -1093,15 +1088,13 @@ function gameLoop() {
             }
         }
 
-        // 移動 & 集結 (自動索敵)
-        if (!blocked && hero.position < 85) { 
+        // 移動 & 集結
+        if (!blocked && hero.position < 75) {  // 修正：終點 75
             hero.position += hero.speed;
             
-            // 往目標移動：如果有敵人，往敵人Y軸靠；否則往集結點靠
-            let targetY = nearestEnemy ? nearestEnemy.y : hero.targetY;
-            
-            if (hero.y < targetY) hero.y += 0.15; 
-            if (hero.y > targetY) hero.y -= 0.15; 
+            // 往目標 Y 軸靠攏
+            if (hero.y < hero.targetY) hero.y += 0.15; 
+            if (hero.y > hero.targetY) hero.y -= 0.15; 
         }
 
         if (hero.el) {
@@ -1162,12 +1155,14 @@ function gameLoop() {
             }
         }
 
-        // 防追撞
+        // 防追撞 (Anti-Stacking)
         if (!blocked) {
             for (let other of enemies) {
-                if (other !== enemy && other.lane === enemy.lane && other.currentHp > 0) {
+                if (other !== enemy && other.currentHp > 0) {
                     let dist = enemy.position - other.position;
-                    if (dist > 0 && dist < 4) {
+                    let vDist = Math.abs(other.y - enemy.y);
+                    
+                    if (dist > 0 && dist < 4 && vDist < 5) {
                         blocked = true;
                         break;
                     }
@@ -1179,11 +1174,9 @@ function gameLoop() {
         if (!blocked) { 
             enemy.position -= enemy.speed;
             
-            // 索敵移動
-            let targetY = nearestHero ? nearestHero.y : enemy.targetY;
-            
-            if (enemy.y < targetY) enemy.y += 0.15;
-            if (enemy.y > targetY) enemy.y -= 0.15;
+            // 往目標 Y 軸靠攏
+            if (enemy.y < enemy.targetY) enemy.y += 0.15;
+            if (enemy.y > enemy.targetY) enemy.y -= 0.15;
         }
         
         if (enemy.el) {
@@ -1229,7 +1222,6 @@ async function endBattle(isWin) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     let finalGold = Math.floor(battleGold * goldMultiplier);
     
-    // 💎 新增：通關獎勵
     let gemReward = 0;
     if (isWin) {
         if (currentDifficulty === 'easy') gemReward = 50;
