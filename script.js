@@ -894,7 +894,7 @@ function spawnHeroes() {
     
     sortedSlots.forEach(({card, index}) => {
         const lane = Math.floor(index / 3);
-        const col = index % 3; 
+        const col = index % 3; // 0, 1, 2
         
         // 修正：左右反轉 (右邊=前排)
         const startPos = 5 + (col * 4); 
@@ -997,7 +997,7 @@ function spawnEnemy() {
     if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
     else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
 
-    // 🔥 修正：從上方或下方出生，留出中間
+    // 🔥 修正：從上方或下方出生，留出中間，且X軸隨機
     let spawnY;
     if (Math.random() < 0.5) {
         spawnY = 10 + Math.random() * 30; // 10-40 (上)
@@ -1005,18 +1005,21 @@ function spawnEnemy() {
         spawnY = 60 + Math.random() * 30; // 60-90 (下)
     }
     
+    // X軸 50~90
+    const spawnX = 50 + Math.random() * 40;
+    
     const enemy = { 
         id: Date.now(), 
         maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, 
         lane: -1, 
-        position: 80, // 🔥 修正：內縮出生點 (80%)
+        position: spawnX, 
         y: spawnY, 
         speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 
     };
     
     const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
     el.style.top = `${enemy.y}%`;
-    el.style.left = `80%`; 
+    el.style.left = `${enemy.position}%`; 
     
     document.getElementById('enemy-container').appendChild(el); enemy.el = el; enemies.push(enemy);
 }
@@ -1102,7 +1105,7 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     setTimeout(() => {
         projectile.remove();
         if(onHitCallback) {
-            playSound('dismantle'); // 🔥 命中音效 (這裡觸發最準)
+            playSound('dismantle'); // 命中音效
             onHitCallback();
         }
     }, 300);
@@ -1209,23 +1212,21 @@ function gameLoop() {
         }
 
         // 4. 移動邏輯 (包含索敵 + 閃避)
-        if (!blocked) {
-             if (nearestEnemy) {
-                 // X 軸追蹤
-                 if (hero.position < nearestEnemy.position - 2) hero.position += hero.speed * gameSpeed;
-                 else if (hero.position > nearestEnemy.position + 2) hero.position -= hero.speed * gameSpeed;
-                 
-                 // Y 軸追蹤
-                 if (hero.y < nearestEnemy.y) hero.y += 0.15 * gameSpeed;
-                 else if (hero.y > nearestEnemy.y) hero.y -= 0.15 * gameSpeed;
-             } else {
-                 // 巡邏
-                 if (hero.position >= 80) hero.patrolDir = -1;
-                 if (hero.position <= 10) hero.patrolDir = 1;
-                 if(!hero.patrolDir) hero.patrolDir = 1;
-                 
-                 hero.position += hero.speed * hero.patrolDir * gameSpeed;
-             }
+        // 🔥 重要修正：Blocked 不代表不能動，只是不能往前衝，但可以往旁邊滑 (Dodge)
+        if (nearestEnemy && !blocked) {
+             // 追殺
+             if (hero.position < nearestEnemy.position - 2) hero.position += hero.speed * gameSpeed;
+             else if (hero.position > nearestEnemy.position + 2) hero.position -= hero.speed * gameSpeed;
+             
+             if (hero.y < nearestEnemy.y) hero.y += 0.15 * gameSpeed;
+             else if (hero.y > nearestEnemy.y) hero.y -= 0.15 * gameSpeed;
+        } else if (!nearestEnemy && !blocked) {
+             // 巡邏
+             if (hero.position >= 80) hero.patrolDir = -1;
+             if (hero.position <= 10) hero.patrolDir = 1;
+             if(!hero.patrolDir) hero.patrolDir = 1;
+             
+             hero.position += hero.speed * hero.patrolDir * gameSpeed;
         }
         
         // 疊加閃避向量 (即使 blocked 也可以滑動，避免攻擊時卡住)
@@ -1240,6 +1241,8 @@ function gameLoop() {
             hero.el.style.left = `${hero.position}%`;
             hero.el.style.top = `${hero.y}%`; 
             hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
+            // 確保永遠不轉頭
+            hero.el.style.transform = 'translateY(-50%) scaleX(1)';
         }
     });
 
@@ -1372,9 +1375,9 @@ async function endBattle(isWin) {
     
     let gemReward = 0;
     if (isWin) {
-        if (currentDifficulty === 'easy') gemReward = 200; // 修正
-        else if (currentDifficulty === 'normal') gemReward = 350; // 修正
-        else if (currentDifficulty === 'hard') gemReward = 500; // 修正
+        if (currentDifficulty === 'easy') gemReward = 200; 
+        else if (currentDifficulty === 'normal') gemReward = 350; 
+        else if (currentDifficulty === 'hard') gemReward = 500; 
     } else {
         finalGold = 0;
         gemReward = 0;
