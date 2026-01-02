@@ -19,6 +19,15 @@ input[type="text"], input[type="email"], input[type="password"] {
     background: #ecf0f1; border: none; padding: 8px; border-radius: 4px; margin: 5px 0;
 }
 
+/* 抽卡區塊佈局修正 */
+.gacha-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
 /* 按鈕 */
 .btn-primary, .btn-secondary, .btn-mini, .btn-danger { cursor: pointer; border: none; border-radius: 5px; transition: transform 0.1s; }
 .btn-primary { background-color: #e74c3c; color: white; padding: 10px 20px; font-size: 1em; margin: 5px; }
