@@ -6,7 +6,7 @@ export let isBattleActive = false;
 export let battleGold = 0;
 export let battleSlots = new Array(9).fill(null);
 export let heroEntities = [];
-export let deadHeroes = []; // 🔥 新增：用來儲存陣亡英雄的數據
+export let deadHeroes = []; 
 export let enemies = [];
 export let currentDifficulty = 'normal';
 export let gameSpeed = 1;
@@ -51,9 +51,12 @@ function startBattle() {
     battleGold = 0;
     enemies = [];
     heroEntities = [];
-    deadHeroes = []; // 🔥 重置陣亡名單
+    deadHeroes = []; 
     document.getElementById('enemy-container').innerHTML = '';
     document.getElementById('hero-container').innerHTML = '';
+    
+    // 清空並準備監控列表
+    document.getElementById('hero-monitor-list').innerHTML = '';
     
     document.querySelector('.lanes-wrapper').style.opacity = '0.3';
     
@@ -80,6 +83,8 @@ export function resetBattleState() {
     deadHeroes = [];
     document.getElementById('enemy-container').innerHTML = '';
     document.getElementById('hero-container').innerHTML = '';
+    document.getElementById('hero-monitor-list').innerHTML = '';
+
     document.getElementById('start-battle-btn').classList.remove('btn-disabled');
     document.getElementById('start-battle-btn').innerText = "請先部署英雄";
     document.getElementById('battle-screen').classList.add('hidden');
@@ -89,6 +94,8 @@ export function resetBattleState() {
 
 function spawnHeroes() {
     const container = document.getElementById('hero-container');
+    const monitorList = document.getElementById('hero-monitor-list');
+
     const sortedSlots = [];
     battleSlots.forEach((card, index) => {
         if(card) sortedSlots.push({card, index});
@@ -117,6 +124,20 @@ function spawnHeroes() {
         let finalHp = card.hp;
         if(card.attackType === 'ranged') finalHp = Math.floor(card.hp * 0.7);
 
+        // 🔥 創建監控面板項目
+        const monitorItem = document.createElement('div');
+        monitorItem.className = 'monitor-item';
+        monitorItem.innerHTML = `
+            <div class="monitor-icon" style="background-image: url('assets/cards/${card.id}.webp');"></div>
+            <div class="monitor-info">
+                <div class="monitor-name">${card.name}</div>
+                <div class="monitor-hp-bg">
+                    <div class="monitor-hp-fill" style="width: 100%;"></div>
+                </div>
+            </div>
+        `;
+        monitorList.appendChild(monitorItem);
+
         heroEntities.push({
             ...card,
             maxHp: finalHp,
@@ -129,6 +150,7 @@ function spawnHeroes() {
             atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.6) : card.atk, 
             lastAttackTime: 0,
             el: el,
+            monitorEl: monitorItem, // 🔥 綁定監控元素
             patrolDir: 1,
             totalDamage: 0
         });
@@ -330,6 +352,13 @@ function gameLoop() {
     heroEntities.forEach((hero, hIndex) => {
         if (hero.currentHp <= 0) return; 
 
+        // 🔥 更新監控面板血量
+        if (hero.monitorEl) {
+            const hpPercent = Math.max(0, (hero.currentHp / hero.maxHp) * 100);
+            const fill = hero.monitorEl.querySelector('.monitor-hp-fill');
+            if (fill) fill.style.width = `${hpPercent}%`;
+        }
+
         let blocked = false;
         let pushX = 0;
         let pushY = 0;
@@ -420,7 +449,13 @@ function gameLoop() {
 
     for (let i = heroEntities.length - 1; i >= 0; i--) {
         if (heroEntities[i].currentHp <= 0) {
-            // 🔥 修改：陣亡處理，先存入 deadHeroes
+            // 🔥 更新監控面板為陣亡
+            if (heroEntities[i].monitorEl) {
+                heroEntities[i].monitorEl.classList.add('dead');
+                heroEntities[i].monitorEl.querySelector('.monitor-name').innerText += " (陣亡)";
+                heroEntities[i].monitorEl.querySelector('.monitor-hp-fill').style.width = '0%';
+            }
+            
             deadHeroes.push(heroEntities[i]);
             heroEntities[i].el.remove();
             heroEntities.splice(i, 1);
@@ -535,7 +570,6 @@ function showDamageText(leftPercent, topPercent, text, colorClass) {
 
 function endBattle(isWin) {
     if(onBattleEndCallback) {
-        // 🔥 修改：將存活的與陣亡的合併回傳
         const allHeroes = [...heroEntities, ...deadHeroes];
         onBattleEndCallback(isWin, battleGold, allHeroes);
     }

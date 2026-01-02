@@ -1,7 +1,7 @@
 // main.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
@@ -21,14 +21,13 @@ const firebaseConfig = {
   measurementId: "G-N0EM6EJ9BK"
 };
 
-let app, db, auth, provider;
+let app, db, auth;
 let isFirebaseReady = false;
 
 try {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
     auth = getAuth(app);
-    provider = new GoogleAuthProvider();
     isFirebaseReady = true;
 } catch (e) {
     console.error("Firebase Init Error:", e);
@@ -203,18 +202,6 @@ const userInfo = document.getElementById('user-info');
 const gameUI = document.getElementById('game-ui');
 const userNameDisplay = document.getElementById('user-name');
 
-if(document.getElementById('google-btn')) {
-    document.getElementById('google-btn').addEventListener('click', () => {
-        if(!isFirebaseReady) return alert("Firebase 尚未初始化，請重新整理");
-        playSound('click');
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        if (isMobile) {
-            signInWithRedirect(auth, provider);
-        } else {
-            signInWithPopup(auth, provider).catch(e=>alert("登入失敗: " + e.message));
-        }
-    });
-}
 if(document.getElementById('email-signup-btn')) {
     document.getElementById('email-signup-btn').addEventListener('click', () => { 
         if(!isFirebaseReady) return alert("Firebase 尚未初始化");
@@ -604,7 +591,7 @@ function renderCard(card, targetContainer) {
     if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     
-    // 🔥 修改：將顯示攻擊力的符號 ⚔️ 改為 👊，避免與職業圖示混淆
+    // 顯示攻擊力的符號為 👊
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats"><span class="type-icon">${typeIcon}</span> 👊${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
     
     cardDiv.addEventListener('click', () => { 
@@ -754,11 +741,11 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
     updateStartButton();
 });
 
-// 🔥 修改：處理戰鬥結束 (從 battle.js 呼叫回來)
+// 處理戰鬥結束 (從 battle.js 呼叫回來)
 async function handleBattleEnd(isWin, earnedGold, heroStats) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     
-    // 🔥 修改：無論輸贏，都能獲得打怪掉落的金幣
+    // 無論輸贏，都能獲得打怪掉落的金幣
     let finalGold = Math.floor(earnedGold * goldMultiplier);
     
     let gemReward = 0;
@@ -767,8 +754,7 @@ async function handleBattleEnd(isWin, earnedGold, heroStats) {
         else if (currentDifficulty === 'normal') gemReward = 350; 
         else if (currentDifficulty === 'hard') gemReward = 500; 
     } else {
-        // 🔥 移除 finalGold = 0; 
-        gemReward = 0; // 只有鑽石拿不到
+        gemReward = 0; 
     }
 
     const modal = document.getElementById('battle-result-modal'); const title = document.getElementById('result-title'); const goldText = document.getElementById('result-gold'); const gemText = document.getElementById('result-gems');

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=110">
+    <link rel="stylesheet" href="style.css?v=112">
 </head>
 <body>
 
@@ -22,8 +22,7 @@
 
         <div id="login-section">
             <h3>請選擇登入方式：</h3>
-            <button id="google-btn" class="btn-primary" style="background:#db4437; width: 100%;">Google 登入</button>
-            <hr style="margin: 20px 0; border-color: #555;">
+            
             <div style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
                 <input type="email" id="email-input" placeholder="電子信箱">
                 <input type="password" id="pass-input" placeholder="密碼 (6位以上)">
@@ -86,43 +85,50 @@
     <div id="battle-screen" class="hidden">
         <div class="battle-header">
             <div class="battle-info">
-                <span>⚔️ 英雄存活: <span id="hero-count-display">0</span></span>
+                <span>⚔️ 存活: <span id="hero-count-display">0</span></span>
                 <span>💀 波次: <span id="wave-count">1</span>/4</span>
                 <span>💰 <span id="battle-gold">0</span> G</span>
             </div>
             <button id="retreat-btn" class="btn-danger" style="padding: 5px 15px; font-size: 0.9em;">🏳️ 撤退</button>
         </div>
 
-        <div class="battle-field-container">
-            <div id="wave-notification" class="hidden">第 1 波</div>
-
-            <div class="spawn-line left"></div>
-
-            <div id="hero-container"></div>
-
-            <div class="lanes-wrapper" style="opacity: 0.3;">
-                <div class="lane-row" id="lane-0">
-                    <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
-                    <div class="defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
-                    <div class="defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
-                </div>
-                <div class="lane-row" id="lane-1">
-                    <div class="defense-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
-                    <div class="defense-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
-                    <div class="defense-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
-                </div>
-                <div class="lane-row" id="lane-2">
-                    <div class="defense-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
-                    <div class="defense-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
-                    <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
-                </div>
-            </div>
-
-            <div class="enemy-spawn-zone">
-                💀 <br> 敵軍<br>來襲
-            </div>
+        <div class="battle-content-wrapper" style="flex: 1; display: flex; overflow: hidden; position: relative;">
             
-            <div id="enemy-container"></div>
+            <div class="battle-field-container">
+                <div id="wave-notification" class="hidden">第 1 波</div>
+
+                <div class="spawn-line left"></div>
+
+                <div id="hero-container"></div>
+
+                <div class="lanes-wrapper" style="opacity: 0.3;">
+                    <div class="lane-row" id="lane-0">
+                        <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
+                    </div>
+                    <div class="lane-row" id="lane-1">
+                        <div class="defense-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
+                    </div>
+                    <div class="lane-row" id="lane-2">
+                        <div class="defense-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
+                    </div>
+                </div>
+
+                <div id="enemy-container"></div>
+            </div>
+
+            <div class="battle-monitor-sidebar">
+                <h3 style="margin: 0 0 10px 0; color: #f1c40f; border-bottom: 1px solid #555; padding-bottom: 5px;">
+                    🛡️ 英雄狀態
+                </h3>
+                <div id="hero-monitor-list">
+                    </div>
+            </div>
         </div>
 
         <div class="battle-deck">
