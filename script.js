@@ -1,6 +1,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+// --- 全域錯誤攔截 (方便除錯) ---
+window.onerror = function(msg, url, line) {
+    console.error("Global Error:", msg);
+};
 
 const firebaseConfig = {
   apiKey: "AIzaSyCaLWMEi7wNxeCjUQC86axbRsxLMDWQrq8",
@@ -12,10 +17,17 @@ const firebaseConfig = {
   measurementId: "G-N0EM6EJ9BK"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
+let app, db, auth, provider;
+
+try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    provider = new GoogleAuthProvider();
+} catch (e) {
+    console.error("Firebase 初始化失敗:", e);
+    alert("遊戲初始化失敗，請重新整理網頁");
+}
 
 let currentUser = null;
 let gems = 0;
@@ -60,6 +72,7 @@ let gachaIndex = 0;
 const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
+// --- 音效系統 ---
 const audioBgm = document.getElementById('bgm');
 const audioBattle = document.getElementById('bgm-battle');
 const sfxDraw = document.getElementById('sfx-draw');
@@ -69,19 +82,26 @@ const sfxCoin = document.getElementById('sfx-coin');
 const sfxUpgrade = document.getElementById('sfx-upgrade');
 
 const AudioContext = window.AudioContext || window.webkitAudioContext;
-const audioCtx = new AudioContext();
+let audioCtx;
+try {
+    audioCtx = new AudioContext();
+} catch(e) {
+    console.warn("瀏覽器不支援 Web Audio API");
+}
 
 let isBgmOn = true;
 let isSfxOn = true;
 let bgmVolume = 0.5;
 let sfxVolume = 1.0;
 
-audioBgm.volume = bgmVolume;
-audioBattle.volume = bgmVolume;
+if(audioBgm) {
+    audioBgm.volume = bgmVolume;
+    audioBattle.volume = bgmVolume;
+}
 
 document.body.addEventListener('click', () => {
-    if (audioCtx.state === 'suspended') { audioCtx.resume(); }
-    if (isBgmOn && audioBgm.paused && audioBattle.paused) {
+    if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
+    if (isBgmOn && audioBgm && audioBgm.paused && audioBattle && audioBattle.paused) {
         if(!document.getElementById('battle-screen').classList.contains('hidden')){
             audioBattle.play().catch(()=>{});
         } else {
@@ -91,7 +111,7 @@ document.body.addEventListener('click', () => {
 }, { once: true });
 
 function playSound(type) {
-    if (!isSfxOn) return;
+    if (!isSfxOn || !audioCtx) return;
     try {
         if (type === 'click') { synthesizeClick(); return; }
         else if (type === 'dismantle') { synthesizeDismantle(); return; }
@@ -114,6 +134,7 @@ function playSound(type) {
 }
 
 function synthesizeClick() {
+    if(!audioCtx) return;
     const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
     osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
     gainNode.gain.setValueAtTime(sfxVolume * 0.5, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
@@ -121,6 +142,7 @@ function synthesizeClick() {
 }
 
 function synthesizeDismantle() {
+    if(!audioCtx) return;
     const bufferSize = audioCtx.sampleRate * 0.5; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
     const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const gainNode = audioCtx.createGain();
     gainNode.gain.setValueAtTime(sfxVolume * 0.8, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
@@ -128,6 +150,7 @@ function synthesizeDismantle() {
 }
 
 function synthesizeInventory() {
+    if(!audioCtx) return;
     const bufferSize = audioCtx.sampleRate * 0.3; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
     const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 800; 
     const gainNode = audioCtx.createGain(); gainNode.gain.setValueAtTime(0, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(sfxVolume * 0.6, audioCtx.currentTime + 0.1); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
@@ -135,12 +158,14 @@ function synthesizeInventory() {
 }
 
 function synthesizePoison() {
+    if(!audioCtx) return;
     const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
     osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3);
     gainNode.gain.setValueAtTime(sfxVolume * 0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
     osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3);
 }
 
+// --- 設定介面 ---
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
 const sfxToggle = document.getElementById('sfx-toggle');
@@ -148,8 +173,24 @@ const bgmSlider = document.getElementById('bgm-volume');
 const sfxSlider = document.getElementById('sfx-volume');
 const settingsNameInput = document.getElementById('settings-name-input');
 
-document.getElementById('settings-btn').addEventListener('click', () => { playSound('click'); settingsModal.classList.remove('hidden'); bgmToggle.checked = isBgmOn; sfxToggle.checked = isSfxOn; bgmSlider.value = bgmVolume; sfxSlider.value = sfxVolume; });
-document.getElementById('close-settings-btn').addEventListener('click', () => { playSound('click'); settingsModal.classList.add('hidden'); });
+if(document.getElementById('settings-btn')) {
+    document.getElementById('settings-btn').addEventListener('click', () => { 
+        playSound('click'); 
+        if(settingsModal) {
+            settingsModal.classList.remove('hidden'); 
+            bgmToggle.checked = isBgmOn; 
+            sfxToggle.checked = isSfxOn; 
+            bgmSlider.value = bgmVolume; 
+            sfxSlider.value = sfxVolume; 
+        }
+    });
+}
+if(document.getElementById('close-settings-btn')) {
+    document.getElementById('close-settings-btn').addEventListener('click', () => { 
+        playSound('click'); 
+        if(settingsModal) settingsModal.classList.add('hidden'); 
+    });
+}
 
 bgmToggle.addEventListener('change', (e) => {
     isBgmOn = e.target.checked;
@@ -168,24 +209,91 @@ document.getElementById('settings-save-name-btn').addEventListener('click', asyn
     try { await updateProfile(currentUser, { displayName: newName }); await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); document.getElementById('user-name').innerText = `玩家：${newName}`; loadLeaderboard(); alert("改名成功！"); settingsModal.classList.add('hidden'); } catch (e) { console.error(e); alert("改名失敗"); }
 });
 
+// --- 登入邏輯 ---
 const loginSection = document.getElementById('login-section');
 const userInfo = document.getElementById('user-info');
 const gameUI = document.getElementById('game-ui');
 const userNameDisplay = document.getElementById('user-name');
 
-document.getElementById('google-btn').addEventListener('click', () => { playSound('click'); signInWithPopup(auth, provider).catch(e=>alert(e.message)); });
-document.getElementById('email-signup-btn').addEventListener('click', () => { playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { await updateProfile(res.user, { displayName: "新玩家" }); location.reload(); }).catch(e=>alert(e.message)); });
-document.getElementById('email-login-btn').addEventListener('click', () => { playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; signInWithEmailAndPassword(auth, email, pass).catch(e=>alert(e.message)); });
-document.getElementById('guest-btn').addEventListener('click', () => { playSound('click'); signInAnonymously(auth).then(async (res) => { await updateProfile(res.user, { displayName: "神秘客" }); location.reload(); }).catch(e=>alert(e.message)); });
-document.getElementById('logout-btn').addEventListener('click', () => { playSound('click'); signOut(auth).then(() => location.reload()); });
+// Google 登入 (支援手機 Redirect)
+const googleBtn = document.getElementById('google-btn');
+if(googleBtn) {
+    googleBtn.addEventListener('click', () => {
+        playSound('click');
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+            signInWithRedirect(auth, provider);
+        } else {
+            signInWithPopup(auth, provider).catch(e => alert("登入失敗: " + e.message));
+        }
+    });
+}
 
+// 註冊與信箱登入
+if(document.getElementById('email-signup-btn')) {
+    document.getElementById('email-signup-btn').addEventListener('click', () => { 
+        playSound('click'); 
+        const email = document.getElementById('email-input').value; 
+        const pass = document.getElementById('pass-input').value; 
+        if(!email || !pass) return alert("請輸入帳號密碼");
+        createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { 
+            await updateProfile(res.user, { displayName: "新玩家" }); 
+            location.reload(); 
+        }).catch(e=>alert("註冊失敗: " + e.message)); 
+    });
+}
+
+if(document.getElementById('email-login-btn')) {
+    document.getElementById('email-login-btn').addEventListener('click', () => { 
+        playSound('click'); 
+        const email = document.getElementById('email-input').value; 
+        const pass = document.getElementById('pass-input').value; 
+        if(!email || !pass) return alert("請輸入帳號密碼");
+        signInWithEmailAndPassword(auth, email, pass).catch(e=>alert("登入失敗: " + e.message)); 
+    });
+}
+
+// 遊客登入
+if(document.getElementById('guest-btn')) {
+    document.getElementById('guest-btn').addEventListener('click', () => { 
+        playSound('click'); 
+        signInAnonymously(auth).then(async (res) => { 
+            await updateProfile(res.user, { displayName: "神秘客" }); 
+        }).catch(e=>alert("遊客登入失敗: " + e.message)); 
+    });
+}
+
+if(document.getElementById('logout-btn')) {
+    document.getElementById('logout-btn').addEventListener('click', () => { 
+        playSound('click'); 
+        signOut(auth).then(() => location.reload()); 
+    });
+}
+
+// 監聽登入狀態
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        currentUser = user; loginSection.style.display = 'none'; userInfo.style.display = 'flex'; userNameDisplay.innerText = `玩家：${user.displayName || '未命名'}`; await loadUserData(user); gameUI.classList.remove('hidden'); await calculateTotalPowerOnly(user.uid); loadLeaderboard();
-    } else { loginSection.style.display = 'block'; userInfo.style.display = 'none'; gameUI.classList.add('hidden'); }
+        currentUser = user; 
+        if(loginSection) loginSection.style.display = 'none'; 
+        if(userInfo) userInfo.style.display = 'flex'; 
+        if(userNameDisplay) userNameDisplay.innerText = `玩家：${user.displayName || '未命名'}`; 
+        if(gameUI) gameUI.classList.remove('hidden'); 
+        
+        try {
+            await loadUserData(user); 
+            await calculateTotalPowerOnly(user.uid); 
+            loadLeaderboard();
+        } catch(e) {
+            console.error("載入資料失敗", e);
+        }
+    } else { 
+        if(loginSection) loginSection.style.display = 'block'; 
+        if(userInfo) userInfo.style.display = 'none'; 
+        if(gameUI) gameUI.classList.add('hidden'); 
+    }
 });
 
-// 定義卡牌資料，包含攻擊類型 (melee/ranged)
+// --- 卡片資料庫 (包含 attackType) ---
 const cardDatabase = [
     { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝", attackType: "melee" },
     { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王", attackType: "melee" },
@@ -248,18 +356,14 @@ async function loadInventory(uid) {
     querySnapshot.forEach((docSnap) => { 
         let data = docSnap.data();
         let needsUpdate = false;
-        
-        // 舊資料修復邏輯
         if(!data.level) { data.level = 1; needsUpdate = true; }
         if(!data.stars) { data.stars = 1; needsUpdate = true; }
-        
         const baseCard = cardDatabase.find(c => c.id === data.id);
         if(baseCard) {
              if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; }
-             // 補上 attackType，如果舊資料沒有的話
+             // 自動補上 attackType
              if(!data.attackType) { data.attackType = baseCard.attackType; needsUpdate = true; }
         }
-
         if(needsUpdate) updateDoc(doc(db, "inventory", docSnap.id), data);
         allUserCards.push({ ...data, docId: docSnap.id }); 
     });
@@ -334,8 +438,10 @@ function changeCard(direction) { playSound('click'); if (direction === 'prev') {
 
 let touchStartX = 0; let touchEndX = 0;
 const detailModal = document.getElementById('detail-modal');
-detailModal.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});
-detailModal.addEventListener('touchend', e => { touchEndX = e.changedTouches[0].screenX; if (touchEndX < touchStartX - 50) changeCard('next'); if (touchEndX > touchStartX + 50) changeCard('prev'); }, {passive: true});
+if(detailModal) {
+    detailModal.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});
+    detailModal.addEventListener('touchend', e => { touchEndX = e.changedTouches[0].screenX; if (touchEndX < touchStartX - 50) changeCard('next'); if (touchEndX > touchStartX + 50) changeCard('prev'); }, {passive: true});
+}
 
 document.getElementById('prev-card-btn').addEventListener('click', () => changeCard('prev')); document.getElementById('next-card-btn').addEventListener('click', () => changeCard('next'));
 document.getElementById('close-detail-btn').addEventListener('click', () => { playSound('click'); document.getElementById('detail-modal').classList.add('hidden'); });
@@ -343,7 +449,6 @@ document.querySelectorAll('.filter-btn').forEach(btn => { btn.addEventListener('
 
 async function saveCardToCloud(card) {
     if (!currentUser) return;
-    // 確保儲存時寫入 attackType
     const docRef = await addDoc(collection(db, "inventory"), { 
         name: card.name, 
         rarity: card.rarity, 
@@ -352,7 +457,7 @@ async function saveCardToCloud(card) {
         title: card.title, 
         baseAtk: card.atk, 
         baseHp: card.hp, 
-        attackType: card.attackType || 'melee', // 預設值防止空值
+        attackType: card.attackType || 'melee', 
         level: 1, 
         stars: 1, 
         obtainedAt: new Date(), 
