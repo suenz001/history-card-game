@@ -848,9 +848,10 @@ function spawnHeroes() {
         const lane = Math.floor(index / 3);
         const col = index % 3; // 0, 1, 2
         
-        // 修正：讓網格位置符合視覺 (右邊是前排)
-        // Col 2 (右) -> 前排 (Start 13%)
-        // Col 0 (左) -> 後排 (Start 5%)
+        // 修正：左右反轉 (右邊=前排)
+        // col=0 (Left) -> 5%
+        // col=1 (Mid)  -> 9%
+        // col=2 (Right)-> 13%
         const startPos = 5 + (col * 4); 
         
         // 🔥 密集方陣集結點
@@ -1034,18 +1035,17 @@ function gameLoop() {
         if (hero.currentHp <= 0) return; 
 
         let blocked = false;
+        let dodgeY = 0;
         
         let nearestEnemy = null;
-        let minTotalDist = 9999; // 找絕對距離最近的
+        let minTotalDist = 9999; 
 
         enemies.forEach(enemy => {
             if (enemy.currentHp > 0) {
-                // 計算歐幾里得距離 (直線距離)
                 const dx = enemy.position - hero.position;
-                const dy = enemy.y - hero.y; // Y軸也是百分比，但視為單位距離
+                const dy = enemy.y - hero.y; 
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                // 必須是前方或附近的敵人 (dx > -5)
                 if (dx > -5 && dist < minTotalDist) {
                     minTotalDist = dist;
                     nearestEnemy = enemy;
@@ -1071,17 +1071,17 @@ function gameLoop() {
             }
         }
 
-        // 🔥 防追撞 (Anti-Stacking)
-        // 修正：加入垂直距離檢查
+        // 🔥 防追撞 + 繞路邏輯 (Smart AI)
         if (!blocked) {
             for (let other of heroEntities) {
                 if (other !== hero && other.currentHp > 0) {
                     let dist = other.position - hero.position;
-                    let vDist = Math.abs(other.y - hero.y);
-                    
-                    // 如果在前方 (dist > 0) 且水平距離 < 4，且垂直距離也很近 (< 5)
-                    if (dist > 0 && dist < 4 && vDist < 5) {
+                    // 如果在前方 (dist > 0) 且水平距離 < 2.5 (20% overlap allowed)，且垂直距離也很近 (< 5)
+                    if (dist > 0 && dist < 2.5 && Math.abs(other.y - hero.y) < 5) {
                         blocked = true;
+                        // 決定繞路方向
+                        if (hero.y <= other.y) dodgeY = -0.3; // 往上繞
+                        else dodgeY = 0.3; // 往下繞
                         break;
                     }
                 }
@@ -1089,12 +1089,21 @@ function gameLoop() {
         }
 
         // 移動 & 集結
-        if (!blocked && hero.position < 75) {  // 修正：終點 75
-            hero.position += hero.speed;
-            
-            // 往目標 Y 軸靠攏
-            if (hero.y < hero.targetY) hero.y += 0.15; 
-            if (hero.y > hero.targetY) hero.y -= 0.15; 
+        if (!blocked) {
+            if (hero.position < 75) { // 修正：終點 75
+                hero.position += hero.speed;
+                // 往目標 Y 軸靠攏
+                let targetY = nearestEnemy ? nearestEnemy.y : hero.targetY;
+                if (Math.abs(hero.y - targetY) > 1) { // 只有距離大於1才修正，避免抖動
+                     if (hero.y < targetY) hero.y += 0.1;
+                     else hero.y -= 0.1;
+                }
+            }
+        } else if (dodgeY !== 0) {
+            // 被擋住時，嘗試繞路 (只動 Y 軸)
+             hero.y += dodgeY;
+             // 限制邊界
+             hero.y = Math.max(15, Math.min(85, hero.y));
         }
 
         if (hero.el) {
@@ -1122,6 +1131,7 @@ function gameLoop() {
 
     enemies.forEach((enemy, eIndex) => {
         let blocked = false;
+        let dodgeY = 0;
         
         let nearestHero = null;
         let minTotalDist = 9999;
@@ -1139,7 +1149,7 @@ function gameLoop() {
             }
         });
 
-        // 攻擊 (射程修正為 3)
+        // 攻擊
         if (nearestHero && minTotalDist <= 3) { 
             blocked = true;
             if (now - enemy.lastAttackTime > 800) {
@@ -1155,15 +1165,27 @@ function gameLoop() {
             }
         }
 
+        if (enemy.position <= 12) {
+            blocked = true;
+            if (now - enemy.lastAttackTime > 1000) { 
+                // baseHp -= 5; // 移除扣血
+                enemy.lastAttackTime = now;
+                // showDamageText(10, 50, "-5 HP", 'enemy-dmg'); // 移除飄字
+                // playSound('dismantle');
+                // updateBattleUI();
+            }
+        }
+
         // 防追撞 (Anti-Stacking)
         if (!blocked) {
             for (let other of enemies) {
                 if (other !== enemy && other.currentHp > 0) {
                     let dist = enemy.position - other.position;
-                    let vDist = Math.abs(other.y - enemy.y);
-                    
-                    if (dist > 0 && dist < 4 && vDist < 5) {
+                    // 如果距離大於 0 (other 在我左邊/前面) 且 小於 2.5
+                    if (dist > 0 && dist < 2.5 && Math.abs(other.y - enemy.y) < 5) {
                         blocked = true;
+                         if (enemy.y <= other.y) dodgeY = -0.3; 
+                         else dodgeY = 0.3;
                         break;
                     }
                 }
@@ -1174,9 +1196,15 @@ function gameLoop() {
         if (!blocked) { 
             enemy.position -= enemy.speed;
             
-            // 往目標 Y 軸靠攏
-            if (enemy.y < enemy.targetY) enemy.y += 0.15;
-            if (enemy.y > enemy.targetY) enemy.y -= 0.15;
+            let targetY = nearestHero ? nearestHero.y : enemy.targetY;
+            
+            if (Math.abs(enemy.y - targetY) > 1) {
+                if (enemy.y < targetY) enemy.y += 0.15;
+                if (enemy.y > targetY) enemy.y -= 0.15;
+            }
+        } else if (dodgeY !== 0) {
+             enemy.y += dodgeY;
+             enemy.y = Math.max(15, Math.min(85, enemy.y));
         }
         
         if (enemy.el) {
@@ -1194,9 +1222,8 @@ function gameLoop() {
         } 
     });
 
-    // 勝利判定：敵人全滅 且 波次結束
     if (enemies.length === 0 && battleState.phase === 'COMBAT') {
-        // 等待下一波或結束
+        // Wait
     }
 
     gameLoopId = requestAnimationFrame(gameLoop);
@@ -1228,7 +1255,6 @@ async function endBattle(isWin) {
         else if (currentDifficulty === 'normal') gemReward = 100;
         else if (currentDifficulty === 'hard') gemReward = 200;
     } else {
-        // 失敗時無獎勵
         finalGold = 0;
         gemReward = 0;
     }
@@ -1291,7 +1317,6 @@ function renderBattleSlots() {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); 
         
-        // 移除舊的卡片
         const existingCard = slotDiv.querySelector('.card'); if (existingCard) existingCard.remove();
         
         if (hero) {
