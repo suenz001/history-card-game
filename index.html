@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=110">
+    <link rel="stylesheet" href="style.css?v=120">
 </head>
 <body>
 
@@ -65,7 +65,7 @@
 
                     <div class="gacha-section">
                         <button id="draw-btn" class="btn-primary">單抽 (100鑽)</button>
-                        <button id="draw-10-btn" class="btn-secondary" style="display:flex; flex-direction:column; align-items:center; line-height:1.2;">
+                        <button id="draw-10-btn" class="btn-secondary">
                             <span>十連 (1000鑽)</span>
                             <span style="font-size:0.7em; color:#ffeaa7;">(必得1張SR以上卡片)</span>
                         </button>
@@ -87,7 +87,7 @@
         <div class="battle-header">
             <div class="battle-info">
                 <span>⚔️ 英雄存活: <span id="hero-count-display">0</span></span>
-                <span>💀 波次: <span id="wave-count">1</span>/4</span>
+                <span>💀 <span id="wave-display-text">波次: 1/4</span></span>
                 <span>💰 <span id="battle-gold">0</span> G</span>
             </div>
             <button id="retreat-btn" class="btn-danger" style="padding: 5px 15px; font-size: 0.9em;">🏳️ 撤退</button>
@@ -270,6 +270,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=110"></script>
+    <script type="module" src="script.js?v=120"></script>
 </body>
 </html>
