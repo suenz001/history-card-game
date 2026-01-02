@@ -555,3 +555,17 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* 旋轉動畫 (搜尋用) */
 @keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* 戰報樣式 */
+.notification-item.battle-report {
+    border-left: 5px solid #555;
+    padding-left: 10px;
+}
+.notification-item.battle-report.defeat {
+    border-color: #e74c3c;
+    background: rgba(231, 76, 60, 0.1);
+}
+.notification-item.battle-report.victory {
+    border-color: #2ecc71;
+    background: rgba(46, 204, 113, 0.1);
+}
