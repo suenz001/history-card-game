@@ -42,7 +42,6 @@ let totalPower = 0;
 let allUserCards = [];
 let claimedNotifs = []; 
 let battleLogs = []; 
-// 🔥 新增：存放從資料庫讀取的全服公告
 let globalAnnouncements = [];
 
 let currentDisplayList = [];
@@ -162,7 +161,6 @@ if(document.getElementById('close-notification-btn')) {
     });
 }
 
-// 🔥 修改：打開通知視窗時，從資料庫讀取最新公告
 async function openNotificationModal() {
     if(currentUser) {
         await loadUserData(currentUser);
@@ -173,16 +171,15 @@ async function openNotificationModal() {
         const q = query(collection(db, "announcements"), orderBy("timestamp", "desc"), limit(20));
         const snap = await getDocs(q);
         
-        // 格式化資料
         globalAnnouncements = snap.docs.map(doc => {
             const data = doc.data();
             return {
-                id: doc.id, // 這就是這則公告的唯一 ID
+                id: doc.id, 
                 title: data.title,
                 reward: data.reward || { type: 'none', amount: 0 },
                 timestamp: data.timestamp ? data.timestamp.seconds * 1000 : Date.now(),
-                type: 'system', // 標記為系統公告
-                isDbNotif: true // 標記為來自資料庫
+                type: 'system', 
+                isDbNotif: true 
             };
         });
     } catch(e) {
@@ -193,28 +190,23 @@ async function openNotificationModal() {
     renderNotifications();
 }
 
-// 🔥 修改：渲染通知列表 (合併靜態、動態、戰報)
 function renderNotifications() {
     notificationList.innerHTML = "";
     
-    // 1. 舊的寫死公告 (開服禮)
     const staticSystemItems = SYSTEM_NOTIFICATIONS.map(notif => ({
         ...notif,
-        timestamp: 9999999999999, // 讓它永遠置頂
+        timestamp: 9999999999999, 
         type: 'system'
     }));
 
-    // 2. 戰鬥日誌
     const logItems = battleLogs.map(log => ({
         ...log,
         timestamp: log.timestamp ? log.timestamp.seconds * 1000 : Date.now(),
         isSystem: false
     }));
 
-    // 3. 合併：靜態公告 + 資料庫公告 + 戰鬥日誌
     const allItems = [...staticSystemItems, ...globalAnnouncements, ...logItems].sort((a, b) => b.timestamp - a.timestamp);
 
-    // 去除重複 (以 ID 為準)
     const uniqueItems = allItems.filter((item, index, self) => 
         index === self.findIndex((t) => (t.id === item.id))
     );
@@ -226,7 +218,6 @@ function renderNotifications() {
             const isClaimed = claimedNotifs.includes(item.id);
             const hasReward = item.reward && item.reward.type !== 'none' && item.reward.amount > 0;
             
-            // 根據有無獎勵顯示不同文字
             let subText = "";
             if (isClaimed) subText = "已領取";
             else if (hasReward) subText = `🎁 點擊領取: ${item.reward.amount} ${item.reward.type === 'gems' ? '鑽石' : '金幣'}`;
@@ -241,11 +232,9 @@ function renderNotifications() {
                 <div class="notif-status">${isClaimed ? '✔' : (hasReward ? '🎁' : 'ℹ️')}</div>
             `;
             
-            // 只有沒領過且有獎勵的才綁定領取事件
             if (!isClaimed && hasReward) {
                 div.addEventListener('click', () => claimReward(item));
             } else if (!hasReward) {
-                // 純公告，點擊後標記為已讀
                 div.addEventListener('click', async () => {
                     if(!isClaimed && currentUser) {
                          claimedNotifs.push(item.id);
@@ -256,7 +245,6 @@ function renderNotifications() {
                 });
             }
         } else {
-            // 戰鬥日誌邏輯
             const date = new Date(item.timestamp).toLocaleString();
             const isWin = item.result === 'win';
             const colorClass = isWin ? 'log-def-win' : 'log-def-lose';
@@ -382,22 +370,31 @@ if (isFirebaseReady && auth) {
     });
 }
 
+// 🔥 修改：載入使用者資料時，順便補登 Email
 async function loadUserData(user) {
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
+    
     if (userSnap.exists()) { 
         const data = userSnap.data(); 
         gems = data.gems; 
         gold = data.gold;
         claimedNotifs = data.claimedNotifs || [];
         battleLogs = data.battleLogs || [];
+
+        // 🔥 自動補登 Email：如果資料庫沒有 Email，但 Auth 有，就寫進去
+        if(!data.email && user.email) {
+            updateDoc(userRef, { email: user.email });
+        }
     } else { 
         gems = 1000; 
         gold = 5000; 
         claimedNotifs = [];
         battleLogs = [];
+        // 🔥 新註冊：直接存 Email
         await setDoc(userRef, { 
-            name: user.displayName||"未命名", 
+            name: user.displayName || "未命名", 
+            email: user.email || null, // 存入 Email
             gems, 
             gold, 
             combatPower: 0, 
