@@ -170,7 +170,6 @@ function spawnHeroes() {
         const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
         const badgeClass = card.attackType === 'ranged' ? 'hero-type-badge ranged' : 'hero-type-badge';
 
-        // PVE 英雄生成邏輯
         const baseCardConfig = cardDatabase.find(c => c.id == card.id);
         const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : (card.skillKey || 'HEAVY_STRIKE');
         const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : (card.skillParams || { dmgMult: 2.0 });
@@ -244,58 +243,33 @@ function spawnPvpEnemies(enemyTeam) {
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
 
-        // 🔥🔥🔥 核心修復：最強大的技能查找邏輯 (ID -> Title -> Name -> Remote) 🔥🔥🔥
+        // 🔥🔥🔥 核心修改：直接信任資料庫 🔥🔥🔥
+        // 既然你的資料庫截圖顯示已經有 skillKey: "INVINCIBLE_STRIKE"，我們就優先用它。
         
-        let baseCardConfig = null;
+        let finalSkillKey = enemyCard.skillKey;
+        let finalSkillParams = enemyCard.skillParams;
+        let finalTitle = enemyCard.title || "強敵";
 
-        // 1. 嘗試用 ID 找
-        baseCardConfig = cardDatabase.find(c => c.id == enemyCard.id);
-
-        // 2. 如果 ID 找不到，或者找到了但沒有設定 skillKey，嘗試用「稱號 (Title)」找
-        if ((!baseCardConfig || !baseCardConfig.skillKey) && enemyCard.title) {
-            const titleMatch = cardDatabase.find(c => c.title === enemyCard.title);
-            if (titleMatch) {
-                console.log(`PVP Fix: 透過稱號 [${enemyCard.title}] 找到對應技能資料。`);
-                baseCardConfig = titleMatch;
+        // 🔥 防呆：只有當 DB 真的沒有技能資料時（例如很舊的資料），才去查 data.js
+        if (!finalSkillKey) {
+            console.warn(`[PVP] ID:${enemyCard.id} 缺少技能，嘗試本地查詢...`);
+            const baseCardConfig = cardDatabase.find(c => c.id == enemyCard.id);
+            if (baseCardConfig) {
+                finalSkillKey = baseCardConfig.skillKey;
+                finalSkillParams = baseCardConfig.skillParams;
+                finalTitle = baseCardConfig.title || finalTitle;
+            } else {
+                finalSkillKey = 'HEAVY_STRIKE';
+                finalSkillParams = { dmgMult: 2.0 };
             }
         }
-        
-        // 3. 如果還找不到，嘗試用「名字 (Name)」找
-        if ((!baseCardConfig || !baseCardConfig.skillKey) && enemyCard.name) {
-             const nameMatch = cardDatabase.find(c => c.name === enemyCard.name);
-             if (nameMatch) {
-                 console.log(`PVP Fix: 透過名字 [${enemyCard.name}] 找到對應技能資料。`);
-                 baseCardConfig = nameMatch;
-             }
-        }
 
-        // 決定最終使用的數據
-        let realSkillKey = 'HEAVY_STRIKE'; // 預設值
-        let realSkillParams = { dmgMult: 2.0 };
-        let realTitle = enemyCard.title || "強敵";
-        let realId = enemyCard.id;
-
-        if (baseCardConfig && baseCardConfig.skillKey) {
-            // 情況 A: 在本地資料庫找到了！使用本地的最新設定 (最優先)
-            realSkillKey = baseCardConfig.skillKey;
-            realSkillParams = baseCardConfig.skillParams || realSkillParams;
-            realId = baseCardConfig.id; // 校正 ID
-            if(baseCardConfig.title) realTitle = baseCardConfig.title;
-        } 
-        else if (enemyCard.skillKey) {
-            // 情況 B: 本地找不到，但對手資料裡有帶技能 (次優先)
-            realSkillKey = enemyCard.skillKey;
-            realSkillParams = enemyCard.skillParams || realSkillParams;
-            console.log(`PVP Fallback: 使用對手自帶技能 [${realSkillKey}]`);
-        }
-        else {
-            // 情況 C: 真的沒救了 (本地沒有，對手也沒帶)
-            console.warn(`PVP Error: 卡片 [${enemyCard.name}] ID:${enemyCard.id} 完全無技能資料，使用預設攻擊。`);
-        }
+        // Debug 訊息：看看實際用了什麼技能
+        console.log(`[PVP Spawn] ${enemyCard.name} (ID:${enemyCard.id}) -> Skill: ${finalSkillKey}`);
 
         const el = document.createElement('div');
         el.className = `enemy-unit pvp-enemy ${enemyCard.rarity}`;
-        el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
+        el.style.backgroundImage = `url(assets/cards/${enemyCard.id}.webp)`;
         el.style.backgroundSize = 'cover';
         el.style.border = '2px solid #e74c3c';
         el.style.left = `${startPos}%`;
@@ -314,8 +288,8 @@ function spawnPvpEnemies(enemyTeam) {
 
         enemies.push({
             ...enemyCard,
-            id: realId,
-            title: realTitle, 
+            id: enemyCard.id,
+            title: finalTitle,
             maxHp: finalHp, currentHp: finalHp,
             maxMana: 100, currentMana: 0,
             position: startPos, y: startY,
@@ -325,8 +299,8 @@ function spawnPvpEnemies(enemyTeam) {
             lastAttackTime: 0,
             el: el,
             isPvpHero: true,
-            skillKey: realSkillKey, // 🔥 修正後的技能 Key
-            skillParams: realSkillParams
+            skillKey: finalSkillKey, // 🔥 使用確認後的技能
+            skillParams: finalSkillParams
         });
     });
 }
@@ -1162,4 +1136,5 @@ function endBattle(isWin) {
         const allHeroes = [...heroEntities, ...deadHeroes];
         onBattleEndCallback(isWin, battleGold, allHeroes);
     }
+}
 }
