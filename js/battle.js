@@ -3,16 +3,15 @@ import { WAVE_CONFIG } from './data.js';
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 
 export let isBattleActive = false;
-export let isPvpMode = false; // 判斷是否為 PVP 模式
+export let isPvpMode = false; 
 export let battleGold = 0;
 export let battleSlots = new Array(9).fill(null);
 export let heroEntities = [];
-export let deadHeroes = []; // 紀錄陣亡英雄
+export let deadHeroes = []; 
 export let enemies = [];
 export let currentDifficulty = 'normal';
-export let gameSpeed = 1;
+export let gameSpeed = 1; // 預設 1
 
-// 暫存 PVP 玩家隊伍
 let pvpPlayerTeamData = [];
 
 let battleState = {
@@ -21,18 +20,13 @@ let battleState = {
 let gameLoopId = null;
 let onBattleEndCallback = null;
 
-// --- 安全音效播放 (防止音效報錯卡死遊戲) ---
 function safePlaySound(type) {
-    try {
-        playSound(type);
-    } catch (e) {
-        console.warn(`音效播放失敗 [${type}]:`, e);
-    }
+    try { playSound(type); } catch (e) { console.warn(`音效播放失敗 [${type}]:`, e); }
 }
 
 export function setBattleSlots(slots) { battleSlots = slots; }
 export function setDifficulty(diff) { currentDifficulty = diff; }
-export function setGameSpeed(speed) { gameSpeed = speed; }
+export function setGameSpeed(speed) { gameSpeed = speed; } // 供 main.js 呼叫
 export function setOnBattleEnd(callback) { onBattleEndCallback = callback; }
 
 export function initBattle() {
@@ -51,22 +45,36 @@ export function initBattle() {
             currentDifficulty = e.target.getAttribute('data-diff');
         });
     });
+
+    // 🔥 初始化時讀取記憶的速度 (這段也可以放在 main.js，但在這雙重保險)
+    const savedSpeed = localStorage.getItem('battleSpeed');
+    if(savedSpeed) {
+        gameSpeed = parseFloat(savedSpeed);
+    }
 }
 
 function startBattle() {
     if (isBattleActive) return;
     isPvpMode = false; 
+    
+    // 🔥 PVE 模式：顯示難度按鈕
+    const diffControls = document.getElementById('difficulty-controls');
+    if(diffControls) diffControls.style.display = 'flex'; // 或 'block'，根據原本排版
+
     setupBattleEnvironment();
     spawnHeroes();
     startWave(1); 
     gameLoop();
 }
 
-// 接收玩家的進攻隊伍
 export function startPvpMatch(enemyTeamData, playerTeamData) {
     if (isBattleActive) return;
     isPvpMode = true; 
     pvpPlayerTeamData = playerTeamData; 
+
+    // 🔥 PVP 模式：隱藏難度按鈕
+    const diffControls = document.getElementById('difficulty-controls');
+    if(diffControls) diffControls.style.display = 'none';
 
     setupBattleEnvironment();
     
@@ -144,7 +152,16 @@ export function resetBattleState() {
     if(battleScreen) battleScreen.classList.add('hidden');
     if(waveNotif) waveNotif.classList.add('hidden');
     if(lanesWrapper) lanesWrapper.style.opacity = '1';
+
+    // 🔥 重置時恢復顯示難度按鈕 (為了 PVE)
+    const diffControls = document.getElementById('difficulty-controls');
+    if(diffControls) diffControls.style.display = 'flex';
 }
+
+// ... (後面的 spawnHeroes, spawnPvpEnemies 等函式保持不變)
+// 請務必保留原有的 spawnHeroes, spawnPvpEnemies, startWave, spawnEnemy, fireBossSkill, fireProjectile, triggerHeroHit, showDamageText, updateBattleUI, gameLoop, endBattle 函式
+// 這裡省略以節省篇幅，請確保不要覆蓋掉它們
+// ...
 
 function spawnHeroes() {
     const container = document.getElementById('hero-container');

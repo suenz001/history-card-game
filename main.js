@@ -5,8 +5,8 @@ import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, s
 
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
-import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive } from './js/battle.js';
-import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/pvp.js'; // 🔥 匯入復仇功能
+import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive, gameSpeed } from './js/battle.js';
+import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/pvp.js'; 
 
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
@@ -168,7 +168,6 @@ async function openNotificationModal() {
     renderNotifications();
 }
 
-// 🔥 渲染通知列表 (支援點擊復仇)
 function renderNotifications() {
     notificationList.innerHTML = "";
     
@@ -201,18 +200,16 @@ function renderNotifications() {
             `;
             if (!isClaimed) div.addEventListener('click', () => claimReward(item));
         } else {
-            // 🔥 PVP 戰鬥日誌
             const date = new Date(item.timestamp).toLocaleString();
             const isWin = item.result === 'win';
             const colorClass = isWin ? 'log-def-win' : 'log-def-lose';
             const resultText = isWin ? '🛡️ 防守成功' : '💔 防守失敗';
             const moneyText = isWin ? '無損失' : `<span style="color:#e74c3c">損失 ${item.goldLost} G</span>`;
             
-            // 如果有 UID，顯示復仇按鈕提示
-            const revengeHint = item.attackerUid ? '<div class="revenge-tag">點擊復仇 ⚔️</div>' : '';
+            const revengeHint = item.attackerUid ? '<div class="revenge-tag" style="background:#e74c3c; padding:2px 5px; border-radius:3px; font-size:0.8em;">復仇 ⚔️</div>' : '';
 
             div.className = `notification-item notif-battle-log ${colorClass}`;
-            div.style.cursor = item.attackerUid ? 'pointer' : 'default'; // 只有新日誌可點
+            div.style.cursor = item.attackerUid ? 'pointer' : 'default'; 
             
             div.innerHTML = `
                 <div style="width:100%">
@@ -230,12 +227,11 @@ function renderNotifications() {
                 </div>
             `;
 
-            // 🔥 綁定復仇事件
             if (item.attackerUid) {
                 div.addEventListener('click', () => {
                     playSound('click');
-                    document.getElementById('notification-modal').classList.add('hidden'); // 關閉通知窗
-                    startRevengeMatch(item.attackerUid); // 啟動復仇
+                    document.getElementById('notification-modal').classList.add('hidden'); 
+                    startRevengeMatch(item.attackerUid); 
                 });
             }
         }
@@ -506,15 +502,52 @@ if(document.getElementById('inventory-clear-btn')) {
     });
 }
 
+// 🔥 倍速按鈕邏輯修正 (自動記憶 + 3倍速)
 if(document.getElementById('speed-btn')) {
+    // 初始載入：讀取記憶
+    const savedSpeed = localStorage.getItem('battleSpeed');
+    if (savedSpeed) {
+        let speedVal = parseFloat(savedSpeed);
+        if([1, 2, 3].includes(speedVal)) {
+            setGameSpeed(speedVal);
+            const btn = document.getElementById('speed-btn');
+            btn.innerText = `⏩ ${speedVal}x`;
+        }
+    }
+
     document.getElementById('speed-btn').addEventListener('click', () => {
         playSound('click');
-        let currentSpeed = 1; 
+        // 簡單做法：讀取按鈕文字推算下一個速度
         const btn = document.getElementById('speed-btn');
-        if(btn.innerText.includes("1x")) { currentSpeed = 2; btn.innerText = "⏩ 2x"; }
-        else if(btn.innerText.includes("2x")) { currentSpeed = 2.5; btn.innerText = "⏩ 2.5x"; }
-        else { currentSpeed = 1; btn.innerText = "⏩ 1x"; }
-        setGameSpeed(currentSpeed);
+        let nextSpeed = 1;
+
+        if(btn.innerText.includes("1x")) nextSpeed = 2;
+        else if(btn.innerText.includes("2x")) nextSpeed = 3;
+        else if(btn.innerText.includes("3x")) nextSpeed = 1;
+        
+        btn.innerText = `⏩ ${nextSpeed}x`;
+        setGameSpeed(nextSpeed);
+        localStorage.setItem('battleSpeed', nextSpeed); // 記憶設定
+    });
+}
+
+// 🔥 側邊欄折疊邏輯
+if(document.getElementById('toggle-sidebar-btn')) {
+    document.getElementById('toggle-sidebar-btn').addEventListener('click', () => {
+        playSound('click');
+        const sidebar = document.querySelector('.battle-monitor-sidebar');
+        const btn = document.getElementById('toggle-sidebar-btn');
+        
+        // 切換 class
+        sidebar.classList.toggle('collapsed');
+        btn.classList.toggle('collapsed-pos');
+
+        // 更改箭頭方向
+        if (sidebar.classList.contains('collapsed')) {
+            btn.innerText = "◀";
+        } else {
+            btn.innerText = "▶";
+        }
     });
 }
 
@@ -795,8 +828,7 @@ let deployTargetSlot = null;
 
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
-        // 排除 PVP 視窗的 slot (因為它們也有 defense-slot class，但在 PVP modal 內)
-        // 這裡透過檢查 parent 是否為 game-area 或 lanes-wrapper 來區分
+        // 排除 PVP 視窗的 slot
         if(slot.closest('#pvp-setup-modal') || slot.closest('#pvp-match-content')) return;
 
         if(isBattleActive) return; playSound('click'); const slotIndex = parseInt(slot.dataset.slot);
@@ -831,7 +863,7 @@ function deployHeroToSlot(card) {
 }
 
 function renderBattleSlots() {
-    // 只選取 PVE 戰場的 slot
+    // 只選取 PVE 戰場的 slot (透過父容器區分)
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
     battleSlotsEl.forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
@@ -871,7 +903,7 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
     updateStartButton();
 });
 
-// 處理戰鬥結束 (從 battle.js 呼叫回來)
+// 🔥 處理戰鬥結束 (從 battle.js 呼叫回來)
 async function handleBattleEnd(isWin, earnedGold, heroStats) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     

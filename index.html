@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=118">
+    <link rel="stylesheet" href="style.css?v=119">
 </head>
 <body>
 
@@ -125,6 +125,8 @@
                 <div id="enemy-container"></div>
             </div>
 
+            <button id="toggle-sidebar-btn">▶</button>
+
             <div class="battle-monitor-sidebar">
                 <h3 style="margin: 0 0 10px 0; color: #f1c40f; border-bottom: 1px solid #555; padding-bottom: 5px;">
                     🛡️ 英雄狀態
@@ -134,7 +136,7 @@
         </div>
 
         <div class="battle-deck">
-            <div style="display:flex; justify-content:center; gap:10px; margin-bottom:5px;">
+            <div id="difficulty-controls" style="display:flex; justify-content:center; gap:10px; margin-bottom:5px;">
                 <button class="difficulty-btn" data-diff="easy" style="background:#2ecc71;">🟢 簡單</button>
                 <button class="difficulty-btn active" data-diff="normal" style="background:#f39c12;">🟡 普通</button>
                 <button class="difficulty-btn" data-diff="hard" style="background:#e74c3c;">🔴 困難</button>
