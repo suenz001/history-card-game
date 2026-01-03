@@ -170,6 +170,7 @@ function spawnHeroes() {
         const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
         const badgeClass = card.attackType === 'ranged' ? 'hero-type-badge ranged' : 'hero-type-badge';
 
+        // PVE 英雄生成邏輯
         const baseCardConfig = cardDatabase.find(c => c.id == card.id);
         const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : (card.skillKey || 'HEAVY_STRIKE');
         const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : (card.skillParams || { dmgMult: 2.0 });
@@ -247,17 +248,22 @@ function spawnPvpEnemies(enemyTeam) {
         let finalSkillParams = enemyCard.skillParams;
         let finalTitle = enemyCard.title || "強敵";
 
-        if (!finalSkillKey) {
-            console.warn(`[PVP] ID:${enemyCard.id} 缺少技能，嘗試本地查詢...`);
+        // 🔥🔥 雙重保險：如果 DB 沒有技能，或者 DB 存的是預設技能 (HEAVY_STRIKE)，
+        // 就強制去本地 cardDatabase 查表，確保拿到最新技能 (例如 INVINCIBLE_STRIKE)
+        if (!finalSkillKey || finalSkillKey === 'HEAVY_STRIKE') {
             const baseCardConfig = cardDatabase.find(c => c.id == enemyCard.id);
-            if (baseCardConfig) {
+            if (baseCardConfig && baseCardConfig.skillKey) {
+                console.log(`[PVP Fix] Found better skill in local DB for ${enemyCard.name}: ${baseCardConfig.skillKey}`);
                 finalSkillKey = baseCardConfig.skillKey;
                 finalSkillParams = baseCardConfig.skillParams;
                 finalTitle = baseCardConfig.title || finalTitle;
-            } else {
-                finalSkillKey = 'HEAVY_STRIKE';
-                finalSkillParams = { dmgMult: 2.0 };
             }
+        }
+
+        // 如果真的還是找不到，才使用預設值
+        if (!finalSkillKey) {
+            finalSkillKey = 'HEAVY_STRIKE';
+            finalSkillParams = { dmgMult: 2.0 };
         }
 
         console.log(`[PVP Spawn] ${enemyCard.name} (ID:${enemyCard.id}) -> Skill: ${finalSkillKey}`);
