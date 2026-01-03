@@ -42,6 +42,8 @@ let totalPower = 0;
 let allUserCards = [];
 let claimedNotifs = []; 
 let battleLogs = []; 
+// 🔥 新增：存放從資料庫讀取的全服公告
+let globalAnnouncements = [];
 
 let currentDisplayList = [];
 let currentCardIndex = 0;
@@ -160,52 +162,106 @@ if(document.getElementById('close-notification-btn')) {
     });
 }
 
+// 🔥 修改：打開通知視窗時，從資料庫讀取最新公告
 async function openNotificationModal() {
     if(currentUser) {
         await loadUserData(currentUser);
     }
+    
+    // 從資料庫讀取最新的 20 則公告
+    try {
+        const q = query(collection(db, "announcements"), orderBy("timestamp", "desc"), limit(20));
+        const snap = await getDocs(q);
+        
+        // 格式化資料
+        globalAnnouncements = snap.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id, // 這就是這則公告的唯一 ID
+                title: data.title,
+                reward: data.reward || { type: 'none', amount: 0 },
+                timestamp: data.timestamp ? data.timestamp.seconds * 1000 : Date.now(),
+                type: 'system', // 標記為系統公告
+                isDbNotif: true // 標記為來自資料庫
+            };
+        });
+    } catch(e) {
+        console.warn("讀取公告失敗", e);
+    }
+
     notificationModal.classList.remove('hidden');
     renderNotifications();
 }
 
+// 🔥 修改：渲染通知列表 (合併靜態、動態、戰報)
 function renderNotifications() {
     notificationList.innerHTML = "";
     
-    const systemItems = SYSTEM_NOTIFICATIONS.map(notif => ({
+    // 1. 舊的寫死公告 (開服禮)
+    const staticSystemItems = SYSTEM_NOTIFICATIONS.map(notif => ({
         ...notif,
-        timestamp: 9999999999999,
+        timestamp: 9999999999999, // 讓它永遠置頂
         type: 'system'
     }));
 
+    // 2. 戰鬥日誌
     const logItems = battleLogs.map(log => ({
         ...log,
         timestamp: log.timestamp ? log.timestamp.seconds * 1000 : Date.now(),
         isSystem: false
     }));
 
-    const allItems = [...systemItems, ...logItems].sort((a, b) => b.timestamp - a.timestamp);
+    // 3. 合併：靜態公告 + 資料庫公告 + 戰鬥日誌
+    const allItems = [...staticSystemItems, ...globalAnnouncements, ...logItems].sort((a, b) => b.timestamp - a.timestamp);
 
-    allItems.forEach(item => {
+    // 去除重複 (以 ID 為準)
+    const uniqueItems = allItems.filter((item, index, self) => 
+        index === self.findIndex((t) => (t.id === item.id))
+    );
+
+    uniqueItems.forEach(item => {
         const div = document.createElement('div');
         
         if (item.type === 'system') {
             const isClaimed = claimedNotifs.includes(item.id);
+            const hasReward = item.reward && item.reward.type !== 'none' && item.reward.amount > 0;
+            
+            // 根據有無獎勵顯示不同文字
+            let subText = "";
+            if (isClaimed) subText = "已領取";
+            else if (hasReward) subText = `🎁 點擊領取: ${item.reward.amount} ${item.reward.type === 'gems' ? '鑽石' : '金幣'}`;
+            else subText = "📢 系統公告";
+
             div.className = `notification-item ${isClaimed ? 'claimed' : ''}`;
             div.innerHTML = `
                 <div>
                     <div class="notif-title">${item.title}</div>
-                    <div style="font-size:0.8em; color:#ccc;">${isClaimed ? '已領取' : '點擊領取獎勵'}</div>
+                    <div style="font-size:0.8em; color:#ccc;">${subText}</div>
                 </div>
-                <div class="notif-status">${isClaimed ? '✔' : '🎁'}</div>
+                <div class="notif-status">${isClaimed ? '✔' : (hasReward ? '🎁' : 'ℹ️')}</div>
             `;
-            if (!isClaimed) div.addEventListener('click', () => claimReward(item));
+            
+            // 只有沒領過且有獎勵的才綁定領取事件
+            if (!isClaimed && hasReward) {
+                div.addEventListener('click', () => claimReward(item));
+            } else if (!hasReward) {
+                // 純公告，點擊後標記為已讀
+                div.addEventListener('click', async () => {
+                    if(!isClaimed && currentUser) {
+                         claimedNotifs.push(item.id);
+                         await updateDoc(doc(db, "users", currentUser.uid), { claimedNotifs: claimedNotifs });
+                         div.classList.add('claimed');
+                         div.querySelector('.notif-status').innerText = '✔';
+                    }
+                });
+            }
         } else {
+            // 戰鬥日誌邏輯
             const date = new Date(item.timestamp).toLocaleString();
             const isWin = item.result === 'win';
             const colorClass = isWin ? 'log-def-win' : 'log-def-lose';
             const resultText = isWin ? '🛡️ 防守成功' : '💔 防守失敗';
             const moneyText = isWin ? '無損失' : `<span style="color:#e74c3c">損失 ${item.goldLost} G</span>`;
-            
             const revengeHint = item.attackerUid ? '<div class="revenge-tag" style="background:#e74c3c; padding:2px 5px; border-radius:3px; font-size:0.8em;">復仇 ⚔️</div>' : '';
 
             div.className = `notification-item notif-battle-log ${colorClass}`;
@@ -239,7 +295,7 @@ function renderNotifications() {
         notificationList.appendChild(div);
     });
     
-    if (allItems.length === 0) {
+    if (uniqueItems.length === 0) {
         notificationList.innerHTML = "<div style='text-align:center; padding:20px; color:#777;'>暫無通知</div>";
     }
 }
@@ -250,12 +306,15 @@ async function claimReward(notif) {
     try {
         if (notif.reward.type === 'gems') {
             gems += notif.reward.amount;
+        } else if (notif.reward.type === 'gold') {
+            gold += notif.reward.amount;
         }
         
         claimedNotifs.push(notif.id);
         
         await updateDoc(doc(db, "users", currentUser.uid), {
             gems: gems,
+            gold: gold,
             claimedNotifs: claimedNotifs
         });
         
