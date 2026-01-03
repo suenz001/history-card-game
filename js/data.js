@@ -10,43 +10,51 @@ export const WAVE_CONFIG = {
     4: { count: 1, hp: 30000, atk: 500 } // Boss
 };
 
-// 卡片資料庫 (已更新技能數值)
+// 卡片資料庫 (已更新技能與特效參數)
 export const cardDatabase = [
     // --- SSR ---
     { 
         id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝", attackType: "melee",
-        skillKey: "HEAL_AND_STRIKE", skillParams: { healRate: 0.40, dmgMult: 1.5 } // 恢復 40%
+        // 恢復自身 40%
+        skillKey: "HEAL_AND_STRIKE", skillParams: { healRate: 0.40, dmgMult: 1.5 } 
     },
     { 
         id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王", attackType: "melee",
-        skillKey: "AOE_CIRCLE", skillParams: { radius: 15, dmgMult: 1.5 } // 周圍 1.5 倍
+        // 對周圍造成 1.5 倍傷害
+        skillKey: "AOE_CIRCLE", skillParams: { radius: 15, dmgMult: 1.5 }
     },
     { 
         id: 3, name: "拿破崙", rarity: "SSR", atk: 1550, hp: 2000, title: "戰爭之神", attackType: "ranged",
-        skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.5 } // 全場 50%
+        // 全場敵人 50% 自身傷害
+        skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.5 }
     },
     { 
         id: 13, name: "成吉思汗", rarity: "SSR", atk: 1700, hp: 1900, title: "草原霸主", attackType: "ranged",
-        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 5.0 } // 5 倍傷害
+        // 造成 5 倍傷害
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 5.0 }
     },
     { 
         id: 14, name: "凱撒大帝", rarity: "SSR", atk: 1500, hp: 2300, title: "羅馬獨裁者", attackType: "melee",
-        skillKey: "INVINCIBLE_STRIKE", skillParams: { duration: 3000, dmgMult: 1.5 } // 免疫 3 秒
+        // 免疫傷害 3 秒
+        skillKey: "INVINCIBLE_STRIKE", skillParams: { duration: 3000, dmgMult: 1.5 }
     },
     { 
         id: 15, name: "漢尼拔", rarity: "SSR", atk: 1580, hp: 2100, title: "戰略之父", attackType: "melee",
-        skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 20, buffRate: 1.10, dmgMult: 1.5 } // 增加 10% 攻擊
+        // 附近英雄增加 10% 攻擊
+        skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 20, buffRate: 1.10, dmgMult: 1.5 }
     },
     { 
         id: 16, name: "埃及豔后", rarity: "SSR", atk: 1400, hp: 1800, title: "尼羅河女王", attackType: "ranged",
-        skillKey: "HEAL_ALLIES", skillParams: { range: 20, healRate: 0.20, dmgMult: 1.5 } // 恢復附近 20%
+        // 恢復附近英雄 20% 血量
+        skillKey: "HEAL_ALLIES", skillParams: { range: 20, healRate: 0.20, dmgMult: 1.5 }
     },
     { 
         id: 17, name: "宮本武藏", rarity: "SSR", atk: 1800, hp: 1500, title: "二天一流", attackType: "melee",
-        skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.25, dmgMult: 2.0 } // 增加 25% 攻擊
+        // 每次施放增加 25% 攻擊力
+        skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.25, dmgMult: 2.0 }
     },
 
-    // --- SR (部分給予通用強力擊，部分可自訂) ---
+    // --- SR (技能參數化) ---
     { id: 4, name: "諸葛亮", rarity: "SR", atk: 1200, hp: 1400, title: "臥龍先生", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 2.5 } },
     { id: 5, name: "聖女貞德", rarity: "SR", atk: 900, hp: 1800, title: "奧爾良少女", attackType: "melee", skillKey: "HEAL_AND_STRIKE", skillParams: { healRate: 0.15, dmgMult: 1.2 } },
     { id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, title: "第六天魔王", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 2.2 } },
@@ -58,7 +66,7 @@ export const cardDatabase = [
     { id: 22, name: "源義經", rarity: "SR", atk: 1280, hp: 1100, title: "牛若丸", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 2.2 } },
     { id: 23, name: "南丁格爾", rarity: "SR", atk: 500, hp: 2000, title: "提燈天使", attackType: "ranged", skillKey: "HEAL_ALLIES", skillParams: { range: 25, healRate: 0.15, dmgMult: 1.0 } },
 
-    // --- R (預設技能) ---
+    // --- R (預設) ---
     { id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士", attackType: "melee" },
     { id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, title: "龜甲陣列", attackType: "melee" },
     { id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, title: "武士道", attackType: "melee" },

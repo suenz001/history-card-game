@@ -1,5 +1,6 @@
 // js/battle.js
-import { WAVE_CONFIG } from './data.js';
+// 🔥 修正：引入 cardDatabase 以便強制讀取最新技能設定
+import { WAVE_CONFIG, cardDatabase } from './data.js';
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 
 export let isBattleActive = false;
@@ -10,7 +11,7 @@ export let heroEntities = [];
 export let deadHeroes = []; 
 export let enemies = [];
 export let currentDifficulty = 'normal';
-export let gameSpeed = 1; // 預設 1
+export let gameSpeed = 1;
 
 let pvpPlayerTeamData = [];
 
@@ -170,6 +171,11 @@ function spawnHeroes() {
         const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
         const badgeClass = card.attackType === 'ranged' ? 'hero-type-badge ranged' : 'hero-type-badge';
 
+        // 🔥 強制從 cardDatabase 讀取最新技能設定 (修正舊存檔問題)
+        const baseCardConfig = cardDatabase.find(c => c.id == card.id);
+        const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : 'HEAVY_STRIKE';
+        const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : { dmgMult: 2.0 };
+
         const el = document.createElement('div');
         el.className = `hero-unit ${card.rarity}`;
         el.style.backgroundImage = `url(assets/cards/${card.id}.webp)`;
@@ -184,7 +190,6 @@ function spawnHeroes() {
         container.appendChild(el);
 
         let finalHp = card.hp;
-        // 平衡性保留：遠程血量 0.45
         if(card.attackType === 'ranged') finalHp = Math.floor(card.hp * 0.45);
 
         let monitorItem = null;
@@ -220,8 +225,9 @@ function spawnHeroes() {
             patrolDir: 1, 
             totalDamage: 0,
             isInvincible: false,
-            skillKey: card.skillKey || 'HEAVY_STRIKE',
-            skillParams: card.skillParams || { dmgMult: 2.0 }
+            // 🔥 使用強制讀取到的技能
+            skillKey: realSkillKey,
+            skillParams: realSkillParams
         });
     });
 }
@@ -236,6 +242,11 @@ function spawnPvpEnemies(enemyTeam) {
         const startPos = 95 - (col * 4); 
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
+
+        // 🔥 強制從 cardDatabase 讀取 PVP 對手技能 (修正對手資料過舊)
+        const baseCardConfig = cardDatabase.find(c => c.id == enemyCard.id);
+        const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : 'HEAVY_STRIKE';
+        const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : { dmgMult: 2.0 };
 
         const el = document.createElement('div');
         el.className = `enemy-unit pvp-enemy ${enemyCard.rarity}`;
@@ -261,7 +272,10 @@ function spawnPvpEnemies(enemyTeam) {
             atk: enemyCard.attackType === 'ranged' ? Math.floor(enemyCard.atk * 0.35) : enemyCard.atk, 
             lastAttackTime: 0,
             el: el,
-            isPvpHero: true 
+            isPvpHero: true,
+            // 🔥 注入技能
+            skillKey: realSkillKey,
+            skillParams: realSkillParams
         });
     });
 }
@@ -536,7 +550,7 @@ const SKILL_LIBRARY = {
     // 4. 強力單體攻擊 (成吉思汗: 5倍傷害 + 巨大投射物)
     HEAVY_STRIKE: (hero, target, params) => {
         const dmgMult = params.dmgMult || 5.0;
-        // 特效：巨大投射物 (在 fireProjectile 裡判斷 skill 會變大，這裡再加強擊中特效)
+        // 特效：巨大投射物
         fireProjectile(hero.el, target.el, 'skill', () => {
              dealDamage(hero, target, dmgMult);
              // 擊中後的額外爆炸感
