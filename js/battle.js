@@ -26,7 +26,7 @@ function safePlaySound(type) {
 
 export function setBattleSlots(slots) { battleSlots = slots; }
 export function setDifficulty(diff) { currentDifficulty = diff; }
-export function setGameSpeed(speed) { gameSpeed = speed; } // 供 main.js 呼叫
+export function setGameSpeed(speed) { gameSpeed = speed; } 
 export function setOnBattleEnd(callback) { onBattleEndCallback = callback; }
 
 export function initBattle() {
@@ -46,7 +46,6 @@ export function initBattle() {
         });
     });
 
-    // 🔥 初始化時讀取記憶的速度
     const savedSpeed = localStorage.getItem('battleSpeed');
     if(savedSpeed) {
         gameSpeed = parseFloat(savedSpeed);
@@ -56,8 +55,6 @@ export function initBattle() {
 function startBattle() {
     if (isBattleActive) return;
     isPvpMode = false; 
-    
-    // 🔥 PVE 模式：顯示難度按鈕
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'flex'; 
 
@@ -72,7 +69,6 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
     isPvpMode = true; 
     pvpPlayerTeamData = playerTeamData; 
 
-    // 🔥 PVP 模式：隱藏難度按鈕
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'none';
 
@@ -153,7 +149,6 @@ export function resetBattleState() {
     if(waveNotif) waveNotif.classList.add('hidden');
     if(lanesWrapper) lanesWrapper.style.opacity = '1';
 
-    // 🔥 重置時恢復顯示難度按鈕
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'flex';
 }
@@ -163,20 +158,16 @@ function spawnHeroes() {
     const monitorList = document.getElementById('hero-monitor-list');
     if(!container) return;
 
-    // 如果是 PVP 模式，使用傳入的隊伍；否則使用 PVE battleSlots
     const currentTeam = isPvpMode ? pvpPlayerTeamData : battleSlots;
 
     currentTeam.forEach((card, index) => {
         if(!card) return;
         
-        // PVP 進攻隊伍的 index 也是 0~8，直接對應位置
         const lane = Math.floor(index / 3);
         const col = index % 3;
         const startPos = 5 + (col * 4); 
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
-        
-        // 加上 'ranged' class 以便 CSS 變色
         const badgeClass = card.attackType === 'ranged' ? 'hero-type-badge ranged' : 'hero-type-badge';
 
         const el = document.createElement('div');
@@ -185,11 +176,16 @@ function spawnHeroes() {
         el.style.left = `${startPos}%`;
         el.style.top = `${startY}%`;
         
-        el.innerHTML = `<div class="hero-hp-bar"><div style="width:100%"></div></div><div class="${badgeClass}">${typeIcon}</div>`;
+        // 🔥 新增：藍色氣力條 (hero-mana-bar)
+        el.innerHTML = `
+            <div class="hero-hp-bar"><div style="width:100%"></div></div>
+            <div class="hero-mana-bar"><div style="width:0%"></div></div>
+            <div class="${badgeClass}">${typeIcon}</div>
+        `;
         container.appendChild(el);
 
         let finalHp = card.hp;
-        // 🔥 平衡性調整：遠程血量係數再次下修至 0.45
+        // 🔥 平衡性保留：遠程血量 0.45
         if(card.attackType === 'ranged') finalHp = Math.floor(card.hp * 0.45);
 
         let monitorItem = null;
@@ -211,11 +207,12 @@ function spawnHeroes() {
         heroEntities.push({
             ...card,
             maxHp: finalHp, currentHp: finalHp,
+            // 🔥 新增氣力屬性
+            maxMana: 100, currentMana: 0, 
             lane: lane, position: startPos, y: startY,
             speed: 0.05,
-            // 🔥 平衡性調整：遠程攻擊距離保持 16
+            // 🔥 平衡性保留：遠程攻擊力 0.35, 射程 16
             range: card.attackType === 'ranged' ? 16 : 4, 
-            // 🔥 平衡性調整：遠程攻擊力係數再次下修至 0.35
             atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.35) : card.atk, 
             lastAttackTime: 0, 
             el: el, 
@@ -250,7 +247,7 @@ function spawnPvpEnemies(enemyTeam) {
         container.appendChild(el);
 
         let finalHp = enemyCard.hp;
-        // 🔥 平衡性調整：PVP 對手遠程血量係數 0.45
+        // 🔥 平衡性保留：PVP 遠程血量 0.45
         if(enemyCard.attackType === 'ranged') finalHp = Math.floor(enemyCard.hp * 0.45);
 
         enemies.push({
@@ -258,9 +255,7 @@ function spawnPvpEnemies(enemyTeam) {
             maxHp: finalHp, currentHp: finalHp,
             position: startPos, y: startY,
             speed: 0.05,
-            // 🔥 平衡性調整：PVP 對手遠程射程 16
             range: enemyCard.attackType === 'ranged' ? 16 : 4, 
-            // 🔥 平衡性調整：PVP 對手遠程攻擊力係數 0.35
             atk: enemyCard.attackType === 'ranged' ? Math.floor(enemyCard.atk * 0.35) : enemyCard.atk, 
             lastAttackTime: 0,
             el: el,
@@ -346,7 +341,7 @@ function fireBossSkill(boss) {
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position; const dy = hero.y - target.y; const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < 7) { 
-                hero.currentHp -= 300; triggerHeroHit(hero.el); showDamageText(hero.position, hero.y, `-300`, 'hero-dmg');
+                hero.currentHp -= 300; triggerHeroHit(hero); showDamageText(hero.position, hero.y, `-300`, 'hero-dmg');
                 if(hero.position < boss.position) hero.position -= 2; else hero.position += 2;
             }
         });
@@ -356,10 +351,19 @@ function fireBossSkill(boss) {
 function fireProjectile(startEl, targetEl, type, onHitCallback) {
     if(!startEl || !targetEl) return;
     const container = getBattleContainer();
-    if(!container) return; // 安全檢查
+    if(!container) return; 
 
     const projectile = document.createElement('div'); projectile.className = 'projectile';
-    if (type === 'arrow') projectile.innerText = '🏹'; else if (type === 'fireball') projectile.innerText = '🔥'; else if (type === 'sword') projectile.innerText = '🗡️'; else projectile.innerText = '⚔️'; 
+    
+    // 🔥 技能投射物樣式區別
+    if (type === 'skill') {
+        projectile.innerText = '🌟'; 
+        projectile.style.fontSize = '3em'; // 技能比較大顆
+        projectile.style.filter = 'drop-shadow(0 0 10px gold)';
+    } else if (type === 'arrow') projectile.innerText = '🏹'; 
+    else if (type === 'fireball') projectile.innerText = '🔥'; 
+    else if (type === 'sword') projectile.innerText = '🗡️'; 
+    else projectile.innerText = '⚔️'; 
     
     const containerRect = container.getBoundingClientRect();
     const startRect = startEl.getBoundingClientRect(); const targetRect = targetEl.getBoundingClientRect();
@@ -371,36 +375,46 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     
     void projectile.offsetWidth; 
     projectile.style.left = `${endX}px`; projectile.style.top = `${endY}px`;
-    setTimeout(() => { projectile.remove(); if(onHitCallback) { safePlaySound('dismantle'); onHitCallback(); } }, 300);
+    setTimeout(() => { projectile.remove(); if(onHitCallback) { onHitCallback(); } }, 300);
 }
 
-function triggerHeroHit(el) { if(el) { el.classList.remove('taking-damage'); void el.offsetWidth; el.classList.add('taking-damage'); } }
+// 🔥 修改：增加氣力恢復 (被擊中)
+function triggerHeroHit(heroObj) { 
+    if(!heroObj) return;
+    const el = heroObj.el; 
+    if(el) { 
+        el.classList.remove('taking-damage'); 
+        void el.offsetWidth; 
+        el.classList.add('taking-damage'); 
+    }
+    // 被打回氣 +5
+    if(heroObj.currentMana !== undefined && heroObj.currentMana < heroObj.maxMana) {
+        heroObj.currentMana = Math.min(heroObj.maxMana, heroObj.currentMana + 5);
+    }
+}
 
-// 🔥 取得戰鬥容器的輔助函式 (多重備案，防止找不到容器)
 function getBattleContainer() {
     return document.querySelector('.battle-field-container') || 
            document.getElementById('battle-screen') || 
-           document.body; // 最後手段：直接貼在 body 上，確保不報錯
+           document.body; 
 }
 
-// 🔥 顯示飄字 (絕對防禦版)
 function showDamageText(x, y, text, type) {
     const container = getBattleContainer();
-    if(!container) return; // 真的找不到就算了，不要當機
+    if(!container) return; 
 
     const el = document.createElement('div');
     el.className = `damage-text ${type}`;
     el.innerText = text;
     el.style.left = `${x}%`;
     el.style.top = `${y}%`;
-    el.style.position = 'absolute'; // 確保一定是絕對定位
-    el.style.zIndex = '9999'; // 確保在最上層
+    el.style.position = 'absolute'; 
+    el.style.zIndex = '9999'; 
     
     container.appendChild(el);
-    setTimeout(() => el.remove(), 800);
+    setTimeout(() => el.remove(), 1200); // 延長一點時間讓技能字看清楚
 }
 
-// 🔥 UI 更新 (絕對防禦版)
 function updateBattleUI() {
     try {
         const goldEl = document.getElementById('battle-gold');
@@ -412,14 +426,47 @@ function updateBattleUI() {
         const countEl = document.getElementById('hero-count-display');
         if(countEl) countEl.innerText = heroEntities.length;
     } catch(e) {
-        console.warn("UI Update Warning:", e); // 只警告，不當機
+        console.warn("UI Update Warning:", e); 
     }
+}
+
+// 🔥 執行必殺技
+function executeSkill(hero, target) {
+    // 1. 消耗所有氣力
+    hero.currentMana = 0;
+    
+    // 2. 顯示稱號特效
+    showDamageText(hero.position, hero.y - 10, hero.title + "!", 'skill-title');
+    safePlaySound('ssr'); // 播放 SSR 音效作為技能音效
+
+    // 3. 預設技能邏輯：兩倍傷害
+    const skillDmg = hero.atk * 2;
+
+    // 4. 發射技能投射物
+    fireProjectile(hero.el, target.el, 'skill', () => {
+        if (target.el && target.currentHp > 0) {
+            target.currentHp -= skillDmg;
+            
+            // 技能打擊特效 (稍微誇張一點的飄字)
+            showDamageText(target.position, target.y, `CRIT -${skillDmg}`, 'hero-dmg'); 
+            
+            // 觸發受傷動畫
+            if(target.el) {
+                target.el.classList.remove('taking-damage');
+                void target.el.offsetWidth;
+                target.el.classList.add('taking-damage');
+            }
+            hero.totalDamage += skillDmg;
+            safePlaySound('dismantle'); // 打擊音效
+        }
+    });
 }
 
 function gameLoop() {
     if (!isBattleActive) return;
     const now = Date.now();
 
+    // --- 遊戲階段控制 (無變更) ---
     if (!isPvpMode && battleState.phase === 'SPAWNING') {
         if (battleState.spawned < battleState.totalToSpawn) {
             if (now - battleState.lastSpawnTime > 1500 / gameSpeed) { 
@@ -448,10 +495,12 @@ function gameLoop() {
         if (heroEntities.length === 0) { endBattle(false); return; }
     }
 
+    // --- 英雄邏輯 ---
     heroEntities.sort((a, b) => b.position - a.position);
     for (let i = heroEntities.length - 1; i >= 0; i--) {
         const hero = heroEntities[i];
 
+        // 死亡判定
         if (hero.currentHp <= 0) {
             if (hero.monitorEl) { 
                 hero.monitorEl.classList.add('dead'); 
@@ -464,14 +513,21 @@ function gameLoop() {
             continue;
         }
         
+        // 更新側邊欄血條
         if (hero.monitorEl) { 
             const hpPercent = Math.max(0, (hero.currentHp / hero.maxHp) * 100); 
             const fill = hero.monitorEl.querySelector('.monitor-hp-fill'); 
             if (fill) fill.style.width = `${hpPercent}%`; 
         }
 
+        // 🔥 氣力自然回復 (每秒+3，配合 gameSpeed)
+        if (hero.currentMana < hero.maxMana) {
+            hero.currentMana += 0.05 * gameSpeed; // 每幀微量增加，累積起來約每秒 3
+            if(hero.currentMana > hero.maxMana) hero.currentMana = hero.maxMana;
+        }
+
+        // 尋找敵人
         let blocked = false; let pushX = 0; let pushY = 0; let nearestEnemy = null; let minTotalDist = 9999; 
-        
         enemies.forEach(enemy => {
             if (enemy.currentHp > 0) {
                 const dx = enemy.position - hero.position; const dy = enemy.y - hero.y; const dist = Math.sqrt(dx*dx + dy*dy);
@@ -479,19 +535,42 @@ function gameLoop() {
             }
         });
 
+        // 攻擊邏輯
         if (nearestEnemy && minTotalDist <= hero.range) {
             blocked = true; 
             if (now - hero.lastAttackTime > 2000 / gameSpeed) {
-                const heroType = hero.attackType || 'melee'; const projType = heroType === 'ranged' ? 'arrow' : 'sword';
-                fireProjectile(hero.el, nearestEnemy.el, projType, () => {
-                    if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
-                        nearestEnemy.currentHp -= hero.atk; showDamageText(nearestEnemy.position, nearestEnemy.y, `-${hero.atk}`, 'hero-dmg'); triggerHeroHit(nearestEnemy.el);
-                        hero.totalDamage += hero.atk;
-                    }
-                });
+                
+                // 🔥 判斷是否施放技能
+                if (hero.currentMana >= hero.maxMana) {
+                    executeSkill(hero, nearestEnemy);
+                } else {
+                    // 一般攻擊
+                    const heroType = hero.attackType || 'melee'; const projType = heroType === 'ranged' ? 'arrow' : 'sword';
+                    fireProjectile(hero.el, nearestEnemy.el, projType, () => {
+                        if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
+                            nearestEnemy.currentHp -= hero.atk; 
+                            showDamageText(nearestEnemy.position, nearestEnemy.y, `-${hero.atk}`, 'hero-dmg'); 
+                            
+                            // 觸發敵人受傷 (這裡不需要回氣，敵人沒氣力條，除非是 PVP)
+                            if(nearestEnemy.el) {
+                                nearestEnemy.el.classList.remove('taking-damage'); 
+                                void nearestEnemy.el.offsetWidth; nearestEnemy.el.classList.add('taking-damage');
+                            }
+                            
+                            hero.totalDamage += hero.atk;
+
+                            // 🔥 攻擊命中回氣 +10
+                            hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 10);
+                        }
+                    });
+                    safePlaySound('dismantle'); // 一般攻擊音效
+                }
+                
                 hero.lastAttackTime = now;
             }
         }
+        
+        // 推擠與移動 (無變更)
         for (let other of heroEntities) {
             if (other !== hero && other.currentHp > 0) {
                 const dx = hero.position - other.position; const dy = hero.y - other.y; const dist = Math.sqrt(dx*dx + dy*dy); const minDist = 5; 
@@ -505,42 +584,60 @@ function gameLoop() {
              } else { if (hero.position >= 80) hero.patrolDir = -1; if (hero.position <= 10) hero.patrolDir = 1; if(!hero.patrolDir) hero.patrolDir = 1; hero.position += hero.speed * hero.patrolDir * gameSpeed; }
         }
         hero.position += pushX; hero.y += pushY; hero.y = Math.max(10, Math.min(90, hero.y)); hero.position = Math.max(0, Math.min(100, hero.position));
+        
+        // 更新畫面位置與狀態
         if (hero.el) {
             hero.el.style.left = `${hero.position}%`; hero.el.style.top = `${hero.y}%`; 
             hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
+            
+            // 🔥 更新藍色氣力條
+            const manaPercent = (hero.currentMana / hero.maxMana) * 100;
+            hero.el.querySelector('.hero-mana-bar div').style.width = `${manaPercent}%`;
+            
+            // 🔥 氣滿發光
+            if(hero.currentMana >= hero.maxMana) hero.el.classList.add('mana-full');
+            else hero.el.classList.remove('mana-full');
+
             if (nearestEnemy && nearestEnemy.position < hero.position) { hero.el.style.transform = 'translateY(-50%) scaleX(-1)'; } else { hero.el.style.transform = 'translateY(-50%) scaleX(1)'; }
         }
     }
 
     if (!isPvpMode && isBattleActive && heroEntities.length === 0 && battleState.spawned > 0) { endBattle(false); return; }
 
+    // --- 敵人邏輯 ---
     enemies.sort((a, b) => a.position - b.position);
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
 
-        // 1. 死亡判定
+        // 死亡判定
         if (enemy.currentHp <= 0) {
             if(enemy.el) enemy.el.remove();
             enemies.splice(i, 1);
             
-            // 🔥 PVE 專屬邏輯 (絕對防禦區塊)
             if(!isPvpMode) { 
                 try {
                     battleGold += 50 + (battleState.wave * 10);
-                    updateBattleUI(); // 如果這裡找不到 ID，只會 console.warn，不會卡死
+                    updateBattleUI(); 
                     showDamageText(enemy.position, enemy.y, `+50G`, 'gold-text'); 
-                } catch(err) {
-                    console.error("Critical Error in PVE Death Logic:", err);
-                }
+                    
+                    // 🔥 擊殺獎勵：擊殺者回氣 +30
+                    // (這有點難判定是誰殺的，這裡做簡化：所有存活英雄微量回氣，或者隨機給一個英雄回氣？)
+                    // (為了精確，我們應該在攻擊造成傷害那邊判定致死，但這裡為了簡化架構，我們給「最近的英雄」獎勵)
+                    let killer = heroEntities.find(h => Math.abs(h.position - enemy.position) < 20); // 隨便找一個附近的
+                    if(killer && killer.currentMana < killer.maxMana) {
+                         killer.currentMana = Math.min(killer.maxMana, killer.currentMana + 30);
+                         showDamageText(killer.position, killer.y, `MP+30`, 'gold-text');
+                    }
+
+                } catch(err) { console.error("Critical Error in PVE Death Logic:", err); }
             }
-            safePlaySound('dismantle'); // 防止音效錯誤卡死
+            safePlaySound('dismantle'); 
             continue; 
         }
 
         if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { fireBossSkill(enemy); enemy.lastAttackTime = now; }
 
         let blocked = false; let dodgeY = 0; let nearestHero = null; let minTotalDist = 9999;
-
         heroEntities.forEach(hero => {
             if (hero.currentHp > 0) {
                 const dx = enemy.position - hero.position; const dy = enemy.y - hero.y; const dist = Math.sqrt(dx*dx + dy*dy);
@@ -548,6 +645,7 @@ function gameLoop() {
             }
         });
 
+        // 敵人攻擊 (包含 PVP 對手)
         if (enemy.isPvpHero && nearestHero && minTotalDist <= enemy.range) {
             blocked = true;
             if (now - enemy.lastAttackTime > 2000 / gameSpeed) {
@@ -555,7 +653,7 @@ function gameLoop() {
                 fireProjectile(enemy.el, nearestHero.el, projType, () => {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
                         nearestHero.currentHp -= enemy.atk;
-                        triggerHeroHit(nearestHero.el);
+                        triggerHeroHit(nearestHero); // 🔥 英雄被打，回氣 +5
                         showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
                     }
                 });
@@ -567,7 +665,10 @@ function gameLoop() {
             if (now - enemy.lastAttackTime > 800 / gameSpeed) {
                 fireProjectile(enemy.el, nearestHero.el, 'fireball', () => {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
-                        nearestHero.currentHp -= enemy.atk; triggerHeroHit(nearestHero.el); safePlaySound('poison'); showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
+                        nearestHero.currentHp -= enemy.atk; 
+                        triggerHeroHit(nearestHero); // 🔥 英雄被打，回氣 +5
+                        safePlaySound('poison'); 
+                        showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
                     }
                 });
                 enemy.lastAttackTime = now;

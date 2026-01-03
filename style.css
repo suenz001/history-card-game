@@ -244,6 +244,65 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .hero-hp-bar > div { height: 100%; background: #2ecc71; }
 .enemy-hp-bar > div { height: 100%; background: #e74c3c; }
 
+/* style.css - 請將此段加在 .hero-hp-bar 附近或檔案最後 */
+
+/* 🔷 英雄氣力條 (藍條) */
+.hero-mana-bar {
+    position: absolute;
+    top: -5px; /* 位於血條下方一點點 */
+    width: 35px;
+    height: 4px;
+    background: #333;
+    border-radius: 2px;
+    overflow: hidden;
+    z-index: 25;
+}
+
+.hero-mana-bar > div {
+    height: 100%;
+    background: #3498db; /* 藍色 */
+    width: 0%;
+    transition: width 0.2s linear;
+}
+
+/* 氣力全滿時的發光特效 */
+.hero-unit.mana-full {
+    box-shadow: 0 0 15px #3498db, 0 0 5px white !important;
+    border-color: #3498db !important;
+    animation: manaPulse 0.5s infinite alternate;
+}
+
+@keyframes manaPulse {
+    from { transform: translateY(-50%) scale(1); }
+    to { transform: translateY(-50%) scale(1.1); }
+}
+
+/* 🔷 技能發動時的飄字特效 (稱號) */
+.damage-text.skill-title {
+    color: #f1c40f; /* 金色字體 */
+    font-size: 1.5em;
+    font-weight: 900;
+    text-shadow: 
+        0 0 5px #e74c3c,
+        0 0 10px #c0392b,
+        2px 2px 0px #000;
+    z-index: 300;
+    animation: skillFloat 1.2s forwards;
+    white-space: nowrap;
+}
+
+@keyframes skillFloat {
+    0% { transform: translateY(0) scale(0.5); opacity: 0; }
+    20% { transform: translateY(-20px) scale(1.5); opacity: 1; }
+    80% { transform: translateY(-40px) scale(1); opacity: 1; }
+    100% { transform: translateY(-50px) scale(0.8); opacity: 0; }
+}
+
+/* 調整原本血條位置，避免重疊 */
+.hero-hp-bar {
+    top: -12px; /* 往上移一點，讓出空間給藍條 */
+}
+
 /* 敵人實體 */
 .enemy-unit { position: absolute; width: 40px; height: 40px; background: #e74c3c; border-radius: 50%; border: 2px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.2em; z-index: 5; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: translateY(-50%); }
 
