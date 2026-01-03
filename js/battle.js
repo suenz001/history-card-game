@@ -241,9 +241,11 @@ function spawnPvpEnemies(enemyTeam) {
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
 
+        // 🔥 確保技能與稱號資料正確 (修正 undefined title)
         const baseCardConfig = cardDatabase.find(c => c.id == enemyCard.id);
         const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : 'HEAVY_STRIKE';
         const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : { dmgMult: 2.0 };
+        const realTitle = baseCardConfig ? baseCardConfig.title : (enemyCard.title || "強敵");
 
         const el = document.createElement('div');
         el.className = `enemy-unit pvp-enemy ${enemyCard.rarity}`;
@@ -254,10 +256,10 @@ function spawnPvpEnemies(enemyTeam) {
         el.style.top = `${startY}%`;
         el.style.transform = 'translateY(-50%) scaleX(-1)';
 
-        // 🔥 修正：加入氣力條 HTML 結構，讓敵人也能顯示藍條
+        // 🔥 修正：氣力條位置調整 (top: 8px 放在血條下方)
         el.innerHTML = `
             <div class="enemy-hp-bar"><div style="width:100%"></div></div>
-            <div class="hero-mana-bar" style="top: -16px; opacity: 0.8;"><div style="width:0%"></div></div>
+            <div class="hero-mana-bar" style="top: 8px; opacity: 0.8;"><div style="width:0%"></div></div>
             <div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>
         `;
         container.appendChild(el);
@@ -267,8 +269,8 @@ function spawnPvpEnemies(enemyTeam) {
 
         enemies.push({
             ...enemyCard,
+            title: realTitle, // 🔥 注入正確稱號
             maxHp: finalHp, currentHp: finalHp,
-            // 🔥 修正：初始化氣力值
             maxMana: 100, currentMana: 0,
             position: startPos, y: startY,
             speed: 0.05,
@@ -459,7 +461,6 @@ function updateBattleUI() {
 // 輔助函數：造成傷害
 function dealDamage(hero, target, multiplier) {
     if (target.el && target.currentHp > 0) {
-        // 🔥 PVP 平衡修正：技能傷害大幅降低 (0.5 -> 0.25)
         if (isPvpMode) multiplier *= 0.25;
 
         const dmg = Math.floor(hero.atk * multiplier);
@@ -878,7 +879,6 @@ function gameLoop() {
         }
 
         if (hero.currentMana < hero.maxMana) {
-            // 🔥 PVP 平衡修正：回氣速度大幅提升 (0.04 -> 0.25)
             let manaRate = isPvpMode ? 0.25 : 0.02;
             hero.currentMana += manaRate * gameSpeed; 
             if(hero.currentMana > hero.maxMana) hero.currentMana = hero.maxMana;
@@ -902,7 +902,6 @@ function gameLoop() {
                     const heroType = hero.attackType || 'melee'; const projType = heroType === 'ranged' ? 'arrow' : 'sword';
                     fireProjectile(hero.el, nearestEnemy.el, projType, () => {
                         if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
-                            // 🔥 PVP 平衡修正：普攻傷害大幅降低 (0.5 -> 0.25)
                             let dmg = hero.atk;
                             if(isPvpMode) dmg = Math.floor(dmg * 0.25);
 
