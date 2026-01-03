@@ -189,8 +189,8 @@ function spawnHeroes() {
         container.appendChild(el);
 
         let finalHp = card.hp;
-        // 🔥 平衡性調整：遠程血量係數從 0.7 降至 0.65
-        if(card.attackType === 'ranged') finalHp = Math.floor(card.hp * 0.65);
+        // 🔥 平衡性調整：遠程血量係數再次下修至 0.45
+        if(card.attackType === 'ranged') finalHp = Math.floor(card.hp * 0.45);
 
         let monitorItem = null;
         if(monitorList) {
@@ -213,10 +213,10 @@ function spawnHeroes() {
             maxHp: finalHp, currentHp: finalHp,
             lane: lane, position: startPos, y: startY,
             speed: 0.05,
-            // 🔥 平衡性調整：遠程攻擊距離從 12 提升至 16
+            // 🔥 平衡性調整：遠程攻擊距離保持 16
             range: card.attackType === 'ranged' ? 16 : 4, 
-            // 🔥 平衡性調整：遠程攻擊力係數從 0.6 大幅降至 0.45
-            atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.45) : card.atk, 
+            // 🔥 平衡性調整：遠程攻擊力係數再次下修至 0.35
+            atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.35) : card.atk, 
             lastAttackTime: 0, 
             el: el, 
             monitorEl: monitorItem, 
@@ -250,18 +250,18 @@ function spawnPvpEnemies(enemyTeam) {
         container.appendChild(el);
 
         let finalHp = enemyCard.hp;
-        // 🔥 平衡性調整：PVP 對手遠程血量係數 0.7 -> 0.65
-        if(enemyCard.attackType === 'ranged') finalHp = Math.floor(enemyCard.hp * 0.65);
+        // 🔥 平衡性調整：PVP 對手遠程血量係數 0.45
+        if(enemyCard.attackType === 'ranged') finalHp = Math.floor(enemyCard.hp * 0.45);
 
         enemies.push({
             ...enemyCard,
             maxHp: finalHp, currentHp: finalHp,
             position: startPos, y: startY,
             speed: 0.05,
-            // 🔥 平衡性調整：PVP 對手遠程射程 12 -> 16
+            // 🔥 平衡性調整：PVP 對手遠程射程 16
             range: enemyCard.attackType === 'ranged' ? 16 : 4, 
-            // 🔥 平衡性調整：PVP 對手遠程攻擊力係數 0.6 -> 0.45
-            atk: enemyCard.attackType === 'ranged' ? Math.floor(enemyCard.atk * 0.45) : enemyCard.atk, 
+            // 🔥 平衡性調整：PVP 對手遠程攻擊力係數 0.35
+            atk: enemyCard.attackType === 'ranged' ? Math.floor(enemyCard.atk * 0.35) : enemyCard.atk, 
             lastAttackTime: 0,
             el: el,
             isPvpHero: true 
