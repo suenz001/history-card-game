@@ -254,7 +254,12 @@ function spawnPvpEnemies(enemyTeam) {
         el.style.top = `${startY}%`;
         el.style.transform = 'translateY(-50%) scaleX(-1)';
 
-        el.innerHTML = `<div class="enemy-hp-bar"><div style="width:100%"></div></div><div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>`;
+        // 🔥 修正：加入氣力條 HTML 結構，讓敵人也能顯示藍條
+        el.innerHTML = `
+            <div class="enemy-hp-bar"><div style="width:100%"></div></div>
+            <div class="hero-mana-bar" style="top: -16px; opacity: 0.8;"><div style="width:0%"></div></div>
+            <div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>
+        `;
         container.appendChild(el);
 
         let finalHp = enemyCard.hp;
@@ -263,6 +268,8 @@ function spawnPvpEnemies(enemyTeam) {
         enemies.push({
             ...enemyCard,
             maxHp: finalHp, currentHp: finalHp,
+            // 🔥 修正：初始化氣力值
+            maxMana: 100, currentMana: 0,
             position: startPos, y: startY,
             speed: 0.05,
             range: enemyCard.attackType === 'ranged' ? 16 : 4, 
@@ -452,7 +459,7 @@ function updateBattleUI() {
 // 輔助函數：造成傷害
 function dealDamage(hero, target, multiplier) {
     if (target.el && target.currentHp > 0) {
-        // 🔥 PVP 平衡修正：傷害大幅降低 (0.5 -> 0.25)
+        // 🔥 PVP 平衡修正：技能傷害大幅降低 (0.5 -> 0.25)
         if (isPvpMode) multiplier *= 0.25;
 
         const dmg = Math.floor(hero.atk * multiplier);
@@ -985,30 +992,57 @@ function gameLoop() {
             }
         });
 
+        // 🔥 敵人 (PVP英雄) 的邏輯更新：回氣、放技能
+        if (enemy.isPvpHero) {
+            // 回氣
+            if (enemy.currentMana < enemy.maxMana) {
+                enemy.currentMana += 0.25 * gameSpeed; // PVP 回氣速度
+                if(enemy.currentMana > enemy.maxMana) enemy.currentMana = enemy.maxMana;
+            }
+            // 更新敵人氣力條 UI
+            if (enemy.el) {
+                const manaBar = enemy.el.querySelector('.hero-mana-bar div');
+                if(manaBar) {
+                    const manaPct = (enemy.currentMana / enemy.maxMana) * 100;
+                    manaBar.style.width = `${manaPct}%`;
+                }
+                if(enemy.currentMana >= enemy.maxMana) enemy.el.classList.add('mana-full');
+                else enemy.el.classList.remove('mana-full');
+            }
+        }
+
         if (enemy.isPvpHero && nearestHero && minTotalDist <= enemy.range) {
             blocked = true;
             if (now - enemy.lastAttackTime > 2000 / gameSpeed) {
-                const projType = enemy.attackType === 'ranged' ? 'arrow' : 'sword';
-                fireProjectile(enemy.el, nearestHero.el, projType, () => {
-                    if (nearestHero.el && nearestHero.currentHp > 0) {
-                        if(nearestHero.isInvincible) {
-                            showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
-                        } else if (nearestHero.immunityStacks > 0) {
-                            // 🔥 PVP時我方英雄格擋
-                            nearestHero.immunityStacks--;
-                            showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
-                            safePlaySound('dismantle');
-                        } else {
-                            // 🔥 PVP 平衡修正：敵方普攻傷害大幅降低 (0.5 -> 0.25)
-                            let dmg = enemy.atk;
-                            dmg = Math.floor(dmg * 0.25); 
+                // 🔥 敵人滿氣放招
+                if (enemy.currentMana >= enemy.maxMana) {
+                    executeSkill(enemy, nearestHero);
+                } else {
+                    const projType = enemy.attackType === 'ranged' ? 'arrow' : 'sword';
+                    fireProjectile(enemy.el, nearestHero.el, projType, () => {
+                        if (nearestHero.el && nearestHero.currentHp > 0) {
+                            if(nearestHero.isInvincible) {
+                                showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
+                            } else if (nearestHero.immunityStacks > 0) {
+                                // 🔥 PVP時我方英雄格擋
+                                nearestHero.immunityStacks--;
+                                showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
+                                safePlaySound('dismantle');
+                            } else {
+                                // 🔥 PVP 平衡修正：敵方普攻傷害大幅降低 (0.5 -> 0.25)
+                                let dmg = enemy.atk;
+                                dmg = Math.floor(dmg * 0.25); 
 
-                            nearestHero.currentHp -= dmg;
-                            triggerHeroHit(nearestHero); 
-                            showDamageText(nearestHero.position, nearestHero.y, `-${dmg}`, 'enemy-dmg');
+                                nearestHero.currentHp -= dmg;
+                                triggerHeroHit(nearestHero); 
+                                showDamageText(nearestHero.position, nearestHero.y, `-${dmg}`, 'enemy-dmg');
+                                
+                                // 敵人攻擊後稍微回氣
+                                enemy.currentMana = Math.min(enemy.maxMana, enemy.currentMana + 5);
+                            }
                         }
-                    }
-                });
+                    });
+                }
                 enemy.lastAttackTime = now;
             }
         }
