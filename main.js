@@ -626,21 +626,30 @@ async function loadInventory(uid) {
                  if(data.title !== baseCard.title) { data.title = baseCard.title; needsUpdate = true; }
                  if(data.name !== baseCard.name) { data.name = baseCard.name; needsUpdate = true; }
 
-                 if(data.skillKey !== baseCard.skillKey) { data.skillKey = baseCard.skillKey; needsUpdate = true; }
-                 
-                 // 🔥 修正：避免 undefined 比較導致的死迴圈
-                 const savedParams = data.skillParams || null;
-                 const baseParams = baseCard.skillParams || null;
+                 // 🔥 修正：Firestore 不接受 undefined，必須轉為 null
+                 const newSkillKey = baseCard.skillKey || null;
+                 const newSkillParams = baseCard.skillParams || null;
 
-                 if(JSON.stringify(savedParams) !== JSON.stringify(baseParams)) { 
-                     data.skillParams = baseParams; 
+                 if(data.skillKey !== newSkillKey) { 
+                     data.skillKey = newSkillKey; 
+                     needsUpdate = true; 
+                 }
+                 
+                 // 物件比較 (簡易版)
+                 if(JSON.stringify(data.skillParams) !== JSON.stringify(newSkillParams)) { 
+                     data.skillParams = newSkillParams; 
                      needsUpdate = true; 
                  }
             } else {
                  if(!data.attackType) { data.attackType = 'melee'; needsUpdate = true; }
             }
 
-            if(needsUpdate) updateDoc(doc(db, "inventory", docSnap.id), data);
+            if(needsUpdate) {
+                // 再次確保沒有 undefined 欄位被寫入
+                if(data.skillKey === undefined) data.skillKey = null;
+                if(data.skillParams === undefined) data.skillParams = null;
+                updateDoc(doc(db, "inventory", docSnap.id), data);
+            }
             
             allUserCards.push({ ...data, docId: docSnap.id }); 
         });

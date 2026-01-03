@@ -241,7 +241,8 @@ function spawnPvpEnemies(enemyTeam) {
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
 
-        const baseCardConfig = cardDatabase.find(c => c.id == enemyCard.id);
+        // 🔥 修正：強制轉換 ID 型別並查找正確的設定
+        const baseCardConfig = cardDatabase.find(c => c.id == parseInt(enemyCard.id));
         const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : 'HEAVY_STRIKE';
         const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : { dmgMult: 2.0 };
         const realTitle = baseCardConfig ? baseCardConfig.title : (enemyCard.title || "強敵");
@@ -268,7 +269,7 @@ function spawnPvpEnemies(enemyTeam) {
 
         enemies.push({
             ...enemyCard,
-            title: realTitle,
+            title: realTitle, // 🔥 注入正確稱號
             maxHp: finalHp, currentHp: finalHp,
             maxMana: 100, currentMana: 0,
             position: startPos, y: startY,
@@ -278,7 +279,7 @@ function spawnPvpEnemies(enemyTeam) {
             lastAttackTime: 0,
             el: el,
             isPvpHero: true,
-            skillKey: realSkillKey,
+            skillKey: realSkillKey, // 🔥 使用查表確認後的技能
             skillParams: realSkillParams
         });
     });
@@ -457,6 +458,7 @@ function updateBattleUI() {
     }
 }
 
+// 輔助函數：造成傷害
 function dealDamage(hero, target, multiplier) {
     if (target.el && target.currentHp > 0) {
         if (isPvpMode) multiplier *= 0.25;
@@ -476,6 +478,9 @@ function dealDamage(hero, target, multiplier) {
     }
 }
 
+// ==========================================
+// 🔥 技能模組庫 (SKILL LIBRARY)
+// ==========================================
 const SKILL_LIBRARY = {
     HEAL_AND_STRIKE: (hero, target, params) => {
         const healRate = params.healRate || 0.4;
