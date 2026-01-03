@@ -1,7 +1,3 @@
-{
-type: uploaded file
-fileName: js/battle.js
-fullContent:
 // js/battle.js
 import { WAVE_CONFIG, cardDatabase } from './data.js';
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
@@ -1202,5 +1198,4 @@ function endBattle(isWin) {
         const allHeroes = [...heroEntities, ...deadHeroes];
         onBattleEndCallback(isWin, battleGold, allHeroes);
     }
-}
 }
