@@ -370,7 +370,6 @@ if (isFirebaseReady && auth) {
     });
 }
 
-// 🔥 修改：載入使用者資料時，記錄最後登入時間
 async function loadUserData(user) {
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
@@ -404,7 +403,7 @@ async function loadUserData(user) {
             claimedNotifs: [],
             battleLogs: [],
             createdAt: new Date(),
-            lastLoginAt: serverTimestamp() // 新增此欄位
+            lastLoginAt: serverTimestamp() 
         }); 
     }
     updateUIDisplay();
@@ -611,28 +610,49 @@ if(document.getElementById('toggle-sidebar-btn')) {
     });
 }
 
+// 🔥🔥 核心優化：讀取背包時，強制同步 data.js 設定 🔥🔥
 async function loadInventory(uid) {
     const container = document.getElementById('inventory-grid');
     container.innerHTML = "讀取中...";
     const q = query(collection(db, "inventory"), where("owner", "==", uid));
     const querySnapshot = await getDocs(q);
     allUserCards = [];
+    
     querySnapshot.forEach((docSnap) => { 
         let data = docSnap.data();
         let needsUpdate = false;
+
+        // 1. 確保基本存檔欄位存在
         if(!data.level) { data.level = 1; needsUpdate = true; }
         if(!data.stars) { data.stars = 1; needsUpdate = true; }
         
+        // 2. 核心優化：與 cardDatabase 同步
         const baseCard = cardDatabase.find(c => c.id == data.id);
         
         if(baseCard) {
+             // 同步基礎數值 (如果尚未記錄)
              if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; }
-             if(!data.attackType) { data.attackType = baseCard.attackType; needsUpdate = true; }
+             
+             // 強制同步靜態屬性 (確保技能、類型、稱號都是最新的)
+             if(data.attackType !== baseCard.attackType) { data.attackType = baseCard.attackType; needsUpdate = true; }
+             if(data.title !== baseCard.title) { data.title = baseCard.title; needsUpdate = true; }
+             if(data.name !== baseCard.name) { data.name = baseCard.name; needsUpdate = true; }
+
+             // 🔥 同步技能設定 (關鍵：確保舊存檔獲得新技能)
+             if(data.skillKey !== baseCard.skillKey) { data.skillKey = baseCard.skillKey; needsUpdate = true; }
+             // 比較物件內容是否變更 (簡易比較)
+             if(JSON.stringify(data.skillParams) !== JSON.stringify(baseCard.skillParams)) { 
+                 data.skillParams = baseCard.skillParams; 
+                 needsUpdate = true; 
+             }
         } else {
+             // 找不到對應 ID 的例外處理 (預設給近戰)
              if(!data.attackType) { data.attackType = 'melee'; needsUpdate = true; }
         }
 
+        // 如果有資料變更，寫回資料庫
         if(needsUpdate) updateDoc(doc(db, "inventory", docSnap.id), data);
+        
         allUserCards.push({ ...data, docId: docSnap.id }); 
     });
     
@@ -744,7 +764,10 @@ async function saveCardToCloud(card) {
         title: card.title, 
         baseAtk: card.atk, 
         baseHp: card.hp, 
-        attackType: card.attackType || 'melee', 
+        attackType: card.attackType || 'melee',
+        // 確保新卡片有技能資料 
+        skillKey: card.skillKey || null,
+        skillParams: card.skillParams || null,
         level: 1, 
         stars: 1, 
         obtainedAt: new Date(), 
