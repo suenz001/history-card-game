@@ -244,36 +244,53 @@ function spawnPvpEnemies(enemyTeam) {
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
 
-        // 🔥🔥🔥 核心修復：更聰明的技能判斷邏輯 🔥🔥🔥
+        // 🔥🔥🔥 核心修復：最強大的技能查找邏輯 (ID -> Title -> Name -> Remote) 🔥🔥🔥
         
-        // 1. 先嘗試查表 (最準，確保是最新版數據)
-        let baseCardConfig = cardDatabase.find(c => c.id == parseInt(enemyCard.id));
+        let baseCardConfig = null;
+
+        // 1. 嘗試用 ID 找
+        baseCardConfig = cardDatabase.find(c => c.id == enemyCard.id);
+
+        // 2. 如果 ID 找不到，或者找到了但沒有設定 skillKey，嘗試用「稱號 (Title)」找
+        if ((!baseCardConfig || !baseCardConfig.skillKey) && enemyCard.title) {
+            const titleMatch = cardDatabase.find(c => c.title === enemyCard.title);
+            if (titleMatch) {
+                console.log(`PVP Fix: 透過稱號 [${enemyCard.title}] 找到對應技能資料。`);
+                baseCardConfig = titleMatch;
+            }
+        }
         
-        // 2. 如果查表失敗 (可能 data.js 沒這張卡，或 ID 格式問題)
-        // 則退而求其次，使用對手資料庫裡自帶的 skillKey (解決 PVP 技能失效問題)
-        
+        // 3. 如果還找不到，嘗試用「名字 (Name)」找
+        if ((!baseCardConfig || !baseCardConfig.skillKey) && enemyCard.name) {
+             const nameMatch = cardDatabase.find(c => c.name === enemyCard.name);
+             if (nameMatch) {
+                 console.log(`PVP Fix: 透過名字 [${enemyCard.name}] 找到對應技能資料。`);
+                 baseCardConfig = nameMatch;
+             }
+        }
+
+        // 決定最終使用的數據
         let realSkillKey = 'HEAVY_STRIKE'; // 預設值
         let realSkillParams = { dmgMult: 2.0 };
         let realTitle = enemyCard.title || "強敵";
         let realId = enemyCard.id;
 
         if (baseCardConfig && baseCardConfig.skillKey) {
-            // Case A: 本地資料庫有資料 -> 使用本地最新設定
+            // 情況 A: 在本地資料庫找到了！使用本地的最新設定 (最優先)
             realSkillKey = baseCardConfig.skillKey;
-            realSkillParams = baseCardConfig.skillParams || { dmgMult: 2.0 };
-            realTitle = baseCardConfig.title || realTitle;
-            realId = baseCardConfig.id;
-            console.log(`PVP Enemy [Local DB]: ${realTitle} uses ${realSkillKey}`);
+            realSkillParams = baseCardConfig.skillParams || realSkillParams;
+            realId = baseCardConfig.id; // 校正 ID
+            if(baseCardConfig.title) realTitle = baseCardConfig.title;
         } 
         else if (enemyCard.skillKey) {
-            // Case B: 本地查無資料，但對手資料有技能 -> 信任對手資料 (這是修復的關鍵)
+            // 情況 B: 本地找不到，但對手資料裡有帶技能 (次優先)
             realSkillKey = enemyCard.skillKey;
-            realSkillParams = enemyCard.skillParams || { dmgMult: 2.0 };
-            console.log(`PVP Enemy [Remote DB]: ${realTitle} uses ${realSkillKey} (Fallback)`);
+            realSkillParams = enemyCard.skillParams || realSkillParams;
+            console.log(`PVP Fallback: 使用對手自帶技能 [${realSkillKey}]`);
         }
         else {
-            // Case C: 真的什麼都沒有 -> 預設攻擊
-            console.warn(`PVP Warning: Card ID ${enemyCard.id} has no skill info. Using default.`);
+            // 情況 C: 真的沒救了 (本地沒有，對手也沒帶)
+            console.warn(`PVP Error: 卡片 [${enemyCard.name}] ID:${enemyCard.id} 完全無技能資料，使用預設攻擊。`);
         }
 
         const el = document.createElement('div');
@@ -308,7 +325,7 @@ function spawnPvpEnemies(enemyTeam) {
             lastAttackTime: 0,
             el: el,
             isPvpHero: true,
-            skillKey: realSkillKey, // 🔥 這裡現在會正確抓到對手的技能了
+            skillKey: realSkillKey, // 🔥 修正後的技能 Key
             skillParams: realSkillParams
         });
     });
