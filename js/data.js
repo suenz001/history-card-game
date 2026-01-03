@@ -10,7 +10,7 @@ export const WAVE_CONFIG = {
     4: { count: 1, hp: 30000, atk: 500 } // Boss
 };
 
-// 卡片資料庫 (SR 技能已更新)
+// 卡片資料庫 (已新增 關羽 & 源義經 技能)
 export const cardDatabase = [
     // --- SSR ---
     { 
@@ -46,41 +46,49 @@ export const cardDatabase = [
         skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.25, dmgMult: 2.0 }
     },
 
-    // --- SR (技能更新) ---
+    // --- SR ---
     { 
         id: 7, name: "愛因斯坦", rarity: "SR", atk: 1300, hp: 1000, title: "物理之父", attackType: "ranged", 
-        skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 3, dmgMult: 2.0 } // 最近3個敵人 2倍傷害
+        skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 3, dmgMult: 2.0 }
     },
     { 
         id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, title: "第六天魔王", attackType: "ranged", 
-        skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 2, dmgMult: 2.5 } // 最近2個敵人 2.5倍傷害
+        skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 2, dmgMult: 2.5 }
     },
     { 
         id: 5, name: "聖女貞德", rarity: "SR", atk: 900, hp: 1800, title: "奧爾良少女", attackType: "melee", 
-        skillKey: "HEAL_ALL_ALLIES", skillParams: { healRate: 0.20, dmgMult: 1.2 } // 全體恢復 20%
+        skillKey: "HEAL_ALL_ALLIES", skillParams: { healRate: 0.20, dmgMult: 1.2 }
     },
     { 
         id: 4, name: "諸葛亮", rarity: "SR", atk: 1200, hp: 1400, title: "臥龍先生", attackType: "ranged", 
-        skillKey: "DEBUFF_GLOBAL_ATK", skillParams: { debuffRate: 0.8, dmgMult: 2.0 } // 敵全體攻擊變為 80% (降低20%)
+        skillKey: "DEBUFF_GLOBAL_ATK", skillParams: { debuffRate: 0.8, dmgMult: 2.0 }
     },
     { 
         id: 23, name: "南丁格爾", rarity: "SR", atk: 500, hp: 2000, title: "提燈天使", attackType: "ranged", 
-        skillKey: "FULL_HEAL_LOWEST", skillParams: { dmgMult: 1.0 } // 補滿血量最低隊友
+        skillKey: "FULL_HEAL_LOWEST", skillParams: { dmgMult: 1.0 }
     },
     { 
         id: 19, name: "華盛頓", rarity: "SR", atk: 1000, hp: 1600, title: "開國元勛", attackType: "ranged", 
-        skillKey: "RESTORE_MANA_ALLIES", skillParams: { range: 20, manaAmount: 20, dmgMult: 1.2 } // 附近隊友回氣 20
+        skillKey: "RESTORE_MANA_ALLIES", skillParams: { range: 20, manaAmount: 20, dmgMult: 1.2 }
     },
     { 
         id: 20, name: "薩拉丁", rarity: "SR", atk: 1150, hp: 1450, title: "沙漠之鷹", attackType: "melee", 
-        skillKey: "STRIKE_AND_RESTORE_MANA", skillParams: { manaRestore: 40, dmgMult: 2.0 } // 回復自身 40% 氣力
+        skillKey: "STRIKE_AND_RESTORE_MANA", skillParams: { manaRestore: 40, dmgMult: 2.0 }
     },
     { 
         id: 21, name: "林肯", rarity: "SR", atk: 1100, hp: 1200, title: "解放者", attackType: "ranged", 
-        skillKey: "HEAL_SELF_AND_ALLY", skillParams: { range: 15, healRate: 0.30, dmgMult: 2.0 } // 恢復自己與附近1名 30%
+        skillKey: "HEAL_SELF_AND_ALLY", skillParams: { range: 15, healRate: 0.30, dmgMult: 2.0 }
     },
-    { id: 18, name: "關羽", rarity: "SR", atk: 1250, hp: 1500, title: "武聖", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 2.5 } },
-    { id: 22, name: "源義經", rarity: "SR", atk: 1280, hp: 1100, title: "牛若丸", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 2.2 } },
+    // 🔥 武聖：斬殺 20% 以下血量
+    { 
+        id: 18, name: "關羽", rarity: "SR", atk: 1250, hp: 1500, title: "武聖", attackType: "melee", 
+        skillKey: "EXECUTE_LOW_HP", skillParams: { threshold: 0.20, dmgMult: 2.5 } 
+    },
+    // 🔥 牛若丸：免疫 2 次傷害 (可累加)
+    { 
+        id: 22, name: "源義經", rarity: "SR", atk: 1280, hp: 1100, title: "牛若丸", attackType: "melee", 
+        skillKey: "STACKABLE_IMMUNITY", skillParams: { count: 2, dmgMult: 2.2 } 
+    },
 
     // --- R (預設) ---
     { id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士", attackType: "melee" },

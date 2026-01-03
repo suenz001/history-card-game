@@ -223,6 +223,7 @@ function spawnHeroes() {
             patrolDir: 1, 
             totalDamage: 0,
             isInvincible: false,
+            immunityStacks: 0,
             skillKey: realSkillKey,
             skillParams: realSkillParams
         });
@@ -354,6 +355,11 @@ function fireBossSkill(boss) {
             if (dist < 7) { 
                 if (hero.isInvincible) {
                     showDamageText(hero.position, hero.y, `免疫`, 'gold-text');
+                } else if (hero.immunityStacks > 0) {
+                    // 🔥 牛若丸免疫判斷
+                    hero.immunityStacks--;
+                    showDamageText(hero.position, hero.y, `格擋!`, 'gold-text');
+                    safePlaySound('dismantle'); // 格擋音效
                 } else {
                     hero.currentHp -= 300; 
                     triggerHeroHit(hero); 
@@ -447,6 +453,9 @@ function updateBattleUI() {
 // 輔助函數：造成傷害
 function dealDamage(hero, target, multiplier) {
     if (target.el && target.currentHp > 0) {
+        // 🔥 PVP 平衡修正：傷害減半
+        if (isPvpMode) multiplier *= 0.5;
+
         const dmg = Math.floor(hero.atk * multiplier);
         target.currentHp -= dmg;
         
@@ -466,69 +475,50 @@ function dealDamage(hero, target, multiplier) {
 // 🔥 技能模組庫 (SKILL LIBRARY)
 // ==========================================
 const SKILL_LIBRARY = {
-    // 1. 恢復自身 & 攻擊 (秦始皇: 恢復40% + 特效)
     HEAL_AND_STRIKE: (hero, target, params) => {
         const healRate = params.healRate || 0.4;
         const dmgMult = params.dmgMult || 1.5;
-        
-        // 恢復
         const healAmount = Math.floor(hero.maxHp * healRate);
         hero.currentHp = Math.min(hero.maxHp, hero.currentHp + healAmount);
         showDamageText(hero.position, hero.y, `+${healAmount}`, 'gold-text');
-        
-        // 特效：綠色治癒光環
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
             eff.style.width = '120px'; eff.style.height = '120px';
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 1000);
         }
-        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
     },
-
-    // 2. 自身攻擊 Buff (宮本武藏: 每次 +25% + 金色戰吼)
     SELF_BUFF_ATK: (hero, target, params) => {
         const buffRate = params.buffRate || 1.25;
         const dmgMult = params.dmgMult || 2.0;
-        
         hero.atk = Math.floor(hero.atk * buffRate);
         showDamageText(hero.position, hero.y, `ATK UP!`, 'gold-text');
-        
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
-            eff.style.borderColor = '#f1c40f'; // 金色
-            eff.style.boxShadow = '0 0 20px #f1c40f';
+            eff.style.borderColor = '#f1c40f'; eff.style.boxShadow = '0 0 20px #f1c40f';
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
         }
-        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
     },
-
-    // 3. 治療隊友 & 攻擊 (埃及豔后)
     HEAL_ALLIES: (hero, target, params) => {
         const range = params.range || 20;
         const healRate = params.healRate || 0.2;
         const dmgMult = params.dmgMult || 1.5;
-
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
-        
         if(hero.el) {
             const wave = document.createElement('div'); wave.className = 'skill-effect-heal';
             wave.style.left = `${hero.position}%`; wave.style.top = `${hero.y}%`;
-            wave.style.width = '200px'; wave.style.height = '200px';
-            wave.style.opacity = '0.5';
+            wave.style.width = '200px'; wave.style.height = '200px'; wave.style.opacity = '0.5';
             getBattleContainer().appendChild(wave); setTimeout(() => wave.remove(), 800);
         }
-
         heroEntities.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
                 const hAmt = Math.floor(ally.maxHp * healRate);
                 ally.currentHp = Math.min(ally.maxHp, ally.currentHp + hAmt);
                 showDamageText(ally.position, ally.y, `+${hAmt}`, 'gold-text');
-                
                 if(ally.el) {
                     const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
                     eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
@@ -538,8 +528,6 @@ const SKILL_LIBRARY = {
             }
         });
     },
-
-    // 4. 強力單體攻擊 (成吉思汗)
     HEAVY_STRIKE: (hero, target, params) => {
         const dmgMult = params.dmgMult || 5.0;
         fireProjectile(hero.el, target.el, 'skill', () => {
@@ -553,12 +541,9 @@ const SKILL_LIBRARY = {
              }
         });
     },
-
-    // 5. 範圍攻擊 (亞歷山大)
     AOE_CIRCLE: (hero, target, params) => {
         const radius = params.radius || 15;
         const dmgMult = params.dmgMult || 1.5;
-        
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'aoe-blast';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
@@ -566,7 +551,6 @@ const SKILL_LIBRARY = {
             eff.style.background = 'radial-gradient(circle, rgba(231, 76, 60, 0.6), transparent)';
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 500);
         }
-        
         enemies.forEach(enemy => {
             const dist = Math.sqrt(Math.pow(enemy.position - hero.position, 2) + Math.pow(enemy.y - hero.y, 2));
             if(dist < radius && enemy.currentHp > 0) {
@@ -574,29 +558,22 @@ const SKILL_LIBRARY = {
             }
         });
     },
-
-    // 6. Buff 隊友攻擊 (漢尼拔)
     BUFF_ALLIES_ATK: (hero, target, params) => {
         const range = params.range || 20;
         const buffRate = params.buffRate || 1.10;
         const dmgMult = params.dmgMult || 1.5;
-
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
-        
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
-            eff.style.borderColor = '#3498db'; 
-            eff.style.boxShadow = '0 0 15px #3498db';
+            eff.style.borderColor = '#3498db'; eff.style.boxShadow = '0 0 15px #3498db';
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
         }
-
         heroEntities.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
                 ally.atk = Math.floor(ally.atk * buffRate);
                 showDamageText(ally.position, ally.y, `⚔️ UP`, 'gold-text');
-                
                 if(ally.el) {
                     const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
                     eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
@@ -606,13 +583,10 @@ const SKILL_LIBRARY = {
             }
         });
     },
-
-    // 7. 全場轟炸 (拿破崙)
     GLOBAL_BOMB: (hero, target, params) => {
         const dmgMult = params.dmgMult || 0.5;
         const flash = document.createElement('div'); flash.className = 'global-bomb-effect';
         document.body.appendChild(flash); setTimeout(() => flash.remove(), 300);
-
         enemies.forEach(enemy => {
             if(enemy.currentHp > 0) {
                 dealDamage(hero, enemy, dmgMult);
@@ -626,59 +600,36 @@ const SKILL_LIBRARY = {
             }
         });
     },
-
-    // 8. 無敵狀態 (凱撒)
     INVINCIBLE_STRIKE: (hero, target, params) => {
         const duration = params.duration || 3000;
         const dmgMult = params.dmgMult || 1.5;
-
         hero.isInvincible = true;
         showDamageText(hero.position, hero.y, `無敵!`, 'gold-text');
-        
         if(hero.el) hero.el.classList.add('invincible-shield');
-        
         setTimeout(() => {
             if(hero && hero.currentHp > 0) {
                 hero.isInvincible = false;
                 if(hero.el) hero.el.classList.remove('invincible-shield');
             }
         }, duration);
-        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
     },
-
-    // 🔥 9. 多重目標打擊 (物理之父、第六天魔王)
     MULTI_TARGET_STRIKE: (hero, target, params) => {
         const count = params.count || 2;
         const dmgMult = params.dmgMult || 2.0;
-
-        // 找出最近的 N 個敵人
-        const sortedEnemies = [...enemies]
-            .filter(e => e.currentHp > 0)
-            .sort((a, b) => {
+        const sortedEnemies = [...enemies].filter(e => e.currentHp > 0).sort((a, b) => {
                 const distA = Math.pow(a.position - hero.position, 2) + Math.pow(a.y - hero.y, 2);
                 const distB = Math.pow(b.position - hero.position, 2) + Math.pow(b.y - hero.y, 2);
                 return distA - distB;
-            })
-            .slice(0, count);
-
-        // 對每個目標發射投射物
+            }).slice(0, count);
         sortedEnemies.forEach((enemy, idx) => {
-            setTimeout(() => {
-                fireProjectile(hero.el, enemy.el, 'skill', () => dealDamage(hero, enemy, dmgMult));
-            }, idx * 100); // 稍微錯開發射時間
+            setTimeout(() => { fireProjectile(hero.el, enemy.el, 'skill', () => dealDamage(hero, enemy, dmgMult)); }, idx * 100);
         });
     },
-
-    // 🔥 10. 全體治療 (奧爾良少女)
     HEAL_ALL_ALLIES: (hero, target, params) => {
         const healRate = params.healRate || 0.2;
         const dmgMult = params.dmgMult || 1.2;
-
-        // 先攻擊當前目標
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
-
-        // 自身發出聖光
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
@@ -686,14 +637,11 @@ const SKILL_LIBRARY = {
             eff.style.background = 'radial-gradient(circle, rgba(255, 255, 255, 0.7) 0%, transparent 70%)';
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 1000);
         }
-
-        // 治療所有隊友
         heroEntities.forEach(ally => {
             if(ally.currentHp > 0) {
                 const hAmt = Math.floor(ally.maxHp * healRate);
                 ally.currentHp = Math.min(ally.maxHp, ally.currentHp + hAmt);
                 showDamageText(ally.position, ally.y, `+${hAmt}`, 'gold-text');
-                
                 if(ally.el) {
                     const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
                     eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
@@ -703,24 +651,17 @@ const SKILL_LIBRARY = {
             }
         });
     },
-
-    // 🔥 11. 全場敵人降攻 (臥龍先生)
     DEBUFF_GLOBAL_ATK: (hero, target, params) => {
-        const debuffRate = params.debuffRate || 0.8; // 變成 80%
+        const debuffRate = params.debuffRate || 0.8;
         const dmgMult = params.dmgMult || 2.0;
-
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
-
-        // 全場特效 (暗色閃爍)
         const flash = document.createElement('div'); flash.className = 'global-bomb-effect';
         flash.style.background = 'rgba(0, 0, 0, 0.3)';
         document.body.appendChild(flash); setTimeout(() => flash.remove(), 500);
-
         enemies.forEach(enemy => {
             if(enemy.currentHp > 0) {
                 enemy.atk = Math.floor(enemy.atk * debuffRate);
                 showDamageText(enemy.position, enemy.y, `ATK DOWN`, 'gold-text');
-                
                 if(enemy.el) {
                     const eff = document.createElement('div'); eff.className = 'aoe-blast';
                     eff.style.left = `${enemy.position}%`; eff.style.top = `${enemy.y}%`;
@@ -730,147 +671,143 @@ const SKILL_LIBRARY = {
             }
         });
     },
-
-    // 🔥 12. 完全恢復血量最低隊友 (提燈天使)
     FULL_HEAL_LOWEST: (hero, target, params) => {
         const dmgMult = params.dmgMult || 1.0;
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
-
-        // 尋找血量比例最低的隊友
-        let lowestAlly = null;
-        let minPct = 1.1;
-
+        let lowestAlly = null; let minPct = 1.1;
         heroEntities.forEach(ally => {
             if(ally.currentHp > 0) {
                 const pct = ally.currentHp / ally.maxHp;
-                if(pct < minPct) {
-                    minPct = pct;
-                    lowestAlly = ally;
-                }
+                if(pct < minPct) { minPct = pct; lowestAlly = ally; }
             }
         });
-
         if(lowestAlly) {
-            const healAmt = lowestAlly.maxHp - lowestAlly.currentHp;
             lowestAlly.currentHp = lowestAlly.maxHp;
             showDamageText(lowestAlly.position, lowestAlly.y, `FULL HEAL`, 'gold-text');
-            
-            // 特效：大愛心
             if(lowestAlly.el) {
-                const eff = document.createElement('div'); 
-                eff.className = 'damage-text'; 
-                eff.innerHTML = '❤️'; 
-                eff.style.fontSize = '3em';
+                const eff = document.createElement('div'); eff.className = 'damage-text'; eff.innerHTML = '❤️'; eff.style.fontSize = '3em';
                 eff.style.left = `${lowestAlly.position}%`; eff.style.top = `${lowestAlly.y}%`;
                 eff.style.animation = 'floatUp 1s forwards';
                 getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 1000);
             }
         }
     },
-
-    // 🔥 13. 回復附近隊友氣力 (開國元勛)
     RESTORE_MANA_ALLIES: (hero, target, params) => {
         const range = params.range || 20;
         const manaAmount = params.manaAmount || 20;
         const dmgMult = params.dmgMult || 1.2;
-
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
-
-        // 藍色光環
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
-            eff.style.borderColor = '#3498db';
-            eff.style.boxShadow = '0 0 20px #3498db';
+            eff.style.borderColor = '#3498db'; eff.style.boxShadow = '0 0 20px #3498db';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
         }
-
         heroEntities.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0 && ally !== hero) {
                 ally.currentMana = Math.min(ally.maxMana, ally.currentMana + manaAmount);
                 showDamageText(ally.position, ally.y, `MP +${manaAmount}`, 'gold-text');
-                
                 if(ally.el) {
                     const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
-                    eff.style.borderColor = '#3498db';
-                    eff.style.width = '40px'; eff.style.height = '40px';
+                    eff.style.borderColor = '#3498db'; eff.style.width = '40px'; eff.style.height = '40px';
                     eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
                     getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 600);
                 }
             }
         });
     },
-
-    // 🔥 14. 攻擊並回復自身氣力 (沙漠之鷹)
     STRIKE_AND_RESTORE_MANA: (hero, target, params) => {
         const dmgMult = params.dmgMult || 2.0;
         const manaRestore = params.manaRestore || 40;
-
         fireProjectile(hero.el, target.el, 'skill', () => {
             dealDamage(hero, target, dmgMult);
-            // 回氣
             hero.currentMana = Math.min(hero.maxMana, hero.currentMana + manaRestore);
             showDamageText(hero.position, hero.y, `MP +${manaRestore}`, 'gold-text');
         });
     },
-
-    // 🔥 15. 恢復自己和一名隊友 (解放者)
     HEAL_SELF_AND_ALLY: (hero, target, params) => {
         const healRate = params.healRate || 0.3;
         const range = params.range || 15;
         const dmgMult = params.dmgMult || 2.0;
-
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
-
-        // 補自己
         const selfHeal = Math.floor(hero.maxHp * healRate);
         hero.currentHp = Math.min(hero.maxHp, hero.currentHp + selfHeal);
         showDamageText(hero.position, hero.y, `+${selfHeal}`, 'gold-text');
-
-        // 找最近的一個隊友
-        let nearestAlly = null;
-        let minDist = 9999;
-
+        let nearestAlly = null; let minDist = 9999;
         heroEntities.forEach(ally => {
             if(ally !== hero && ally.currentHp > 0) {
                 const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
-                if(dist < minDist) {
-                    minDist = dist;
-                    nearestAlly = ally;
-                }
+                if(dist < minDist) { minDist = dist; nearestAlly = ally; }
             }
         });
-
         if(nearestAlly && minDist <= range) {
             const allyHeal = Math.floor(nearestAlly.maxHp * healRate);
             nearestAlly.currentHp = Math.min(nearestAlly.maxHp, nearestAlly.currentHp + allyHeal);
             showDamageText(nearestAlly.position, nearestAlly.y, `+${allyHeal}`, 'gold-text');
-            
             if(nearestAlly.el) {
                 const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
                 eff.style.left = `${nearestAlly.position}%`; eff.style.top = `${nearestAlly.y}%`;
                 getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
             }
         }
+    },
+    EXECUTE_LOW_HP: (hero, target, params) => {
+        const threshold = params.threshold || 0.2;
+        const dmgMult = params.dmgMult || 2.5;
+
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            dealDamage(hero, target, dmgMult);
+            
+            let executedCount = 0;
+            enemies.forEach(enemy => {
+                if(enemy.currentHp > 0 && (enemy.currentHp / enemy.maxHp) < threshold && !enemy.isBoss) {
+                    enemy.currentHp = 0; 
+                    showDamageText(enemy.position, enemy.y, `斬殺!`, 'skill-title');
+                    
+                    if(enemy.el) {
+                        const slash = document.createElement('div'); slash.className = 'aoe-blast';
+                        slash.style.left = `${enemy.position}%`; slash.style.top = `${enemy.y}%`;
+                        slash.style.background = 'linear-gradient(45deg, transparent, red, transparent)';
+                        slash.style.width = '100px'; slash.style.height = '10px';
+                        slash.style.transform = 'rotate(-45deg)';
+                        getBattleContainer().appendChild(slash); setTimeout(() => slash.remove(), 300);
+                    }
+                    executedCount++;
+                }
+            });
+            
+            if(executedCount > 0) safePlaySound('ssr');
+        });
+    },
+    STACKABLE_IMMUNITY: (hero, target, params) => {
+        const count = params.count || 2;
+        const dmgMult = params.dmgMult || 2.2;
+        
+        hero.immunityStacks = (hero.immunityStacks || 0) + count;
+        showDamageText(hero.position, hero.y, `免疫x${hero.immunityStacks}`, 'gold-text');
+        
+        if(hero.el) {
+            const shield = document.createElement('div'); shield.className = 'invincible-shield';
+            shield.style.border = '2px solid #3498db'; 
+            hero.el.appendChild(shield);
+            setTimeout(() => { if(shield.parentNode) shield.remove(); }, 1000); 
+        }
+
+        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
     }
 };
 
-// 🔥 執行必殺技 (查表模式)
 function executeSkill(hero, target) {
-    // 1. 消耗所有氣力
     hero.currentMana = 0;
     
-    // 2. 顯示稱號特效
     showDamageText(hero.position, hero.y - 10, hero.title + "!", 'skill-title');
     safePlaySound('ssr'); 
 
-    // 3. 根據 skillKey 執行邏輯
     const skillFunc = SKILL_LIBRARY[hero.skillKey];
     if (skillFunc) {
         skillFunc(hero, target, hero.skillParams || {});
     } else {
-        // 預設行為
         SKILL_LIBRARY['HEAVY_STRIKE'](hero, target, { dmgMult: 2.0 });
     }
 }
@@ -879,7 +816,6 @@ function gameLoop() {
     if (!isBattleActive) return;
     const now = Date.now();
 
-    // --- 遊戲階段控制 (無變更) ---
     if (!isPvpMode && battleState.phase === 'SPAWNING') {
         if (battleState.spawned < battleState.totalToSpawn) {
             if (now - battleState.lastSpawnTime > 1500 / gameSpeed) { 
@@ -908,7 +844,6 @@ function gameLoop() {
         if (heroEntities.length === 0) { endBattle(false); return; }
     }
 
-    // --- 英雄邏輯 ---
     heroEntities.sort((a, b) => b.position - a.position);
     for (let i = heroEntities.length - 1; i >= 0; i--) {
         const hero = heroEntities[i];
@@ -937,7 +872,9 @@ function gameLoop() {
         }
 
         if (hero.currentMana < hero.maxMana) {
-            hero.currentMana += 0.02 * gameSpeed; 
+            // 🔥 PVP 平衡修正：回氣速度加倍
+            let manaRate = isPvpMode ? 0.04 : 0.02;
+            hero.currentMana += manaRate * gameSpeed; 
             if(hero.currentMana > hero.maxMana) hero.currentMana = hero.maxMana;
         }
 
@@ -959,16 +896,19 @@ function gameLoop() {
                     const heroType = hero.attackType || 'melee'; const projType = heroType === 'ranged' ? 'arrow' : 'sword';
                     fireProjectile(hero.el, nearestEnemy.el, projType, () => {
                         if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
-                            nearestEnemy.currentHp -= hero.atk; 
-                            showDamageText(nearestEnemy.position, nearestEnemy.y, `-${hero.atk}`, 'hero-dmg'); 
+                            // 🔥 PVP 平衡修正：普攻傷害減半
+                            let dmg = hero.atk;
+                            if(isPvpMode) dmg = Math.floor(dmg * 0.5);
+
+                            nearestEnemy.currentHp -= dmg; 
+                            showDamageText(nearestEnemy.position, nearestEnemy.y, `-${dmg}`, 'hero-dmg'); 
                             
                             if(nearestEnemy.el) {
                                 nearestEnemy.el.classList.remove('taking-damage'); 
                                 void nearestEnemy.el.offsetWidth; nearestEnemy.el.classList.add('taking-damage');
                             }
                             
-                            hero.totalDamage += hero.atk;
-
+                            hero.totalDamage += dmg;
                             hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 5);
                         }
                     });
@@ -1054,10 +994,19 @@ function gameLoop() {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
                         if(nearestHero.isInvincible) {
                             showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
+                        } else if (nearestHero.immunityStacks > 0) {
+                            // 🔥 PVP時我方英雄格擋
+                            nearestHero.immunityStacks--;
+                            showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
+                            safePlaySound('dismantle');
                         } else {
-                            nearestHero.currentHp -= enemy.atk;
+                            // 🔥 PVP 平衡修正：敵方普攻傷害減半
+                            let dmg = enemy.atk;
+                            dmg = Math.floor(dmg * 0.5); 
+
+                            nearestHero.currentHp -= dmg;
                             triggerHeroHit(nearestHero); 
-                            showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
+                            showDamageText(nearestHero.position, nearestHero.y, `-${dmg}`, 'enemy-dmg');
                         }
                     }
                 });
@@ -1071,6 +1020,11 @@ function gameLoop() {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
                         if(nearestHero.isInvincible) {
                             showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
+                        } else if (nearestHero.immunityStacks > 0) {
+                            // 🔥 PVE時我方英雄格擋
+                            nearestHero.immunityStacks--;
+                            showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
+                            safePlaySound('dismantle');
                         } else {
                             nearestHero.currentHp -= enemy.atk; 
                             triggerHeroHit(nearestHero); 
