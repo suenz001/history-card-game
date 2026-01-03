@@ -260,7 +260,7 @@ function resetToOpponentList() {
     currentEnemyData = null;
 }
 
-// 搜尋邏輯
+// 🔥 修改：搜尋邏輯 (混合策略：強者 + 弱者 + 全服頂尖)
 async function searchOpponent() {
     const loadingDiv = document.getElementById('pvp-loading');
     const listView = document.getElementById('pvp-opponent-list-view');
@@ -273,25 +273,55 @@ async function searchOpponent() {
     try {
         const myPower = currentUser.combatPower || 0;
 
-        const qHigh = query(collection(db, "users"), where("combatPower", ">=", myPower), orderBy("combatPower", "asc"), limit(15));
-        const qLow = query(collection(db, "users"), where("combatPower", "<", myPower), orderBy("combatPower", "desc"), limit(15));
+        // 1. 找比自己強的 15 個 (按戰力由低到高，找最接近的強者)
+        const qHigh = query(
+            collection(db, "users"), 
+            where("combatPower", ">", myPower), 
+            orderBy("combatPower", "asc"), 
+            limit(15) 
+        );
 
-        const [snapHigh, snapLow] = await Promise.all([getDocs(qHigh), getDocs(qLow)]);
+        // 2. 找比自己弱的 15 個 (按戰力由高到低，找最接近的弱者)
+        const qLow = query(
+            collection(db, "users"), 
+            where("combatPower", "<=", myPower), 
+            orderBy("combatPower", "desc"), 
+            limit(15)
+        );
+
+        // 3. 🔥 保底機制：找全服最強的 20 個 (確保一定有強者)
+        const qTop = query(
+            collection(db, "users"), 
+            orderBy("combatPower", "desc"), 
+            limit(20)
+        );
+
+        // 平行執行三個查詢
+        const [snapHigh, snapLow, snapTop] = await Promise.all([getDocs(qHigh), getDocs(qLow), getDocs(qTop)]);
         
         let candidates = [];
+        
+        // 收集所有結果
         const processDoc = (doc) => {
-            if (doc.id === currentUser.uid) return;
+            if (doc.id === currentUser.uid) return; // 排除自己
             const data = doc.data();
+            // 不論有無防守陣容都加入 (空陣容視為福利局)
             candidates.push({ ...data, uid: doc.id });
         };
 
         snapHigh.forEach(processDoc);
         snapLow.forEach(processDoc);
+        snapTop.forEach(processDoc);
 
-        candidates = candidates.filter((item, index, self) => index === self.findIndex((t) => (t.uid === item.uid)));
+        // 去除重複 (UID 唯一)
+        candidates = candidates.filter((item, index, self) => 
+            index === self.findIndex((t) => (t.uid === item.uid))
+        );
+
+        // 最後統一按戰力由高到低排序
         candidates.sort((a, b) => b.combatPower - a.combatPower);
-        candidates = candidates.slice(0, 20);
 
+        // 顯示
         if (candidates.length === 0) { 
             listContainer.innerHTML = "<p>目前找不到合適的對手，請稍後再試！</p>";
         } else {
@@ -348,12 +378,11 @@ function selectOpponent(enemyData) {
     loadLastAttackTeam();
 }
 
-// 🔥 新增：供 main.js 呼叫的「復仇」功能
+// 復仇功能
 export async function startRevengeMatch(targetUid) {
     if (!currentUser) return alert("請先登入");
     if (!targetUid) return alert("無法找到該玩家的資料 (舊戰報)");
 
-    // 顯示 Loading
     document.getElementById('pvp-arena-modal').classList.remove('hidden');
     document.getElementById('pvp-loading').classList.remove('hidden');
     document.getElementById('pvp-opponent-list-view').classList.add('hidden');
@@ -371,9 +400,8 @@ export async function startRevengeMatch(targetUid) {
 
         const enemyData = { ...targetSnap.data(), uid: targetUid };
         
-        // 隱藏 Loading，直接進入選擇後的畫面
         document.getElementById('pvp-loading').classList.add('hidden');
-        selectOpponent(enemyData); // 這會負責切換 UI 和讀取我方陣容
+        selectOpponent(enemyData); 
 
     } catch(e) {
         console.error("Revenge failed", e);
@@ -385,7 +413,6 @@ export async function startRevengeMatch(targetUid) {
 async function loadLastAttackTeam() {
     if(!currentUser) return;
     
-    // 確保背包資料已同步
     if (!allUserCards || allUserCards.length === 0) {
         try {
             const q = query(collection(db, "inventory"), where("owner", "==", currentUser.uid));
@@ -516,7 +543,6 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
         playSound('dismantle');
         goldText.innerText = "💰 搶奪失敗 (0 G)";
         
-        // 🔥 輸了，也要記錄對方「防守成功」
         recordDefenseWinLog(currentEnemyData.uid, currentUser.displayName || "神秘客", currentUser.uid);
     }
 
@@ -528,7 +554,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
     };
 }
 
-// 🔥 金幣掠奪交易 + 寫入對方日誌 (Defeat) + 紀錄 UID
+// 金幣掠奪交易 + 寫入對方日誌 (Defeat) + 紀錄 UID
 async function executeStealTransaction(myUid, enemyUid) {
     const myRef = doc(db, "users", myUid);
     const enemyRef = doc(db, "users", enemyUid);
@@ -552,12 +578,11 @@ async function executeStealTransaction(myUid, enemyUid) {
 
             transaction.update(enemyRef, { 
                 gold: newEnemyGold,
-                // 🔥 紀錄攻擊者 UID 以便復仇
                 battleLogs: arrayUnion({
                     type: "defense",
-                    result: "lose", // 對方視角：輸了
+                    result: "lose",
                     attackerName: currentUser.displayName || "無名氏",
-                    attackerUid: myUid, // 新增
+                    attackerUid: myUid, 
                     goldLost: amount,
                     timestamp: Timestamp.now()
                 })
@@ -573,16 +598,16 @@ async function executeStealTransaction(myUid, enemyUid) {
     }
 }
 
-// 🔥 記錄對方防守成功日誌 + 紀錄 UID
+// 記錄對方防守成功日誌 + 紀錄 UID
 async function recordDefenseWinLog(enemyUid, attackerName, attackerUid) {
     try {
         const enemyRef = doc(db, "users", enemyUid);
         await updateDoc(enemyRef, {
             battleLogs: arrayUnion({
                 type: "defense",
-                result: "win", // 對方視角：贏了
+                result: "win",
                 attackerName: attackerName,
-                attackerUid: attackerUid, // 新增
+                attackerUid: attackerUid,
                 goldLost: 0,
                 timestamp: Timestamp.now()
             })
