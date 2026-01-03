@@ -220,7 +220,6 @@ function spawnHeroes() {
             patrolDir: 1, 
             totalDamage: 0,
             isInvincible: false,
-            // 🔥 注入技能資料 (預設使用 HEAVY_STRIKE)
             skillKey: card.skillKey || 'HEAVY_STRIKE',
             skillParams: card.skillParams || { dmgMult: 2.0 }
         });
@@ -458,9 +457,9 @@ function dealDamage(hero, target, multiplier) {
 // 🔥 技能模組庫 (SKILL LIBRARY)
 // ==========================================
 const SKILL_LIBRARY = {
-    // 1. 恢復自身 & 攻擊 (秦始皇, 聖女貞德)
+    // 1. 恢復自身 & 攻擊 (秦始皇: 恢復40% + 特效)
     HEAL_AND_STRIKE: (hero, target, params) => {
-        const healRate = params.healRate || 0.2;
+        const healRate = params.healRate || 0.4;
         const dmgMult = params.dmgMult || 1.5;
         
         // 恢復
@@ -468,40 +467,54 @@ const SKILL_LIBRARY = {
         hero.currentHp = Math.min(hero.maxHp, hero.currentHp + healAmount);
         showDamageText(hero.position, hero.y, `+${healAmount}`, 'gold-text');
         
+        // 特效：綠色治癒光環
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
+            eff.style.width = '120px'; eff.style.height = '120px'; // 放大特效
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 1000);
         }
         
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
     },
 
-    // 2. 自身攻擊 Buff & 攻擊 (宮本武藏)
+    // 2. 自身攻擊 Buff (宮本武藏: 每次 +25% + 金色戰吼)
     SELF_BUFF_ATK: (hero, target, params) => {
-        const buffRate = params.buffRate || 1.05;
+        const buffRate = params.buffRate || 1.25;
         const dmgMult = params.dmgMult || 2.0;
         
         hero.atk = Math.floor(hero.atk * buffRate);
         showDamageText(hero.position, hero.y, `ATK UP!`, 'gold-text');
         
+        // 特效：金色戰吼
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
+            eff.style.borderColor = '#f1c40f'; // 強制金色
+            eff.style.boxShadow = '0 0 20px #f1c40f';
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
         }
         
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
     },
 
-    // 3. 治療隊友 & 攻擊 (埃及豔后, 南丁格爾)
+    // 3. 治療隊友 & 攻擊 (埃及豔后: 附近20% + 綠色漣漪)
     HEAL_ALLIES: (hero, target, params) => {
         const range = params.range || 20;
-        const healRate = params.healRate || 0.1;
+        const healRate = params.healRate || 0.2;
         const dmgMult = params.dmgMult || 1.5;
 
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
         
+        // 特效：自身發出大範圍綠光
+        if(hero.el) {
+            const wave = document.createElement('div'); wave.className = 'skill-effect-heal';
+            wave.style.left = `${hero.position}%`; wave.style.top = `${hero.y}%`;
+            wave.style.width = '200px'; wave.style.height = '200px'; // 範圍更大
+            wave.style.opacity = '0.5';
+            getBattleContainer().appendChild(wave); setTimeout(() => wave.remove(), 800);
+        }
+
         heroEntities.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
@@ -509,22 +522,35 @@ const SKILL_LIBRARY = {
                 ally.currentHp = Math.min(ally.maxHp, ally.currentHp + hAmt);
                 showDamageText(ally.position, ally.y, `+${hAmt}`, 'gold-text');
                 
+                // 受治療者身上也有小特效
                 if(ally.el) {
                     const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
                     eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
-                    getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 1000);
+                    eff.style.width = '60px'; eff.style.height = '60px';
+                    getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
                 }
             }
         });
     },
 
-    // 4. 強力單體攻擊 (成吉思汗, 諸葛亮 等)
+    // 4. 強力單體攻擊 (成吉思汗: 5倍傷害 + 巨大投射物)
     HEAVY_STRIKE: (hero, target, params) => {
-        const dmgMult = params.dmgMult || 3.0;
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        const dmgMult = params.dmgMult || 5.0;
+        // 特效：巨大投射物 (在 fireProjectile 裡判斷 skill 會變大，這裡再加強擊中特效)
+        fireProjectile(hero.el, target.el, 'skill', () => {
+             dealDamage(hero, target, dmgMult);
+             // 擊中後的額外爆炸感
+             if(target.el) {
+                 const blast = document.createElement('div'); blast.className = 'aoe-blast';
+                 blast.style.left = `${target.position}%`; blast.style.top = `${target.y}%`;
+                 blast.style.width = '80px'; blast.style.height = '80px';
+                 blast.style.background = 'radial-gradient(circle, #fff, transparent)';
+                 getBattleContainer().appendChild(blast); setTimeout(() => blast.remove(), 300);
+             }
+        });
     },
 
-    // 5. 範圍攻擊 (亞歷山大, 愛因斯坦)
+    // 5. 範圍攻擊 (亞歷山大: 1.5倍 + 範圍震波)
     AOE_CIRCLE: (hero, target, params) => {
         const radius = params.radius || 15;
         const dmgMult = params.dmgMult || 1.5;
@@ -532,6 +558,8 @@ const SKILL_LIBRARY = {
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'aoe-blast';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
+            eff.style.width = '180px'; eff.style.height = '180px'; // 範圍更大
+            eff.style.background = 'radial-gradient(circle, rgba(231, 76, 60, 0.6), transparent)';
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 500);
         }
         
@@ -543,14 +571,23 @@ const SKILL_LIBRARY = {
         });
     },
 
-    // 6. Buff 隊友攻擊 (漢尼拔, 華盛頓)
+    // 6. Buff 隊友攻擊 (漢尼拔: 每次 +10% + 藍色戰吼)
     BUFF_ALLIES_ATK: (hero, target, params) => {
         const range = params.range || 20;
-        const buffRate = params.buffRate || 1.02;
+        const buffRate = params.buffRate || 1.10;
         const dmgMult = params.dmgMult || 1.5;
 
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
         
+        // 特效：自身藍色光環
+        if(hero.el) {
+            const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
+            eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
+            eff.style.borderColor = '#3498db'; // 藍色
+            eff.style.boxShadow = '0 0 15px #3498db';
+            getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
+        }
+
         heroEntities.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
@@ -560,33 +597,37 @@ const SKILL_LIBRARY = {
                 if(ally.el) {
                     const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
                     eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
+                    eff.style.borderColor = '#3498db'; // 藍色
                     getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
                 }
             }
         });
     },
 
-    // 7. 全場轟炸 (拿破崙)
+    // 7. 全場轟炸 (拿破崙: 50%自身傷害 + 全螢幕閃光 + 敵人爆炸)
     GLOBAL_BOMB: (hero, target, params) => {
         const dmgMult = params.dmgMult || 0.5;
 
+        // 全螢幕閃光
         const flash = document.createElement('div'); flash.className = 'global-bomb-effect';
         document.body.appendChild(flash); setTimeout(() => flash.remove(), 300);
 
         enemies.forEach(enemy => {
             if(enemy.currentHp > 0) {
                 dealDamage(hero, enemy, dmgMult);
+                // 每個敵人身上產生爆炸特效
                 if(enemy.el) {
                     const eff = document.createElement('div'); eff.className = 'aoe-blast';
-                    eff.style.width = '50px'; eff.style.height = '50px';
+                    eff.style.width = '60px'; eff.style.height = '60px';
                     eff.style.left = `${enemy.position}%`; eff.style.top = `${enemy.y}%`;
+                    eff.style.background = 'radial-gradient(circle, #f1c40f, transparent)';
                     getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 500);
                 }
             }
         });
     },
 
-    // 8. 無敵狀態 (凱撒)
+    // 8. 無敵狀態 (凱撒: 免疫3秒 + 金色護盾)
     INVINCIBLE_STRIKE: (hero, target, params) => {
         const duration = params.duration || 3000;
         const dmgMult = params.dmgMult || 1.5;
@@ -607,7 +648,7 @@ const SKILL_LIBRARY = {
     }
 };
 
-// 🔥 執行必殺技 (改為查表模式)
+// 🔥 執行必殺技 (查表模式)
 function executeSkill(hero, target) {
     // 1. 消耗所有氣力
     hero.currentMana = 0;
