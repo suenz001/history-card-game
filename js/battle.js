@@ -170,6 +170,7 @@ function spawnHeroes() {
         const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
         const badgeClass = card.attackType === 'ranged' ? 'hero-type-badge ranged' : 'hero-type-badge';
 
+        // 確保技能從最新資料庫讀取
         const baseCardConfig = cardDatabase.find(c => c.id == card.id);
         const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : 'HEAVY_STRIKE';
         const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : { dmgMult: 2.0 };
@@ -235,28 +236,44 @@ function spawnPvpEnemies(enemyTeam) {
     if(!container) return;
 
     enemyTeam.forEach(enemyCard => {
+        // 🔥 核心修正：確保 ID 為數字，避免字串比對錯誤
+        const cardId = parseInt(enemyCard.id);
+        if (isNaN(cardId)) {
+            console.warn("PVP Spawn Error: Invalid Card ID", enemyCard);
+            return;
+        }
+
         const lane = Math.floor(enemyCard.slotIndex / 3);
         const col = enemyCard.slotIndex % 3;
         const startPos = 95 - (col * 4); 
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
 
-        // 🔥 修正：強制轉換 ID 型別並查找正確的設定
-        const baseCardConfig = cardDatabase.find(c => c.id == parseInt(enemyCard.id));
-        const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : 'HEAVY_STRIKE';
-        const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : { dmgMult: 2.0 };
-        const realTitle = baseCardConfig ? baseCardConfig.title : (enemyCard.title || "強敵");
+        // 🔥 核心修正：強制從 data.js 讀取最新的技能設定 (Source of Truth)
+        // 這樣即使對手存檔裡是舊的技能資料，也會被修正
+        const baseCardConfig = cardDatabase.find(c => c.id === cardId);
+        
+        let realSkillKey = 'HEAVY_STRIKE';
+        let realSkillParams = { dmgMult: 2.0 };
+        let realTitle = (enemyCard.title || "強敵");
+
+        if (baseCardConfig) {
+            realSkillKey = baseCardConfig.skillKey || 'HEAVY_STRIKE';
+            realSkillParams = baseCardConfig.skillParams || { dmgMult: 2.0 };
+            realTitle = baseCardConfig.title || realTitle;
+        } else {
+            console.warn(`PVP Warning: Card ID ${cardId} not found in database. Using default skill.`);
+        }
 
         const el = document.createElement('div');
         el.className = `enemy-unit pvp-enemy ${enemyCard.rarity}`;
-        el.style.backgroundImage = `url(assets/cards/${enemyCard.id}.webp)`;
+        el.style.backgroundImage = `url(assets/cards/${cardId}.webp)`;
         el.style.backgroundSize = 'cover';
         el.style.border = '2px solid #e74c3c';
         el.style.left = `${startPos}%`;
         el.style.top = `${startY}%`;
         el.style.transform = 'translateY(-50%) scaleX(-1)';
 
-        // 🔥 修正：氣力條 top 改為 -8px，避免擋到人物
         el.innerHTML = `
             <div class="enemy-hp-bar"><div style="width:100%"></div></div>
             <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
@@ -269,7 +286,8 @@ function spawnPvpEnemies(enemyTeam) {
 
         enemies.push({
             ...enemyCard,
-            title: realTitle, // 🔥 注入正確稱號
+            id: cardId, // 確保使用數字 ID
+            title: realTitle, 
             maxHp: finalHp, currentHp: finalHp,
             maxMana: 100, currentMana: 0,
             position: startPos, y: startY,
@@ -279,7 +297,7 @@ function spawnPvpEnemies(enemyTeam) {
             lastAttackTime: 0,
             el: el,
             isPvpHero: true,
-            skillKey: realSkillKey, // 🔥 使用查表確認後的技能
+            skillKey: realSkillKey, // 使用修正後的技能
             skillParams: realSkillParams
         });
     });
