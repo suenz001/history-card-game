@@ -263,16 +263,31 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     transition: width 0.2s linear;
 }
 
-/* 🔥 氣力全滿時的發光特效 (修改為橘色) */
-.hero-unit.mana-full {
-    box-shadow: 0 0 20px #e67e22, 0 0 10px #f39c12 !important;
-    border-color: #f39c12 !important;
-    animation: manaPulse 0.5s infinite alternate;
+/* 🔥 氣力全滿時的發光特效 (修改為外圈橘光) */
+/* 使用偽元素製作外圈，不覆蓋原本的 border-color */
+.hero-unit.mana-full::after {
+    content: '';
+    position: absolute;
+    /* 設定比原本大一圈 (原本是 45x45) */
+    top: -10px; 
+    left: -10px; 
+    right: -10px; 
+    bottom: -10px;
+    border-radius: 50%;
+    
+    /* 橘色光圈 */
+    border: 3px solid #e67e22; 
+    box-shadow: 0 0 15px #e67e22, inset 0 0 5px #f39c12; 
+    
+    /* 確保位於圖層最下方，不遮擋稀有度框 */
+    z-index: -1; 
+    
+    animation: manaRingPulse 0.6s infinite alternate;
 }
 
-@keyframes manaPulse {
-    from { transform: translateY(-50%) scale(1); }
-    to { transform: translateY(-50%) scale(1.1); }
+@keyframes manaRingPulse {
+    from { transform: scale(0.95); opacity: 0.7; }
+    to { transform: scale(1.1); opacity: 1; }
 }
 
 /* 🔷 技能發動時的飄字特效 (稱號) */
