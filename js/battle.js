@@ -1,3 +1,7 @@
+{
+type: uploaded file
+fileName: js/battle.js
+fullContent:
 // js/battle.js
 import { WAVE_CONFIG, cardDatabase } from './data.js';
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
@@ -245,8 +249,7 @@ function spawnPvpEnemies(enemyTeam) {
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
 
         // 🔥🔥🔥 核心修改：本地資料強制優先 (Local Authority) 🔥🔥🔥
-        // 即使資料庫裡有技能資料，我們也優先信任本地的 data.js
-        // 這樣可以避免資料庫裡存到舊的/錯誤的技能設定
+        // 確保技能與 data.js 同步，並解決 R 卡可能為 null 的問題
         
         let finalSkillKey = 'HEAVY_STRIKE';
         let finalSkillParams = { dmgMult: 2.0 };
@@ -256,21 +259,28 @@ function spawnPvpEnemies(enemyTeam) {
         // 1. 先查本地資料庫 (Source of Truth)
         const localConfig = cardDatabase.find(c => c.id == enemyCard.id);
         
-        if (localConfig && localConfig.skillKey) {
-            console.log(`[PVP] Using LOCAL skill for ${localConfig.name}: ${localConfig.skillKey}`);
-            finalSkillKey = localConfig.skillKey;
-            finalSkillParams = localConfig.skillParams || finalSkillParams;
-            finalTitle = localConfig.title || finalTitle;
+        if (localConfig) {
+            // 如果本地有設定，優先使用本地的 id 與 title
             realId = localConfig.id;
+            finalTitle = localConfig.title || finalTitle;
+
+            // 只有當本地設定有技能時才覆蓋，否則保持預設或使用遠端的 (針對 R 卡無技能的情況)
+            if (localConfig.skillKey) {
+                console.log(`[PVP] Using LOCAL skill for ${localConfig.name}: ${localConfig.skillKey}`);
+                finalSkillKey = localConfig.skillKey;
+                finalSkillParams = localConfig.skillParams || finalSkillParams;
+            } else if (enemyCard.skillKey) {
+                // 本地沒有 (R卡)，但遠端有 (可能是舊資料殘留)，這裡選擇信任遠端或維持預設
+                // 通常 R 卡不該有技能，所以這裡可以選擇不做事，讓它維持 HEAVY_STRIKE
+                // 但為了保險起見，如果遠端有奇怪的技能，我們這裡其實可以重置它
+                // 這裡我們邏輯是：本地是 R 卡沒技能 -> 用 HEAVY_STRIKE
+            }
         } 
         else if (enemyCard.skillKey) {
-            // 2. 如果本地沒有 (可能是新卡片還沒更新)，才用對手身上的
+            // 2. 如果本地找不到這張卡 (極少見)，才勉強用對手身上的資料
             console.log(`[PVP] Local miss, using REMOTE skill for ID:${enemyCard.id}: ${enemyCard.skillKey}`);
             finalSkillKey = enemyCard.skillKey;
             finalSkillParams = enemyCard.skillParams || finalSkillParams;
-        }
-        else {
-            console.warn(`[PVP] No skill found for ID:${enemyCard.id}, using default.`);
         }
 
         const el = document.createElement('div');
@@ -485,22 +495,38 @@ function updateBattleUI() {
 }
 
 // 輔助函數：造成傷害
-function dealDamage(hero, target, multiplier) {
-    if (target.el && target.currentHp > 0) {
-        if (isPvpMode) multiplier *= 0.25;
+function dealDamage(source, target, multiplier) {
+    if (!target.el || target.currentHp <= 0) return;
 
-        const dmg = Math.floor(hero.atk * multiplier);
-        target.currentHp -= dmg;
-        
-        showDamageText(target.position, target.y, `CRIT -${dmg}`, 'hero-dmg'); 
-        
-        if(target.el) {
-            target.el.classList.remove('taking-damage');
-            void target.el.offsetWidth;
-            target.el.classList.add('taking-damage');
-        }
-        hero.totalDamage += dmg;
-        safePlaySound('dismantle'); 
+    if (isPvpMode) multiplier *= 0.25;
+
+    const dmg = Math.floor(source.atk * multiplier);
+    target.currentHp -= dmg;
+    
+    // 🔥 優化傷害顏色顯示：如果是「我方」受傷，顯示紅色；如果是「敵方」受傷，顯示白色
+    const isPlayerUnit = heroEntities.includes(target);
+    const textClass = isPlayerUnit ? 'enemy-dmg' : 'hero-dmg';
+    
+    showDamageText(target.position, target.y, `-${dmg}`, textClass); 
+    
+    if(target.el) {
+        target.el.classList.remove('taking-damage');
+        void target.el.offsetWidth;
+        target.el.classList.add('taking-damage');
+    }
+    source.totalDamage += dmg;
+    safePlaySound('dismantle'); 
+}
+
+// 🔥🔥 核心修復：動態判斷敵我陣營 🔥🔥
+function getCombatGroups(caster) {
+    // 如果施法者在 heroEntities (我方)
+    if (heroEntities.includes(caster)) {
+        return { allies: heroEntities, foes: enemies };
+    } 
+    // 否則施法者是敵人 (PVP對手/PVE怪物)
+    else {
+        return { allies: enemies, foes: heroEntities };
     }
 }
 
@@ -509,11 +535,14 @@ function dealDamage(hero, target, multiplier) {
 // ==========================================
 const SKILL_LIBRARY = {
     HEAL_AND_STRIKE: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const healRate = params.healRate || 0.4;
         const dmgMult = params.dmgMult || 1.5;
+        
         const healAmount = Math.floor(hero.maxHp * healRate);
         hero.currentHp = Math.min(hero.maxHp, hero.currentHp + healAmount);
         showDamageText(hero.position, hero.y, `+${healAmount}`, 'gold-text');
+        
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
@@ -525,8 +554,10 @@ const SKILL_LIBRARY = {
     SELF_BUFF_ATK: (hero, target, params) => {
         const buffRate = params.buffRate || 1.25;
         const dmgMult = params.dmgMult || 2.0;
+        
         hero.atk = Math.floor(hero.atk * buffRate);
         showDamageText(hero.position, hero.y, `ATK UP!`, 'gold-text');
+        
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
@@ -536,17 +567,21 @@ const SKILL_LIBRARY = {
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
     },
     HEAL_ALLIES: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const range = params.range || 20;
         const healRate = params.healRate || 0.2;
         const dmgMult = params.dmgMult || 1.5;
+        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        
         if(hero.el) {
             const wave = document.createElement('div'); wave.className = 'skill-effect-heal';
             wave.style.left = `${hero.position}%`; wave.style.top = `${hero.y}%`;
             wave.style.width = '200px'; wave.style.height = '200px'; wave.style.opacity = '0.5';
             getBattleContainer().appendChild(wave); setTimeout(() => wave.remove(), 800);
         }
-        heroEntities.forEach(ally => {
+        
+        allies.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
                 const hAmt = Math.floor(ally.maxHp * healRate);
@@ -575,8 +610,10 @@ const SKILL_LIBRARY = {
         });
     },
     AOE_CIRCLE: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const radius = params.radius || 15;
         const dmgMult = params.dmgMult || 1.5;
+        
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'aoe-blast';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
@@ -584,7 +621,8 @@ const SKILL_LIBRARY = {
             eff.style.background = 'radial-gradient(circle, rgba(231, 76, 60, 0.6), transparent)';
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 500);
         }
-        enemies.forEach(enemy => {
+        
+        foes.forEach(enemy => {
             const dist = Math.sqrt(Math.pow(enemy.position - hero.position, 2) + Math.pow(enemy.y - hero.y, 2));
             if(dist < radius && enemy.currentHp > 0) {
                 dealDamage(hero, enemy, dmgMult);
@@ -592,17 +630,21 @@ const SKILL_LIBRARY = {
         });
     },
     BUFF_ALLIES_ATK: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const range = params.range || 20;
         const buffRate = params.buffRate || 1.10;
         const dmgMult = params.dmgMult || 1.5;
+        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
             eff.style.borderColor = '#3498db'; eff.style.boxShadow = '0 0 15px #3498db';
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
         }
-        heroEntities.forEach(ally => {
+        
+        allies.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
                 ally.atk = Math.floor(ally.atk * buffRate);
@@ -617,10 +659,13 @@ const SKILL_LIBRARY = {
         });
     },
     GLOBAL_BOMB: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const dmgMult = params.dmgMult || 0.5;
+        
         const flash = document.createElement('div'); flash.className = 'global-bomb-effect';
         document.body.appendChild(flash); setTimeout(() => flash.remove(), 300);
-        enemies.forEach(enemy => {
+        
+        foes.forEach(enemy => {
             if(enemy.currentHp > 0) {
                 dealDamage(hero, enemy, dmgMult);
                 if(enemy.el) {
@@ -636,33 +681,43 @@ const SKILL_LIBRARY = {
     INVINCIBLE_STRIKE: (hero, target, params) => {
         const duration = params.duration || 3000;
         const dmgMult = params.dmgMult || 1.5;
+        
         hero.isInvincible = true;
         showDamageText(hero.position, hero.y, `無敵!`, 'gold-text');
         if(hero.el) hero.el.classList.add('invincible-shield');
+        
         setTimeout(() => {
             if(hero && hero.currentHp > 0) {
                 hero.isInvincible = false;
                 if(hero.el) hero.el.classList.remove('invincible-shield');
             }
         }, duration);
+        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
     },
     MULTI_TARGET_STRIKE: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const count = params.count || 2;
         const dmgMult = params.dmgMult || 2.0;
-        const sortedEnemies = [...enemies].filter(e => e.currentHp > 0).sort((a, b) => {
+        
+        // 找出最近的幾個敵人
+        const sortedEnemies = [...foes].filter(e => e.currentHp > 0).sort((a, b) => {
                 const distA = Math.pow(a.position - hero.position, 2) + Math.pow(a.y - hero.y, 2);
                 const distB = Math.pow(b.position - hero.position, 2) + Math.pow(b.y - hero.y, 2);
                 return distA - distB;
             }).slice(0, count);
+            
         sortedEnemies.forEach((enemy, idx) => {
             setTimeout(() => { fireProjectile(hero.el, enemy.el, 'skill', () => dealDamage(hero, enemy, dmgMult)); }, idx * 100);
         });
     },
     HEAL_ALL_ALLIES: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const healRate = params.healRate || 0.2;
         const dmgMult = params.dmgMult || 1.2;
+        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
@@ -670,7 +725,8 @@ const SKILL_LIBRARY = {
             eff.style.background = 'radial-gradient(circle, rgba(255, 255, 255, 0.7) 0%, transparent 70%)';
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 1000);
         }
-        heroEntities.forEach(ally => {
+        
+        allies.forEach(ally => {
             if(ally.currentHp > 0) {
                 const hAmt = Math.floor(ally.maxHp * healRate);
                 ally.currentHp = Math.min(ally.maxHp, ally.currentHp + hAmt);
@@ -685,13 +741,17 @@ const SKILL_LIBRARY = {
         });
     },
     DEBUFF_GLOBAL_ATK: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const debuffRate = params.debuffRate || 0.8;
         const dmgMult = params.dmgMult || 2.0;
+        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        
         const flash = document.createElement('div'); flash.className = 'global-bomb-effect';
         flash.style.background = 'rgba(0, 0, 0, 0.3)';
         document.body.appendChild(flash); setTimeout(() => flash.remove(), 500);
-        enemies.forEach(enemy => {
+        
+        foes.forEach(enemy => {
             if(enemy.currentHp > 0) {
                 enemy.atk = Math.floor(enemy.atk * debuffRate);
                 showDamageText(enemy.position, enemy.y, `ATK DOWN`, 'gold-text');
@@ -705,15 +765,19 @@ const SKILL_LIBRARY = {
         });
     },
     FULL_HEAL_LOWEST: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const dmgMult = params.dmgMult || 1.0;
+        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        
         let lowestAlly = null; let minPct = 1.1;
-        heroEntities.forEach(ally => {
+        allies.forEach(ally => {
             if(ally.currentHp > 0) {
                 const pct = ally.currentHp / ally.maxHp;
                 if(pct < minPct) { minPct = pct; lowestAlly = ally; }
             }
         });
+        
         if(lowestAlly) {
             lowestAlly.currentHp = lowestAlly.maxHp;
             showDamageText(lowestAlly.position, lowestAlly.y, `FULL HEAL`, 'gold-text');
@@ -726,17 +790,21 @@ const SKILL_LIBRARY = {
         }
     },
     RESTORE_MANA_ALLIES: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const range = params.range || 20;
         const manaAmount = params.manaAmount || 20;
         const dmgMult = params.dmgMult || 1.2;
+        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
             eff.style.borderColor = '#3498db'; eff.style.boxShadow = '0 0 20px #3498db';
             eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
             getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
         }
-        heroEntities.forEach(ally => {
+        
+        allies.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0 && ally !== hero) {
                 ally.currentMana = Math.min(ally.maxMana, ally.currentMana + manaAmount);
@@ -753,6 +821,7 @@ const SKILL_LIBRARY = {
     STRIKE_AND_RESTORE_MANA: (hero, target, params) => {
         const dmgMult = params.dmgMult || 2.0;
         const manaRestore = params.manaRestore || 40;
+        
         fireProjectile(hero.el, target.el, 'skill', () => {
             dealDamage(hero, target, dmgMult);
             hero.currentMana = Math.min(hero.maxMana, hero.currentMana + manaRestore);
@@ -760,20 +829,25 @@ const SKILL_LIBRARY = {
         });
     },
     HEAL_SELF_AND_ALLY: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const healRate = params.healRate || 0.3;
         const range = params.range || 15;
         const dmgMult = params.dmgMult || 2.0;
+        
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        
         const selfHeal = Math.floor(hero.maxHp * healRate);
         hero.currentHp = Math.min(hero.maxHp, hero.currentHp + selfHeal);
         showDamageText(hero.position, hero.y, `+${selfHeal}`, 'gold-text');
+        
         let nearestAlly = null; let minDist = 9999;
-        heroEntities.forEach(ally => {
+        allies.forEach(ally => {
             if(ally !== hero && ally.currentHp > 0) {
                 const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
                 if(dist < minDist) { minDist = dist; nearestAlly = ally; }
             }
         });
+        
         if(nearestAlly && minDist <= range) {
             const allyHeal = Math.floor(nearestAlly.maxHp * healRate);
             nearestAlly.currentHp = Math.min(nearestAlly.maxHp, nearestAlly.currentHp + allyHeal);
@@ -786,6 +860,7 @@ const SKILL_LIBRARY = {
         }
     },
     EXECUTE_LOW_HP: (hero, target, params) => {
+        const { allies, foes } = getCombatGroups(hero);
         const threshold = params.threshold || 0.2;
         const dmgMult = params.dmgMult || 2.5;
 
@@ -793,7 +868,8 @@ const SKILL_LIBRARY = {
             dealDamage(hero, target, dmgMult);
             
             let executedCount = 0;
-            enemies.forEach(enemy => {
+            // 🔥 修正：只斬殺敵對目標 (foes)
+            foes.forEach(enemy => {
                 if(enemy.currentHp > 0 && (enemy.currentHp / enemy.maxHp) < threshold && !enemy.isBoss) {
                     enemy.currentHp = 0; 
                     showDamageText(enemy.position, enemy.y, `斬殺!`, 'skill-title');
@@ -932,18 +1008,7 @@ function gameLoop() {
                     const heroType = hero.attackType || 'melee'; const projType = heroType === 'ranged' ? 'arrow' : 'sword';
                     fireProjectile(hero.el, nearestEnemy.el, projType, () => {
                         if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
-                            let dmg = hero.atk;
-                            if(isPvpMode) dmg = Math.floor(dmg * 0.25);
-
-                            nearestEnemy.currentHp -= dmg; 
-                            showDamageText(nearestEnemy.position, nearestEnemy.y, `-${dmg}`, 'hero-dmg'); 
-                            
-                            if(nearestEnemy.el) {
-                                nearestEnemy.el.classList.remove('taking-damage'); 
-                                void nearestEnemy.el.offsetWidth; nearestEnemy.el.classList.add('taking-damage');
-                            }
-                            
-                            hero.totalDamage += dmg;
+                            dealDamage(hero, nearestEnemy, 1.0);
                             hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 5);
                         }
                     });
@@ -1058,13 +1123,8 @@ function gameLoop() {
                                 showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
                                 safePlaySound('dismantle');
                             } else {
-                                // 🔥 PVP 平衡修正：敵方普攻傷害大幅降低 (0.5 -> 0.25)
-                                let dmg = enemy.atk;
-                                dmg = Math.floor(dmg * 0.25); 
-
-                                nearestHero.currentHp -= dmg;
-                                triggerHeroHit(nearestHero); 
-                                showDamageText(nearestHero.position, nearestHero.y, `-${dmg}`, 'enemy-dmg');
+                                dealDamage(enemy, nearestHero, 1.0);
+                                triggerHeroHit(nearestHero);
                                 
                                 // 敵人攻擊後稍微回氣
                                 enemy.currentMana = Math.min(enemy.maxMana, enemy.currentMana + 5);
@@ -1142,4 +1202,5 @@ function endBattle(isWin) {
         const allHeroes = [...heroEntities, ...deadHeroes];
         onBattleEndCallback(isWin, battleGold, allHeroes);
     }
+}
 }
