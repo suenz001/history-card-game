@@ -2,6 +2,7 @@
 import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, limit, orderBy, runTransaction, arrayUnion, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { startPvpMatch, setOnBattleEnd, resetBattleState } from './battle.js';
+import { cardDatabase } from './data.js'; // 🔥 新增引用：為了讀取最新技能資料
 
 let db;
 let currentUser;
@@ -194,15 +195,56 @@ function renderPvpSlots(type) {
 
 function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !== null).length; const btn = document.getElementById('save-pvp-team-btn'); if (count > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `💾 儲存防守陣容 (${count}/6)`; } else { btn.classList.add('btn-disabled'); btn.innerText = "請至少配置 1 名英雄"; } }
 
+// 🔥 核心修改：在儲存防守陣容時，強制注入最新的技能設定
 async function saveDefenseTeam() {
     if (!currentUser) return;
-    const count = pvpDefenseSlots.filter(x => x !== null).length; if (count === 0) return alert("請至少配置 1 名英雄！"); if (count > 6) return alert("防守英雄不能超過 6 名！"); 
-    const btn = document.getElementById('save-pvp-team-btn'); btn.innerText = "儲存中..."; btn.classList.add('btn-disabled');
+    const count = pvpDefenseSlots.filter(x => x !== null).length; 
+    if (count === 0) return alert("請至少配置 1 名英雄！"); 
+    if (count > 6) return alert("防守英雄不能超過 6 名！"); 
+    
+    const btn = document.getElementById('save-pvp-team-btn'); 
+    btn.innerText = "儲存中..."; 
+    btn.classList.add('btn-disabled');
+    
     try {
-        const teamData = []; pvpDefenseSlots.forEach((hero, index) => { if (hero) { teamData.push({ id: hero.id, docId: hero.docId, name: hero.name, rarity: hero.rarity, level: hero.level, stars: hero.stars, atk: hero.atk, hp: hero.hp, maxHp: hero.hp, currentHp: hero.hp, attackType: hero.attackType || 'melee', slotIndex: index }); } });
-        const userRef = doc(db, "users", currentUser.uid); await updateDoc(userRef, { defenseTeam: teamData });
-        playSound('upgrade'); alert("✅ 防守陣容已更新！"); document.getElementById('pvp-setup-modal').classList.add('hidden');
-    } catch (e) { console.error("儲存失敗", e); alert("儲存失敗，請檢查網路連線"); } finally { btn.classList.remove('btn-disabled'); updateSaveButtonState(); }
+        const teamData = []; 
+        pvpDefenseSlots.forEach((hero, index) => { 
+            if (hero) { 
+                // 🔥 關鍵步驟：去 cardDatabase 找最新的設定
+                const baseConfig = cardDatabase.find(c => c.id == hero.id);
+                
+                teamData.push({ 
+                    id: hero.id, 
+                    docId: hero.docId, 
+                    name: hero.name, 
+                    rarity: hero.rarity, 
+                    level: hero.level, 
+                    stars: hero.stars, 
+                    atk: hero.atk, 
+                    hp: hero.hp, 
+                    maxHp: hero.hp, 
+                    currentHp: hero.hp, 
+                    attackType: hero.attackType || 'melee', 
+                    slotIndex: index,
+                    // 🔥 這裡直接把技能寫死進去資料庫
+                    title: baseConfig ? baseConfig.title : (hero.title || ""),
+                    skillKey: baseConfig ? baseConfig.skillKey : "HEAVY_STRIKE",
+                    skillParams: baseConfig ? baseConfig.skillParams : { dmgMult: 2.0 }
+                }); 
+            } 
+        });
+        const userRef = doc(db, "users", currentUser.uid); 
+        await updateDoc(userRef, { defenseTeam: teamData });
+        playSound('upgrade'); 
+        alert("✅ 防守陣容已更新！(技能資訊已同步)"); 
+        document.getElementById('pvp-setup-modal').classList.add('hidden');
+    } catch (e) { 
+        console.error("儲存失敗", e); 
+        alert("儲存失敗，請檢查網路連線"); 
+    } finally { 
+        btn.classList.remove('btn-disabled'); 
+        updateSaveButtonState(); 
+    }
 }
 
 // 自動儲存進攻隊伍 (靜默模式)
