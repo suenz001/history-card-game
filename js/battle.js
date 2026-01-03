@@ -170,10 +170,11 @@ function spawnHeroes() {
         const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
         const badgeClass = card.attackType === 'ranged' ? 'hero-type-badge ranged' : 'hero-type-badge';
 
-        // PVE 英雄生成邏輯：信任 ID
+        // PVE 英雄生成邏輯：信任 ID，並重新從資料庫獲取最新技能設定
         const baseCardConfig = cardDatabase.find(c => c.id == card.id);
         const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : 'HEAVY_STRIKE';
         const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : { dmgMult: 2.0 };
+        const realTitle = baseCardConfig ? baseCardConfig.title : card.title;
 
         const el = document.createElement('div');
         el.className = `hero-unit ${card.rarity}`;
@@ -212,6 +213,7 @@ function spawnHeroes() {
 
         heroEntities.push({
             ...card,
+            title: realTitle,
             maxHp: finalHp, currentHp: finalHp,
             maxMana: 100, currentMana: 0, 
             lane: lane, position: startPos, y: startY,
@@ -242,28 +244,39 @@ function spawnPvpEnemies(enemyTeam) {
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
 
-        // 🔥🔥 核心修復：三重搜尋機制 (ID -> 稱號 -> 名稱) 🔥🔥
+        // 🔥🔥🔥 核心修復：強制查表 (Source of Truth) 🔥🔥🔥
+        // 這裡解決了「對手存檔是舊的，導致技能顯示正確但效果錯誤」的問題
+        
+        // 1. 先嘗試用 ID 找 (最準)
         let baseCardConfig = cardDatabase.find(c => c.id == parseInt(enemyCard.id));
         
-        // 如果用 ID 找不到 (例如舊存檔 ID 格式跑掉)，嘗試用 Title 找 (解決"名稱對效果錯"的問題)
+        // 2. 如果 ID 找不到 (例如舊存檔 ID 格式跑掉)，嘗試用 Title 找 (解決凱薩大帝這類問題)
         if (!baseCardConfig && enemyCard.title) {
             console.warn(`PVP: ID lookup failed for ${enemyCard.id}, trying Title: ${enemyCard.title}`);
             baseCardConfig = cardDatabase.find(c => c.title === enemyCard.title);
         }
-        // 如果還是找不到，嘗試用 Name 找
+        // 3. 如果還是找不到，嘗試用 Name 找
         if (!baseCardConfig && enemyCard.name) {
             console.warn(`PVP: Title lookup failed, trying Name: ${enemyCard.name}`);
             baseCardConfig = cardDatabase.find(c => c.name === enemyCard.name);
         }
 
-        // 最後確認技能資料
-        const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : 'HEAVY_STRIKE';
-        const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : { dmgMult: 2.0 };
-        const realTitle = baseCardConfig ? baseCardConfig.title : (enemyCard.title || "強敵");
-        const realId = baseCardConfig ? baseCardConfig.id : enemyCard.id; // 確保圖片 ID 正確
+        // 決定最終使用的數值與技能
+        let realSkillKey = 'HEAVY_STRIKE';
+        let realSkillParams = { dmgMult: 2.0 };
+        let realTitle = (enemyCard.title || "強敵");
+        let realId = enemyCard.id;
 
-        if(!baseCardConfig) {
-            console.error(`PVP Error: 找不到卡片資料，將使用預設攻擊。ID:${enemyCard.id}, Title:${enemyCard.title}`);
+        if (baseCardConfig) {
+            // 找到了最新設定，覆蓋舊資料
+            realSkillKey = baseCardConfig.skillKey || 'HEAVY_STRIKE';
+            realSkillParams = baseCardConfig.skillParams || { dmgMult: 2.0 };
+            realTitle = baseCardConfig.title || realTitle;
+            realId = baseCardConfig.id; // 確保圖片 ID 正確
+            // Debug 用
+            console.log(`PVP Enemy Spawned: ${realTitle} (ID:${realId}) using Skill: ${realSkillKey}`);
+        } else {
+            console.error(`PVP Error: 無法在資料庫找到卡片 ID:${enemyCard.id}, Name:${enemyCard.name}，將使用預設技能。`);
         }
 
         const el = document.createElement('div');
@@ -830,10 +843,15 @@ function executeSkill(hero, target) {
     showDamageText(hero.position, hero.y - 10, hero.title + "!", 'skill-title');
     safePlaySound('ssr'); 
 
+    // 🔥 Debug 用：在 Console 顯示觸發了什麼技能
+    // 如果這裡出現 undefined，表示資料庫的 skillKey 設定有錯
+    console.log(`[Skill Trigger] Hero: ${hero.name}, SkillKey: ${hero.skillKey}`);
+
     const skillFunc = SKILL_LIBRARY[hero.skillKey];
     if (skillFunc) {
         skillFunc(hero, target, hero.skillParams || {});
     } else {
+        console.warn(`⚠️ Warning: Skill function not found for key [${hero.skillKey}]. Using HEAVY_STRIKE default.`);
         SKILL_LIBRARY['HEAVY_STRIKE'](hero, target, { dmgMult: 2.0 });
     }
 }
