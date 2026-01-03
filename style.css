@@ -678,3 +678,74 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     border-left-color: #e74c3c; /* 紅色：防守失敗 */
     background: rgba(231, 76, 60, 0.1);
 }
+
+/* =========================================
+   === ⚡ 技能特效 (新增) ===
+   ========================================= */
+
+/* 治療光環 */
+.skill-effect-heal {
+    position: absolute;
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(46, 204, 113, 0.5) 0%, transparent 70%);
+    transform: translate(-50%, -50%);
+    pointer-events: none; z-index: 50;
+    animation: skillHealAnim 1s ease-out forwards;
+}
+@keyframes skillHealAnim {
+    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.8; }
+    100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
+
+/* 戰吼 (Buff) */
+.skill-effect-buff {
+    position: absolute;
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    border: 2px solid #f1c40f;
+    box-shadow: 0 0 10px gold;
+    transform: translate(-50%, -50%);
+    pointer-events: none; z-index: 50;
+    animation: skillBuffAnim 0.8s ease-out forwards;
+}
+@keyframes skillBuffAnim {
+    0% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
+
+/* 無敵護盾 */
+.invincible-shield {
+    box-shadow: 0 0 15px gold, inset 0 0 10px gold !important;
+    border-color: gold !important;
+    animation: shieldPulse 0.5s infinite alternate !important;
+}
+@keyframes shieldPulse {
+    from { opacity: 0.8; } to { opacity: 1; }
+}
+
+/* AoE 爆炸 */
+.aoe-blast {
+    position: absolute;
+    width: 150px; height: 150px;
+    background: radial-gradient(circle, rgba(231, 76, 60, 0.8) 0%, transparent 70%);
+    transform: translate(-50%, -50%);
+    pointer-events: none; z-index: 100;
+    animation: blastAnim 0.5s ease-out forwards;
+}
+@keyframes blastAnim {
+    0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0; }
+}
+
+/* 全場轟炸 */
+.global-bomb-effect {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: white; opacity: 0;
+    z-index: 2000; pointer-events: none;
+    animation: globalFlash 0.3s ease-out;
+}
+@keyframes globalFlash {
+    0% { opacity: 0.5; } 100% { opacity: 0; }
+}

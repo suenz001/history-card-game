@@ -222,7 +222,8 @@ function spawnHeroes() {
             el: el, 
             monitorEl: monitorItem, 
             patrolDir: 1, 
-            totalDamage: 0
+            totalDamage: 0,
+            isInvincible: false // 初始非無敵
         });
     });
 }
@@ -345,7 +346,15 @@ function fireBossSkill(boss) {
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position; const dy = hero.y - target.y; const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < 7) { 
-                hero.currentHp -= 300; triggerHeroHit(hero); showDamageText(hero.position, hero.y, `-300`, 'hero-dmg');
+                // 無敵判斷
+                if (hero.isInvincible) {
+                    showDamageText(hero.position, hero.y, `免疫`, 'gold-text');
+                } else {
+                    hero.currentHp -= 300; 
+                    triggerHeroHit(hero); 
+                    showDamageText(hero.position, hero.y, `-300`, 'hero-dmg');
+                }
+                
                 if(hero.position < boss.position) hero.position -= 2; else hero.position += 2;
             }
         });
@@ -409,7 +418,7 @@ function showDamageText(x, y, text, type) {
 
     const el = document.createElement('div');
     el.className = `damage-text ${type}`;
-    el.innerText = text;
+    el.innerHTML = text; // 改為 innerHTML 支援 HTML 標籤
     el.style.left = `${x}%`;
     el.style.top = `${y}%`;
     el.style.position = 'absolute'; 
@@ -434,36 +443,183 @@ function updateBattleUI() {
     }
 }
 
-// 🔥 執行必殺技
+// 🔥 執行必殺技 (技能邏輯實裝)
 function executeSkill(hero, target) {
     // 1. 消耗所有氣力
     hero.currentMana = 0;
     
     // 2. 顯示稱號特效
     showDamageText(hero.position, hero.y - 10, hero.title + "!", 'skill-title');
-    safePlaySound('ssr'); // 播放 SSR 音效作為技能音效
+    safePlaySound('ssr'); 
 
-    // 3. 預設技能邏輯：兩倍傷害
-    const skillDmg = hero.atk * 2;
+    // 取得戰場容器用於特效
+    const container = getBattleContainer();
 
-    // 4. 發射技能投射物
-    fireProjectile(hero.el, target.el, 'skill', () => {
-        if (target.el && target.currentHp > 0) {
-            target.currentHp -= skillDmg;
+    // 3. 根據 Hero ID 執行不同邏輯
+    switch(parseInt(hero.id)) {
+        
+        // 🔹 秦始皇 (ID: 1) - 千古一帝：恢復自身 20% 血量
+        case 1:
+            const healAmount = Math.floor(hero.maxHp * 0.2);
+            hero.currentHp = Math.min(hero.maxHp, hero.currentHp + healAmount);
+            showDamageText(hero.position, hero.y, `+${healAmount}`, 'gold-text');
             
-            // 技能打擊特效 (稍微誇張一點的飄字)
-            showDamageText(target.position, target.y, `CRIT -${skillDmg}`, 'hero-dmg'); 
-            
-            // 觸發受傷動畫
-            if(target.el) {
-                target.el.classList.remove('taking-damage');
-                void target.el.offsetWidth;
-                target.el.classList.add('taking-damage');
+            // 視覺特效：綠色光環
+            if(hero.el) {
+                const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
+                eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
+                container.appendChild(eff); setTimeout(() => eff.remove(), 1000);
             }
-            hero.totalDamage += skillDmg;
-            safePlaySound('dismantle'); // 打擊音效
+            
+            // 仍然對敵人造成 150% 傷害
+            fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, 1.5));
+            break;
+
+        // 🔹 宮本武藏 (ID: 17) - 二天一流：戰鬥中每次施放增加攻擊力 5%
+        case 17:
+            hero.atk = Math.floor(hero.atk * 1.05);
+            showDamageText(hero.position, hero.y, `ATK UP!`, 'gold-text');
+            
+            // 視覺特效：戰吼
+            if(hero.el) {
+                const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
+                eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
+                container.appendChild(eff); setTimeout(() => eff.remove(), 800);
+            }
+            
+            // 對敵人造成 200% 傷害
+            fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, 2.0));
+            break;
+
+        // 🔹 埃及豔后 (ID: 16) - 尼羅河女王：恢復附近英雄 10% 血量
+        case 16:
+            // 對敵人攻擊
+            fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, 1.5));
+            
+            // 治療附近隊友 (距離 < 20)
+            heroEntities.forEach(ally => {
+                const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
+                if(dist < 20 && ally.currentHp > 0) {
+                    const hAmt = Math.floor(ally.maxHp * 0.1);
+                    ally.currentHp = Math.min(ally.maxHp, ally.currentHp + hAmt);
+                    showDamageText(ally.position, ally.y, `+${hAmt}`, 'gold-text');
+                    
+                    if(ally.el) {
+                        const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
+                        eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
+                        container.appendChild(eff); setTimeout(() => eff.remove(), 1000);
+                    }
+                }
+            });
+            break;
+
+        // 🔹 成吉思汗 (ID: 13) - 草原霸主：造成 4 倍傷害
+        case 13:
+            fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, 4.0));
+            break;
+
+        // 🔹 亞歷山大 (ID: 2) - 征服王：對周圍敵人造成傷害
+        case 2:
+            // 範圍爆炸特效
+            if(hero.el) {
+                const eff = document.createElement('div'); eff.className = 'aoe-blast';
+                eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
+                container.appendChild(eff); setTimeout(() => eff.remove(), 500);
+            }
+            
+            // 對周圍敵人造成 150% 傷害 (距離 < 15)
+            enemies.forEach(enemy => {
+                const dist = Math.sqrt(Math.pow(enemy.position - hero.position, 2) + Math.pow(enemy.y - hero.y, 2));
+                if(dist < 15 && enemy.currentHp > 0) {
+                    dealDamage(hero, enemy, 1.5);
+                }
+            });
+            break;
+
+        // 🔹 漢尼拔 (ID: 15) - 戰略之父：提升附近英雄 2% 攻擊力
+        case 15:
+            fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, 1.5));
+            
+            // Buff 附近隊友
+            heroEntities.forEach(ally => {
+                const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
+                if(dist < 20 && ally.currentHp > 0) {
+                    ally.atk = Math.floor(ally.atk * 1.02);
+                    showDamageText(ally.position, ally.y, `⚔️ UP`, 'gold-text');
+                    
+                    if(ally.el) {
+                        const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
+                        eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
+                        container.appendChild(eff); setTimeout(() => eff.remove(), 800);
+                    }
+                }
+            });
+            break;
+
+        // 🔹 拿破崙 (ID: 3) - 戰爭之神：對全場敵人造成自身傷害 50% 的傷害
+        case 3:
+            // 全螢幕閃光
+            const flash = document.createElement('div'); flash.className = 'global-bomb-effect';
+            document.body.appendChild(flash); setTimeout(() => flash.remove(), 300);
+
+            // 全體傷害
+            enemies.forEach(enemy => {
+                if(enemy.currentHp > 0) {
+                    dealDamage(hero, enemy, 0.5);
+                    // 額外特效
+                    if(enemy.el) {
+                        const eff = document.createElement('div'); eff.className = 'aoe-blast';
+                        eff.style.width = '50px'; eff.style.height = '50px';
+                        eff.style.left = `${enemy.position}%`; eff.style.top = `${enemy.y}%`;
+                        container.appendChild(eff); setTimeout(() => eff.remove(), 500);
+                    }
+                }
+            });
+            break;
+
+        // 🔹 凱撒大帝 (ID: 14) - 羅馬獨裁者：免疫傷害 3 秒
+        case 14:
+            hero.isInvincible = true;
+            showDamageText(hero.position, hero.y, `無敵!`, 'gold-text');
+            
+            // 視覺特效：金色邊框
+            if(hero.el) hero.el.classList.add('invincible-shield');
+            
+            // 3秒後移除
+            setTimeout(() => {
+                if(hero && hero.currentHp > 0) {
+                    hero.isInvincible = false;
+                    if(hero.el) hero.el.classList.remove('invincible-shield');
+                }
+            }, 3000);
+            
+            // 對單體造成 150% 傷害
+            fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, 1.5));
+            break;
+
+        // 預設技能 (一般 SSR/SR)
+        default:
+            fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, 2.0));
+            break;
+    }
+}
+
+// 輔助函數：造成傷害
+function dealDamage(hero, target, multiplier) {
+    if (target.el && target.currentHp > 0) {
+        const dmg = Math.floor(hero.atk * multiplier);
+        target.currentHp -= dmg;
+        
+        showDamageText(target.position, target.y, `CRIT -${dmg}`, 'hero-dmg'); 
+        
+        if(target.el) {
+            target.el.classList.remove('taking-damage');
+            void target.el.offsetWidth;
+            target.el.classList.add('taking-damage');
         }
-    });
+        hero.totalDamage += dmg;
+        safePlaySound('dismantle'); 
+    }
 }
 
 function gameLoop() {
@@ -630,9 +786,7 @@ function gameLoop() {
                     showDamageText(enemy.position, enemy.y, `+50G`, 'gold-text'); 
                     
                     // 🔥 擊殺獎勵：擊殺者回氣 +15 (降低效率)
-                    // (這有點難判定是誰殺的，這裡做簡化：所有存活英雄微量回氣，或者隨機給一個英雄回氣？)
-                    // (為了精確，我們應該在攻擊造成傷害那邊判定致死，但這裡為了簡化架構，我們給「最近的英雄」獎勵)
-                    let killer = heroEntities.find(h => Math.abs(h.position - enemy.position) < 20); // 隨便找一個附近的
+                    let killer = heroEntities.find(h => Math.abs(h.position - enemy.position) < 20); 
                     if(killer && killer.currentMana < killer.maxMana) {
                          killer.currentMana = Math.min(killer.maxMana, killer.currentMana + 15);
                          showDamageText(killer.position, killer.y, `MP+15`, 'gold-text');
@@ -661,9 +815,14 @@ function gameLoop() {
                 const projType = enemy.attackType === 'ranged' ? 'arrow' : 'sword';
                 fireProjectile(enemy.el, nearestHero.el, projType, () => {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
-                        nearestHero.currentHp -= enemy.atk;
-                        triggerHeroHit(nearestHero); // 🔥 英雄被打，回氣 +2
-                        showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
+                        // 🔥 凱撒大帝無敵判定
+                        if(nearestHero.isInvincible) {
+                            showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
+                        } else {
+                            nearestHero.currentHp -= enemy.atk;
+                            triggerHeroHit(nearestHero); 
+                            showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
+                        }
                     }
                 });
                 enemy.lastAttackTime = now;
@@ -674,10 +833,15 @@ function gameLoop() {
             if (now - enemy.lastAttackTime > 800 / gameSpeed) {
                 fireProjectile(enemy.el, nearestHero.el, 'fireball', () => {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
-                        nearestHero.currentHp -= enemy.atk; 
-                        triggerHeroHit(nearestHero); // 🔥 英雄被打，回氣 +2
-                        safePlaySound('poison'); 
-                        showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
+                        // 🔥 凱撒大帝無敵判定
+                        if(nearestHero.isInvincible) {
+                            showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
+                        } else {
+                            nearestHero.currentHp -= enemy.atk; 
+                            triggerHeroHit(nearestHero); 
+                            safePlaySound('poison'); 
+                            showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
+                        }
                     }
                 });
                 enemy.lastAttackTime = now;
