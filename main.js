@@ -166,7 +166,6 @@ async function openNotificationModal() {
         await loadUserData(currentUser);
     }
     
-    // 從資料庫讀取最新的 20 則公告
     try {
         const q = query(collection(db, "announcements"), orderBy("timestamp", "desc"), limit(20));
         const snap = await getDocs(q);
