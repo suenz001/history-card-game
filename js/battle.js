@@ -244,33 +244,38 @@ function spawnPvpEnemies(enemyTeam) {
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
 
-        let finalSkillKey = enemyCard.skillKey;
-        let finalSkillParams = enemyCard.skillParams;
+        // 🔥🔥🔥 核心修改：本地資料強制優先 (Local Authority) 🔥🔥🔥
+        // 即使資料庫裡有技能資料，我們也優先信任本地的 data.js
+        // 這樣可以避免資料庫裡存到舊的/錯誤的技能設定
+        
+        let finalSkillKey = 'HEAVY_STRIKE';
+        let finalSkillParams = { dmgMult: 2.0 };
         let finalTitle = enemyCard.title || "強敵";
+        let realId = enemyCard.id;
 
-        // 🔥🔥 雙重保險：如果 DB 沒有技能，或者 DB 存的是預設技能 (HEAVY_STRIKE)，
-        // 就強制去本地 cardDatabase 查表，確保拿到最新技能 (例如 INVINCIBLE_STRIKE)
-        if (!finalSkillKey || finalSkillKey === 'HEAVY_STRIKE') {
-            const baseCardConfig = cardDatabase.find(c => c.id == enemyCard.id);
-            if (baseCardConfig && baseCardConfig.skillKey) {
-                console.log(`[PVP Fix] Found better skill in local DB for ${enemyCard.name}: ${baseCardConfig.skillKey}`);
-                finalSkillKey = baseCardConfig.skillKey;
-                finalSkillParams = baseCardConfig.skillParams;
-                finalTitle = baseCardConfig.title || finalTitle;
-            }
+        // 1. 先查本地資料庫 (Source of Truth)
+        const localConfig = cardDatabase.find(c => c.id == enemyCard.id);
+        
+        if (localConfig && localConfig.skillKey) {
+            console.log(`[PVP] Using LOCAL skill for ${localConfig.name}: ${localConfig.skillKey}`);
+            finalSkillKey = localConfig.skillKey;
+            finalSkillParams = localConfig.skillParams || finalSkillParams;
+            finalTitle = localConfig.title || finalTitle;
+            realId = localConfig.id;
+        } 
+        else if (enemyCard.skillKey) {
+            // 2. 如果本地沒有 (可能是新卡片還沒更新)，才用對手身上的
+            console.log(`[PVP] Local miss, using REMOTE skill for ID:${enemyCard.id}: ${enemyCard.skillKey}`);
+            finalSkillKey = enemyCard.skillKey;
+            finalSkillParams = enemyCard.skillParams || finalSkillParams;
         }
-
-        // 如果真的還是找不到，才使用預設值
-        if (!finalSkillKey) {
-            finalSkillKey = 'HEAVY_STRIKE';
-            finalSkillParams = { dmgMult: 2.0 };
+        else {
+            console.warn(`[PVP] No skill found for ID:${enemyCard.id}, using default.`);
         }
-
-        console.log(`[PVP Spawn] ${enemyCard.name} (ID:${enemyCard.id}) -> Skill: ${finalSkillKey}`);
 
         const el = document.createElement('div');
         el.className = `enemy-unit pvp-enemy ${enemyCard.rarity}`;
-        el.style.backgroundImage = `url(assets/cards/${enemyCard.id}.webp)`;
+        el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
         el.style.backgroundSize = 'cover';
         el.style.border = '2px solid #e74c3c';
         el.style.left = `${startPos}%`;
@@ -289,7 +294,7 @@ function spawnPvpEnemies(enemyTeam) {
 
         enemies.push({
             ...enemyCard,
-            id: enemyCard.id,
+            id: realId,
             title: finalTitle,
             maxHp: finalHp, currentHp: finalHp,
             maxMana: 100, currentMana: 0,
@@ -300,7 +305,7 @@ function spawnPvpEnemies(enemyTeam) {
             lastAttackTime: 0,
             el: el,
             isPvpHero: true,
-            skillKey: finalSkillKey, 
+            skillKey: finalSkillKey, // 使用確認後的技能
             skillParams: finalSkillParams
         });
     });
