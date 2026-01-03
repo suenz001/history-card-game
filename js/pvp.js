@@ -225,7 +225,7 @@ async function saveAttackTeam() {
     }
 }
 
-// 手動儲存按鈕功能
+// 手動儲存按鈕 (有提示)
 async function manualSaveAttackTeam() {
     if (!currentUser) return;
     const btn = document.getElementById('save-attack-team-btn');
@@ -348,6 +348,40 @@ function selectOpponent(enemyData) {
     loadLastAttackTeam();
 }
 
+// 🔥 新增：供 main.js 呼叫的「復仇」功能
+export async function startRevengeMatch(targetUid) {
+    if (!currentUser) return alert("請先登入");
+    if (!targetUid) return alert("無法找到該玩家的資料 (舊戰報)");
+
+    // 顯示 Loading
+    document.getElementById('pvp-arena-modal').classList.remove('hidden');
+    document.getElementById('pvp-loading').classList.remove('hidden');
+    document.getElementById('pvp-opponent-list-view').classList.add('hidden');
+    document.getElementById('pvp-match-content').classList.add('hidden');
+
+    try {
+        const targetRef = doc(db, "users", targetUid);
+        const targetSnap = await getDoc(targetRef);
+
+        if (!targetSnap.exists()) {
+            alert("該玩家似乎已經不存在了...");
+            document.getElementById('pvp-arena-modal').classList.add('hidden');
+            return;
+        }
+
+        const enemyData = { ...targetSnap.data(), uid: targetUid };
+        
+        // 隱藏 Loading，直接進入選擇後的畫面
+        document.getElementById('pvp-loading').classList.add('hidden');
+        selectOpponent(enemyData); // 這會負責切換 UI 和讀取我方陣容
+
+    } catch(e) {
+        console.error("Revenge failed", e);
+        alert("讀取對手資料失敗");
+        document.getElementById('pvp-arena-modal').classList.add('hidden');
+    }
+}
+
 async function loadLastAttackTeam() {
     if(!currentUser) return;
     
@@ -437,7 +471,6 @@ async function startActualPvp() {
     startPvpMatch(currentEnemyData.defenseTeam || [], pvpAttackSlots);
 }
 
-// PVP 結算邏輯
 async function handlePvpResult(isWin, _unusedGold, heroStats) {
     const resultModal = document.getElementById('battle-result-modal');
     const title = document.getElementById('result-title');
@@ -460,7 +493,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
     }
 
     resultModal.classList.remove('hidden');
-    gemText.style.display = 'none'; 
+    gemText.style.display = 'none';
 
     if (isWin) {
         title.innerText = "VICTORY";
@@ -470,7 +503,6 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
         goldText.innerText = "計算戰利品中...";
         
         try {
-            // 🔥 執行交易並寫入對方日誌 (Defeat)
             const stolenGold = await executeStealTransaction(currentUser.uid, currentEnemyData.uid);
             goldText.innerText = `💰 搶奪 +${stolenGold} G`;
         } catch (e) {
@@ -485,7 +517,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
         goldText.innerText = "💰 搶奪失敗 (0 G)";
         
         // 🔥 輸了，也要記錄對方「防守成功」
-        recordDefenseWinLog(currentEnemyData.uid, currentUser.displayName || "神秘客");
+        recordDefenseWinLog(currentEnemyData.uid, currentUser.displayName || "神秘客", currentUser.uid);
     }
 
     btn.onclick = () => {
@@ -496,7 +528,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
     };
 }
 
-// 🔥 核心修正：金幣掠奪交易 + 寫入對方防守失敗日誌
+// 🔥 金幣掠奪交易 + 寫入對方日誌 (Defeat) + 紀錄 UID
 async function executeStealTransaction(myUid, enemyUid) {
     const myRef = doc(db, "users", myUid);
     const enemyRef = doc(db, "users", enemyUid);
@@ -518,19 +550,18 @@ async function executeStealTransaction(myUid, enemyUid) {
             const newEnemyGold = Math.max(0, enemyGold - amount);
             const newMyGold = myGold + amount;
 
-            // 寫入金幣變更
             transaction.update(enemyRef, { 
                 gold: newEnemyGold,
-                // 🔥 寫入 Battle Logs (防守失敗)
+                // 🔥 紀錄攻擊者 UID 以便復仇
                 battleLogs: arrayUnion({
                     type: "defense",
                     result: "lose", // 對方視角：輸了
                     attackerName: currentUser.displayName || "無名氏",
+                    attackerUid: myUid, // 新增
                     goldLost: amount,
                     timestamp: Timestamp.now()
                 })
             });
-            
             transaction.update(myRef, { gold: newMyGold });
 
             return amount; 
@@ -542,8 +573,8 @@ async function executeStealTransaction(myUid, enemyUid) {
     }
 }
 
-// 🔥 新增：記錄對方防守成功日誌 (不涉及金幣交易，直接 Update)
-async function recordDefenseWinLog(enemyUid, attackerName) {
+// 🔥 記錄對方防守成功日誌 + 紀錄 UID
+async function recordDefenseWinLog(enemyUid, attackerName, attackerUid) {
     try {
         const enemyRef = doc(db, "users", enemyUid);
         await updateDoc(enemyRef, {
@@ -551,6 +582,7 @@ async function recordDefenseWinLog(enemyUid, attackerName) {
                 type: "defense",
                 result: "win", // 對方視角：贏了
                 attackerName: attackerName,
+                attackerUid: attackerUid, // 新增
                 goldLost: 0,
                 timestamp: Timestamp.now()
             })

@@ -6,7 +6,7 @@ import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, s
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
 import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive } from './js/battle.js';
-import { initPvp, updatePvpContext, setPvpHero } from './js/pvp.js'; 
+import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/pvp.js'; // 🔥 匯入復仇功能
 
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
@@ -41,7 +41,7 @@ let gold = 0;
 let totalPower = 0;
 let allUserCards = [];
 let claimedNotifs = []; 
-let battleLogs = []; // 🔥 新增：戰鬥日誌
+let battleLogs = []; 
 
 let currentDisplayList = [];
 let currentCardIndex = 0;
@@ -160,42 +160,36 @@ if(document.getElementById('close-notification-btn')) {
     });
 }
 
-// 🔥 讀取最新資料並開啟通知
 async function openNotificationModal() {
     if(currentUser) {
-        // 重新讀取一次 User Data 確保日誌最新
         await loadUserData(currentUser);
     }
     notificationModal.classList.remove('hidden');
     renderNotifications();
 }
 
-// 🔥 渲染通知列表 (包含 PVP 日誌)
+// 🔥 渲染通知列表 (支援點擊復仇)
 function renderNotifications() {
     notificationList.innerHTML = "";
     
-    // 1. 系統通知
     const systemItems = SYSTEM_NOTIFICATIONS.map(notif => ({
         ...notif,
-        timestamp: 9999999999999, // 置頂
+        timestamp: 9999999999999,
         type: 'system'
     }));
 
-    // 2. 戰鬥日誌 (從 User Data 讀取)
     const logItems = battleLogs.map(log => ({
         ...log,
-        timestamp: log.timestamp ? log.timestamp.seconds * 1000 : Date.now(), // 轉為毫秒
+        timestamp: log.timestamp ? log.timestamp.seconds * 1000 : Date.now(),
         isSystem: false
     }));
 
-    // 3. 合併並排序 (新到舊)
     const allItems = [...systemItems, ...logItems].sort((a, b) => b.timestamp - a.timestamp);
 
     allItems.forEach(item => {
         const div = document.createElement('div');
         
         if (item.type === 'system') {
-            // 系統通知樣式
             const isClaimed = claimedNotifs.includes(item.id);
             div.className = `notification-item ${isClaimed ? 'claimed' : ''}`;
             div.innerHTML = `
@@ -207,27 +201,43 @@ function renderNotifications() {
             `;
             if (!isClaimed) div.addEventListener('click', () => claimReward(item));
         } else {
-            // 🔥 PVP 戰鬥日誌樣式
+            // 🔥 PVP 戰鬥日誌
             const date = new Date(item.timestamp).toLocaleString();
             const isWin = item.result === 'win';
             const colorClass = isWin ? 'log-def-win' : 'log-def-lose';
             const resultText = isWin ? '🛡️ 防守成功' : '💔 防守失敗';
             const moneyText = isWin ? '無損失' : `<span style="color:#e74c3c">損失 ${item.goldLost} G</span>`;
             
+            // 如果有 UID，顯示復仇按鈕提示
+            const revengeHint = item.attackerUid ? '<div class="revenge-tag">點擊復仇 ⚔️</div>' : '';
+
             div.className = `notification-item notif-battle-log ${colorClass}`;
-            div.style.cursor = 'default';
+            div.style.cursor = item.attackerUid ? 'pointer' : 'default'; // 只有新日誌可點
+            
             div.innerHTML = `
                 <div style="width:100%">
                     <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                         <span style="font-weight:bold; color:#fff;">⚔️ ${item.attackerName} 攻擊了你</span>
                         <span style="font-size:0.8em; color:#aaa;">${date}</span>
                     </div>
-                    <div style="display:flex; justify-content:space-between;">
-                        <span style="font-weight:bold; ${isWin ? 'color:#2ecc71' : 'color:#e74c3c'}">${resultText}</span>
-                        <span>${moneyText}</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span style="font-weight:bold; ${isWin ? 'color:#2ecc71' : 'color:#e74c3c'}">${resultText}</span>
+                            <span style="margin-left:5px;">${moneyText}</span>
+                        </div>
+                        ${revengeHint}
                     </div>
                 </div>
             `;
+
+            // 🔥 綁定復仇事件
+            if (item.attackerUid) {
+                div.addEventListener('click', () => {
+                    playSound('click');
+                    document.getElementById('notification-modal').classList.add('hidden'); // 關閉通知窗
+                    startRevengeMatch(item.attackerUid); // 啟動復仇
+                });
+            }
         }
         
         notificationList.appendChild(div);
@@ -325,7 +335,6 @@ async function loadUserData(user) {
         gems = data.gems; 
         gold = data.gold;
         claimedNotifs = data.claimedNotifs || [];
-        // 🔥 讀取戰鬥日誌
         battleLogs = data.battleLogs || [];
     } else { 
         gems = 1000; 
@@ -786,7 +795,8 @@ let deployTargetSlot = null;
 
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
-        // 排除 PVP 視窗的 slot
+        // 排除 PVP 視窗的 slot (因為它們也有 defense-slot class，但在 PVP modal 內)
+        // 這裡透過檢查 parent 是否為 game-area 或 lanes-wrapper 來區分
         if(slot.closest('#pvp-setup-modal') || slot.closest('#pvp-match-content')) return;
 
         if(isBattleActive) return; playSound('click'); const slotIndex = parseInt(slot.dataset.slot);
@@ -821,7 +831,7 @@ function deployHeroToSlot(card) {
 }
 
 function renderBattleSlots() {
-    // 只選取 PVE 戰場的 slot (透過父容器區分)
+    // 只選取 PVE 戰場的 slot
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
     battleSlotsEl.forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
