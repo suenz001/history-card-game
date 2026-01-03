@@ -245,21 +245,60 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 敵人實體 */
 .enemy-unit { position: absolute; width: 40px; height: 40px; background: #e74c3c; border-radius: 50%; border: 2px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.2em; z-index: 5; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: translateY(-50%); }
 
-/* 🔥 魔王樣式 */
+/* 🔥 魔王樣式 (修改後：正方形旋轉外框) */
 .enemy-unit.boss { 
     width: 80px; height: 80px; 
-    border: 4px solid #8e44ad; /* 紫色邊框 */
-    box-shadow: 0 0 20px #8e44ad;
+    background: rgba(0,0,0,0.6);
+    border-radius: 5px; /* 微微圓角的正方形 */
     z-index: 10;
     font-size: 3em;
-    animation: bossPulse 1s infinite alternate;
-}
-.enemy-unit.boss .enemy-hp-bar { top: -15px; width: 60px; height: 6px; }
+    
+    /* 移除舊邊框，改用偽元素 */
+    border: none; 
+    box-shadow: none; 
 
-/* 🔥 魔王呼吸燈動畫 */
-@keyframes bossPulse {
-    from { box-shadow: 0 0 20px #8e44ad; transform: translateY(-50%) scale(1); }
-    to { box-shadow: 0 0 40px #9b59b6; transform: translateY(-50%) scale(1.05); }
+    /* 保持 flex 讓 Emoji 居中 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 旋轉外框 - 內層 */
+.enemy-unit.boss::before {
+    content: '';
+    position: absolute;
+    top: -10px; left: -10px; right: -10px; bottom: -10px;
+    border: 4px dashed #8e44ad; /* 紫色虛線 */
+    border-radius: 5px;
+    box-shadow: 0 0 20px #8e44ad;
+    animation: bossSpin 4s linear infinite;
+    z-index: -1;
+}
+
+/* 旋轉外框 - 外層 (增加威力感) */
+.enemy-unit.boss::after {
+    content: '';
+    position: absolute;
+    top: -15px; left: -15px; right: -15px; bottom: -15px;
+    border: 2px solid #f1c40f; /* 金色外框 */
+    border-radius: 5px;
+    box-shadow: 0 0 30px #f1c40f;
+    animation: bossSpin 6s linear infinite reverse; /* 反向旋轉 */
+    z-index: -2;
+}
+
+/* 血條位置調整 */
+.enemy-unit.boss .enemy-hp-bar { 
+    top: -30px; 
+    width: 100px; 
+    height: 8px; 
+    border: 1px solid rgba(255,255,255,0.5);
+}
+
+/* 旋轉動畫定義 */
+@keyframes bossSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 /* 底部 */
