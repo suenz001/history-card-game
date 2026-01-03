@@ -192,12 +192,16 @@ function spawnHeroes() {
         if(monitorList) {
             monitorItem = document.createElement('div');
             monitorItem.className = 'monitor-item';
+            // 🔥 新增：側邊欄氣力條結構
             monitorItem.innerHTML = `
                 <div class="monitor-icon" style="background-image: url('assets/cards/${card.id}.webp');"></div>
                 <div class="monitor-info">
                     <div class="monitor-name">${card.name}</div>
                     <div class="monitor-hp-bg">
                         <div class="monitor-hp-fill" style="width: 100%;"></div>
+                    </div>
+                    <div class="monitor-mana-bg">
+                        <div class="monitor-mana-fill" style="width: 0%;"></div>
                     </div>
                 </div>
             `;
@@ -387,9 +391,9 @@ function triggerHeroHit(heroObj) {
         void el.offsetWidth; 
         el.classList.add('taking-damage'); 
     }
-    // 被打回氣 +5
+    // 🔥 被打回氣 +2 (降低效率)
     if(heroObj.currentMana !== undefined && heroObj.currentMana < heroObj.maxMana) {
-        heroObj.currentMana = Math.min(heroObj.maxMana, heroObj.currentMana + 5);
+        heroObj.currentMana = Math.min(heroObj.maxMana, heroObj.currentMana + 2);
     }
 }
 
@@ -506,6 +510,7 @@ function gameLoop() {
                 hero.monitorEl.classList.add('dead'); 
                 hero.monitorEl.querySelector('.monitor-name').innerText += " (陣亡)"; 
                 hero.monitorEl.querySelector('.monitor-hp-fill').style.width = '0%'; 
+                hero.monitorEl.querySelector('.monitor-mana-fill').style.width = '0%'; 
             }
             if(hero.el) hero.el.remove();
             deadHeroes.push(hero); 
@@ -513,16 +518,20 @@ function gameLoop() {
             continue;
         }
         
-        // 更新側邊欄血條
+        // 更新側邊欄血條 & 氣力條
         if (hero.monitorEl) { 
             const hpPercent = Math.max(0, (hero.currentHp / hero.maxHp) * 100); 
-            const fill = hero.monitorEl.querySelector('.monitor-hp-fill'); 
-            if (fill) fill.style.width = `${hpPercent}%`; 
+            const manaPercent = Math.max(0, (hero.currentMana / hero.maxMana) * 100);
+
+            const fillHp = hero.monitorEl.querySelector('.monitor-hp-fill'); 
+            const fillMana = hero.monitorEl.querySelector('.monitor-mana-fill'); 
+            if (fillHp) fillHp.style.width = `${hpPercent}%`; 
+            if (fillMana) fillMana.style.width = `${manaPercent}%`; 
         }
 
-        // 🔥 氣力自然回復 (每秒+3，配合 gameSpeed)
+        // 🔥 氣力自然回復 (降低效率：每幀 0.02)
         if (hero.currentMana < hero.maxMana) {
-            hero.currentMana += 0.05 * gameSpeed; // 每幀微量增加，累積起來約每秒 3
+            hero.currentMana += 0.02 * gameSpeed; 
             if(hero.currentMana > hero.maxMana) hero.currentMana = hero.maxMana;
         }
 
@@ -559,8 +568,8 @@ function gameLoop() {
                             
                             hero.totalDamage += hero.atk;
 
-                            // 🔥 攻擊命中回氣 +10
-                            hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 10);
+                            // 🔥 攻擊命中回氣 +5 (降低效率)
+                            hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 5);
                         }
                     });
                     safePlaySound('dismantle'); // 一般攻擊音效
@@ -620,13 +629,13 @@ function gameLoop() {
                     updateBattleUI(); 
                     showDamageText(enemy.position, enemy.y, `+50G`, 'gold-text'); 
                     
-                    // 🔥 擊殺獎勵：擊殺者回氣 +30
+                    // 🔥 擊殺獎勵：擊殺者回氣 +15 (降低效率)
                     // (這有點難判定是誰殺的，這裡做簡化：所有存活英雄微量回氣，或者隨機給一個英雄回氣？)
                     // (為了精確，我們應該在攻擊造成傷害那邊判定致死，但這裡為了簡化架構，我們給「最近的英雄」獎勵)
                     let killer = heroEntities.find(h => Math.abs(h.position - enemy.position) < 20); // 隨便找一個附近的
                     if(killer && killer.currentMana < killer.maxMana) {
-                         killer.currentMana = Math.min(killer.maxMana, killer.currentMana + 30);
-                         showDamageText(killer.position, killer.y, `MP+30`, 'gold-text');
+                         killer.currentMana = Math.min(killer.maxMana, killer.currentMana + 15);
+                         showDamageText(killer.position, killer.y, `MP+15`, 'gold-text');
                     }
 
                 } catch(err) { console.error("Critical Error in PVE Death Logic:", err); }
@@ -653,7 +662,7 @@ function gameLoop() {
                 fireProjectile(enemy.el, nearestHero.el, projType, () => {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
                         nearestHero.currentHp -= enemy.atk;
-                        triggerHeroHit(nearestHero); // 🔥 英雄被打，回氣 +5
+                        triggerHeroHit(nearestHero); // 🔥 英雄被打，回氣 +2
                         showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
                     }
                 });
@@ -666,7 +675,7 @@ function gameLoop() {
                 fireProjectile(enemy.el, nearestHero.el, 'fireball', () => {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
                         nearestHero.currentHp -= enemy.atk; 
-                        triggerHeroHit(nearestHero); // 🔥 英雄被打，回氣 +5
+                        triggerHeroHit(nearestHero); // 🔥 英雄被打，回氣 +2
                         safePlaySound('poison'); 
                         showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
                     }

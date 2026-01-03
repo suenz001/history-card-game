@@ -244,8 +244,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .hero-hp-bar > div { height: 100%; background: #2ecc71; }
 .enemy-hp-bar > div { height: 100%; background: #e74c3c; }
 
-/* style.css - 請將此段加在 .hero-hp-bar 附近或檔案最後 */
-
 /* 🔷 英雄氣力條 (藍條) */
 .hero-mana-bar {
     position: absolute;
@@ -265,10 +263,10 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     transition: width 0.2s linear;
 }
 
-/* 氣力全滿時的發光特效 */
+/* 🔥 氣力全滿時的發光特效 (修改為橘色) */
 .hero-unit.mana-full {
-    box-shadow: 0 0 15px #3498db, 0 0 5px white !important;
-    border-color: #3498db !important;
+    box-shadow: 0 0 20px #e67e22, 0 0 10px #f39c12 !important;
+    border-color: #f39c12 !important;
     animation: manaPulse 0.5s infinite alternate;
 }
 
@@ -532,11 +530,26 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     background-color: #e74c3c;
 }
 
-/* 🔥 修正 2：補回缺失的戰鬥側邊欄 (Monitor) 樣式 */
-.battle-monitor-sidebar {
-    width: 180px; background: #222; border-left: 1px solid #444; padding: 10px; overflow-y: auto;
-    display: flex; flex-direction: column; gap: 8px;
+/* 戰鬥內容容器 */
+.battle-content-wrapper {
+    position: relative; 
+    overflow: hidden; 
 }
+
+/* 修改戰鬥側邊欄：加入過渡動畫 */
+.battle-monitor-sidebar {
+    width: 180px; 
+    background: #222; 
+    border-left: 1px solid #444; 
+    padding: 10px; 
+    overflow-y: auto;
+    display: flex; 
+    flex-direction: column; 
+    gap: 8px;
+    transition: width 0.3s ease, padding 0.3s ease;
+    flex-shrink: 0;
+}
+
 .monitor-item {
     display: flex; align-items: center; gap: 8px; background: #333; padding: 5px; border-radius: 5px;
 }
@@ -547,8 +560,60 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .monitor-hp-bg { width: 100%; height: 6px; background: #555; border-radius: 3px; overflow: hidden; }
 .monitor-hp-fill { height: 100%; background: #2ecc71; transition: width 0.2s; width: 100%; }
 
+/* 🔥 新增：側邊欄氣力條 */
+.monitor-mana-bg {
+    width: 100%; height: 4px; background: #333; border-radius: 2px; overflow: hidden; margin-top: 2px;
+}
+.monitor-mana-fill {
+    height: 100%; background: #3498db; width: 0%; transition: width 0.2s;
+}
+
+/* 🔥 新增：側邊欄摺疊狀態 */
+.battle-monitor-sidebar.collapsed {
+    width: 0;
+    padding: 10px 0; 
+    border-left: none;
+    overflow: hidden;
+}
+
+/* 🔥 新增：側邊欄切換按鈕 */
+#toggle-sidebar-btn {
+    position: absolute;
+    right: 180px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 60px;
+    background: #34495e;
+    border: 1px solid #7f8c8d;
+    border-right: none;
+    border-radius: 10px 0 0 10px;
+    color: #f1c40f;
+    font-size: 1.2em;
+    cursor: pointer;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: right 0.3s ease;
+    padding: 0;
+}
+
+#toggle-sidebar-btn:hover {
+    background: #2c3e50;
+    color: white;
+}
+
+.battle-monitor-sidebar.collapsed + #toggle-sidebar-btn,
+#toggle-sidebar-btn.collapsed-pos {
+    right: 0;
+    border-right: 1px solid #7f8c8d;
+    border-left: none;
+    border-radius: 10px 0 0 10px;
+}
+
 /* =========================================
-   === 新增 PVP 功能樣式 (請保留) ===
+   === PVP 功能樣式 ===
    ========================================= */
 
 /* PVP VS 介面 */
@@ -586,8 +651,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .tag-strong { background: #e74c3c; color: white; }
 .tag-weak { background: #2ecc71; color: #2c3e50; }
 
-/* style.css (追加) */
-
 /* 戰鬥日誌 (Battle Log) 樣式 */
 .notif-battle-log {
     border-left: 5px solid #ccc;
@@ -599,74 +662,4 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .log-def-lose {
     border-left-color: #e74c3c; /* 紅色：防守失敗 */
     background: rgba(231, 76, 60, 0.1);
-}
-
-/* style.css (請追加或修改以下內容) */
-
-/* 確保戰鬥內容容器是相對定位，以便放置摺疊按鈕 */
-.battle-content-wrapper {
-    position: relative; 
-    /* 確保 overflow 隱藏，避免動畫時出現捲軸 */
-    overflow: hidden; 
-}
-
-/* 修改戰鬥側邊欄：加入過渡動畫 */
-.battle-monitor-sidebar {
-    width: 180px; 
-    background: #222; 
-    border-left: 1px solid #444; 
-    padding: 10px; 
-    overflow-y: auto;
-    display: flex; 
-    flex-direction: column; 
-    gap: 8px;
-    /* 🔥 新增：寬度與 padding 的過渡動畫 */
-    transition: width 0.3s ease, padding 0.3s ease;
-    flex-shrink: 0; /* 防止被壓縮 */
-}
-
-/* 🔥 新增：側邊欄摺疊狀態 */
-.battle-monitor-sidebar.collapsed {
-    width: 0;
-    padding: 10px 0; /* 上下保持，左右為0 */
-    border-left: none;
-    overflow: hidden;
-}
-
-/* 🔥 新增：側邊欄切換按鈕 */
-#toggle-sidebar-btn {
-    position: absolute;
-    right: 180px; /* 初始位置在側邊欄左側 */
-    top: 50%;
-    transform: translateY(-50%);
-    width: 24px;
-    height: 60px;
-    background: #34495e;
-    border: 1px solid #7f8c8d;
-    border-right: none;
-    border-radius: 10px 0 0 10px;
-    color: #f1c40f;
-    font-size: 1.2em;
-    cursor: pointer;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: right 0.3s ease; /* 跟隨側邊欄移動 */
-    padding: 0;
-}
-
-#toggle-sidebar-btn:hover {
-    background: #2c3e50;
-    color: white;
-}
-
-/* 當側邊欄摺疊時，按鈕要貼齊最右邊 */
-.battle-monitor-sidebar.collapsed + #toggle-sidebar-btn,
-/* 如果 JS 是切換 class 在 wrapper 上，或者我們直接用 JS 控制 style，這裡用一個通用 class 控制位置 */
-#toggle-sidebar-btn.collapsed-pos {
-    right: 0;
-    border-right: 1px solid #7f8c8d;
-    border-left: none;
-    border-radius: 10px 0 0 10px; /* 維持原狀或是改成 0 10px 10px 0 看個人喜好，這裡維持靠右 */
 }
