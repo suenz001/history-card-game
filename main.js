@@ -41,6 +41,7 @@ let gold = 0;
 let totalPower = 0;
 let allUserCards = [];
 let claimedNotifs = []; 
+let battleLogs = []; // 🔥 新增：戰鬥日誌
 
 let currentDisplayList = [];
 let currentCardIndex = 0;
@@ -52,29 +53,24 @@ let selectedBatchCards = new Set();
 let gachaQueue = [];
 let gachaIndex = 0;
 
-// 🔥 修改：PVP 選擇英雄的目標資訊 (包含位置與類型)
 let pvpTargetInfo = { index: null, type: null };
 
 const SYSTEM_NOTIFICATIONS = [
-    { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 } }
+    { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 }, isSystem: true }
 ];
 
 // 初始化戰鬥模組
 initBattle();
 setOnBattleEnd(handleBattleEnd);
 
-// 🔥 初始化 PVP 模組 (傳入回調函式)
+// 初始化 PVP
 setTimeout(() => {
     if(document.getElementById('pvp-menu-btn')) {
         initPvp(db, currentUser, allUserCards, (slotIndex, type) => {
-            // 當 PVP 請求打開背包時
             pvpTargetInfo = { index: slotIndex, type: type };
-            
             const title = type === 'defense' ? "👇 選擇 PVP 防守英雄" : "👇 選擇 PVP 進攻英雄";
             document.getElementById('inventory-title').innerText = title; 
             document.getElementById('inventory-modal').classList.remove('hidden');
-            
-            // 確保有資料
             if(allUserCards.length === 0 && currentUser) loadInventory(currentUser.uid); 
             else filterInventory('ALL');
         });
@@ -164,33 +160,82 @@ if(document.getElementById('close-notification-btn')) {
     });
 }
 
-function openNotificationModal() {
+// 🔥 讀取最新資料並開啟通知
+async function openNotificationModal() {
+    if(currentUser) {
+        // 重新讀取一次 User Data 確保日誌最新
+        await loadUserData(currentUser);
+    }
     notificationModal.classList.remove('hidden');
     renderNotifications();
 }
 
+// 🔥 渲染通知列表 (包含 PVP 日誌)
 function renderNotifications() {
     notificationList.innerHTML = "";
     
-    SYSTEM_NOTIFICATIONS.forEach(notif => {
-        const isClaimed = claimedNotifs.includes(notif.id);
-        const item = document.createElement('div');
-        item.className = `notification-item ${isClaimed ? 'claimed' : ''}`;
+    // 1. 系統通知
+    const systemItems = SYSTEM_NOTIFICATIONS.map(notif => ({
+        ...notif,
+        timestamp: 9999999999999, // 置頂
+        type: 'system'
+    }));
+
+    // 2. 戰鬥日誌 (從 User Data 讀取)
+    const logItems = battleLogs.map(log => ({
+        ...log,
+        timestamp: log.timestamp ? log.timestamp.seconds * 1000 : Date.now(), // 轉為毫秒
+        isSystem: false
+    }));
+
+    // 3. 合併並排序 (新到舊)
+    const allItems = [...systemItems, ...logItems].sort((a, b) => b.timestamp - a.timestamp);
+
+    allItems.forEach(item => {
+        const div = document.createElement('div');
         
-        item.innerHTML = `
-            <div>
-                <div class="notif-title">${notif.title}</div>
-                <div style="font-size:0.8em; color:#ccc;">${isClaimed ? '已領取' : '點擊領取獎勵'}</div>
-            </div>
-            <div class="notif-status">${isClaimed ? '✔' : '🎁'}</div>
-        `;
-        
-        if (!isClaimed) {
-            item.addEventListener('click', () => claimReward(notif));
+        if (item.type === 'system') {
+            // 系統通知樣式
+            const isClaimed = claimedNotifs.includes(item.id);
+            div.className = `notification-item ${isClaimed ? 'claimed' : ''}`;
+            div.innerHTML = `
+                <div>
+                    <div class="notif-title">${item.title}</div>
+                    <div style="font-size:0.8em; color:#ccc;">${isClaimed ? '已領取' : '點擊領取獎勵'}</div>
+                </div>
+                <div class="notif-status">${isClaimed ? '✔' : '🎁'}</div>
+            `;
+            if (!isClaimed) div.addEventListener('click', () => claimReward(item));
+        } else {
+            // 🔥 PVP 戰鬥日誌樣式
+            const date = new Date(item.timestamp).toLocaleString();
+            const isWin = item.result === 'win';
+            const colorClass = isWin ? 'log-def-win' : 'log-def-lose';
+            const resultText = isWin ? '🛡️ 防守成功' : '💔 防守失敗';
+            const moneyText = isWin ? '無損失' : `<span style="color:#e74c3c">損失 ${item.goldLost} G</span>`;
+            
+            div.className = `notification-item notif-battle-log ${colorClass}`;
+            div.style.cursor = 'default';
+            div.innerHTML = `
+                <div style="width:100%">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <span style="font-weight:bold; color:#fff;">⚔️ ${item.attackerName} 攻擊了你</span>
+                        <span style="font-size:0.8em; color:#aaa;">${date}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="font-weight:bold; ${isWin ? 'color:#2ecc71' : 'color:#e74c3c'}">${resultText}</span>
+                        <span>${moneyText}</span>
+                    </div>
+                </div>
+            `;
         }
         
-        notificationList.appendChild(item);
+        notificationList.appendChild(div);
     });
+    
+    if (allItems.length === 0) {
+        notificationList.innerHTML = "<div style='text-align:center; padding:20px; color:#777;'>暫無通知</div>";
+    }
 }
 
 async function claimReward(notif) {
@@ -262,7 +307,6 @@ if (isFirebaseReady && auth) {
                 await loadUserData(user); 
                 await calculateTotalPowerOnly(user.uid); 
                 loadLeaderboard();
-                // 🔥 同步 PVP 資料
                 updatePvpContext(currentUser, allUserCards);
             } catch(e) { console.error("載入使用者資料失敗", e); }
         } else { 
@@ -281,16 +325,20 @@ async function loadUserData(user) {
         gems = data.gems; 
         gold = data.gold;
         claimedNotifs = data.claimedNotifs || [];
+        // 🔥 讀取戰鬥日誌
+        battleLogs = data.battleLogs || [];
     } else { 
         gems = 1000; 
         gold = 5000; 
         claimedNotifs = [];
+        battleLogs = [];
         await setDoc(userRef, { 
             name: user.displayName||"未命名", 
             gems, 
             gold, 
             combatPower: 0, 
             claimedNotifs: [],
+            battleLogs: [],
             createdAt: new Date() 
         }); 
     }
@@ -449,7 +497,6 @@ if(document.getElementById('inventory-clear-btn')) {
     });
 }
 
-// 倍速按鈕
 if(document.getElementById('speed-btn')) {
     document.getElementById('speed-btn').addEventListener('click', () => {
         playSound('click');

@@ -1,5 +1,5 @@
 // js/pvp.js
-import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, limit, orderBy, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, limit, orderBy, runTransaction, arrayUnion, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { startPvpMatch, setOnBattleEnd, resetBattleState } from './battle.js';
 
@@ -225,7 +225,7 @@ async function saveAttackTeam() {
     }
 }
 
-// 🔥 手動儲存按鈕 (有提示)
+// 手動儲存按鈕功能
 async function manualSaveAttackTeam() {
     if (!currentUser) return;
     const btn = document.getElementById('save-attack-team-btn');
@@ -260,7 +260,7 @@ function resetToOpponentList() {
     currentEnemyData = null;
 }
 
-// 搜尋對手
+// 搜尋邏輯
 async function searchOpponent() {
     const loadingDiv = document.getElementById('pvp-loading');
     const listView = document.getElementById('pvp-opponent-list-view');
@@ -338,7 +338,6 @@ function renderOpponentList(opponents) {
     });
 }
 
-// 選擇對手後，準備進入佈署畫面
 function selectOpponent(enemyData) {
     currentEnemyData = enemyData;
     
@@ -346,18 +345,14 @@ function selectOpponent(enemyData) {
     document.getElementById('pvp-match-content').classList.remove('hidden');
 
     renderMatchup();
-    
-    // 🔥 讀取我方上次陣容 (這裡最重要)
     loadLastAttackTeam();
 }
 
-// 🔥 讀取上次進攻陣容 (包含防呆與重新抓取背包)
 async function loadLastAttackTeam() {
     if(!currentUser) return;
     
-    // 確保背包資料已同步，若為空則嘗試重新抓取
+    // 確保背包資料已同步
     if (!allUserCards || allUserCards.length === 0) {
-        // console.log("Inventory empty, refetching...");
         try {
             const q = query(collection(db, "inventory"), where("owner", "==", currentUser.uid));
             const querySnapshot = await getDocs(q);
@@ -374,13 +369,12 @@ async function loadLastAttackTeam() {
         const userRef = doc(db, "users", currentUser.uid);
         const userSnap = await getDoc(userRef);
         
-        pvpAttackSlots = new Array(9).fill(null); // 先清空
+        pvpAttackSlots = new Array(9).fill(null); 
 
         if (userSnap.exists() && userSnap.data().lastAttackTeam) {
             const savedTeam = userSnap.data().lastAttackTeam;
             savedTeam.forEach(hero => { 
                 if (hero.slotIndex !== undefined) {
-                    // 從背包找回對應卡片 (確保卡片還存在且數據最新)
                     const existInBag = allUserCards.find(c => c.docId === hero.docId);
                     if(existInBag) {
                         pvpAttackSlots[hero.slotIndex] = { ...existInBag };
@@ -388,7 +382,7 @@ async function loadLastAttackTeam() {
                 }
             });
         }
-        renderPvpSlots('attack'); // 渲染
+        renderPvpSlots('attack'); 
     } catch(e) {
         console.warn("讀取進攻陣容失敗", e);
     }
@@ -432,7 +426,7 @@ async function startActualPvp() {
     if (myCount === 0) return alert("請至少配置 1 名進攻英雄！");
     if (myCount > 6) return alert("進攻英雄不能超過 6 名！");
     
-    saveAttackTeam(); // 開戰前再存一次
+    saveAttackTeam(); 
 
     document.getElementById('pvp-arena-modal').classList.add('hidden');
     document.getElementById('battle-screen').classList.remove('hidden');
@@ -443,6 +437,7 @@ async function startActualPvp() {
     startPvpMatch(currentEnemyData.defenseTeam || [], pvpAttackSlots);
 }
 
+// PVP 結算邏輯
 async function handlePvpResult(isWin, _unusedGold, heroStats) {
     const resultModal = document.getElementById('battle-result-modal');
     const title = document.getElementById('result-title');
@@ -465,7 +460,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
     }
 
     resultModal.classList.remove('hidden');
-    gemText.style.display = 'none';
+    gemText.style.display = 'none'; 
 
     if (isWin) {
         title.innerText = "VICTORY";
@@ -475,9 +470,9 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
         goldText.innerText = "計算戰利品中...";
         
         try {
+            // 🔥 執行交易並寫入對方日誌 (Defeat)
             const stolenGold = await executeStealTransaction(currentUser.uid, currentEnemyData.uid);
             goldText.innerText = `💰 搶奪 +${stolenGold} G`;
-            // 🔥 已移除 Alert 對話框
         } catch (e) {
             console.error("結算交易失敗", e);
             goldText.innerText = "💰 結算異常";
@@ -488,6 +483,9 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
         title.className = "result-title lose-text";
         playSound('dismantle');
         goldText.innerText = "💰 搶奪失敗 (0 G)";
+        
+        // 🔥 輸了，也要記錄對方「防守成功」
+        recordDefenseWinLog(currentEnemyData.uid, currentUser.displayName || "神秘客");
     }
 
     btn.onclick = () => {
@@ -498,6 +496,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
     };
 }
 
+// 🔥 核心修正：金幣掠奪交易 + 寫入對方防守失敗日誌
 async function executeStealTransaction(myUid, enemyUid) {
     const myRef = doc(db, "users", myUid);
     const enemyRef = doc(db, "users", enemyUid);
@@ -519,7 +518,19 @@ async function executeStealTransaction(myUid, enemyUid) {
             const newEnemyGold = Math.max(0, enemyGold - amount);
             const newMyGold = myGold + amount;
 
-            transaction.update(enemyRef, { gold: newEnemyGold });
+            // 寫入金幣變更
+            transaction.update(enemyRef, { 
+                gold: newEnemyGold,
+                // 🔥 寫入 Battle Logs (防守失敗)
+                battleLogs: arrayUnion({
+                    type: "defense",
+                    result: "lose", // 對方視角：輸了
+                    attackerName: currentUser.displayName || "無名氏",
+                    goldLost: amount,
+                    timestamp: Timestamp.now()
+                })
+            });
+            
             transaction.update(myRef, { gold: newMyGold });
 
             return amount; 
@@ -528,5 +539,23 @@ async function executeStealTransaction(myUid, enemyUid) {
     } catch (e) {
         console.error("Transaction failed: ", e);
         throw e;
+    }
+}
+
+// 🔥 新增：記錄對方防守成功日誌 (不涉及金幣交易，直接 Update)
+async function recordDefenseWinLog(enemyUid, attackerName) {
+    try {
+        const enemyRef = doc(db, "users", enemyUid);
+        await updateDoc(enemyRef, {
+            battleLogs: arrayUnion({
+                type: "defense",
+                result: "win", // 對方視角：贏了
+                attackerName: attackerName,
+                goldLost: 0,
+                timestamp: Timestamp.now()
+            })
+        });
+    } catch (e) {
+        console.error("Failed to record defense win log:", e);
     }
 }
