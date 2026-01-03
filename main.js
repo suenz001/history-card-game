@@ -1,6 +1,6 @@
 // main.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
@@ -166,6 +166,7 @@ async function openNotificationModal() {
         await loadUserData(currentUser);
     }
     
+    // 從資料庫讀取最新的 20 則公告
     try {
         const q = query(collection(db, "announcements"), orderBy("timestamp", "desc"), limit(20));
         const snap = await getDocs(q);
@@ -369,7 +370,7 @@ if (isFirebaseReady && auth) {
     });
 }
 
-// 🔥 修改：載入使用者資料時，順便補登 Email
+// 🔥 修改：載入使用者資料時，記錄最後登入時間
 async function loadUserData(user) {
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
@@ -381,25 +382,29 @@ async function loadUserData(user) {
         claimedNotifs = data.claimedNotifs || [];
         battleLogs = data.battleLogs || [];
 
-        // 🔥 自動補登 Email：如果資料庫沒有 Email，但 Auth 有，就寫進去
+        // 每次登入都更新時間
+        const updateData = { lastLoginAt: serverTimestamp() };
         if(!data.email && user.email) {
-            updateDoc(userRef, { email: user.email });
+            updateData.email = user.email;
         }
+        updateDoc(userRef, updateData);
+
     } else { 
         gems = 1000; 
         gold = 5000; 
         claimedNotifs = [];
         battleLogs = [];
-        // 🔥 新註冊：直接存 Email
+        // 新註冊
         await setDoc(userRef, { 
             name: user.displayName || "未命名", 
-            email: user.email || null, // 存入 Email
+            email: user.email || null,
             gems, 
             gold, 
             combatPower: 0, 
             claimedNotifs: [],
             battleLogs: [],
-            createdAt: new Date() 
+            createdAt: new Date(),
+            lastLoginAt: serverTimestamp() // 新增此欄位
         }); 
     }
     updateUIDisplay();
