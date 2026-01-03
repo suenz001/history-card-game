@@ -602,45 +602,56 @@ if(document.getElementById('toggle-sidebar-btn')) {
     });
 }
 
+// 🔥🔥 核心優化：讀取背包時，強制同步 data.js 設定 (修正無限讀取 BUG) 🔥🔥
 async function loadInventory(uid) {
     const container = document.getElementById('inventory-grid');
     container.innerHTML = "讀取中...";
-    const q = query(collection(db, "inventory"), where("owner", "==", uid));
-    const querySnapshot = await getDocs(q);
-    allUserCards = [];
-    
-    querySnapshot.forEach((docSnap) => { 
-        let data = docSnap.data();
-        let needsUpdate = false;
-
-        if(!data.level) { data.level = 1; needsUpdate = true; }
-        if(!data.stars) { data.stars = 1; needsUpdate = true; }
+    try {
+        const q = query(collection(db, "inventory"), where("owner", "==", uid));
+        const querySnapshot = await getDocs(q);
+        allUserCards = [];
         
-        const baseCard = cardDatabase.find(c => c.id == data.id);
-        
-        if(baseCard) {
-             if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; }
-             if(data.attackType !== baseCard.attackType) { data.attackType = baseCard.attackType; needsUpdate = true; }
-             if(data.title !== baseCard.title) { data.title = baseCard.title; needsUpdate = true; }
-             if(data.name !== baseCard.name) { data.name = baseCard.name; needsUpdate = true; }
+        querySnapshot.forEach((docSnap) => { 
+            let data = docSnap.data();
+            let needsUpdate = false;
 
-             if(data.skillKey !== baseCard.skillKey) { data.skillKey = baseCard.skillKey; needsUpdate = true; }
-             if(JSON.stringify(data.skillParams) !== JSON.stringify(baseCard.skillParams)) { 
-                 data.skillParams = baseCard.skillParams; 
-                 needsUpdate = true; 
-             }
-        } else {
-             if(!data.attackType) { data.attackType = 'melee'; needsUpdate = true; }
-        }
+            if(!data.level) { data.level = 1; needsUpdate = true; }
+            if(!data.stars) { data.stars = 1; needsUpdate = true; }
+            
+            const baseCard = cardDatabase.find(c => c.id == data.id);
+            
+            if(baseCard) {
+                 if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; }
+                 if(data.attackType !== baseCard.attackType) { data.attackType = baseCard.attackType; needsUpdate = true; }
+                 if(data.title !== baseCard.title) { data.title = baseCard.title; needsUpdate = true; }
+                 if(data.name !== baseCard.name) { data.name = baseCard.name; needsUpdate = true; }
 
-        if(needsUpdate) updateDoc(doc(db, "inventory", docSnap.id), data);
+                 if(data.skillKey !== baseCard.skillKey) { data.skillKey = baseCard.skillKey; needsUpdate = true; }
+                 
+                 // 🔥 修正：避免 undefined 比較導致的死迴圈
+                 const savedParams = data.skillParams || null;
+                 const baseParams = baseCard.skillParams || null;
+
+                 if(JSON.stringify(savedParams) !== JSON.stringify(baseParams)) { 
+                     data.skillParams = baseParams; 
+                     needsUpdate = true; 
+                 }
+            } else {
+                 if(!data.attackType) { data.attackType = 'melee'; needsUpdate = true; }
+            }
+
+            if(needsUpdate) updateDoc(doc(db, "inventory", docSnap.id), data);
+            
+            allUserCards.push({ ...data, docId: docSnap.id }); 
+        });
         
-        allUserCards.push({ ...data, docId: docSnap.id }); 
-    });
-    
-    updateInventoryCounts();
-    filterInventory('ALL');
-    updatePvpContext(currentUser, allUserCards);
+        updateInventoryCounts();
+        filterInventory('ALL');
+        updatePvpContext(currentUser, allUserCards);
+    } catch (e) {
+        console.error("Load Inventory Failed:", e);
+        container.innerHTML = "<p>讀取失敗，請重新整理</p>";
+    }
 }
 
 if(document.getElementById('sort-select')) document.getElementById('sort-select').addEventListener('change', (e) => { playSound('click'); currentSortMethod = e.target.value; filterInventory(currentFilterRarity); });
@@ -674,9 +685,8 @@ function openDetailModal(index) {
     renderDetailCard(); 
 }
 
-// 🔥🔥 新增：技能描述產生器 🔥🔥
 function getSkillDescription(skillKey, params) {
-    if (!params) return "暫無技能說明";
+    if (!params) return "造成強力傷害。";
 
     switch (skillKey) {
         case 'HEAL_AND_STRIKE':
@@ -709,12 +719,15 @@ function getSkillDescription(skillKey, params) {
             return `造成 ${params.dmgMult} 倍傷害，並回復自身 ${params.manaRestore} 點氣力。`;
         case 'HEAL_SELF_AND_ALLY':
             return `恢復自身與一名隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並造成 ${params.dmgMult} 倍傷害。`;
+        case 'EXECUTE_LOW_HP':
+            return `對目標造成傷害，並立即斬殺場上所有血量低於 ${Math.floor((params.threshold || 0) * 100)}% 的敵人。`;
+        case 'STACKABLE_IMMUNITY':
+            return `對目標造成傷害，並獲得 ${params.count} 層傷害免疫護盾 (可疊加)。`;
         default:
             return "造成強力傷害。";
     }
 }
 
-// 🔥🔥 修改：詳細卡片渲染 (支援 3D 翻轉) 🔥🔥
 function renderDetailCard() {
     const container = document.getElementById('large-card-view');
     container.innerHTML = "";
@@ -722,7 +735,6 @@ function renderDetailCard() {
     const card = currentDisplayList[currentCardIndex];
     if (!card) return;
 
-    // --- 準備資料 ---
     const charPath = `assets/cards/${card.id}.webp`;
     const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
     const level = card.level || 1;
@@ -731,17 +743,14 @@ function renderDetailCard() {
     const idString = String(card.id).padStart(3, '0');
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
     
-    // 產生技能描述
     const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
 
-    // --- 建立 3D 翻轉結構 ---
     const cardWrapper = document.createElement('div');
     cardWrapper.className = `large-card ${card.rarity}`;
     
     const cardInner = document.createElement('div');
     cardInner.className = 'large-card-inner';
 
-    // === 正面 ===
     const frontFace = document.createElement('div');
     frontFace.className = 'large-card-front';
     if(card.rarity === 'SSR') frontFace.classList.add('ssr-effect');
@@ -759,7 +768,6 @@ function renderDetailCard() {
         <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
     `;
 
-    // === 背面 ===
     const backFace = document.createElement('div');
     backFace.className = `large-card-back ${card.rarity}`;
     backFace.innerHTML = `
@@ -779,13 +787,11 @@ function renderDetailCard() {
     cardWrapper.appendChild(cardInner);
     container.appendChild(cardWrapper);
 
-    // --- 點擊翻轉事件 ---
     cardWrapper.addEventListener('click', () => {
         playSound('click');
         cardWrapper.classList.toggle('is-flipped');
     });
 
-    // --- 升級按鈕邏輯 ---
     document.getElementById('dismantle-btn').onclick = () => dismantleCurrentCard();
     const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); 
     const upgradeStarBtn = document.getElementById('upgrade-star-btn');
@@ -871,6 +877,7 @@ async function saveCardToCloud(card) {
         baseAtk: card.atk, 
         baseHp: card.hp, 
         attackType: card.attackType || 'melee',
+        // 🔥 修正：避免 undefined
         skillKey: card.skillKey || null,
         skillParams: card.skillParams || null,
         level: 1, 
