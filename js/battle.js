@@ -158,11 +158,6 @@ export function resetBattleState() {
     if(diffControls) diffControls.style.display = 'flex';
 }
 
-// ... (後面的 spawnHeroes, spawnPvpEnemies 等函式保持不變)
-// 請務必保留原有的 spawnHeroes, spawnPvpEnemies, startWave, spawnEnemy, fireBossSkill, fireProjectile, triggerHeroHit, showDamageText, updateBattleUI, gameLoop, endBattle 函式
-// 這裡省略以節省篇幅，請確保不要覆蓋掉它們
-// ...
-
 function spawnHeroes() {
     const container = document.getElementById('hero-container');
     const monitorList = document.getElementById('hero-monitor-list');
@@ -180,13 +175,18 @@ function spawnHeroes() {
         const startPos = 5 + (col * 4); 
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
+        
+        // 🔥 新增：如果是遠程，加上 'ranged' class 以便 CSS 變色
+        const badgeClass = card.attackType === 'ranged' ? 'hero-type-badge ranged' : 'hero-type-badge';
 
         const el = document.createElement('div');
         el.className = `hero-unit ${card.rarity}`;
         el.style.backgroundImage = `url(assets/cards/${card.id}.webp)`;
         el.style.left = `${startPos}%`;
         el.style.top = `${startY}%`;
-        el.innerHTML = `<div class="hero-hp-bar"><div style="width:100%"></div></div><div class="hero-type-badge">${typeIcon}</div>`;
+        
+        // 使用 badgeClass
+        el.innerHTML = `<div class="hero-hp-bar"><div style="width:100%"></div></div><div class="${badgeClass}">${typeIcon}</div>`;
         container.appendChild(el);
 
         let finalHp = card.hp;

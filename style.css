@@ -1,3 +1,5 @@
+/* style.css */
+
 /* 全域設定 */
 body {
     font-family: 'Arial', 'Microsoft JhengHei', sans-serif;
@@ -245,7 +247,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 敵人實體 */
 .enemy-unit { position: absolute; width: 40px; height: 40px; background: #e74c3c; border-radius: 50%; border: 2px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.2em; z-index: 5; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: translateY(-50%); }
 
-/* 🔥 魔王樣式 (修改後：正方形旋轉外框) */
+/* 🔥 魔王樣式 */
 .enemy-unit.boss { 
     width: 80px; height: 80px; 
     background: rgba(0,0,0,0.6);
@@ -464,6 +466,11 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     background: #3498db; border-radius: 50%; font-size: 12px;
     display: flex; justify-content: center; align-items: center; color: white;
     z-index: 25;
+}
+
+/* 🔥 新增：遠程兵種圖示改為紅色 */
+.hero-type-badge.ranged {
+    background-color: #e74c3c;
 }
 
 /* 🔥 修正 2：補回缺失的戰鬥側邊欄 (Monitor) 樣式 */
