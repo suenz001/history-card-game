@@ -170,7 +170,7 @@ function spawnHeroes() {
         const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
         const badgeClass = card.attackType === 'ranged' ? 'hero-type-badge ranged' : 'hero-type-badge';
 
-        // 確保技能從最新資料庫讀取
+        // PVE 英雄生成邏輯：信任 ID
         const baseCardConfig = cardDatabase.find(c => c.id == card.id);
         const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : 'HEAVY_STRIKE';
         const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : { dmgMult: 2.0 };
@@ -236,38 +236,39 @@ function spawnPvpEnemies(enemyTeam) {
     if(!container) return;
 
     enemyTeam.forEach(enemyCard => {
-        // 🔥 核心修正：確保 ID 為數字，避免字串比對錯誤
-        const cardId = parseInt(enemyCard.id);
-        if (isNaN(cardId)) {
-            console.warn("PVP Spawn Error: Invalid Card ID", enemyCard);
-            return;
-        }
-
         const lane = Math.floor(enemyCard.slotIndex / 3);
         const col = enemyCard.slotIndex % 3;
         const startPos = 95 - (col * 4); 
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
 
-        // 🔥 核心修正：強制從 data.js 讀取最新的技能設定 (Source of Truth)
-        // 這樣即使對手存檔裡是舊的技能資料，也會被修正
-        const baseCardConfig = cardDatabase.find(c => c.id === cardId);
+        // 🔥🔥 核心修復：三重搜尋機制 (ID -> 稱號 -> 名稱) 🔥🔥
+        let baseCardConfig = cardDatabase.find(c => c.id == parseInt(enemyCard.id));
         
-        let realSkillKey = 'HEAVY_STRIKE';
-        let realSkillParams = { dmgMult: 2.0 };
-        let realTitle = (enemyCard.title || "強敵");
+        // 如果用 ID 找不到 (例如舊存檔 ID 格式跑掉)，嘗試用 Title 找 (解決"名稱對效果錯"的問題)
+        if (!baseCardConfig && enemyCard.title) {
+            console.warn(`PVP: ID lookup failed for ${enemyCard.id}, trying Title: ${enemyCard.title}`);
+            baseCardConfig = cardDatabase.find(c => c.title === enemyCard.title);
+        }
+        // 如果還是找不到，嘗試用 Name 找
+        if (!baseCardConfig && enemyCard.name) {
+            console.warn(`PVP: Title lookup failed, trying Name: ${enemyCard.name}`);
+            baseCardConfig = cardDatabase.find(c => c.name === enemyCard.name);
+        }
 
-        if (baseCardConfig) {
-            realSkillKey = baseCardConfig.skillKey || 'HEAVY_STRIKE';
-            realSkillParams = baseCardConfig.skillParams || { dmgMult: 2.0 };
-            realTitle = baseCardConfig.title || realTitle;
-        } else {
-            console.warn(`PVP Warning: Card ID ${cardId} not found in database. Using default skill.`);
+        // 最後確認技能資料
+        const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : 'HEAVY_STRIKE';
+        const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : { dmgMult: 2.0 };
+        const realTitle = baseCardConfig ? baseCardConfig.title : (enemyCard.title || "強敵");
+        const realId = baseCardConfig ? baseCardConfig.id : enemyCard.id; // 確保圖片 ID 正確
+
+        if(!baseCardConfig) {
+            console.error(`PVP Error: 找不到卡片資料，將使用預設攻擊。ID:${enemyCard.id}, Title:${enemyCard.title}`);
         }
 
         const el = document.createElement('div');
         el.className = `enemy-unit pvp-enemy ${enemyCard.rarity}`;
-        el.style.backgroundImage = `url(assets/cards/${cardId}.webp)`;
+        el.style.backgroundImage = `url(assets/cards/${realId}.webp)`; // 使用校正後的 ID
         el.style.backgroundSize = 'cover';
         el.style.border = '2px solid #e74c3c';
         el.style.left = `${startPos}%`;
@@ -286,7 +287,7 @@ function spawnPvpEnemies(enemyTeam) {
 
         enemies.push({
             ...enemyCard,
-            id: cardId, // 確保使用數字 ID
+            id: realId,
             title: realTitle, 
             maxHp: finalHp, currentHp: finalHp,
             maxMana: 100, currentMana: 0,
@@ -297,7 +298,7 @@ function spawnPvpEnemies(enemyTeam) {
             lastAttackTime: 0,
             el: el,
             isPvpHero: true,
-            skillKey: realSkillKey, // 使用修正後的技能
+            skillKey: realSkillKey, // 🔥 使用校正後的正確技能 Key
             skillParams: realSkillParams
         });
     });
