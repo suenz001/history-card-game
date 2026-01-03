@@ -2,7 +2,7 @@
 import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, limit, orderBy, runTransaction, arrayUnion, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { startPvpMatch, setOnBattleEnd, resetBattleState } from './battle.js';
-import { cardDatabase } from './data.js'; // 🔥 新增引用：為了讀取最新技能資料
+import { cardDatabase } from './data.js'; // 🔥 確保引用了 data.js
 
 let db;
 let currentUser;
@@ -43,7 +43,8 @@ export function initPvp(database, user, inventory, openInventoryCallback) {
         slot.addEventListener('click', () => handleSlotClick(slot, 'attack'));
     });
 
-    document.getElementById('save-pvp-team-btn').addEventListener('click', saveDefenseTeam);
+    const saveDefBtn = document.getElementById('save-pvp-team-btn');
+    if(saveDefBtn) saveDefBtn.addEventListener('click', saveDefenseTeam);
     
     document.getElementById('close-pvp-modal-btn').addEventListener('click', () => {
         playSound('click');
@@ -83,10 +84,13 @@ export function initPvp(database, user, inventory, openInventoryCallback) {
     }
 
     // 綁定開戰按鈕
-    document.getElementById('start-pvp-battle-btn').addEventListener('click', () => {
-        playSound('click');
-        startActualPvp();
-    });
+    const startBtn = document.getElementById('start-pvp-battle-btn');
+    if(startBtn) {
+        startBtn.addEventListener('click', () => {
+            playSound('click');
+            startActualPvp();
+        });
+    }
 }
 
 export function updatePvpContext(user, inventory) {
@@ -195,7 +199,7 @@ function renderPvpSlots(type) {
 
 function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !== null).length; const btn = document.getElementById('save-pvp-team-btn'); if (count > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `💾 儲存防守陣容 (${count}/6)`; } else { btn.classList.add('btn-disabled'); btn.innerText = "請至少配置 1 名英雄"; } }
 
-// 🔥 核心修改：在儲存防守陣容時，強制注入最新的技能設定
+// 🔥 核心修復：在儲存防守陣容時，更嚴謹地比對 ID 並寫入技能
 async function saveDefenseTeam() {
     if (!currentUser) return;
     const count = pvpDefenseSlots.filter(x => x !== null).length; 
@@ -210,9 +214,16 @@ async function saveDefenseTeam() {
         const teamData = []; 
         pvpDefenseSlots.forEach((hero, index) => { 
             if (hero) { 
-                // 🔥 關鍵步驟：去 cardDatabase 找最新的設定
-                const baseConfig = cardDatabase.find(c => c.id == hero.id);
+                // 🔥 強制將 ID 轉為字串比對，避免 1 == "1" 的潛在問題
+                const baseConfig = cardDatabase.find(c => String(c.id) === String(hero.id));
                 
+                // Debug log
+                if (baseConfig) {
+                    console.log(`Saving Defense Hero: ${hero.name}, Skill: ${baseConfig.skillKey}`);
+                } else {
+                    console.warn(`⚠️ Warning: No base config found for hero ID: ${hero.id}`);
+                }
+
                 teamData.push({ 
                     id: hero.id, 
                     docId: hero.docId, 
@@ -226,7 +237,7 @@ async function saveDefenseTeam() {
                     currentHp: hero.hp, 
                     attackType: hero.attackType || 'melee', 
                     slotIndex: index,
-                    // 🔥 這裡直接把技能寫死進去資料庫
+                    // 🔥 若找不到配置，則預設為 HEAVY_STRIKE
                     title: baseConfig ? baseConfig.title : (hero.title || ""),
                     skillKey: baseConfig ? baseConfig.skillKey : "HEAVY_STRIKE",
                     skillParams: baseConfig ? baseConfig.skillParams : { dmgMult: 2.0 }
@@ -236,7 +247,7 @@ async function saveDefenseTeam() {
         const userRef = doc(db, "users", currentUser.uid); 
         await updateDoc(userRef, { defenseTeam: teamData });
         playSound('upgrade'); 
-        alert("✅ 防守陣容已更新！(技能資訊已同步)"); 
+        alert("✅ 防守陣容已更新！"); 
         document.getElementById('pvp-setup-modal').classList.add('hidden');
     } catch (e) { 
         console.error("儲存失敗", e); 
@@ -315,7 +326,7 @@ async function searchOpponent() {
     try {
         const myPower = currentUser.combatPower || 0;
 
-        // 1. 找比自己強的 15 個 (按戰力由低到高，找最接近的強者)
+        // 1. 找比自己強的 15 個
         const qHigh = query(
             collection(db, "users"), 
             where("combatPower", ">", myPower), 
@@ -323,7 +334,7 @@ async function searchOpponent() {
             limit(15) 
         );
 
-        // 2. 找比自己弱的 15 個 (按戰力由高到低，找最接近的弱者)
+        // 2. 找比自己弱的 15 個
         const qLow = query(
             collection(db, "users"), 
             where("combatPower", "<=", myPower), 
@@ -331,23 +342,20 @@ async function searchOpponent() {
             limit(15)
         );
 
-        // 3. 🔥 保底機制：找全服最強的 20 個 (確保一定有強者)
+        // 3. 全服最強 20 個
         const qTop = query(
             collection(db, "users"), 
             orderBy("combatPower", "desc"), 
             limit(20)
         );
 
-        // 平行執行三個查詢
         const [snapHigh, snapLow, snapTop] = await Promise.all([getDocs(qHigh), getDocs(qLow), getDocs(qTop)]);
         
         let candidates = [];
         
-        // 收集所有結果
         const processDoc = (doc) => {
-            if (doc.id === currentUser.uid) return; // 排除自己
+            if (doc.id === currentUser.uid) return;
             const data = doc.data();
-            // 不論有無防守陣容都加入 (空陣容視為福利局)
             candidates.push({ ...data, uid: doc.id });
         };
 
@@ -355,15 +363,12 @@ async function searchOpponent() {
         snapLow.forEach(processDoc);
         snapTop.forEach(processDoc);
 
-        // 去除重複 (UID 唯一)
         candidates = candidates.filter((item, index, self) => 
             index === self.findIndex((t) => (t.uid === item.uid))
         );
 
-        // 最後統一按戰力由高到低排序
         candidates.sort((a, b) => b.combatPower - a.combatPower);
 
-        // 顯示
         if (candidates.length === 0) { 
             listContainer.innerHTML = "<p>目前找不到合適的對手，請稍後再試！</p>";
         } else {
