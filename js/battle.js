@@ -260,17 +260,13 @@ function spawnPvpEnemies(enemyTeam) {
             realId = localConfig.id;
             finalTitle = localConfig.title || finalTitle;
 
-            // 只有當本地設定有技能時才覆蓋，否則保持預設或使用遠端的 (針對 R 卡無技能的情況)
+            // 只有當本地設定有技能時才覆蓋
             if (localConfig.skillKey) {
                 console.log(`[PVP] Using LOCAL skill for ${localConfig.name}: ${localConfig.skillKey}`);
                 finalSkillKey = localConfig.skillKey;
                 finalSkillParams = localConfig.skillParams || finalSkillParams;
-            } else if (enemyCard.skillKey) {
-                // 本地沒有 (R卡)，但遠端有 (可能是舊資料殘留)，這裡選擇信任遠端或維持預設
-                // 通常 R 卡不該有技能，所以這裡可以選擇不做事，讓它維持 HEAVY_STRIKE
-                // 但為了保險起見，如果遠端有奇怪的技能，我們這裡其實可以重置它
-                // 這裡我們邏輯是：本地是 R 卡沒技能 -> 用 HEAVY_STRIKE
-            }
+            } 
+            // 如果本地沒有技能 (例如 R 卡)，則保持 HEAVY_STRIKE，不使用遠端可能殘留的舊技能
         } 
         else if (enemyCard.skillKey) {
             // 2. 如果本地找不到這張卡 (極少見)，才勉強用對手身上的資料
