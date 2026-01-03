@@ -243,14 +243,10 @@ function spawnPvpEnemies(enemyTeam) {
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
         const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
 
-        // 🔥🔥🔥 核心修改：直接信任資料庫 🔥🔥🔥
-        // 既然你的資料庫截圖顯示已經有 skillKey: "INVINCIBLE_STRIKE"，我們就優先用它。
-        
         let finalSkillKey = enemyCard.skillKey;
         let finalSkillParams = enemyCard.skillParams;
         let finalTitle = enemyCard.title || "強敵";
 
-        // 🔥 防呆：只有當 DB 真的沒有技能資料時（例如很舊的資料），才去查 data.js
         if (!finalSkillKey) {
             console.warn(`[PVP] ID:${enemyCard.id} 缺少技能，嘗試本地查詢...`);
             const baseCardConfig = cardDatabase.find(c => c.id == enemyCard.id);
@@ -264,7 +260,6 @@ function spawnPvpEnemies(enemyTeam) {
             }
         }
 
-        // Debug 訊息：看看實際用了什麼技能
         console.log(`[PVP Spawn] ${enemyCard.name} (ID:${enemyCard.id}) -> Skill: ${finalSkillKey}`);
 
         const el = document.createElement('div');
@@ -299,7 +294,7 @@ function spawnPvpEnemies(enemyTeam) {
             lastAttackTime: 0,
             el: el,
             isPvpHero: true,
-            skillKey: finalSkillKey, // 🔥 使用確認後的技能
+            skillKey: finalSkillKey, 
             skillParams: finalSkillParams
         });
     });
@@ -1136,5 +1131,4 @@ function endBattle(isWin) {
         const allHeroes = [...heroEntities, ...deadHeroes];
         onBattleEndCallback(isWin, battleGold, allHeroes);
     }
-}
 }
