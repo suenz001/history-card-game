@@ -356,10 +356,9 @@ function fireBossSkill(boss) {
                 if (hero.isInvincible) {
                     showDamageText(hero.position, hero.y, `免疫`, 'gold-text');
                 } else if (hero.immunityStacks > 0) {
-                    // 🔥 牛若丸免疫判斷
                     hero.immunityStacks--;
                     showDamageText(hero.position, hero.y, `格擋!`, 'gold-text');
-                    safePlaySound('dismantle'); // 格擋音效
+                    safePlaySound('dismantle');
                 } else {
                     hero.currentHp -= 300; 
                     triggerHeroHit(hero); 
@@ -453,8 +452,8 @@ function updateBattleUI() {
 // 輔助函數：造成傷害
 function dealDamage(hero, target, multiplier) {
     if (target.el && target.currentHp > 0) {
-        // 🔥 PVP 平衡修正：傷害減半
-        if (isPvpMode) multiplier *= 0.5;
+        // 🔥 PVP 平衡修正：傷害大幅降低 (0.5 -> 0.25)
+        if (isPvpMode) multiplier *= 0.25;
 
         const dmg = Math.floor(hero.atk * multiplier);
         target.currentHp -= dmg;
@@ -872,8 +871,8 @@ function gameLoop() {
         }
 
         if (hero.currentMana < hero.maxMana) {
-            // 🔥 PVP 平衡修正：回氣速度加倍
-            let manaRate = isPvpMode ? 0.04 : 0.02;
+            // 🔥 PVP 平衡修正：回氣速度大幅提升 (0.04 -> 0.25)
+            let manaRate = isPvpMode ? 0.25 : 0.02;
             hero.currentMana += manaRate * gameSpeed; 
             if(hero.currentMana > hero.maxMana) hero.currentMana = hero.maxMana;
         }
@@ -896,9 +895,9 @@ function gameLoop() {
                     const heroType = hero.attackType || 'melee'; const projType = heroType === 'ranged' ? 'arrow' : 'sword';
                     fireProjectile(hero.el, nearestEnemy.el, projType, () => {
                         if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
-                            // 🔥 PVP 平衡修正：普攻傷害減半
+                            // 🔥 PVP 平衡修正：普攻傷害大幅降低 (0.5 -> 0.25)
                             let dmg = hero.atk;
-                            if(isPvpMode) dmg = Math.floor(dmg * 0.5);
+                            if(isPvpMode) dmg = Math.floor(dmg * 0.25);
 
                             nearestEnemy.currentHp -= dmg; 
                             showDamageText(nearestEnemy.position, nearestEnemy.y, `-${dmg}`, 'hero-dmg'); 
@@ -1000,9 +999,9 @@ function gameLoop() {
                             showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
                             safePlaySound('dismantle');
                         } else {
-                            // 🔥 PVP 平衡修正：敵方普攻傷害減半
+                            // 🔥 PVP 平衡修正：敵方普攻傷害大幅降低 (0.5 -> 0.25)
                             let dmg = enemy.atk;
-                            dmg = Math.floor(dmg * 0.5); 
+                            dmg = Math.floor(dmg * 0.25); 
 
                             nearestHero.currentHp -= dmg;
                             triggerHeroHit(nearestHero); 
