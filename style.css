@@ -749,3 +749,105 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 @keyframes globalFlash {
     0% { opacity: 0.5; } 100% { opacity: 0; }
 }
+
+/* =========================================
+   === 🎴 卡片翻轉特效 (新增) ===
+   ========================================= */
+
+/* 大卡片容器 (移除背景，改為 3D 空間) */
+.large-card {
+    background-color: transparent !important;
+    perspective: 1000px; /* 設定 3D 景深 */
+    cursor: pointer;
+    box-shadow: none !important; /* 陰影移給內層 */
+    border: none !important; /* 邊框移給內層 */
+}
+
+/* 內層容器 (負責旋轉) */
+.large-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+    transform-style: preserve-3d;
+    border-radius: 15px;
+}
+
+/* 觸發翻轉 */
+.large-card.is-flipped .large-card-inner {
+    transform: rotateY(180deg);
+}
+
+/* 正面與背面共用設定 */
+.large-card-front, .large-card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    -webkit-backface-visibility: hidden; /* 隱藏背面 */
+    backface-visibility: hidden;
+    border-radius: 15px;
+    overflow: hidden;
+    top: 0; left: 0;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5); /* 統一陰影 */
+}
+
+/* --- 正面設定 --- */
+.large-card-front {
+    background: #000;
+    transform: rotateY(0deg);
+    z-index: 2;
+}
+
+/* 修正 SSR 光效在正面顯示 */
+.large-card-front.ssr-effect::before {
+    content: ''; position: absolute; top: 50%; left: 50%; 
+    transform: translate(-50%, -50%); width: 150%; height: 150%; 
+    background: radial-gradient(circle, rgba(255,215,0,0.6) 0%, rgba(0,0,0,0) 70%); 
+    animation: rotate-glow 5s linear infinite; z-index: -1; 
+}
+
+/* --- 背面設定 --- */
+.large-card-back {
+    background: linear-gradient(135deg, #34495e 0%, #1a252f 100%);
+    color: white;
+    transform: rotateY(180deg); /* 預先旋轉 180 度 */
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box;
+    border: 3px solid #7f8c8d;
+    text-align: left;
+    overflow-y: auto; /* 內容多時可捲動 */
+}
+
+/* 背面稀有度邊框顏色 */
+.large-card-back.SSR { border-color: #f1c40f; box-shadow: inset 0 0 30px rgba(241, 196, 15, 0.2); }
+.large-card-back.SR { border-color: #9b59b6; box-shadow: inset 0 0 30px rgba(155, 89, 182, 0.2); }
+.large-card-back.R { border-color: #3498db; box-shadow: inset 0 0 30px rgba(52, 152, 219, 0.2); }
+
+/* 背面內容排版 */
+.card-back-section { margin-bottom: 20px; }
+.card-back-title {
+    color: #f1c40f;
+    font-size: 1.2em;
+    font-weight: bold;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+    text-shadow: 0 0 5px rgba(0,0,0,0.5);
+    display: flex; align-items: center; gap: 5px;
+}
+.card-back-text {
+    font-size: 0.95em;
+    line-height: 1.6;
+    color: #ecf0f1;
+    text-shadow: 1px 1px 2px black;
+}
+.flip-hint {
+    margin-top: auto;
+    text-align: center;
+    font-size: 0.8em;
+    color: #95a5a6;
+    animation: pulse 2s infinite;
+}

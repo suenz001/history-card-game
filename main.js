@@ -381,7 +381,6 @@ async function loadUserData(user) {
         claimedNotifs = data.claimedNotifs || [];
         battleLogs = data.battleLogs || [];
 
-        // 每次登入都更新時間
         const updateData = { lastLoginAt: serverTimestamp() };
         if(!data.email && user.email) {
             updateData.email = user.email;
@@ -393,7 +392,6 @@ async function loadUserData(user) {
         gold = 5000; 
         claimedNotifs = [];
         battleLogs = [];
-        // 新註冊
         await setDoc(userRef, { 
             name: user.displayName || "未命名", 
             email: user.email || null,
@@ -561,9 +559,7 @@ if(document.getElementById('inventory-clear-btn')) {
     });
 }
 
-// 🔥 倍速按鈕邏輯修正 (自動記憶 + 3倍速)
 if(document.getElementById('speed-btn')) {
-    // 初始載入：讀取記憶
     const savedSpeed = localStorage.getItem('battleSpeed');
     if (savedSpeed) {
         let speedVal = parseFloat(savedSpeed);
@@ -576,7 +572,6 @@ if(document.getElementById('speed-btn')) {
 
     document.getElementById('speed-btn').addEventListener('click', () => {
         playSound('click');
-        // 簡單做法：讀取按鈕文字推算下一個速度
         const btn = document.getElementById('speed-btn');
         let nextSpeed = 1;
 
@@ -586,22 +581,19 @@ if(document.getElementById('speed-btn')) {
         
         btn.innerText = `⏩ ${nextSpeed}x`;
         setGameSpeed(nextSpeed);
-        localStorage.setItem('battleSpeed', nextSpeed); // 記憶設定
+        localStorage.setItem('battleSpeed', nextSpeed); 
     });
 }
 
-// 🔥 側邊欄折疊邏輯
 if(document.getElementById('toggle-sidebar-btn')) {
     document.getElementById('toggle-sidebar-btn').addEventListener('click', () => {
         playSound('click');
         const sidebar = document.querySelector('.battle-monitor-sidebar');
         const btn = document.getElementById('toggle-sidebar-btn');
         
-        // 切換 class
         sidebar.classList.toggle('collapsed');
         btn.classList.toggle('collapsed-pos');
 
-        // 更改箭頭方向
         if (sidebar.classList.contains('collapsed')) {
             btn.innerText = "◀";
         } else {
@@ -610,7 +602,6 @@ if(document.getElementById('toggle-sidebar-btn')) {
     });
 }
 
-// 🔥🔥 核心優化：讀取背包時，強制同步 data.js 設定 🔥🔥
 async function loadInventory(uid) {
     const container = document.getElementById('inventory-grid');
     container.innerHTML = "讀取中...";
@@ -622,35 +613,26 @@ async function loadInventory(uid) {
         let data = docSnap.data();
         let needsUpdate = false;
 
-        // 1. 確保基本存檔欄位存在
         if(!data.level) { data.level = 1; needsUpdate = true; }
         if(!data.stars) { data.stars = 1; needsUpdate = true; }
         
-        // 2. 核心優化：與 cardDatabase 同步
         const baseCard = cardDatabase.find(c => c.id == data.id);
         
         if(baseCard) {
-             // 同步基礎數值 (如果尚未記錄)
              if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; needsUpdate = true; }
-             
-             // 強制同步靜態屬性 (確保技能、類型、稱號都是最新的)
              if(data.attackType !== baseCard.attackType) { data.attackType = baseCard.attackType; needsUpdate = true; }
              if(data.title !== baseCard.title) { data.title = baseCard.title; needsUpdate = true; }
              if(data.name !== baseCard.name) { data.name = baseCard.name; needsUpdate = true; }
 
-             // 🔥 同步技能設定 (關鍵：確保舊存檔獲得新技能)
              if(data.skillKey !== baseCard.skillKey) { data.skillKey = baseCard.skillKey; needsUpdate = true; }
-             // 比較物件內容是否變更 (簡易比較)
              if(JSON.stringify(data.skillParams) !== JSON.stringify(baseCard.skillParams)) { 
                  data.skillParams = baseCard.skillParams; 
                  needsUpdate = true; 
              }
         } else {
-             // 找不到對應 ID 的例外處理 (預設給近戰)
              if(!data.attackType) { data.attackType = 'melee'; needsUpdate = true; }
         }
 
-        // 如果有資料變更，寫回資料庫
         if(needsUpdate) updateDoc(doc(db, "inventory", docSnap.id), data);
         
         allUserCards.push({ ...data, docId: docSnap.id }); 
@@ -658,8 +640,6 @@ async function loadInventory(uid) {
     
     updateInventoryCounts();
     filterInventory('ALL');
-    
-    // 🔥 同步到 PVP
     updatePvpContext(currentUser, allUserCards);
 }
 
@@ -687,18 +667,144 @@ function sortCards(list, method) {
     });
 }
 
-function openDetailModal(index) { playSound('click'); currentCardIndex = index; document.getElementById('detail-modal').classList.remove('hidden'); renderDetailCard(); }
+function openDetailModal(index) { 
+    playSound('click'); 
+    currentCardIndex = index; 
+    document.getElementById('detail-modal').classList.remove('hidden'); 
+    renderDetailCard(); 
+}
 
+// 🔥🔥 新增：技能描述產生器 🔥🔥
+function getSkillDescription(skillKey, params) {
+    if (!params) return "暫無技能說明";
+
+    switch (skillKey) {
+        case 'HEAL_AND_STRIKE':
+            return `恢復自身 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對目標造成 ${params.dmgMult} 倍傷害。`;
+        case 'AOE_CIRCLE':
+            return `對周圍半徑 ${params.radius} 範圍內的敵人造成 ${params.dmgMult} 倍傷害。`;
+        case 'GLOBAL_BOMB':
+            return `對全場所有敵人造成 ${Math.floor((params.dmgMult || 0) * 100)}% 自身攻擊力的傷害。`;
+        case 'HEAVY_STRIKE':
+            return `對目標造成強力一擊，傷害倍率為 ${params.dmgMult} 倍。`;
+        case 'INVINCIBLE_STRIKE':
+            return `獲得無敵狀態持續 ${params.duration / 1000} 秒，並對目標造成 ${params.dmgMult} 倍傷害。`;
+        case 'BUFF_ALLIES_ATK':
+            return `提升範圍 ${params.range} 內隊友攻擊力，倍率 ${params.buffRate}，並對敵造成 ${params.dmgMult} 倍傷害。`;
+        case 'HEAL_ALLIES':
+            return `恢復範圍 ${params.range} 內隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對敵造成 ${params.dmgMult} 倍傷害。`;
+        case 'SELF_BUFF_ATK':
+            return `每次施放增加自身攻擊力 ${Math.floor(((params.buffRate || 1) - 1) * 100)}%，並造成 ${params.dmgMult} 倍傷害。`;
+        case 'MULTI_TARGET_STRIKE':
+            return `同時攻擊最近的 ${params.count} 個敵人，造成 ${params.dmgMult} 倍傷害。`;
+        case 'HEAL_ALL_ALLIES':
+            return `恢復全體隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對目標造成 ${params.dmgMult} 倍傷害。`;
+        case 'DEBUFF_GLOBAL_ATK':
+            return `降低全場敵人攻擊力至 ${Math.floor((params.debuffRate || 1) * 100)}%，並造成 ${params.dmgMult} 倍傷害。`;
+        case 'FULL_HEAL_LOWEST':
+            return `完全恢復血量最低的一名隊友，並對目標造成 ${params.dmgMult} 倍傷害。`;
+        case 'RESTORE_MANA_ALLIES':
+            return `回復範圍 ${params.range} 內隊友 ${params.manaAmount} 點氣力，並造成 ${params.dmgMult} 倍傷害。`;
+        case 'STRIKE_AND_RESTORE_MANA':
+            return `造成 ${params.dmgMult} 倍傷害，並回復自身 ${params.manaRestore} 點氣力。`;
+        case 'HEAL_SELF_AND_ALLY':
+            return `恢復自身與一名隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並造成 ${params.dmgMult} 倍傷害。`;
+        default:
+            return "造成強力傷害。";
+    }
+}
+
+// 🔥🔥 修改：詳細卡片渲染 (支援 3D 翻轉) 🔥🔥
 function renderDetailCard() {
-    const container = document.getElementById('large-card-view'); container.innerHTML = ""; 
-    const card = currentDisplayList[currentCardIndex]; if(!card) return;
-    const cardDiv = renderCard(card, container); cardDiv.classList.add('large-card'); cardDiv.classList.remove('card');
+    const container = document.getElementById('large-card-view');
+    container.innerHTML = "";
+    
+    const card = currentDisplayList[currentCardIndex];
+    if (!card) return;
+
+    // --- 準備資料 ---
+    const charPath = `assets/cards/${card.id}.webp`;
+    const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
+    const level = card.level || 1;
+    const stars = card.stars || 1;
+    const starString = '★'.repeat(stars);
+    const idString = String(card.id).padStart(3, '0');
+    const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
+    
+    // 產生技能描述
+    const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
+
+    // --- 建立 3D 翻轉結構 ---
+    const cardWrapper = document.createElement('div');
+    cardWrapper.className = `large-card ${card.rarity}`;
+    
+    const cardInner = document.createElement('div');
+    cardInner.className = 'large-card-inner';
+
+    // === 正面 ===
+    const frontFace = document.createElement('div');
+    frontFace.className = 'large-card-front';
+    if(card.rarity === 'SSR') frontFace.classList.add('ssr-effect');
+
+    frontFace.innerHTML = `
+        <div class="card-id-badge">#${idString}</div>
+        <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
+        <img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+        <div class="card-info-overlay">
+            <div class="card-title">${card.title || ""}</div>
+            <div class="card-name">${card.name}</div>
+            <div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div>
+            <div class="card-stats"><span class="type-icon">${typeIcon}</span> 👊${card.atk} ❤️${card.hp}</div>
+        </div>
+        <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
+    `;
+
+    // === 背面 ===
+    const backFace = document.createElement('div');
+    backFace.className = `large-card-back ${card.rarity}`;
+    backFace.innerHTML = `
+        <div class="card-back-section">
+            <div class="card-back-title">✨ 技能效果</div>
+            <div class="card-back-text">${skillDesc}</div>
+        </div>
+        <div class="card-back-section">
+            <div class="card-back-title">📜 人物生平</div>
+            <div class="card-back-text" style="color:#bdc3c7;">(資料查詢中...)</div>
+        </div>
+        <div class="flip-hint">(再次點擊翻回正面)</div>
+    `;
+
+    cardInner.appendChild(frontFace);
+    cardInner.appendChild(backFace);
+    cardWrapper.appendChild(cardInner);
+    container.appendChild(cardWrapper);
+
+    // --- 點擊翻轉事件 ---
+    cardWrapper.addEventListener('click', () => {
+        playSound('click');
+        cardWrapper.classList.toggle('is-flipped');
+    });
+
+    // --- 升級按鈕邏輯 ---
     document.getElementById('dismantle-btn').onclick = () => dismantleCurrentCard();
-    const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); const upgradeStarBtn = document.getElementById('upgrade-star-btn');
-    if (card.level >= 30) { upgradeLevelBtn.innerHTML = "已達 MAX"; upgradeLevelBtn.classList.add('btn-disabled'); upgradeLevelBtn.onclick = null; } 
-    else { const cost = card.level * 100; upgradeLevelBtn.innerHTML = `⬆️ 升級 <span style="font-size:0.8em;">(${cost}G)</span>`; upgradeLevelBtn.classList.remove('btn-disabled'); upgradeLevelBtn.onclick = () => upgradeCardLevel(cost); }
-    if (card.stars >= 5) { upgradeStarBtn.innerText = "已達 5★"; upgradeStarBtn.classList.add('btn-disabled'); upgradeStarBtn.onclick = null; } 
-    else { upgradeStarBtn.innerText = "⭐ 升星"; upgradeStarBtn.classList.remove('btn-disabled'); upgradeStarBtn.onclick = () => upgradeCardStar(); }
+    const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); 
+    const upgradeStarBtn = document.getElementById('upgrade-star-btn');
+    
+    if (card.level >= 30) { 
+        upgradeLevelBtn.innerHTML = "已達 MAX"; upgradeLevelBtn.classList.add('btn-disabled'); upgradeLevelBtn.onclick = null; 
+    } else { 
+        const cost = card.level * 100; 
+        upgradeLevelBtn.innerHTML = `⬆️ 升級 <span style="font-size:0.8em;">(${cost}G)</span>`; 
+        upgradeLevelBtn.classList.remove('btn-disabled'); 
+        upgradeLevelBtn.onclick = () => upgradeCardLevel(cost); 
+    }
+    
+    if (card.stars >= 5) { 
+        upgradeStarBtn.innerText = "已達 5★"; upgradeStarBtn.classList.add('btn-disabled'); upgradeStarBtn.onclick = null; 
+    } else { 
+        upgradeStarBtn.innerText = "⭐ 升星"; upgradeStarBtn.classList.remove('btn-disabled'); 
+        upgradeStarBtn.onclick = () => upgradeCardStar(); 
+    }
 }
 
 async function upgradeCardLevel(cost) {
@@ -765,7 +871,6 @@ async function saveCardToCloud(card) {
         baseAtk: card.atk, 
         baseHp: card.hp, 
         attackType: card.attackType || 'melee',
-        // 確保新卡片有技能資料 
         skillKey: card.skillKey || null,
         skillParams: card.skillParams || null,
         level: 1, 
@@ -783,37 +888,30 @@ function drawSRorAbove() { const rand = Math.random(); let rarity = rand < 0.17 
 function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
     
-    // 預設為近戰，避免 undefined
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
 
     cardDiv.className = `card ${card.rarity}`; 
     if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     
-    // 顯示攻擊力的符號為 👊
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats"><span class="type-icon">${typeIcon}</span> 👊${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
     
-    // 🔥 修改：卡片點擊事件 (支援 PVP 選角)
     cardDiv.addEventListener('click', () => { 
         playSound('click'); 
         if (cardDiv.classList.contains('is-deployed')) return; 
         if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } 
         
-        // 1. PVE 部署
         if (deployTargetSlot !== null) { deployHeroToSlot(card); return; } 
 
-        // 2. PVP 部署 (進攻或防守)
         if (pvpTargetInfo.index !== null) {
             const success = setPvpHero(pvpTargetInfo.index, card, pvpTargetInfo.type);
             if(success) {
-                // 重置
                 pvpTargetInfo = { index: null, type: null };
-                document.getElementById('inventory-modal').classList.add('hidden'); // 關閉背包
+                document.getElementById('inventory-modal').classList.add('hidden'); 
             }
             return;
         }
 
-        // 3. 詳情頁
         let index = currentDisplayList.indexOf(card); if (index === -1) { currentDisplayList = [card]; index = 0; } openDetailModal(index); 
     });
     targetContainer.appendChild(cardDiv); return cardDiv;
@@ -855,7 +953,6 @@ if(document.getElementById('inventory-btn')) document.getElementById('inventory-
     playSound('inventory'); 
     if(!currentUser) return alert("請先登入"); 
     
-    // 重置所有選角狀態
     deployTargetSlot = null; 
     pvpTargetInfo = { index: null, type: null }; 
     
@@ -869,7 +966,6 @@ if(document.getElementById('close-inventory-btn')) document.getElementById('clos
     
     deployTargetSlot = null; 
     
-    // 如果是 PVP 模式下關閉背包，應該回到對應的 PVP 視窗
     if (pvpTargetInfo.type === 'defense') {
         document.getElementById('pvp-setup-modal').classList.remove('hidden');
     } else if (pvpTargetInfo.type === 'attack') {
@@ -893,10 +989,6 @@ if(batchConfirmBtn) batchConfirmBtn.addEventListener('click', async () => { play
 updateInventoryCounts();
 alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
-// ==========================================
-// 整合戰鬥模組的回調函式
-// ==========================================
-
 if(document.getElementById('enter-battle-mode-btn')) document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
     if(!currentUser) return alert("請先登入");
@@ -911,7 +1003,6 @@ let deployTargetSlot = null;
 
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
-        // 排除 PVP 視窗的 slot
         if(slot.closest('#pvp-setup-modal') || slot.closest('#pvp-match-content')) return;
 
         if(isBattleActive) return; playSound('click'); const slotIndex = parseInt(slot.dataset.slot);
@@ -946,7 +1037,6 @@ function deployHeroToSlot(card) {
 }
 
 function renderBattleSlots() {
-    // 只選取 PVE 戰場的 slot (透過父容器區分)
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
     battleSlotsEl.forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
@@ -986,11 +1076,9 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
     updateStartButton();
 });
 
-// 🔥 處理戰鬥結束 (從 battle.js 呼叫回來)
 async function handleBattleEnd(isWin, earnedGold, heroStats) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     
-    // 無論輸贏，都能獲得打怪掉落的金幣
     let finalGold = Math.floor(earnedGold * goldMultiplier);
     
     let gemReward = 0;
@@ -1027,12 +1115,10 @@ async function handleBattleEnd(isWin, earnedGold, heroStats) {
     await updateCurrencyCloud(); 
     updateUIDisplay();
 
-    // 生成傷害排行榜 (DPS Meter)
     const dpsContainer = document.getElementById('dps-chart');
     dpsContainer.innerHTML = "";
     
     if (heroStats && heroStats.length > 0) {
-        // 排序：傷害高的在上面
         const sortedHeroes = [...heroStats].sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
         const maxDmg = sortedHeroes[0].totalDamage || 1; 
         
