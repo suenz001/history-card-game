@@ -180,15 +180,17 @@ function spawnHeroes() {
 
         const el = document.createElement('div');
         el.className = `hero-unit ${card.rarity}`;
-        el.style.backgroundImage = `url(assets/cards/${card.id}.webp)`;
+        // 🔥 修改結構：分離視覺與UI
+        el.innerHTML = `
+            <div class="unit-visual" style="position:absolute; width:100%; height:100%; top:0; left:0; background-image: url('assets/cards/${card.id}.webp'); background-size: cover;"></div>
+            <div class="unit-ui" style="position:absolute; width:100%; height:100%; top:0; left:0; z-index:10;">
+                <div class="hero-hp-bar"><div style="width:100%"></div></div>
+                <div class="hero-mana-bar"><div style="width:0%"></div></div>
+                <div class="${badgeClass}">${typeIcon}</div>
+            </div>
+        `;
         el.style.left = `${startPos}%`;
         el.style.top = `${startY}%`;
-        
-        el.innerHTML = `
-            <div class="hero-hp-bar"><div style="width:100%"></div></div>
-            <div class="hero-mana-bar"><div style="width:0%"></div></div>
-            <div class="${badgeClass}">${typeIcon}</div>
-        `;
         container.appendChild(el);
 
         let finalHp = card.hp;
@@ -224,6 +226,7 @@ function spawnHeroes() {
             atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.35) : card.atk, 
             lastAttackTime: 0, 
             el: el, 
+            visualEl: el.querySelector('.unit-visual'), // 🔥 儲存視覺元素引用
             monitorEl: monitorItem, 
             patrolDir: 1, 
             totalDamage: 0,
@@ -298,23 +301,28 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
 
     const el = document.createElement('div');
     el.className = `enemy-unit pvp-enemy ${enemyCard.rarity || 'R'}`;
-    el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
-    el.style.backgroundSize = 'cover';
+    // 🔥 修改結構：分離視覺與UI
+    el.innerHTML = `
+        <div class="unit-visual" style="position:absolute; width:100%; height:100%; top:0; left:0; background-image: url('assets/cards/${realId}.webp'); background-size: cover;"></div>
+        <div class="unit-ui" style="position:absolute; width:100%; height:100%; top:0; left:0; z-index:10;">
+            <div class="enemy-hp-bar"><div style="width:100%"></div></div>
+            <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
+            <div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>
+        </div>
+    `;
     el.style.border = '2px solid #e74c3c';
     el.style.left = `${startPos}%`;
     el.style.top = `${startY}%`;
-    el.style.transform = 'translateY(-50%) scaleX(-1)';
+    
+    // 預設朝左 (scaleX -1)，但現在我們在 gameLoop 處理，這裡先設定 transform
+    el.style.transform = 'translateY(-50%)'; 
+    el.querySelector('.unit-visual').style.transform = 'scaleX(-1)';
 
     if(enemyCard.isBoss) {
         el.style.width = '70px'; el.style.height = '70px'; el.style.zIndex = '30';
         el.style.border = '3px solid #f1c40f'; el.style.boxShadow = '0 0 15px #f1c40f';
     }
-
-    el.innerHTML = `
-        <div class="enemy-hp-bar"><div style="width:100%"></div></div>
-        <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
-        <div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>
-    `;
+    
     container.appendChild(el);
 
     if(attackType === 'ranged') finalHp = Math.floor(finalHp * 0.45);
@@ -332,6 +340,7 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         range: attackType === 'ranged' ? 16 : 4, 
         lastAttackTime: 0,
         el: el,
+        visualEl: el.querySelector('.unit-visual'), // 🔥 儲存視覺元素引用
         isPvpHero: true, 
         totalDamage: 0,
         totalHealing: 0,
@@ -407,9 +416,21 @@ function spawnEnemy() {
         const bossX = 10 + Math.random() * 80; 
         const bossY = 10 + Math.random() * 80;
         const boss = { id: Date.now(), maxHp: 30000, currentHp: 30000, atk: 500, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
-        const el = document.createElement('div'); el.className = 'enemy-unit boss'; el.innerHTML = `😈<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
+        const el = document.createElement('div'); el.className = 'enemy-unit boss'; 
+        // 🔥 修改結構：分離視覺與UI (Emoji版)
+        el.innerHTML = `
+            <div class="unit-visual" style="font-size: 2em; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);">😈</div>
+            <div class="unit-ui" style="position:absolute; width:100%; height:100%; top:0; left:0;">
+                <div class="enemy-hp-bar"><div style="width:100%"></div></div>
+            </div>
+        `;
         el.style.top = `${boss.y}%`; el.style.left = `${boss.position}%`;
-        container.appendChild(el); boss.el = el; enemies.push(boss);
+        el.style.transform = 'translateY(-50%)'; // 垂直置中
+        
+        container.appendChild(el); 
+        boss.el = el; 
+        boss.visualEl = el.querySelector('.unit-visual'); // 儲存引用
+        enemies.push(boss);
         return;
     }
 
@@ -418,9 +439,21 @@ function spawnEnemy() {
     if (Math.random() < 0.5) spawnY = 10 + Math.random() * 30; else spawnY = 60 + Math.random() * 30;
     
     const enemy = { id: Date.now(), maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, lane: -1, position: spawnX, y: spawnY, speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 };
-    const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
+    const el = document.createElement('div'); el.className = 'enemy-unit'; 
+    // 🔥 修改結構：分離視覺與UI (骷髏版)
+    el.innerHTML = `
+        <div class="unit-visual" style="font-size: 2em; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);">💀</div>
+        <div class="unit-ui" style="position:absolute; width:100%; height:100%; top:0; left:0;">
+            <div class="enemy-hp-bar"><div style="width:100%"></div></div>
+        </div>
+    `;
     el.style.top = `${enemy.y}%`; el.style.left = `${enemy.position}%`; 
-    container.appendChild(el); enemy.el = el; enemies.push(enemy);
+    el.style.transform = 'translateY(-50%)';
+    
+    container.appendChild(el); 
+    enemy.el = el; 
+    enemy.visualEl = el.querySelector('.unit-visual');
+    enemies.push(enemy);
 }
 
 function fireBossSkill(boss) {
@@ -444,18 +477,18 @@ function fireBossSkill(boss) {
         effect.style.left = `${target.position}%`; effect.style.top = `${target.y}%`;
         if(container) container.appendChild(effect);
         setTimeout(() => effect.remove(), 600);
-        safePlaySound('explosion'); // 🔥 替換為爆炸音效
+        safePlaySound('explosion'); 
         
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position; const dy = hero.y - target.y; const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < 7) { 
                 if (hero.isInvincible) {
                     showDamageText(hero.position, hero.y, `免疫`, 'gold-text');
-                    safePlaySound('block'); // 🔥 免疫音效
+                    safePlaySound('block'); 
                 } else if (hero.immunityStacks > 0) {
                     hero.immunityStacks--;
                     showDamageText(hero.position, hero.y, `格擋!`, 'gold-text');
-                    safePlaySound('block'); // 🔥 格擋音效
+                    safePlaySound('block'); 
                 } else {
                     hero.currentHp -= 300; 
                     triggerHeroHit(hero); 
@@ -472,7 +505,6 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     const container = getBattleContainer();
     if(!container) return; 
 
-    // 🔥 根據類型播放發射音效
     if (type === 'arrow') safePlaySound('arrow');
     else if (type === 'fireball') safePlaySound('fireball');
     else if (type === 'skill') safePlaySound('magic');
@@ -501,7 +533,6 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     projectile.style.left = `${startX}px`; projectile.style.top = `${startY}px`;
     container.appendChild(projectile);
     
-    // 計算角度
     const deltaX = endX - startX;
     const deltaY = endY - startY;
     const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
@@ -609,9 +640,6 @@ function dealDamage(source, target, multiplier) {
         target.el.classList.add('taking-damage');
     }
     source.totalDamage += dmg;
-    
-    // 如果沒有特效，至少要有個基礎音效 (如果有特效會由特效函式觸發)
-    // safePlaySound('slash'); 
 }
 
 function healTarget(source, target, amount) {
@@ -1004,9 +1032,10 @@ function executeSkill(hero, target) {
     showDamageText(hero.position, hero.y - 10, hero.title + "!", 'skill-title');
     safePlaySound('magic'); 
     
-    if(hero.el) {
-        hero.el.classList.add('hero-casting');
-        setTimeout(() => hero.el.classList.remove('hero-casting'), 300);
+    // 🔥 施法特效只作用於 visualEl，避免血條變形
+    if(hero.visualEl) {
+        hero.visualEl.classList.add('hero-casting');
+        setTimeout(() => hero.visualEl.classList.remove('hero-casting'), 300);
     }
 
     const skillFunc = SKILL_LIBRARY[hero.skillKey];
@@ -1128,6 +1157,19 @@ function gameLoop() {
         
         if (hero.el) {
             hero.el.style.left = `${hero.position}%`; hero.el.style.top = `${hero.y}%`; 
+            
+            // 🔥 修正：容器不翻轉，只翻轉 visualEl
+            hero.el.style.transform = 'translateY(-50%)'; 
+            const visual = hero.visualEl;
+            
+            if (visual) {
+                if (nearestEnemy && nearestEnemy.position < hero.position) { 
+                    visual.style.transform = 'scaleX(-1)'; 
+                } else { 
+                    visual.style.transform = 'scaleX(1)'; 
+                }
+            }
+
             hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
             
             const manaPercent = (hero.currentMana / hero.maxMana) * 100;
@@ -1135,8 +1177,6 @@ function gameLoop() {
             
             if(hero.currentMana >= hero.maxMana) hero.el.classList.add('mana-full');
             else hero.el.classList.remove('mana-full');
-
-            if (nearestEnemy && nearestEnemy.position < hero.position) { hero.el.style.transform = 'translateY(-50%) scaleX(-1)'; } else { hero.el.style.transform = 'translateY(-50%) scaleX(1)'; }
         }
     }
 
@@ -1271,12 +1311,20 @@ function gameLoop() {
 
         if (enemy.el) {
             enemy.el.style.left = `${enemy.position}%`; enemy.el.style.top = `${enemy.y}%`;
-            enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
-            if (nearestHero && nearestHero.position > enemy.position) {
-                enemy.el.style.transform = 'translateY(-50%) scaleX(1)';
-            } else {
-                enemy.el.style.transform = 'translateY(-50%) scaleX(-1)';
+            
+            // 🔥 修正：容器不翻轉，只翻轉 visualEl
+            enemy.el.style.transform = 'translateY(-50%)';
+            const visual = enemy.visualEl;
+            
+            if (visual) {
+                if (nearestHero && nearestHero.position > enemy.position) {
+                    visual.style.transform = 'scaleX(1)';
+                } else {
+                    visual.style.transform = 'scaleX(-1)';
+                }
             }
+
+            enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
         }
     }
 
