@@ -3,7 +3,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// 🔥 引入生平模組
 import { HERO_BIOS } from './js/bios.js';
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
@@ -80,7 +79,6 @@ setTimeout(() => {
             document.getElementById('inventory-title').innerText = title; 
             document.getElementById('inventory-modal').classList.remove('hidden');
             
-            // 確保排序選單與記憶同步
             const sortSelect = document.getElementById('sort-select');
             if(sortSelect) sortSelect.value = currentSortMethod;
 
@@ -92,14 +90,12 @@ setTimeout(() => {
 
 // 處理點擊敵方卡片的邏輯
 function handleEnemyCardClick(enemyCard) {
-    isViewingEnemy = true; // 標記為查看敵人模式
+    isViewingEnemy = true; 
 
-    // 重新建構卡片資料
     const baseCard = cardDatabase.find(c => c.id == enemyCard.id);
     let displayCard = { ...baseCard, ...enemyCard };
 
     if (baseCard) {
-        // 根據等級與星數重新計算數值
         const level = displayCard.level || 1;
         const stars = displayCard.stars || 1;
         const levelBonus = (level - 1) * 0.03;
@@ -114,7 +110,6 @@ function handleEnemyCardClick(enemyCard) {
     currentDisplayList = [displayCard];
     currentCardIndex = 0;
     
-    // 強制將詳情視窗的 Z-Index 設為最高，確保顯示在 PVP 視窗之上
     const detailModal = document.getElementById('detail-modal');
     detailModal.classList.remove('hidden');
     detailModal.style.zIndex = "99999"; 
@@ -236,20 +231,27 @@ async function openNotificationModal() {
 function renderNotifications() {
     notificationList.innerHTML = "";
     
+    // 系統通知 (固定 ID)
     const staticSystemItems = SYSTEM_NOTIFICATIONS.map(notif => ({
         ...notif,
         timestamp: 9999999999999, 
         type: 'system'
     }));
 
-    const logItems = battleLogs.map(log => ({
+    // 🔥 修正：戰鬥紀錄 (自動生成唯一 ID)
+    // 使用 timestamp + index 確保 ID 唯一，避免被過濾器刪除
+    const logItems = battleLogs.map((log, index) => ({
         ...log,
+        // 為每個戰報生成一個獨特的臨時 ID，確保不被視為重複
+        id: `battle_log_${log.timestamp ? log.timestamp.seconds : Date.now()}_${index}`,
+        originalLog: log, // 保存原始物件以便刪除時比對
         timestamp: log.timestamp ? log.timestamp.seconds * 1000 : Date.now(),
         isSystem: false
     }));
 
     const allItems = [...staticSystemItems, ...globalAnnouncements, ...logItems].sort((a, b) => b.timestamp - a.timestamp);
 
+    // 過濾重複項目 (現在戰報已有唯一 ID，不會被過濾掉)
     const uniqueItems = allItems.filter((item, index, self) => 
         index === self.findIndex((t) => (t.id === item.id))
     );
@@ -297,9 +299,10 @@ function renderNotifications() {
 
             div.className = `notification-item notif-battle-log ${colorClass}`;
             div.style.cursor = item.attackerUid ? 'pointer' : 'default'; 
+            div.style.position = 'relative'; // 為了定位刪除按鈕
             
             div.innerHTML = `
-                <div style="width:100%">
+                <div style="width:100%; padding-right: 30px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                         <span style="font-weight:bold; color:#fff;">⚔️ ${item.attackerName} 攻擊了你</span>
                         <span style="font-size:0.8em; color:#aaa;">${date}</span>
@@ -312,8 +315,19 @@ function renderNotifications() {
                         ${revengeHint}
                     </div>
                 </div>
+                <div class="delete-log-btn" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-size:1.2em; color:#e74c3c;">❌</div>
             `;
 
+            // 🔥 刪除按鈕事件
+            const deleteBtn = div.querySelector('.delete-log-btn');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // 防止觸發復仇
+                if(confirm("確定要刪除這條戰鬥紀錄嗎？")) {
+                    deleteBattleLog(item.originalLog);
+                }
+            });
+
+            // 點擊本體 (復仇)
             if (item.attackerUid) {
                 div.addEventListener('click', () => {
                     playSound('click');
@@ -328,6 +342,38 @@ function renderNotifications() {
     
     if (uniqueItems.length === 0) {
         notificationList.innerHTML = "<div style='text-align:center; padding:20px; color:#777;'>暫無通知</div>";
+    }
+}
+
+// 🔥 新增：刪除戰報功能
+async function deleteBattleLog(logToRemove) {
+    if (!currentUser) return;
+    
+    // 透過比對時間戳記來找出要刪除的項目
+    // 因為 Firestore 的 arrayRemove 需要完全一樣的物件，但時間戳記轉來轉去可能會有些微誤差
+    // 所以我們採用「讀取 -> 過濾 -> 寫回」的方式，這是最穩定的
+    
+    const newLogs = battleLogs.filter(log => {
+        // 比對時間戳記的秒數是否相同
+        if(log.timestamp && logToRemove.timestamp) {
+            return log.timestamp.seconds !== logToRemove.timestamp.seconds;
+        }
+        return true; 
+    });
+
+    try {
+        await updateDoc(doc(db, "users", currentUser.uid), {
+            battleLogs: newLogs
+        });
+        
+        // 更新本地資料並重新渲染
+        battleLogs = newLogs;
+        renderNotifications();
+        playSound('dismantle');
+        
+    } catch (e) {
+        console.error("刪除戰報失敗", e);
+        alert("刪除失敗，請檢查網路");
     }
 }
 
@@ -744,7 +790,7 @@ function openDetailModal(index) {
     renderDetailCard(); 
 }
 
-// 🔥 全面優化：確保文字敘述與程式邏輯完全一致
+// 全面優化：確保文字敘述與程式邏輯完全一致
 function getSkillDescription(skillKey, params) {
     if (!params) return "造成強力傷害。";
 
@@ -812,7 +858,7 @@ function renderDetailCard() {
     
     const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
 
-    // 🔥 讀取生平資料
+    // 讀取生平資料
     const bioData = HERO_BIOS[card.id]; 
     let bioHtml = "";
     
@@ -1064,15 +1110,12 @@ if(document.getElementById('draw-10-btn')) document.getElementById('draw-10-btn'
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
 });
 
-// 監聽背包按鈕，開啟時自動解除全軍 + 帶入上次排序
 if(document.getElementById('inventory-btn')) document.getElementById('inventory-btn').addEventListener('click', () => { 
     playSound('inventory'); 
     if(!currentUser) return alert("請先登入"); 
     
-    // 自動解除全軍 (讓介面看起來是清空的)
     clearDeployment();
 
-    // 恢復上次的排序選擇
     const sortSelect = document.getElementById('sort-select');
     if(sortSelect && currentSortMethod) {
         sortSelect.value = currentSortMethod;
