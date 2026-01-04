@@ -99,10 +99,12 @@ function setupBattleEnvironment() {
     const enemyContainer = document.getElementById('enemy-container');
     const heroContainer = document.getElementById('hero-container');
     const monitorList = document.getElementById('hero-monitor-list');
+    const enemyMonitorList = document.getElementById('enemy-monitor-list'); // 🔥
     
     if(enemyContainer) enemyContainer.innerHTML = '';
     if(heroContainer) heroContainer.innerHTML = '';
     if(monitorList) monitorList.innerHTML = '';
+    if(enemyMonitorList) enemyMonitorList.innerHTML = ''; // 🔥 清空敵方監控
 
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) lanesWrapper.style.opacity = '0.3';
@@ -137,6 +139,8 @@ export function resetBattleState() {
     
     const monitorList = document.getElementById('hero-monitor-list');
     if(monitorList) monitorList.innerHTML = '';
+    const enemyMonitorList = document.getElementById('enemy-monitor-list');
+    if(enemyMonitorList) enemyMonitorList.innerHTML = '';
 
     const startBtn = document.getElementById('start-battle-btn');
     if(startBtn) {
@@ -180,7 +184,6 @@ function spawnHeroes() {
 
         const el = document.createElement('div');
         el.className = `hero-unit ${card.rarity}`;
-        // 🔥 修改結構：分離視覺與UI
         el.innerHTML = `
             <div class="unit-visual" style="position:absolute; width:100%; height:100%; top:0; left:0; background-image: url('assets/cards/${card.id}.webp'); background-size: cover;"></div>
             <div class="unit-ui" style="position:absolute; width:100%; height:100%; top:0; left:0; z-index:10;">
@@ -226,7 +229,7 @@ function spawnHeroes() {
             atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.35) : card.atk, 
             lastAttackTime: 0, 
             el: el, 
-            visualEl: el.querySelector('.unit-visual'), // 🔥 儲存視覺元素引用
+            visualEl: el.querySelector('.unit-visual'), 
             monitorEl: monitorItem, 
             patrolDir: 1, 
             totalDamage: 0,
@@ -301,7 +304,6 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
 
     const el = document.createElement('div');
     el.className = `enemy-unit pvp-enemy ${enemyCard.rarity || 'R'}`;
-    // 🔥 修改結構：分離視覺與UI
     el.innerHTML = `
         <div class="unit-visual" style="position:absolute; width:100%; height:100%; top:0; left:0; background-image: url('assets/cards/${realId}.webp'); background-size: cover;"></div>
         <div class="unit-ui" style="position:absolute; width:100%; height:100%; top:0; left:0; z-index:10;">
@@ -313,8 +315,6 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     el.style.border = '2px solid #e74c3c';
     el.style.left = `${startPos}%`;
     el.style.top = `${startY}%`;
-    
-    // 預設朝左 (scaleX -1)，但現在我們在 gameLoop 處理，這裡先設定 transform
     el.style.transform = 'translateY(-50%)'; 
     el.querySelector('.unit-visual').style.transform = 'scaleX(-1)';
 
@@ -327,10 +327,37 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
 
     if(attackType === 'ranged') finalHp = Math.floor(finalHp * 0.45);
 
+    // 🔥 新增：建立敵方監控項目
+    const monitorList = document.getElementById('enemy-monitor-list');
+    let monitorItem = null;
+    if(monitorList) {
+        monitorItem = document.createElement('div');
+        monitorItem.className = 'monitor-item';
+        // 使用紅色邊框區分
+        monitorItem.style.borderLeft = '4px solid #e74c3c';
+        
+        const realName = localConfig ? localConfig.name : (enemyCard.name || "敵人");
+        
+        monitorItem.innerHTML = `
+            <div class="monitor-icon" style="background-image: url('assets/cards/${realId}.webp');"></div>
+            <div class="monitor-info">
+                <div class="monitor-name">${realName}</div>
+                <div class="monitor-hp-bg">
+                    <div class="monitor-hp-fill" style="width: 100%; background: #e74c3c;"></div>
+                </div>
+                <div class="monitor-mana-bg">
+                    <div class="monitor-mana-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+        `;
+        monitorList.appendChild(monitorItem);
+    }
+
     enemies.push({
         ...enemyCard, 
         id: realId,
         title: finalTitle,
+        name: localConfig ? localConfig.name : "敵人", // 確保有名稱
         maxHp: finalHp, currentHp: finalHp,
         atk: finalAtk,
         attackType: attackType, 
@@ -340,7 +367,8 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         range: attackType === 'ranged' ? 16 : 4, 
         lastAttackTime: 0,
         el: el,
-        visualEl: el.querySelector('.unit-visual'), // 🔥 儲存視覺元素引用
+        visualEl: el.querySelector('.unit-visual'),
+        monitorEl: monitorItem, // 🔥 綁定監控元素
         isPvpHero: true, 
         totalDamage: 0,
         totalHealing: 0,
@@ -417,7 +445,6 @@ function spawnEnemy() {
         const bossY = 10 + Math.random() * 80;
         const boss = { id: Date.now(), maxHp: 30000, currentHp: 30000, atk: 500, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
         const el = document.createElement('div'); el.className = 'enemy-unit boss'; 
-        // 🔥 修改結構：分離視覺與UI (Emoji版)
         el.innerHTML = `
             <div class="unit-visual" style="font-size: 2em; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);">😈</div>
             <div class="unit-ui" style="position:absolute; width:100%; height:100%; top:0; left:0;">
@@ -425,11 +452,11 @@ function spawnEnemy() {
             </div>
         `;
         el.style.top = `${boss.y}%`; el.style.left = `${boss.position}%`;
-        el.style.transform = 'translateY(-50%)'; // 垂直置中
+        el.style.transform = 'translateY(-50%)'; 
         
         container.appendChild(el); 
         boss.el = el; 
-        boss.visualEl = el.querySelector('.unit-visual'); // 儲存引用
+        boss.visualEl = el.querySelector('.unit-visual'); 
         enemies.push(boss);
         return;
     }
@@ -440,7 +467,6 @@ function spawnEnemy() {
     
     const enemy = { id: Date.now(), maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, lane: -1, position: spawnX, y: spawnY, speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 };
     const el = document.createElement('div'); el.className = 'enemy-unit'; 
-    // 🔥 修改結構：分離視覺與UI (骷髏版)
     el.innerHTML = `
         <div class="unit-visual" style="font-size: 2em; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);">💀</div>
         <div class="unit-ui" style="position:absolute; width:100%; height:100%; top:0; left:0;">
@@ -661,7 +687,7 @@ function getCombatGroups(caster) {
 }
 
 // ==========================================
-// 🔥 技能模組庫 (全面升級 VFX & SFX)
+// 🔥 技能模組庫
 // ==========================================
 const SKILL_LIBRARY = {
     HEAL_AND_STRIKE: (hero, target, params) => {
@@ -709,7 +735,7 @@ const SKILL_LIBRARY = {
             dealDamage(hero, target, dmgMult);
         });
         
-        safePlaySound('heal'); // 群體治療音效
+        safePlaySound('heal');
         allies.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
@@ -723,7 +749,7 @@ const SKILL_LIBRARY = {
         const dmgMult = params.dmgMult || 5.0;
         
         fireProjectile(hero.el, target.el, 'skill', () => {
-             safePlaySound('explosion'); // 重擊音效
+             safePlaySound('explosion');
              dealDamage(hero, target, dmgMult);
              createVfx(target.position, target.y, 'vfx-slash'); 
              shakeScreen(); 
@@ -792,7 +818,7 @@ const SKILL_LIBRARY = {
         const duration = params.duration || 3000;
         const dmgMult = params.dmgMult || 1.5;
         
-        safePlaySound('block'); // 無敵音效
+        safePlaySound('block');
         hero.isInvincible = true;
         showDamageText(hero.position, hero.y, `無敵!`, 'gold-text');
         createVfx(hero.position, hero.y, 'vfx-buff-ring');
@@ -989,7 +1015,7 @@ const SKILL_LIBRARY = {
                 if(enemy.currentHp > 0 && (enemy.currentHp / enemy.maxHp) < threshold && !enemy.isBoss) {
                     enemy.currentHp = 0; 
                     showDamageText(enemy.position, enemy.y, `斬殺!`, 'skill-title');
-                    createVfx(enemy.position, enemy.y, 'vfx-execute'); // 斬殺特效
+                    createVfx(enemy.position, enemy.y, 'vfx-execute'); 
                     executedCount++;
                 }
             });
@@ -1032,7 +1058,6 @@ function executeSkill(hero, target) {
     showDamageText(hero.position, hero.y - 10, hero.title + "!", 'skill-title');
     safePlaySound('magic'); 
     
-    // 🔥 施法特效只作用於 visualEl，避免血條變形
     if(hero.visualEl) {
         hero.visualEl.classList.add('hero-casting');
         setTimeout(() => hero.visualEl.classList.remove('hero-casting'), 300);
@@ -1158,7 +1183,6 @@ function gameLoop() {
         if (hero.el) {
             hero.el.style.left = `${hero.position}%`; hero.el.style.top = `${hero.y}%`; 
             
-            // 🔥 修正：容器不翻轉，只翻轉 visualEl
             hero.el.style.transform = 'translateY(-50%)'; 
             const visual = hero.visualEl;
             
@@ -1188,6 +1212,14 @@ function gameLoop() {
         const enemy = enemies[i];
 
         if (enemy.currentHp <= 0) {
+            // 🔥 新增：敵人死亡時，也要更新監控狀態
+            if (enemy.monitorEl) { 
+                enemy.monitorEl.classList.add('dead'); 
+                enemy.monitorEl.querySelector('.monitor-name').innerText += " (陣亡)"; 
+                enemy.monitorEl.querySelector('.monitor-hp-fill').style.width = '0%'; 
+                enemy.monitorEl.querySelector('.monitor-mana-fill').style.width = '0%'; 
+            }
+
             if(enemy.el) enemy.el.remove();
             deadEnemies.push(enemy);
             enemies.splice(i, 1);
@@ -1208,6 +1240,17 @@ function gameLoop() {
             }
             safePlaySound('dismantle'); 
             continue; 
+        }
+
+        // 🔥 新增：即時更新敵人監控條
+        if (enemy.monitorEl) { 
+            const hpPercent = Math.max(0, (enemy.currentHp / enemy.maxHp) * 100); 
+            const manaPercent = Math.max(0, (enemy.currentMana / enemy.maxMana) * 100);
+
+            const fillHp = enemy.monitorEl.querySelector('.monitor-hp-fill'); 
+            const fillMana = enemy.monitorEl.querySelector('.monitor-mana-fill'); 
+            if (fillHp) fillHp.style.width = `${hpPercent}%`; 
+            if (fillMana) fillMana.style.width = `${manaPercent}%`; 
         }
 
         if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { fireBossSkill(enemy); enemy.lastAttackTime = now; }
@@ -1312,8 +1355,7 @@ function gameLoop() {
         if (enemy.el) {
             enemy.el.style.left = `${enemy.position}%`; enemy.el.style.top = `${enemy.y}%`;
             
-            // 🔥 修正：容器不翻轉，只翻轉 visualEl
-            enemy.el.style.transform = 'translateY(-50%)';
+            hero.el.style.transform = 'translateY(-50%)'; 
             const visual = enemy.visualEl;
             
             if (visual) {
