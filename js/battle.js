@@ -1,5 +1,5 @@
 // js/battle.js
-import { LEVEL_CONFIGS, cardDatabase } from './data.js'; // 🔥 改用 LEVEL_CONFIGS
+import { LEVEL_CONFIGS, cardDatabase } from './data.js';
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { executeSkill } from './skills.js'; 
 import { fireProjectile, createVfx, showDamageText, shakeScreen, triggerHeroHit } from './vfx.js'; 
@@ -15,7 +15,6 @@ export let deadEnemies = [];
 export let currentDifficulty = 'normal';
 export let gameSpeed = 1;
 
-// 🔥 新增：當前關卡 ID
 let currentLevelId = 1; 
 
 let pvpPlayerTeamData = [];
@@ -35,17 +34,14 @@ export function setDifficulty(diff) { currentDifficulty = diff; }
 export function setGameSpeed(speed) { gameSpeed = speed; } 
 export function setOnBattleEnd(callback) { onBattleEndCallback = callback; }
 
-// 🔥 修改：initBattle 接收 levelId
 export function initBattle(levelId = 1) {
     currentLevelId = levelId;
     
-    // 初始化 UI 監聽器 (只需執行一次，避免重複綁定)
     if (!document.getElementById('start-battle-btn').dataset.initialized) {
         setupBattleListeners();
         document.getElementById('start-battle-btn').dataset.initialized = "true";
     }
 
-    // 呼叫開始準備邏輯
     prepareLevel();
 }
 
@@ -72,20 +68,17 @@ function setupBattleListeners() {
     }
 }
 
-// 🔥 新增：準備關卡 (設定背景、標題)
 function prepareLevel() {
     isPvpMode = false;
     const config = LEVEL_CONFIGS[currentLevelId];
     
-    // 設定背景圖 (預設找不到圖就用深色背景)
     const container = document.querySelector('.battle-field-container');
     if(container) {
         container.style.backgroundImage = `url('${config.bg}'), linear-gradient(#2c3e50 1px, transparent 1px), linear-gradient(90deg, #2c3e50 1px, transparent 1px)`;
-        container.style.backgroundSize = "cover"; // 確保背景圖覆蓋
-        container.style.backgroundBlendMode = "normal"; // 混合模式
+        container.style.backgroundSize = "cover"; 
+        container.style.backgroundBlendMode = "normal"; 
     }
 
-    // 更新標題
     const levelTitle = document.getElementById('level-title-display');
     if(levelTitle) levelTitle.innerText = config.name;
 
@@ -95,12 +88,11 @@ function prepareLevel() {
     document.getElementById('battle-screen').classList.remove('hidden');
     renderBattleSlots();
     updateStartButton();
+    updateBattleUI(); // 初始化 UI 狀態
     
-    // 播放背景音樂
     if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
 }
 
-// 內部使用：渲染部屬槽位 (從 main.js 移過來或共用)
 function renderBattleSlots() {
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
     battleSlotsEl.forEach(slotDiv => {
@@ -147,7 +139,6 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
 
     setupBattleEnvironment();
     
-    // PVP 時清除背景圖
     const container = document.querySelector('.battle-field-container');
     if(container) {
         container.style.backgroundImage = "";
@@ -155,13 +146,14 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
     }
 
     const waveNotif = document.getElementById('wave-notification');
-    const waveCount = document.getElementById('wave-count');
     if(waveNotif) waveNotif.innerText = "⚔️ PVP 對決開始 ⚔️";
-    if(waveCount) waveCount.innerText = "PVP";
     
     spawnHeroes(); 
     spawnPvpEnemies(enemyTeamData); 
     
+    // 🔥 修正：PVP 開始時立即更新 UI，確保顯示正確的存活人數
+    updateBattleUI();
+
     battleState.phase = 'COMBAT'; 
     gameLoop();
 }
@@ -240,7 +232,6 @@ export function resetBattleState() {
 }
 
 function spawnHeroes() {
-    // ... (維持原樣)
     const container = document.getElementById('hero-container');
     const monitorList = document.getElementById('hero-monitor-list');
     if(!container) return;
@@ -321,7 +312,6 @@ function spawnHeroes() {
 }
 
 function spawnPvpEnemies(enemyTeam) {
-    // ... (維持原樣，不需修改)
     const container = document.getElementById('enemy-container');
     if(!container) return;
 
@@ -331,7 +321,6 @@ function spawnPvpEnemies(enemyTeam) {
 }
 
 function spawnSingleEnemyFromCard(enemyCard, container) {
-    // ... (維持原樣，不需修改)
     const lane = enemyCard.slotIndex !== undefined ? Math.floor(enemyCard.slotIndex / 3) : -1;
     const col = enemyCard.slotIndex !== undefined ? (enemyCard.slotIndex % 3) : 0;
     
@@ -453,7 +442,6 @@ function startWave(waveNum) {
     battleState.wave = waveNum;
     battleState.spawned = 0;
     
-    // 🔥 修改：讀取 currentLevelId 的設定
     const levelConfig = LEVEL_CONFIGS[currentLevelId];
     battleState.totalToSpawn = levelConfig.waves[waveNum].count;
     
@@ -477,7 +465,6 @@ function spawnEnemy() {
     const container = document.getElementById('enemy-container');
     if(!container) return;
 
-    // 🔥 修改：讀取 currentLevelId 的設定
     const levelConfig = LEVEL_CONFIGS[currentLevelId];
     const config = levelConfig.waves[battleState.wave];
     
@@ -486,7 +473,6 @@ function spawnEnemy() {
     if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
     else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
 
-    // (波次池判斷邏輯保持不變，若 config.enemyPool 有資料則隨機抽)
     if (config.enemyPool && config.enemyPool.length > 0) {
         const randomId = config.enemyPool[Math.floor(Math.random() * config.enemyPool.length)];
         const baseCard = cardDatabase.find(c => c.id === randomId);
@@ -539,7 +525,6 @@ function spawnEnemy() {
     container.appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
-// ... (後面的 fireBossSkill, updateBattleUI, dealDamage, gameLoop, endBattle 保持不變)
 function fireBossSkill(boss) {
     const container = document.querySelector('.battle-field-container');
     if(!container) return;
@@ -589,11 +574,22 @@ function updateBattleUI() {
         const goldEl = document.getElementById('battle-gold');
         if(goldEl) goldEl.innerText = battleGold; 
         
-        const waveEl = document.getElementById('wave-count');
-        if(waveEl) waveEl.innerText = isPvpMode ? "PVP" : battleState.wave;
+        // 🔥 修正：PVP 模式隱藏波次顯示
+        const waveContainer = document.getElementById('wave-display-container');
+        if (waveContainer) {
+            waveContainer.style.display = isPvpMode ? 'none' : 'inline';
+        }
+
+        // PVE 模式才更新波次文字
+        if (!isPvpMode) {
+            const waveEl = document.getElementById('wave-count');
+            if(waveEl) waveEl.innerText = battleState.wave;
+        }
         
+        // 更新存活數量
         const countEl = document.getElementById('hero-count-display');
         if(countEl) countEl.innerText = heroEntities.length;
+        
     } catch(e) {
         console.warn("UI Update Warning:", e); 
     }
@@ -684,6 +680,10 @@ function gameLoop() {
             if(hero.el) hero.el.remove();
             deadHeroes.push(hero); 
             heroEntities.splice(i, 1);
+            
+            // 🔥 修正：英雄陣亡時，立即更新 UI 以顯示正確的存活數量
+            updateBattleUI();
+
             continue;
         }
         
