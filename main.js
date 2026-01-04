@@ -742,6 +742,8 @@ function openDetailModal(index) {
     renderDetailCard(); 
 }
 
+// 請替換 main.js 中的 getSkillDescription 函式
+
 function getSkillDescription(skillKey, params) {
     if (!params) return "造成強力傷害。";
 
@@ -771,13 +773,15 @@ function getSkillDescription(skillKey, params) {
         case 'FULL_HEAL_LOWEST':
             return `完全恢復血量最低的一名隊友，並對目標造成 ${params.dmgMult} 倍傷害。`;
         case 'RESTORE_MANA_ALLIES':
-            return `回復範圍 ${params.range} 內隊友 ${params.manaAmount} 點氣力，並造成 ${params.dmgMult} 倍傷害。`;
+            // 🔥 修正：程式碼中 ally !== hero，所以要強調是「其他」隊友
+            return `回復範圍 ${params.range} 內其他隊友 ${params.manaAmount} 點氣力，並造成 ${params.dmgMult} 倍傷害。`;
         case 'STRIKE_AND_RESTORE_MANA':
             return `造成 ${params.dmgMult} 倍傷害，並回復自身 ${params.manaRestore} 點氣力。`;
         case 'HEAL_SELF_AND_ALLY':
             return `恢復自身與一名隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並造成 ${params.dmgMult} 倍傷害。`;
         case 'EXECUTE_LOW_HP':
-            return `對目標造成傷害，並立即斬殺場上所有血量低於 ${Math.floor((params.threshold || 0) * 100)}% 的敵人。`;
+            // 🔥 修正：程式碼中有 !enemy.isBoss，所以要加上 Boss 除外
+            return `對目標造成傷害，並立即斬殺場上所有血量低於 ${Math.floor((params.threshold || 0) * 100)}% 的敵人 (Boss除外)。`;
         case 'STACKABLE_IMMUNITY':
             return `對目標造成傷害，並獲得 ${params.count} 層傷害免疫護盾 (可疊加)。`;
         default:
