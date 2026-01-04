@@ -34,14 +34,18 @@ export function setDifficulty(diff) { currentDifficulty = diff; }
 export function setGameSpeed(speed) { gameSpeed = speed; } 
 export function setOnBattleEnd(callback) { onBattleEndCallback = callback; }
 
+// 🔥 獨立出一個函式來確保按鈕監聽器已安裝
+function ensureBattleListeners() {
+    const startBtn = document.getElementById('start-battle-btn');
+    if (startBtn && !startBtn.dataset.initialized) {
+        setupBattleListeners();
+        startBtn.dataset.initialized = "true";
+    }
+}
+
 export function initBattle(levelId = 1) {
     currentLevelId = levelId;
-    
-    if (!document.getElementById('start-battle-btn').dataset.initialized) {
-        setupBattleListeners();
-        document.getElementById('start-battle-btn').dataset.initialized = "true";
-    }
-
+    ensureBattleListeners(); // 確保 PVE 有監聽器
     prepareLevel();
 }
 
@@ -50,7 +54,20 @@ function setupBattleListeners() {
     if(startBtn) startBtn.addEventListener('click', startBattle);
     
     const retreatBtn = document.getElementById('retreat-btn');
-    if(retreatBtn) retreatBtn.addEventListener('click', () => { safePlaySound('click'); resetBattleState(); });
+    if(retreatBtn) {
+        retreatBtn.addEventListener('click', () => { 
+            safePlaySound('click'); 
+            
+            // 🔥 區分 PVP 與 PVE 的撤退邏輯
+            if (isPvpMode) {
+                if (confirm("🏳️ 確定要投降嗎？\n\n這將被判定為戰敗。")) {
+                    endBattle(false); // 觸發戰敗結算
+                }
+            } else {
+                resetBattleState(); // PVE 直接重置
+            }
+        });
+    }
     
     document.querySelectorAll('.difficulty-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -84,11 +101,15 @@ function prepareLevel() {
 
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'flex'; 
+
+    // PVE 模式下按鈕文字
+    const retreatBtn = document.getElementById('retreat-btn');
+    if(retreatBtn) retreatBtn.innerText = "🏳️ 撤退";
     
     document.getElementById('battle-screen').classList.remove('hidden');
     renderBattleSlots();
     updateStartButton();
-    updateBattleUI(); // 初始化 UI 狀態
+    updateBattleUI(); 
     
     if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
 }
@@ -134,10 +155,17 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
     isPvpMode = true; 
     pvpPlayerTeamData = playerTeamData; 
 
+    // 🔥 修正：確保 PVP 開場時也會綁定按鈕監聽器
+    ensureBattleListeners();
+
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'none';
 
     setupBattleEnvironment();
+    
+    // PVP 模式下按鈕文字
+    const retreatBtn = document.getElementById('retreat-btn');
+    if(retreatBtn) retreatBtn.innerText = "🏳️ 投降";
     
     const container = document.querySelector('.battle-field-container');
     if(container) {
@@ -150,8 +178,6 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
     
     spawnHeroes(); 
     spawnPvpEnemies(enemyTeamData); 
-    
-    // 🔥 修正：PVP 開始時立即更新 UI，確保顯示正確的存活人數
     updateBattleUI();
 
     battleState.phase = 'COMBAT'; 
@@ -574,19 +600,22 @@ function updateBattleUI() {
         const goldEl = document.getElementById('battle-gold');
         if(goldEl) goldEl.innerText = battleGold; 
         
-        // 🔥 修正：PVP 模式隱藏波次顯示
+        // 🔥 修正：PVP 模式隱藏金幣顯示
+        const goldContainer = document.getElementById('battle-gold-container');
+        if (goldContainer) {
+            goldContainer.style.display = isPvpMode ? 'none' : 'inline';
+        }
+
         const waveContainer = document.getElementById('wave-display-container');
         if (waveContainer) {
             waveContainer.style.display = isPvpMode ? 'none' : 'inline';
         }
 
-        // PVE 模式才更新波次文字
         if (!isPvpMode) {
             const waveEl = document.getElementById('wave-count');
             if(waveEl) waveEl.innerText = battleState.wave;
         }
         
-        // 更新存活數量
         const countEl = document.getElementById('hero-count-display');
         if(countEl) countEl.innerText = heroEntities.length;
         
@@ -681,9 +710,7 @@ function gameLoop() {
             deadHeroes.push(hero); 
             heroEntities.splice(i, 1);
             
-            // 🔥 修正：英雄陣亡時，立即更新 UI 以顯示正確的存活數量
             updateBattleUI();
-
             continue;
         }
         
