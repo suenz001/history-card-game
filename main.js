@@ -47,7 +47,9 @@ let globalAnnouncements = [];
 let currentDisplayList = [];
 let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
-let currentSortMethod = 'time_desc';
+
+// 🔥 優化：讀取上次記憶的排序方式，如果沒有則預設為 time_desc
+let currentSortMethod = localStorage.getItem('userSortMethod') || 'time_desc';
 
 let isBatchMode = false;
 let selectedBatchCards = new Set();
@@ -56,7 +58,7 @@ let gachaIndex = 0;
 
 let pvpTargetInfo = { index: null, type: null };
 
-// 🔥 新增：是否正在查看敵方卡片 (用於隱藏升級按鈕)
+// 是否正在查看敵方卡片 (用於隱藏升級按鈕)
 let isViewingEnemy = false;
 
 const SYSTEM_NOTIFICATIONS = [
@@ -70,12 +72,16 @@ setOnBattleEnd(handleBattleEnd);
 // 初始化 PVP
 setTimeout(() => {
     if(document.getElementById('pvp-menu-btn')) {
-        // 🔥 修改：傳入 handleEnemyCardClick 作為第 5 個參數
         initPvp(db, currentUser, allUserCards, (slotIndex, type) => {
             pvpTargetInfo = { index: slotIndex, type: type };
             const title = type === 'defense' ? "👇 選擇 PVP 防守英雄" : "👇 選擇 PVP 進攻英雄";
             document.getElementById('inventory-title').innerText = title; 
             document.getElementById('inventory-modal').classList.remove('hidden');
+            
+            // 確保排序選單與記憶同步
+            const sortSelect = document.getElementById('sort-select');
+            if(sortSelect) sortSelect.value = currentSortMethod;
+
             if(allUserCards.length === 0 && currentUser) loadInventory(currentUser.uid); 
             else filterInventory('ALL');
         }, handleEnemyCardClick);
@@ -86,12 +92,12 @@ setTimeout(() => {
 function handleEnemyCardClick(enemyCard) {
     isViewingEnemy = true; // 標記為查看敵人模式
 
-    // 重新建構卡片資料 (因為 enemyCard 可能缺少年份/敘述，且數值需要即時計算)
+    // 重新建構卡片資料
     const baseCard = cardDatabase.find(c => c.id == enemyCard.id);
     let displayCard = { ...baseCard, ...enemyCard };
 
     if (baseCard) {
-        // 根據等級與星數重新計算數值 (模擬 battle.js 的邏輯)
+        // 根據等級與星數重新計算數值
         const level = displayCard.level || 1;
         const stars = displayCard.stars || 1;
         const levelBonus = (level - 1) * 0.03;
@@ -106,7 +112,11 @@ function handleEnemyCardClick(enemyCard) {
     currentDisplayList = [displayCard];
     currentCardIndex = 0;
     
-    document.getElementById('detail-modal').classList.remove('hidden');
+    // 🔥 優化：強制將詳情視窗的 Z-Index 設為最高，確保顯示在 PVP 視窗之上
+    const detailModal = document.getElementById('detail-modal');
+    detailModal.classList.remove('hidden');
+    detailModal.style.zIndex = "99999"; 
+
     renderDetailCard();
 }
 
@@ -198,7 +208,6 @@ async function openNotificationModal() {
         await loadUserData(currentUser);
     }
     
-    // 從資料庫讀取最新的 20 則公告
     try {
         const q = query(collection(db, "announcements"), orderBy("timestamp", "desc"), limit(20));
         const snap = await getDocs(q);
@@ -634,7 +643,6 @@ if(document.getElementById('toggle-sidebar-btn')) {
     });
 }
 
-// 🔥🔥 核心優化：讀取背包時，強制同步 data.js 設定 (修正無限讀取 BUG) 🔥🔥
 async function loadInventory(uid) {
     const container = document.getElementById('inventory-grid');
     container.innerHTML = "讀取中...";
@@ -658,7 +666,6 @@ async function loadInventory(uid) {
                  if(data.title !== baseCard.title) { data.title = baseCard.title; needsUpdate = true; }
                  if(data.name !== baseCard.name) { data.name = baseCard.name; needsUpdate = true; }
 
-                 // 🔥 修正：Firestore 不接受 undefined，必須轉為 null
                  const newSkillKey = baseCard.skillKey || null;
                  const newSkillParams = baseCard.skillParams || null;
 
@@ -667,7 +674,6 @@ async function loadInventory(uid) {
                      needsUpdate = true; 
                  }
                  
-                 // 物件比較 (簡易版)
                  if(JSON.stringify(data.skillParams) !== JSON.stringify(newSkillParams)) { 
                      data.skillParams = newSkillParams; 
                      needsUpdate = true; 
@@ -677,7 +683,6 @@ async function loadInventory(uid) {
             }
 
             if(needsUpdate) {
-                // 再次確保沒有 undefined 欄位被寫入
                 if(data.skillKey === undefined) data.skillKey = null;
                 if(data.skillParams === undefined) data.skillParams = null;
                 updateDoc(doc(db, "inventory", docSnap.id), data);
@@ -695,7 +700,13 @@ async function loadInventory(uid) {
     }
 }
 
-if(document.getElementById('sort-select')) document.getElementById('sort-select').addEventListener('change', (e) => { playSound('click'); currentSortMethod = e.target.value; filterInventory(currentFilterRarity); });
+// 🔥 優化：監聽排序變更時，儲存到 localStorage
+if(document.getElementById('sort-select')) document.getElementById('sort-select').addEventListener('change', (e) => { 
+    playSound('click'); 
+    currentSortMethod = e.target.value; 
+    localStorage.setItem('userSortMethod', currentSortMethod); // 儲存排序
+    filterInventory(currentFilterRarity); 
+});
 
 function filterInventory(rarity) {
     currentFilterRarity = rarity; 
@@ -722,7 +733,12 @@ function sortCards(list, method) {
 function openDetailModal(index) { 
     playSound('click'); 
     currentCardIndex = index; 
-    document.getElementById('detail-modal').classList.remove('hidden'); 
+    
+    // 🔥 優化：強制將詳情視窗的 Z-Index 設為最高
+    const detailModal = document.getElementById('detail-modal');
+    detailModal.classList.remove('hidden'); 
+    detailModal.style.zIndex = "99999"; 
+
     renderDetailCard(); 
 }
 
@@ -837,7 +853,6 @@ function renderDetailCard() {
     const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); 
     const upgradeStarBtn = document.getElementById('upgrade-star-btn');
     
-    // 🔥 修正：若是觀看敵人卡片，隱藏升級和分解按鈕
     const upgradeControls = document.querySelector('.upgrade-controls');
     const dismantleBtn = document.getElementById('dismantle-btn');
     
@@ -922,7 +937,7 @@ if(document.getElementById('next-card-btn')) document.getElementById('next-card-
 if(document.getElementById('close-detail-btn')) document.getElementById('close-detail-btn').addEventListener('click', () => { 
     playSound('click'); 
     document.getElementById('detail-modal').classList.add('hidden'); 
-    isViewingEnemy = false; // 🔥 重置查看模式
+    isViewingEnemy = false; 
     
     // 恢復按鈕顯示
     const upgradeControls = document.querySelector('.upgrade-controls');
@@ -943,7 +958,6 @@ async function saveCardToCloud(card) {
         baseAtk: card.atk, 
         baseHp: card.hp, 
         attackType: card.attackType || 'melee',
-        // 🔥 修正：避免 undefined
         skillKey: card.skillKey || null,
         skillParams: card.skillParams || null,
         level: 1, 
@@ -1022,10 +1036,20 @@ if(document.getElementById('draw-10-btn')) document.getElementById('draw-10-btn'
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
 });
 
+// 🔥 優化：監聽背包按鈕，開啟時自動解除全軍 + 帶入上次排序
 if(document.getElementById('inventory-btn')) document.getElementById('inventory-btn').addEventListener('click', () => { 
     playSound('inventory'); 
     if(!currentUser) return alert("請先登入"); 
     
+    // 1. 自動解除全軍 (讓介面看起來是清空的)
+    clearDeployment();
+
+    // 2. 恢復上次的排序選擇
+    const sortSelect = document.getElementById('sort-select');
+    if(sortSelect && currentSortMethod) {
+        sortSelect.value = currentSortMethod;
+    }
+
     deployTargetSlot = null; 
     pvpTargetInfo = { index: null, type: null }; 
     
@@ -1033,6 +1057,7 @@ if(document.getElementById('inventory-btn')) document.getElementById('inventory-
     document.getElementById('inventory-modal').classList.remove('hidden'); 
     loadInventory(currentUser.uid); 
 });
+
 if(document.getElementById('close-inventory-btn')) document.getElementById('close-inventory-btn').addEventListener('click', () => { 
     playSound('click'); 
     document.getElementById('inventory-modal').classList.add('hidden'); 
