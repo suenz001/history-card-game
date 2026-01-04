@@ -3,6 +3,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+// 🔥 引入生平模組
+import { HERO_BIOS } from './js/bios.js';
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
 import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive, gameSpeed } from './js/battle.js';
@@ -48,7 +50,7 @@ let currentDisplayList = [];
 let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 
-// 🔥 優化：讀取上次記憶的排序方式，如果沒有則預設為 time_desc
+// 讀取上次記憶的排序方式
 let currentSortMethod = localStorage.getItem('userSortMethod') || 'time_desc';
 
 let isBatchMode = false;
@@ -88,7 +90,7 @@ setTimeout(() => {
     }
 }, 500);
 
-// 🔥 新增：處理點擊敵方卡片的邏輯
+// 處理點擊敵方卡片的邏輯
 function handleEnemyCardClick(enemyCard) {
     isViewingEnemy = true; // 標記為查看敵人模式
 
@@ -112,7 +114,7 @@ function handleEnemyCardClick(enemyCard) {
     currentDisplayList = [displayCard];
     currentCardIndex = 0;
     
-    // 🔥 優化：強制將詳情視窗的 Z-Index 設為最高，確保顯示在 PVP 視窗之上
+    // 強制將詳情視窗的 Z-Index 設為最高，確保顯示在 PVP 視窗之上
     const detailModal = document.getElementById('detail-modal');
     detailModal.classList.remove('hidden');
     detailModal.style.zIndex = "99999"; 
@@ -700,11 +702,11 @@ async function loadInventory(uid) {
     }
 }
 
-// 🔥 優化：監聽排序變更時，儲存到 localStorage
+// 監聽排序變更時，儲存到 localStorage
 if(document.getElementById('sort-select')) document.getElementById('sort-select').addEventListener('change', (e) => { 
     playSound('click'); 
     currentSortMethod = e.target.value; 
-    localStorage.setItem('userSortMethod', currentSortMethod); // 儲存排序
+    localStorage.setItem('userSortMethod', currentSortMethod); 
     filterInventory(currentFilterRarity); 
 });
 
@@ -734,7 +736,7 @@ function openDetailModal(index) {
     playSound('click'); 
     currentCardIndex = index; 
     
-    // 🔥 優化：強制將詳情視窗的 Z-Index 設為最高
+    // 強制將詳情視窗的 Z-Index 設為最高
     const detailModal = document.getElementById('detail-modal');
     detailModal.classList.remove('hidden'); 
     detailModal.style.zIndex = "99999"; 
@@ -742,8 +744,7 @@ function openDetailModal(index) {
     renderDetailCard(); 
 }
 
-// 請替換 main.js 中的 getSkillDescription 函式
-
+// 🔥 全面優化：確保文字敘述與程式邏輯完全一致
 function getSkillDescription(skillKey, params) {
     if (!params) return "造成強力傷害。";
 
@@ -753,13 +754,16 @@ function getSkillDescription(skillKey, params) {
         case 'AOE_CIRCLE':
             return `對周圍半徑 ${params.radius} 範圍內的敵人造成 ${params.dmgMult} 倍傷害。`;
         case 'GLOBAL_BOMB':
+            // 拿破崙：全場轟炸，係數通常較低
             return `對全場所有敵人造成 ${Math.floor((params.dmgMult || 0) * 100)}% 自身攻擊力的傷害。`;
         case 'HEAVY_STRIKE':
+            // 成吉思汗/呂布：單體重擊
             return `對目標造成強力一擊，傷害倍率為 ${params.dmgMult} 倍。`;
         case 'INVINCIBLE_STRIKE':
             return `獲得無敵狀態持續 ${params.duration / 1000} 秒，並對目標造成 ${params.dmgMult} 倍傷害。`;
         case 'BUFF_ALLIES_ATK':
-            return `提升範圍 ${params.range} 內隊友攻擊力，倍率 ${params.buffRate}，並對敵造成 ${params.dmgMult} 倍傷害。`;
+            // 漢尼拔：修正「倍率1.1」為「提升10%」
+            return `提升範圍 ${params.range} 內隊友 ${Math.floor(((params.buffRate || 1) - 1) * 100)}% 攻擊力，並對敵造成 ${params.dmgMult} 倍傷害。`;
         case 'HEAL_ALLIES':
             return `恢復範圍 ${params.range} 內隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對敵造成 ${params.dmgMult} 倍傷害。`;
         case 'SELF_BUFF_ATK':
@@ -769,20 +773,22 @@ function getSkillDescription(skillKey, params) {
         case 'HEAL_ALL_ALLIES':
             return `恢復全體隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對目標造成 ${params.dmgMult} 倍傷害。`;
         case 'DEBUFF_GLOBAL_ATK':
-            return `降低全場敵人攻擊力至 ${Math.floor((params.debuffRate || 1) * 100)}%，並造成 ${params.dmgMult} 倍傷害。`;
+            // 諸葛亮：修正為「降低 X%」
+            return `降低全場敵人 ${100 - Math.floor((params.debuffRate || 1) * 100)}% 攻擊力，並造成 ${params.dmgMult} 倍傷害。`;
         case 'FULL_HEAL_LOWEST':
             return `完全恢復血量最低的一名隊友，並對目標造成 ${params.dmgMult} 倍傷害。`;
         case 'RESTORE_MANA_ALLIES':
-            // 🔥 修正：程式碼中 ally !== hero，所以要強調是「其他」隊友
+            // 華盛頓：強調「其他隊友」
             return `回復範圍 ${params.range} 內其他隊友 ${params.manaAmount} 點氣力，並造成 ${params.dmgMult} 倍傷害。`;
         case 'STRIKE_AND_RESTORE_MANA':
             return `造成 ${params.dmgMult} 倍傷害，並回復自身 ${params.manaRestore} 點氣力。`;
         case 'HEAL_SELF_AND_ALLY':
             return `恢復自身與一名隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並造成 ${params.dmgMult} 倍傷害。`;
         case 'EXECUTE_LOW_HP':
-            // 🔥 修正：程式碼中有 !enemy.isBoss，所以要加上 Boss 除外
+            // 關羽：強調「Boss除外」
             return `對目標造成傷害，並立即斬殺場上所有血量低於 ${Math.floor((params.threshold || 0) * 100)}% 的敵人 (Boss除外)。`;
         case 'STACKABLE_IMMUNITY':
+            // 源義經：強調「可疊加」
             return `對目標造成傷害，並獲得 ${params.count} 層傷害免疫護盾 (可疊加)。`;
         default:
             return "造成強力傷害。";
@@ -805,6 +811,23 @@ function renderDetailCard() {
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
     
     const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
+
+    // 🔥 讀取生平資料
+    const bioData = HERO_BIOS[card.id]; 
+    let bioHtml = "";
+    
+    if (bioData) {
+        bioHtml = `
+            <div style="font-size: 0.85em; color: #f39c12; margin-bottom: 5px; font-weight: bold;">
+                ${bioData.era}
+            </div>
+            <div style="font-size: 0.9em; line-height: 1.6; text-align: justify;">
+                ${bioData.text}
+            </div>
+        `;
+    } else {
+        bioHtml = `<div class="card-back-text" style="color:#bdc3c7;">(資料查詢中...)</div>`;
+    }
 
     const cardWrapper = document.createElement('div');
     cardWrapper.className = `large-card ${card.rarity}`;
@@ -831,14 +854,15 @@ function renderDetailCard() {
 
     const backFace = document.createElement('div');
     backFace.className = `large-card-back ${card.rarity}`;
+    
     backFace.innerHTML = `
         <div class="card-back-section">
             <div class="card-back-title">✨ 技能效果</div>
             <div class="card-back-text">${skillDesc}</div>
         </div>
-        <div class="card-back-section">
+        <div class="card-back-section" style="flex: 1; overflow-y: auto;">
             <div class="card-back-title">📜 人物生平</div>
-            <div class="card-back-text" style="color:#bdc3c7;">(資料查詢中...)</div>
+            ${bioHtml}
         </div>
         <div class="flip-hint">(再次點擊翻回正面)</div>
     `;
@@ -1040,15 +1064,15 @@ if(document.getElementById('draw-10-btn')) document.getElementById('draw-10-btn'
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
 });
 
-// 🔥 優化：監聽背包按鈕，開啟時自動解除全軍 + 帶入上次排序
+// 監聽背包按鈕，開啟時自動解除全軍 + 帶入上次排序
 if(document.getElementById('inventory-btn')) document.getElementById('inventory-btn').addEventListener('click', () => { 
     playSound('inventory'); 
     if(!currentUser) return alert("請先登入"); 
     
-    // 1. 自動解除全軍 (讓介面看起來是清空的)
+    // 自動解除全軍 (讓介面看起來是清空的)
     clearDeployment();
 
-    // 2. 恢復上次的排序選擇
+    // 恢復上次的排序選擇
     const sortSelect = document.getElementById('sort-select');
     if(sortSelect && currentSortMethod) {
         sortSelect.value = currentSortMethod;
