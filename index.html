@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=120">
+    <link rel="stylesheet" href="style.css?v=119">
 </head>
 <body>
 
@@ -21,351 +21,352 @@
         <h1>⚔️ 歷史英靈：策略對決</h1>
 
         <div id="login-section">
-            <h3>請先登入</h3>
-            <div style="margin-bottom: 15px;">
-                <input type="text" id="email-input" placeholder="Email">
-                <input type="password" id="pass-input" placeholder="密碼">
-            </div>
-            <button id="email-login-btn" class="btn-primary">登入</button>
-            <button id="email-signup-btn" class="btn-secondary">註冊</button>
-            <hr>
-            <button id="guest-btn" class="btn-secondary" style="width: 100%;">👤 遊客試玩</button>
-        </div>
-
-        <div id="user-info" style="display:none;">
-            <div class="user-status">
-                <span id="user-name">玩家：...</span>
-                <span id="power-display">🔥 戰力: 0</span>
-            </div>
-            <div class="resources">
-                <span>💎 <span id="gem-count">0</span></span>
-                <span>💰 <span id="gold-count">0</span></span>
-            </div>
-            <div class="user-actions">
-                <button id="settings-btn" class="icon-btn">⚙️ 設定</button>
-                <button id="notification-btn" class="icon-btn">🔔 通知</button>
-                <button id="logout-btn" class="btn-danger-small">登出</button>
-            </div>
-        </div>
-
-        <div id="game-ui" class="hidden">
+            <h3>請選擇登入方式：</h3>
             
-            <div class="lobby-container">
-                <div class="gacha-section">
-                    <button id="draw-btn" class="btn-gacha">
-                        <span class="gacha-title">單次召喚</span>
-                        <span class="gacha-cost">💎 100</span>
-                    </button>
-                    <button id="draw-10-btn" class="btn-gacha gacha-10">
-                        <span class="gacha-title">十連召喚</span>
-                        <span class="gacha-cost">💎 1000</span>
-                        <span class="gacha-tag">必出 SR+</span>
-                    </button>
-                </div>
+            <div style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
+                <input type="email" id="email-input" placeholder="電子信箱">
+                <input type="password" id="pass-input" placeholder="密碼 (6位以上)">
+            </div>
+            <div style="display: flex; justify-content: center;">
+                <button id="email-login-btn" class="btn-secondary">信箱登入</button>
+                <button id="email-signup-btn" class="btn-secondary" style="background:#2ecc71;">註冊新帳號</button>
+            </div>
+            <hr style="margin: 20px 0; border-color: #555;">
+            <button id="guest-btn" class="btn-secondary" style="background:#95a5a6; width: 100%;">👻 遊客試玩 (匿名)</button>
+        </div>
 
-                <div class="menu-grid">
-                    <button id="inventory-btn" class="btn-menu">🎒 我的背包 / 編隊</button>
-                    <button id="pvp-menu-btn" class="btn-menu pvp-btn">🏟️ PVP 競技場</button>
-                    <button id="enter-battle-mode-btn" class="btn-menu battle-mode-btn">⚔️ 進入 PVE 戰場</button>
-                </div>
-
-                <div class="leaderboard-panel">
-                    <h3>🏆 戰力排行榜</h3>
-                    <div id="leaderboard-list">
-                        <div class="rank-item">載入中...</div>
-                    </div>
+        <div id="user-info" style="display:none; flex-direction:column; gap:10px;">
+            <div style="display:flex; justify-content:space-between; width:100%; align-items:center; flex-wrap: wrap; gap: 10px;">
+                <span id="user-name" style="font-size:1.2em; font-weight:bold;">玩家：載入中...</span>
+                <div style="display: flex; gap: 5px;">
+                    <button id="notification-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #e67e22;">🔔 通知</button>
+                    <button id="settings-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">⚙️ 設定</button>
+                    <button id="logout-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">登出</button>
                 </div>
             </div>
-
-            <div id="battle-screen" class="hidden">
-                <div class="battle-monitor-sidebar">
-                    <button id="toggle-sidebar-btn">▶</button>
-                    
-                    <h3 style="font-size: 0.9em; margin: 10px 0 5px; color: #3498db; border-bottom: 2px solid #3498db; padding-bottom: 3px;">我方狀態</h3>
-                    <div id="hero-monitor-list" style="max-height: 45%; overflow-y: auto;"></div>
-                    
-                    <h3 style="font-size: 0.9em; margin: 15px 0 5px; color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 3px;">敵方狀態</h3>
-                    <div id="enemy-monitor-list" style="max-height: 45%; overflow-y: auto;"></div>
-                </div>
-
-                <div class="battle-field-container">
-                    <div id="wave-notification" class="hidden">第 1 波 來襲!</div>
-                    
-                    <div class="lanes-wrapper">
-                        <div class="battle-lane"></div>
-                        <div class="battle-lane"></div>
-                        <div class="battle-lane"></div>
-                    </div>
-
-                    <div id="enemy-container"></div>
-                    <div id="hero-container"></div>
-                </div>
-
-                <div id="battle-ui-layer">
-                    <div class="battle-stats">
-                        <span>💰 本場金幣: <span id="battle-gold">0</span></span>
-                        <span>🌊 波次: <span id="wave-count">1</span></span>
-                        <span>🛡️ 存活: <span id="hero-count-display">0</span></span>
-                    </div>
-                    
-                    <div class="battle-controls">
-                        <button id="speed-btn" class="btn-secondary-small">⏩ 1x</button>
-                        <button id="retreat-btn" class="btn-danger-small">🏳️ 撤退</button>
-                    </div>
-
-                    <div class="deploy-controls">
-                        <div class="defense-grid-mini">
-                            <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
-                            <div class="defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
-                            <div class="defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
-                            <div class="defense-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
-                            <div class="defense-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
-                            <div class="defense-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
-                            <div class="defense-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
-                            <div class="defense-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
-                            <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
-                        </div>
-                        <div style="display:flex; flex-direction:column; gap:5px;">
-                            <button id="auto-deploy-btn" class="btn-primary-small">⚡ 自動佈署</button>
-                            <button id="clear-deploy-btn" class="btn-secondary-small">🗑️ 清空</button>
-                            <button id="start-battle-btn" class="btn-success-small btn-disabled">請先部署英雄</button>
+            <div><span id="power-display">🔥 戰力: 0</span></div>
+        </div>
+        
+        <div id="game-ui" class="hidden">
+            <div class="main-layout">
+                <div class="game-area">
+                    <div class="status-bar">
+                        <div style="display:flex; flex-direction:column; gap:5px; width:100%;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <span>💎 <span id="gem-count">0</span></span>
+                                <span>💰 <span id="gold-count">0</span></span>
+                            </div>
+                            <button id="inventory-btn" class="btn-secondary" style="background:#8e44ad; width:100%; margin:0;">🎒 打開我的背包 (查看所有卡片)</button>
                         </div>
                     </div>
+
+                    <button id="enter-battle-mode-btn" class="btn-danger" style="width: 100%; margin-bottom: 10px; font-size: 1.2em; border: 2px solid #fff; box-shadow: 0 0 10px #c0392b;">⚔️ 前往戰場 (賺金幣/鑽石)</button>
+
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <button id="pvp-menu-btn" class="btn-primary" style="flex: 1; background: #2980b9; border: 2px solid #fff;">🛡️ 設定防守隊伍</button>
+                        <button id="pvp-search-btn" class="btn-danger" style="flex: 1; background: #c0392b; border: 2px solid #fff; box-shadow: 0 0 10px #e74c3c;">⚔️ 尋找對手</button>
+                    </div>
+
+                    <div class="gacha-section">
+                        <button id="draw-btn" class="btn-primary">單抽 (100鑽)</button>
+                        <button id="draw-10-btn" class="btn-secondary" style="display:flex; flex-direction:column; align-items:center; line-height:1.2;">
+                            <span>十連 (1000鑽)</span>
+                            <span style="font-size:0.7em; color:#ffeaa7;">(必得1張SR以上卡片)</span>
+                        </button>
+                    </div>
+
+                    <h3 style="margin-bottom:5px; color:#ccc;">最新獲得：</h3>
+                    <div id="card-display-area" class="card-container"></div>
                 </div>
 
-                <div id="difficulty-controls">
-                    <button class="difficulty-btn" data-diff="easy" style="background:#2ecc71;">簡單 (50%金幣)</button>
-                    <button class="difficulty-btn active" data-diff="normal" style="background:#f1c40f;">普通 (100%金幣)</button>
-                    <button class="difficulty-btn" data-diff="hard" style="background:#e74c3c;">困難 (200%金幣)</button>
+                <div class="leaderboard-area">
+                    <h2 style="margin-top:0; color:#f1c40f; text-align: center;">🏆 全服戰力榜</h2>
+                    <div id="leaderboard-list"><p style="text-align:center;">載入中...</p></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="gacha-overlay" class="hidden">
-        <div id="summon-circle"></div>
-        <div id="summon-burst"></div>
-        <div id="summon-text">召喚中...</div>
-        <button id="gacha-skip-btn">⏩ 跳過動畫</button>
+    <div id="battle-screen" class="hidden">
+        <div class="battle-header">
+            <div class="battle-info">
+                <span>⚔️ 存活: <span id="hero-count-display">0</span></span>
+                <span>💀 波次: <span id="wave-count">1</span>/4</span>
+                <span>💰 <span id="battle-gold">0</span> G</span>
+            </div>
+            <button id="retreat-btn" class="btn-danger" style="padding: 5px 15px; font-size: 0.9em;">🏳️ 撤退</button>
+        </div>
+
+        <div class="battle-content-wrapper" style="flex: 1; display: flex; overflow: hidden; position: relative;">
+            
+            <div class="battle-field-container">
+                <div id="wave-notification" class="hidden">第 1 波</div>
+                <div class="spawn-line left"></div>
+                <div id="hero-container"></div>
+
+                <div class="lanes-wrapper" style="opacity: 0.3;">
+                    <div class="lane-row" id="lane-0">
+                        <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
+                    </div>
+                    <div class="lane-row" id="lane-1">
+                        <div class="defense-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
+                    </div>
+                    <div class="lane-row" id="lane-2">
+                        <div class="defense-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
+                        <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
+                    </div>
+                </div>
+
+                <div id="enemy-container"></div>
+            </div>
+
+            <button id="toggle-sidebar-btn">▶</button>
+
+<div class="battle-monitor-sidebar">
+    <button id="toggle-sidebar-btn">▶</button>
+    
+    <h3 style="font-size: 0.9em; margin: 10px 0 5px; color: #3498db; border-bottom: 2px solid #3498db; padding-bottom: 3px;">我方狀態</h3>
+    <div id="hero-monitor-list" style="max-height: 45%; overflow-y: auto;"></div>
+    
+    <h3 style="font-size: 0.9em; margin: 15px 0 5px; color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 3px;">敵方狀態</h3>
+    <div id="enemy-monitor-list" style="max-height: 45%; overflow-y: auto;"></div>
+</div>
+        </div>
+
+        <div class="battle-deck">
+            <div id="difficulty-controls" style="display:flex; justify-content:center; gap:10px; margin-bottom:5px;">
+                <button class="difficulty-btn" data-diff="easy" style="background:#2ecc71;">🟢 簡單</button>
+                <button class="difficulty-btn active" data-diff="normal" style="background:#f39c12;">🟡 普通</button>
+                <button class="difficulty-btn" data-diff="hard" style="background:#e74c3c;">🔴 困難</button>
+            </div>
+            
+            <div style="display: flex; gap: 10px; width: 95%; margin: 0 auto; align-items: center;">
+                <button id="auto-deploy-btn" class="btn-secondary" style="flex: 1; padding: 10px; font-size: 1em; background: #8e44ad;">⚡ 自動</button>
+                <button id="clear-deploy-btn" class="btn-secondary" style="flex: 0.5; padding: 10px; font-size: 1em; background: #95a5a6;">🗑️ 清空</button>
+                <button id="speed-btn" class="btn-secondary" style="flex: 0.5; padding: 10px; font-size: 1em; background: #f39c12;">⏩ 1x</button>
+                <button id="start-battle-btn" class="btn-primary btn-disabled" style="flex: 2; padding: 10px; font-size: 1.2em;">請先部署英雄</button>
+            </div>
+        </div>
     </div>
 
-    <div id="gacha-reveal-modal" class="modal hidden">
-        <div class="modal-content transparent-bg">
-            <div id="gacha-reveal-container"></div>
-            <div class="click-hint">點擊螢幕繼續...</div>
+    <div id="battle-result-modal" class="hidden">
+        <div class="result-content">
+            <div id="result-title" class="result-title">VICTORY</div>
+            <div id="result-desc" style="color:#ccc; margin-bottom:5px;">戰鬥獎勵</div>
+            <div id="result-gold" class="result-gold">💰 +0</div>
+            <div id="result-gems" class="result-gold" style="color:#2ecc71;">💎 +0</div>
+            
+            <div id="dps-chart" class="dps-container"></div>
+
+            <button id="close-result-btn" class="btn-primary" style="width:100%; margin-top: 15px;">回到大廳</button>
         </div>
     </div>
 
     <div id="inventory-modal" class="modal hidden">
-        <div class="modal-content large">
-            <div class="modal-header">
-                <h2 id="inventory-title">🎒 我的背包</h2>
-                <button id="close-inventory-btn" class="btn-close">×</button>
-            </div>
-            
-            <div class="inventory-controls">
-                <div class="filter-group">
-                    <button class="filter-btn active" data-filter="ALL">全部</button>
-                    <button class="filter-btn" data-filter="SSR" style="color:#f1c40f">SSR</button>
-                    <button class="filter-btn" data-filter="SR" style="color:#9b59b6">SR</button>
-                    <button class="filter-btn" data-filter="R" style="color:#3498db">R</button>
-                </div>
-                <select id="sort-select">
-                    <option value="time_desc">獲得時間 (新→舊)</option>
-                    <option value="rarity_desc">稀有度 (高→低)</option>
-                    <option value="power_desc">戰力 (高→低)</option>
-                    <option value="id_asc">編號 (小→大)</option>
-                </select>
-            </div>
-
-            <div class="batch-controls">
-                <button id="batch-toggle-btn" class="btn-secondary-small">🔧 批量分解</button>
-                <div id="batch-action-bar" class="hidden">
-                    <span id="batch-info">已選 0 張</span>
-                    <button id="batch-confirm-btn" class="btn-danger-small btn-disabled">確認分解</button>
-                </div>
-            </div>
-
-            <div class="function-bar">
-                <button id="auto-star-btn" class="btn-upgrade" style="flex:1;">⚡ 一鍵升星</button>
-                <button id="inventory-clear-btn" class="btn-secondary" style="flex:0.5;">🗑️ 清空佈署</button>
-            </div>
-
-            <div id="inventory-grid" class="card-grid"></div>
-        </div>
-    </div>
-
-    <div id="detail-modal" class="modal hidden" style="z-index: 99999;">
-        <div class="modal-content card-detail-content">
-            <button id="close-detail-btn" class="btn-close-circle">×</button>
-            
-            <div class="detail-layout">
-                <button id="prev-card-btn" class="nav-btn">❮</button>
-                <div id="large-card-view"></div>
-                <button id="next-card-btn" class="nav-btn">❯</button>
-            </div>
-
-            <div class="upgrade-controls">
-                <button id="upgrade-level-btn" class="btn-upgrade">⬆️ 升級</button>
-                <button id="upgrade-star-btn" class="btn-upgrade star-up">⭐ 升星</button>
-            </div>
-            <button id="dismantle-btn" class="btn-danger" style="margin-top:10px; width:100%;">♻️ 分解卡片</button>
-        </div>
-    </div>
-
-    <div id="settings-modal" class="modal hidden">
         <div class="modal-content">
-            <h2>⚙️ 設定</h2>
-            
-            <div class="setting-item">
-                <span>你的暱稱</span>
-                <div style="display:flex; gap:5px;">
-                    <input type="text" id="settings-name-input" placeholder="輸入新暱稱">
-                    <button id="settings-save-name-btn" class="btn-primary-small">保存</button>
+            <div class="modal-header">
+                <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                    <h2 id="inventory-title">🎒 背包</h2>
+                    <button id="auto-star-btn" class="btn-secondary" style="background:#2ecc71; font-size: 0.8em; padding: 5px;">⚡ 一鍵升星</button>
+                    <button id="inventory-clear-btn" class="btn-secondary" style="background:#e74c3c; font-size: 0.8em; padding: 5px;">🗑️ 解除全軍</button>
+                    <select id="sort-select" class="sort-dropdown">
+                        <option value="time_desc">📅 獲得時間</option>
+                        <option value="power_desc">🔥 依戰力</option>
+                        <option value="rarity_desc">💎 依稀有度</option>
+                        <option value="id_asc">🔢 卡片序號</option>
+                    </select>
+                    <button id="batch-toggle-btn" style="font-size: 0.8em;">🔧 批量</button>
                 </div>
+                <button id="close-inventory-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
             </div>
-
-            <div class="setting-item">
-                <span>🎵 背景音樂</span>
-                <input type="checkbox" id="bgm-toggle" checked>
+            <div class="filter-bar">
+                <button class="filter-btn active" data-filter="ALL">全部</button>
+                <button class="filter-btn" data-filter="SSR" style="color:#f1c40f; border-color:#f1c40f;">SSR</button>
+                <button class="filter-btn" data-filter="SR" style="color:#9b59b6; border-color:#9b59b6;">SR</button>
+                <button class="filter-btn" data-filter="R" style="color:#3498db; border-color:#3498db;">R</button>
             </div>
-            <div class="setting-item">
-                <span>🔊 音量</span>
-                <input type="range" id="bgm-volume" min="0" max="1" step="0.1" value="0.5">
+            <div id="inventory-grid" class="card-container" style="justify-content: flex-start;"></div>
+            
+            <div id="batch-action-bar" class="hidden">
+                <div id="batch-info">已選 0 張，獲得 0 G</div>
+                <button id="batch-confirm-btn">確認分解</button>
             </div>
-            <div class="setting-item">
-                <span>⚔️ 音效</span>
-                <input type="checkbox" id="sfx-toggle" checked>
-            </div>
-            <div class="setting-item">
-                <span>🔊 音效音量</span>
-                <input type="range" id="sfx-volume" min="0" max="1" step="0.1" value="1.0">
-            </div>
-
-            <hr>
-            <h3>🎁 禮包碼兌換</h3>
-            <div style="display:flex; gap:5px;">
-                <input type="text" id="redeem-code-input" placeholder="輸入序號">
-                <button id="redeem-btn" class="btn-success-small">兌換</button>
-            </div>
-
-            <button id="close-settings-btn" class="btn-secondary" style="margin-top:20px; width:100%;">關閉</button>
         </div>
     </div>
 
     <div id="notification-modal" class="modal hidden">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 500px; height: auto; max-height: 80vh;">
             <div class="modal-header">
-                <h2>🔔 戰報與公告</h2>
-                <button id="close-notification-btn" class="btn-close">×</button>
+                <h2>🔔 系統通知</h2>
+                <button id="close-notification-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
             </div>
-            <div id="notification-list">
-                </div>
+            <div id="notification-list" style="overflow-y: auto; text-align: left;"></div>
         </div>
     </div>
 
-    <div id="battle-result-modal" class="modal hidden">
-        <div class="modal-content result-content">
-            <h1 id="result-title">VICTORY</h1>
-            <div class="rewards">
-                <div id="result-gold" class="reward-item">💰 +0</div>
-                <div id="result-gems" class="reward-item">💎 +0</div>
+    <div id="detail-modal" class="modal hidden" style="background: rgba(0,0,0,0.95);">
+        <button id="close-detail-btn" class="btn-close-circle">✕</button>
+        <button id="prev-card-btn" class="nav-arrow left">❮</button>
+        <button id="next-card-btn" class="nav-arrow right">❯</button>
+        <div id="large-card-view" class="large-card-container"></div>
+        <div class="upgrade-controls">
+            <div class="upgrade-box">
+                <div class="upgrade-title">提升等級 (Lv.30 Max)</div>
+                <button id="upgrade-level-btn" class="btn-upgrade">⬆️ 升級 <span id="upgrade-cost" style="font-size:0.8em;">(500G)</span></button>
             </div>
-            
-            <div class="dps-panel">
-                <h3>📊 戰鬥數據</h3>
-                <div id="dps-chart"></div>
+            <div class="upgrade-box">
+                <div class="upgrade-title">提升星級 (5★ Max)</div>
+                <div style="font-size:0.8em; color:#aaa; margin-bottom:5px;">需消耗 1 張同名卡片</div>
+                <button id="upgrade-star-btn" class="btn-star">⭐ 升星</button>
             </div>
+        </div>
+        <div style="margin-top: 15px; z-index: 102;">
+            <button id="dismantle-btn" class="btn-danger">💰 分解此卡</button>
+        </div>
+    </div>
 
-            <button id="close-result-btn" class="btn-primary" style="margin-top:20px; width:80%;">確定</button>
+    <div id="gacha-reveal-modal" class="modal hidden" style="background: rgba(0,0,0,0.98); z-index: 2000;">
+        <div style="position: absolute; top: 20px; right: 20px; z-index: 2005;">
+            <button id="gacha-skip-btn" class="btn-secondary" style="font-size: 1.2em; padding: 10px 20px; border: 2px solid white;">⏩ 跳過 (Skip)</button>
+        </div>
+        <div id="gacha-reveal-container" class="large-card-container"></div>
+        <div id="gacha-next-hint" style="margin-top: 30px; color: white; animation: blink 1s infinite;">點擊螢幕顯示下一張</div>
+    </div>
+
+    <div id="gacha-overlay" class="hidden">
+        <div id="summon-burst"></div>
+        <div id="summon-circle"></div>
+        <h2 id="summon-text" style="color: white; margin-top: 20px; letter-spacing: 5px;">召喚中...</h2>
+    </div>
+
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px; height: auto;">
+            <div class="modal-header">
+                <h2>⚙️ 遊戲設定</h2>
+                <button id="close-settings-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
+            </div>
+            <div class="settings-body">
+                <div class="setting-item">
+                    <label>玩家暱稱</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="text" id="settings-name-input" placeholder="輸入新暱稱" style="flex:1;">
+                        <button id="settings-save-name-btn" class="btn-primary">儲存</button>
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <label>🎁 輸入序號</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="text" id="redeem-code-input" placeholder="輸入序號領獎" style="flex:1;">
+                        <button id="redeem-btn" class="btn-secondary" style="background:#8e44ad;">兌換</button>
+                    </div>
+                </div>
+
+                <hr style="border-color: #555; margin: 15px 0;">
+                <div class="setting-item">
+                    <label>背景音樂 (BGM)</label>
+                    <div class="control-row">
+                        <input type="checkbox" id="bgm-toggle" checked> <span id="bgm-status">開啟</span>
+                    </div>
+                    <input type="range" id="bgm-volume" min="0" max="1" step="0.1" value="0.5" style="width:100%;">
+                </div>
+                <div class="setting-item">
+                    <label>遊戲音效 (SFX)</label>
+                    <div class="control-row">
+                        <input type="checkbox" id="sfx-toggle" checked> <span id="sfx-status">開啟</span>
+                    </div>
+                    <input type="range" id="sfx-volume" min="0" max="1" step="0.1" value="1.0" style="width:100%;">
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="pvp-setup-modal" class="modal hidden">
-        <div class="modal-content large">
+        <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
-                <h2>🛡️ 設定防守陣容</h2>
-                <button id="close-pvp-modal-btn" class="btn-close">×</button>
+                <h2>🛡️ 佈署防守軍隊</h2>
+                <button id="close-pvp-modal-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
             </div>
-            <p style="text-align:center; color:#ccc; font-size:0.9em;">其他玩家將會挑戰此陣容，請配置最強防守！</p>
             
-            <div class="lanes-wrapper" style="margin: 20px 0; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
-                <div class="defense-grid">
-                    <div class="lane-row">
-                        <div class="defense-slot pvp-defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
-                        <div class="defense-slot pvp-defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
-                        <div class="defense-slot pvp-defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
-                    </div>
-                    <div class="lane-row">
-                        <div class="defense-slot pvp-defense-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
-                        <div class="defense-slot pvp-defense-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
-                        <div class="defense-slot pvp-defense-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
-                    </div>
-                    <div class="lane-row">
-                        <div class="defense-slot pvp-defense-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
-                        <div class="defense-slot pvp-defense-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
-                        <div class="defense-slot pvp-defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
-                    </div>
+            <div style="color: #ccc; font-size: 0.9em; margin-bottom: 10px; text-align: center;">
+                請在 3x3 的方格中配置您的防守陣型 (最多 6 人)<br>
+                <span style="color: #f1c40f;">左側為前排，右側為後排</span>
+            </div>
+
+            <div class="pvp-grid-container" style="background: #34495e; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                <div class="lane-row">
+                    <div class="defense-slot pvp-defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
+                </div>
+                <div class="lane-row" style="margin: 10px 0;">
+                    <div class="defense-slot pvp-defense-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
+                </div>
+                <div class="lane-row">
+                    <div class="defense-slot pvp-defense-slot" data-slot="6"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="7"><div class="slot-placeholder">+</div></div>
+                    <div class="defense-slot pvp-defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
                 </div>
             </div>
 
-            <div style="display: flex; gap: 10px;">
-                <button id="pvp-search-btn" class="btn-danger" style="flex: 1;">🔍 尋找對手</button>
-                <button id="save-pvp-team-btn" class="btn-success" style="flex: 1;">💾 儲存防守陣容</button>
-            </div>
+            <button id="save-pvp-team-btn" class="btn-upgrade" style="width: 100%; font-size: 1.2em; padding: 15px;">💾 儲存防守陣容</button>
         </div>
     </div>
 
     <div id="pvp-arena-modal" class="modal hidden">
-        <div class="modal-content large">
+        <div class="modal-content" style="max-width: 800px; background: #2c3e50; border: 3px solid #e74c3c; height: 90vh; overflow-y: auto;">
             <div class="modal-header">
-                <h2>🏟️ 競技場</h2>
-                <button id="close-arena-btn" class="btn-close">×</button>
+                <h2 style="color: #e74c3c;">⚔️ PVP 競技場</h2>
+                <button id="close-arena-btn" class="btn-primary" style="background:#7f8c8d;">離開</button>
             </div>
 
-            <div id="pvp-loading" class="hidden" style="text-align:center; padding: 50px;">
-                <div class="spinner"></div>
-                <p>正在搜尋對手...</p>
+            <div id="pvp-loading" class="hidden" style="text-align: center; padding: 50px;">
+                <div style="font-size: 3em; animation: spin 1s infinite linear;">🔍</div>
+                <h3>正在搜尋旗鼓相當的對手...</h3>
             </div>
 
-            <div id="pvp-opponent-list-view">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <span>選擇你的對手 (消耗 0 體力)</span>
-                    <button id="refresh-opponent-btn" class="btn-secondary-small">🔄 刷新</button>
-                </div>
-                <div id="pvp-opponent-list"></div>
-            </div>
-
-            <div id="pvp-match-content" class="hidden">
-                <div class="matchup-banner">
-                    <div class="fighter my-side">
-                        <div class="avatar my-avatar">我</div>
-                        <div class="name" id="arena-my-name">玩家名稱</div>
-                        <div class="power" id="arena-my-power">戰力: 0</div>
+            <div id="pvp-opponent-list-view" class="hidden" style="padding: 10px;">
+                <button id="refresh-opponent-btn" class="btn-secondary" style="margin-bottom:15px; width: 100%;">🔄 刷新列表</button>
+                <h3 style="text-align:center; color:#f1c40f; margin-top: 0;">請選擇挑戰對手</h3>
+                <div id="pvp-opponent-list" class="opponent-list-container">
                     </div>
-                    <div class="vs">VS</div>
-                    <div class="fighter enemy-side">
-                        <div class="avatar enemy-avatar">敵</div>
-                        <div class="name" id="arena-enemy-name">對手名稱</div>
-                        <div class="power" id="arena-enemy-power">戰力: ???</div>
+            </div>
+
+            <div id="pvp-match-content" class="hidden" style="padding-bottom: 20px;">
+                <div class="vs-container" style="padding: 10px;">
+                    <div class="player-card self">
+                        <div class="p-name" id="arena-my-name">我方</div>
+                        <div class="p-power">戰力: <span id="arena-my-power">0</span></div>
+                    </div>
+                    <div class="vs-logo" style="font-size: 2em; margin: 0 10px;">VS</div>
+                    <div class="player-card enemy">
+                        <div class="p-name" id="arena-enemy-name">???</div>
+                        <div class="p-power">戰力: <span id="arena-enemy-power">???</span></div>
                     </div>
                 </div>
 
-                <div style="margin: 15px 0;">
-                    <h3 style="margin:0 0 5px 0; font-size:1em; color:#e74c3c;">⚠️ 敵方佈署情報</h3>
-                    <div id="enemy-preview-grid" class="defense-grid small-grid"></div>
-                </div>
+                <div style="display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px;">
+                    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; border: 1px solid #e74c3c;">
+                        <h3 style="text-align: center; color: #e74c3c; margin: 0 0 10px 0;">⚠️ 敵方防守佈署</h3>
+                        <div id="enemy-preview-grid" class="pvp-grid-container readonly"></div>
+                    </div>
 
-                <div style="margin: 15px 0;">
-                    <h3 style="margin:0 0 5px 0; font-size:1em; color:#3498db;">⚔️ 我方進攻陣容</h3>
-                    <div class="lanes-wrapper" style="background: rgba(52, 152, 219, 0.1); padding: 5px; border-radius: 5px;">
-                        <div class="defense-grid small-grid">
+                    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; border: 1px solid #3498db;">
+                        <h3 style="text-align: center; color: #3498db; margin: 0 0 10px 0;">⚔️ 我方進攻佈署 (點擊配置)</h3>
+                        <div class="pvp-grid-container" id="my-attack-grid" style="background: #2c3e50;">
                             <div class="lane-row">
                                 <div class="defense-slot pvp-attack-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
                                 <div class="defense-slot pvp-attack-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
                                 <div class="defense-slot pvp-attack-slot" data-slot="2"><div class="slot-placeholder">+</div></div>
                             </div>
-                            <div class="lane-row">
+                            <div class="lane-row" style="margin: 10px 0;">
                                 <div class="defense-slot pvp-attack-slot" data-slot="3"><div class="slot-placeholder">+</div></div>
                                 <div class="defense-slot pvp-attack-slot" data-slot="4"><div class="slot-placeholder">+</div></div>
                                 <div class="defense-slot pvp-attack-slot" data-slot="5"><div class="slot-placeholder">+</div></div>
