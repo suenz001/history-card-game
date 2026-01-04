@@ -2,21 +2,18 @@
 import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, limit, orderBy, runTransaction, arrayUnion, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { startPvpMatch, setOnBattleEnd, resetBattleState } from './battle.js';
-import { cardDatabase } from './data.js'; // 🔥 確保引用了 data.js
+import { cardDatabase } from './data.js'; 
 
 let db;
 let currentUser;
 let allUserCards = [];
 
-// 兩組陣列：防守用、進攻用
 let pvpDefenseSlots = new Array(9).fill(null);
 let pvpAttackSlots = new Array(9).fill(null);
 
 export let currentEnemyData = null;
 
-// 回調函式，用來請求主程式打開背包
 let requestOpenInventory = null;
-// 🔥 新增：回調函式，用來請求主程式打開敵人卡片詳情
 let showEnemyCardCallback = null;
 
 export function initPvp(database, user, inventory, openInventoryCallback, onCardClick) {
@@ -24,7 +21,7 @@ export function initPvp(database, user, inventory, openInventoryCallback, onCard
     currentUser = user;
     allUserCards = inventory;
     requestOpenInventory = openInventoryCallback; 
-    showEnemyCardCallback = onCardClick; // 儲存回調
+    showEnemyCardCallback = onCardClick; 
 
     const pvpBtn = document.getElementById('pvp-menu-btn');
     if (pvpBtn) {
@@ -36,12 +33,10 @@ export function initPvp(database, user, inventory, openInventoryCallback, onCard
         searchBtn.addEventListener('click', () => { playSound('click'); openPvpArena(); });
     }
 
-    // 防守格點擊
     document.querySelectorAll('.pvp-defense-slot').forEach(slot => {
         slot.addEventListener('click', () => handleSlotClick(slot, 'defense'));
     });
 
-    // 進攻格點擊
     document.querySelectorAll('.pvp-attack-slot').forEach(slot => {
         slot.addEventListener('click', () => handleSlotClick(slot, 'attack'));
     });
@@ -59,7 +54,6 @@ export function initPvp(database, user, inventory, openInventoryCallback, onCard
         document.getElementById('pvp-arena-modal').classList.add('hidden');
     });
 
-    // 綁定刷新按鈕
     const refreshBtn = document.getElementById('refresh-opponent-btn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', () => {
@@ -68,7 +62,6 @@ export function initPvp(database, user, inventory, openInventoryCallback, onCard
         });
     }
 
-    // 返回列表按鈕
     const backBtn = document.getElementById('back-to-list-btn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
@@ -77,7 +70,6 @@ export function initPvp(database, user, inventory, openInventoryCallback, onCard
         });
     }
 
-    // 綁定手動儲存按鈕
     const saveAttackBtn = document.getElementById('save-attack-team-btn');
     if (saveAttackBtn) {
         saveAttackBtn.addEventListener('click', () => {
@@ -86,7 +78,6 @@ export function initPvp(database, user, inventory, openInventoryCallback, onCard
         });
     }
 
-    // 綁定開戰按鈕
     const startBtn = document.getElementById('start-pvp-battle-btn');
     if(startBtn) {
         startBtn.addEventListener('click', () => {
@@ -101,12 +92,10 @@ export function updatePvpContext(user, inventory) {
     allUserCards = inventory;
 }
 
-// --- 設定防守陣容相關 ---
 async function openPvpModal() {
     if (!currentUser) return alert("請先登入");
     document.getElementById('pvp-setup-modal').classList.remove('hidden');
     
-    // 讀取防守陣容
     const userRef = doc(db, "users", currentUser.uid);
     const userSnap = await getDoc(userRef);
     if (userSnap.exists() && userSnap.data().defenseTeam) {
@@ -119,11 +108,9 @@ async function openPvpModal() {
     updateSaveButtonState();
 }
 
-// 🔥 當 main.js 選擇好卡片後，呼叫此函式寫入 PVP 欄位
 export function setPvpHero(slotIndex, card, type) {
     const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
 
-    // 檢查卡片是否已經在該陣容中
     const isAlreadyDeployed = targetArray.some(h => h && h.docId === card.docId);
     if(isAlreadyDeployed) {
         alert("該英雄已經在此陣容中！");
@@ -132,14 +119,12 @@ export function setPvpHero(slotIndex, card, type) {
 
     targetArray[slotIndex] = { ...card };
     
-    // 渲染對應的格子
     renderPvpSlots(type);
     
     if(type === 'defense') {
         updateSaveButtonState();
         document.getElementById('pvp-setup-modal').classList.remove('hidden');
     } else {
-        // 🔥 進攻模式：自動存檔
         saveAttackTeam();
         document.getElementById('pvp-arena-modal').classList.remove('hidden');
     }
@@ -151,7 +136,6 @@ function handleSlotClick(slotElement, type) {
     const index = parseInt(slotElement.dataset.slot);
     const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
     
-    // 如果該位置已有卡片，點擊則移除
     if (targetArray[index]) { 
         playSound('click'); 
         targetArray[index] = null; 
@@ -160,7 +144,6 @@ function handleSlotClick(slotElement, type) {
         if(type === 'defense') {
             updateSaveButtonState();
         } else {
-            // 🔥 進攻模式：移除時也要自動存檔
             saveAttackTeam();
         }
     } 
@@ -170,18 +153,15 @@ function handleSlotClick(slotElement, type) {
         
         playSound('click'); 
         
-        // 隱藏對應視窗
         if(type === 'defense') document.getElementById('pvp-setup-modal').classList.add('hidden');
         else document.getElementById('pvp-arena-modal').classList.add('hidden');
 
-        // 通知 main.js 打開背包
         if(requestOpenInventory) {
             requestOpenInventory(index, type);
         }
     }
 }
 
-// 渲染 PVP 格子
 function renderPvpSlots(type) {
     const selector = (type === 'attack') ? '.pvp-attack-slot' : '.pvp-defense-slot';
     const sourceArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
@@ -202,7 +182,6 @@ function renderPvpSlots(type) {
 
 function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !== null).length; const btn = document.getElementById('save-pvp-team-btn'); if (count > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `💾 儲存防守陣容 (${count}/6)`; } else { btn.classList.add('btn-disabled'); btn.innerText = "請至少配置 1 名英雄"; } }
 
-// 🔥 核心修復：在儲存防守陣容時，更嚴謹地比對 ID 並寫入技能
 async function saveDefenseTeam() {
     if (!currentUser) return;
     const count = pvpDefenseSlots.filter(x => x !== null).length; 
@@ -217,17 +196,8 @@ async function saveDefenseTeam() {
         const teamData = []; 
         pvpDefenseSlots.forEach((hero, index) => { 
             if (hero) { 
-                // 🔥 強制將 ID 轉為字串比對，避免 1 == "1" 的潛在問題
                 const baseConfig = cardDatabase.find(c => String(c.id) === String(hero.id));
                 
-                // Debug log
-                if (baseConfig) {
-                    console.log(`Saving Defense Hero: ${hero.name}, Skill: ${baseConfig.skillKey}`);
-                } else {
-                    console.warn(`⚠️ Warning: No base config found for hero ID: ${hero.id}`);
-                }
-
-                // 這裡只儲存必要的索引資料，戰鬥時會根據這些資料重新計算數值
                 teamData.push({ 
                     id: hero.id, 
                     docId: hero.docId, 
@@ -236,7 +206,6 @@ async function saveDefenseTeam() {
                     level: hero.level || 1, 
                     stars: hero.stars || 1, 
                     slotIndex: index,
-                    // 🔥 若找不到配置，則預設為 HEAVY_STRIKE
                     title: baseConfig ? baseConfig.title : (hero.title || ""),
                     skillKey: baseConfig ? baseConfig.skillKey : "HEAVY_STRIKE",
                     skillParams: baseConfig ? baseConfig.skillParams : { dmgMult: 2.0 }
@@ -257,7 +226,6 @@ async function saveDefenseTeam() {
     }
 }
 
-// 自動儲存進攻隊伍 (靜默模式)
 async function saveAttackTeam() {
     if (!currentUser) return;
     try {
@@ -277,7 +245,6 @@ async function saveAttackTeam() {
     }
 }
 
-// 手動儲存按鈕 (有提示)
 async function manualSaveAttackTeam() {
     if (!currentUser) return;
     const btn = document.getElementById('save-attack-team-btn');
@@ -293,8 +260,6 @@ async function manualSaveAttackTeam() {
         if(btn) btn.innerText = "💾 儲存陣容";
     }
 }
-
-// --- PVP 搜尋與對決邏輯 ---
 
 function openPvpArena() {
     if (!currentUser) return alert("請先登入");
@@ -312,7 +277,6 @@ function resetToOpponentList() {
     currentEnemyData = null;
 }
 
-// 🔥 修改：搜尋邏輯 (混合策略：強者 + 弱者 + 全服頂尖)
 async function searchOpponent() {
     const loadingDiv = document.getElementById('pvp-loading');
     const listView = document.getElementById('pvp-opponent-list-view');
@@ -325,7 +289,6 @@ async function searchOpponent() {
     try {
         const myPower = currentUser.combatPower || 0;
 
-        // 1. 找比自己強的 15 個
         const qHigh = query(
             collection(db, "users"), 
             where("combatPower", ">", myPower), 
@@ -333,7 +296,6 @@ async function searchOpponent() {
             limit(15) 
         );
 
-        // 2. 找比自己弱的 15 個
         const qLow = query(
             collection(db, "users"), 
             where("combatPower", "<=", myPower), 
@@ -341,7 +303,6 @@ async function searchOpponent() {
             limit(15)
         );
 
-        // 3. 全服最強 20 個
         const qTop = query(
             collection(db, "users"), 
             orderBy("combatPower", "desc"), 
@@ -424,7 +385,6 @@ function selectOpponent(enemyData) {
     loadLastAttackTeam();
 }
 
-// 復仇功能
 export async function startRevengeMatch(targetUid) {
     if (!currentUser) return alert("請先登入");
     if (!targetUid) return alert("無法找到該玩家的資料 (舊戰報)");
@@ -518,7 +478,6 @@ function renderMatchup() {
                 const cardDiv = document.createElement('div'); const charPath = `assets/cards/${enemyHero.id}.webp`; const framePath = `assets/frames/${enemyHero.rarity.toLowerCase()}.png`;
                 cardDiv.className = `card ${enemyHero.rarity}`; cardDiv.style.transform = 'scale(0.45)'; cardDiv.style.position = 'absolute'; cardDiv.style.top = '50%'; cardDiv.style.left = '50%'; cardDiv.style.translate = '-50% -50%'; cardDiv.style.margin = '0';
                 
-                // 🔥 修改：允許點擊查看詳情
                 cardDiv.style.pointerEvents = 'auto'; 
                 cardDiv.style.cursor = 'pointer';
                 cardDiv.addEventListener('click', () => {
@@ -555,7 +514,8 @@ async function startActualPvp() {
     startPvpMatch(currentEnemyData.defenseTeam || [], pvpAttackSlots);
 }
 
-async function handlePvpResult(isWin, _unusedGold, heroStats) {
+// 🔥 新增：PVP 結算時接收敵我雙方數據，並渲染雙排列表
+async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
     const resultModal = document.getElementById('battle-result-modal');
     const title = document.getElementById('result-title');
     const goldText = document.getElementById('result-gold');
@@ -564,17 +524,107 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
 
     const dpsContainer = document.getElementById('dps-chart');
     dpsContainer.innerHTML = "";
-    if (heroStats && heroStats.length > 0) {
-        const sortedHeroes = [...heroStats].sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
-        const maxDmg = sortedHeroes[0].totalDamage || 1; 
-        sortedHeroes.forEach(h => {
-            if(!h.totalDamage) h.totalDamage = 0;
-            const percent = (h.totalDamage / maxDmg) * 100;
-            const row = document.createElement('div'); row.className = 'dps-row';
-            row.innerHTML = `<div class="dps-icon" style="background-image: url('assets/cards/${h.id}.webp');"></div><div class="dps-bar-container"><div class="dps-info"><span>${h.name}</span><span>${h.totalDamage}</span></div><div class="dps-bar-bg"><div class="dps-bar-fill" style="width: ${percent}%;"></div></div></div>`;
-            dpsContainer.appendChild(row);
-        });
-    }
+
+    // 插入切換按鈕
+    const tabs = document.createElement('div');
+    tabs.style.display = "flex";
+    tabs.style.justifyContent = "center";
+    tabs.style.gap = "10px";
+    tabs.style.marginBottom = "10px";
+    tabs.innerHTML = `
+        <button id="pvp-show-dmg-btn" class="btn-secondary active" style="padding:5px 15px; background:#e74c3c;">⚔️ 傷害</button>
+        <button id="pvp-show-heal-btn" class="btn-secondary" style="padding:5px 15px; opacity: 0.6;">💚 治療</button>
+    `;
+    dpsContainer.appendChild(tabs);
+
+    // 建立雙欄位容器 (我方 vs 敵方)
+    const listWrapper = document.createElement('div');
+    listWrapper.style.display = "flex";
+    listWrapper.style.gap = "10px";
+    listWrapper.style.maxHeight = "300px";
+    listWrapper.style.overflowY = "auto";
+
+    const myCol = document.createElement('div');
+    myCol.style.flex = "1";
+    myCol.innerHTML = "<div style='text-align:center; color:#3498db; margin-bottom:5px; font-weight:bold;'>我方</div>";
+    
+    const enemyCol = document.createElement('div');
+    enemyCol.style.flex = "1";
+    enemyCol.innerHTML = "<div style='text-align:center; color:#e74c3c; margin-bottom:5px; font-weight:bold;'>敵方</div>";
+
+    listWrapper.appendChild(myCol);
+    listWrapper.appendChild(enemyCol);
+    dpsContainer.appendChild(listWrapper);
+
+    let currentMode = 'damage';
+
+    // 輔助函式：渲染單邊列表
+    const renderSide = (stats, container, color) => {
+        // 清空列表內容但保留標題
+        while (container.childNodes.length > 1) {
+            container.removeChild(container.lastChild);
+        }
+
+        const statKey = currentMode === 'damage' ? 'totalDamage' : 'totalHealing';
+        
+        if (stats && stats.length > 0) {
+            const sorted = [...stats].sort((a, b) => (b[statKey] || 0) - (a[statKey] || 0));
+            const maxVal = sorted[0][statKey] || 1;
+
+            sorted.forEach(h => {
+                if(!h[statKey]) h[statKey] = 0;
+                if(h[statKey] === 0 && currentMode === 'healing') return;
+
+                const percent = (h[statKey] / maxVal) * 100;
+                const row = document.createElement('div');
+                row.className = 'dps-row';
+                // 簡化樣式以適應雙欄
+                row.style.marginBottom = "5px";
+                
+                row.innerHTML = `
+                    <div class="dps-icon" style="background-image: url('assets/cards/${h.id}.webp'); width:30px; height:30px;"></div>
+                    <div class="dps-bar-container" style="height:30px;">
+                        <div class="dps-info" style="font-size:0.8em;">
+                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:60px;">${h.name}</span>
+                            <span>${h[statKey]}</span>
+                        </div>
+                        <div class="dps-bar-bg" style="height:4px; bottom:2px;">
+                            <div class="dps-bar-fill" style="width: ${percent}%; background-color: ${color};"></div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        } else {
+            const noData = document.createElement('div');
+            noData.style.textAlign = 'center'; noData.style.color = '#777'; noData.innerText = "無數據";
+            container.appendChild(noData);
+        }
+    };
+
+    const updateView = () => {
+        renderSide(heroStats, myCol, '#3498db');
+        renderSide(enemyStats, enemyCol, '#e74c3c');
+    };
+
+    updateView();
+
+    // 綁定切換按鈕
+    const dmgBtn = tabs.querySelector('#pvp-show-dmg-btn');
+    const healBtn = tabs.querySelector('#pvp-show-heal-btn');
+
+    dmgBtn.onclick = () => {
+        currentMode = 'damage';
+        dmgBtn.style.opacity = "1"; dmgBtn.style.background = "#e74c3c";
+        healBtn.style.opacity = "0.6"; healBtn.style.background = "#95a5a6";
+        updateView();
+    };
+    healBtn.onclick = () => {
+        currentMode = 'healing';
+        healBtn.style.opacity = "1"; healBtn.style.background = "#2ecc71";
+        dmgBtn.style.opacity = "0.6"; dmgBtn.style.background = "#95a5a6";
+        updateView();
+    };
 
     resultModal.classList.remove('hidden');
     gemText.style.display = 'none';
@@ -611,7 +661,6 @@ async function handlePvpResult(isWin, _unusedGold, heroStats) {
     };
 }
 
-// 金幣掠奪交易 + 寫入對方日誌 (Defeat) + 紀錄 UID
 async function executeStealTransaction(myUid, enemyUid) {
     const myRef = doc(db, "users", myUid);
     const enemyRef = doc(db, "users", enemyUid);
@@ -655,7 +704,6 @@ async function executeStealTransaction(myUid, enemyUid) {
     }
 }
 
-// 記錄對方防守成功日誌 + 紀錄 UID
 async function recordDefenseWinLog(enemyUid, attackerName, attackerUid) {
     try {
         const enemyRef = doc(db, "users", enemyUid);

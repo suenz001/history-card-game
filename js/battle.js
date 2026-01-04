@@ -9,6 +9,7 @@ export let battleSlots = new Array(9).fill(null);
 export let heroEntities = [];
 export let deadHeroes = []; 
 export let enemies = [];
+export let deadEnemies = []; // 🔥 新增：紀錄死亡敵人 (為了PVP統計)
 export let currentDifficulty = 'normal';
 export let gameSpeed = 1;
 
@@ -93,6 +94,7 @@ function setupBattleEnvironment() {
     enemies = [];
     heroEntities = [];
     deadHeroes = [];
+    deadEnemies = []; // 重置
     
     const enemyContainer = document.getElementById('enemy-container');
     const heroContainer = document.getElementById('hero-container');
@@ -126,6 +128,7 @@ export function resetBattleState() {
     enemies = [];
     heroEntities = [];
     deadHeroes = [];
+    deadEnemies = [];
     
     const enemyContainer = document.getElementById('enemy-container');
     const heroContainer = document.getElementById('hero-container');
@@ -170,7 +173,6 @@ function spawnHeroes() {
         const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
         const badgeClass = card.attackType === 'ranged' ? 'hero-type-badge ranged' : 'hero-type-badge';
 
-        // PVE 英雄生成邏輯
         const baseCardConfig = cardDatabase.find(c => c.id == card.id);
         const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : (card.skillKey || 'HEAVY_STRIKE');
         const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : (card.skillParams || { dmgMult: 2.0 });
@@ -225,6 +227,7 @@ function spawnHeroes() {
             monitorEl: monitorItem, 
             patrolDir: 1, 
             totalDamage: 0,
+            totalHealing: 0, // 🔥 新增：治療統計
             isInvincible: false,
             immunityStacks: 0,
             skillKey: realSkillKey,
@@ -238,83 +241,102 @@ function spawnPvpEnemies(enemyTeam) {
     if(!container) return;
 
     enemyTeam.forEach(enemyCard => {
-        // 🔥 本地資料權威驗證 (Local Authority)
-        // 確保敵人必定使用 data.js 內的最新數值與技能
-        const lane = Math.floor(enemyCard.slotIndex / 3);
-        const col = enemyCard.slotIndex % 3;
-        const startPos = 95 - (col * 4); 
-        const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
+        spawnSingleEnemyFromCard(enemyCard, container);
+    });
+}
 
-        const localConfig = cardDatabase.find(c => c.id == enemyCard.id);
+function spawnSingleEnemyFromCard(enemyCard, container) {
+    const lane = enemyCard.slotIndex !== undefined ? Math.floor(enemyCard.slotIndex / 3) : -1;
+    const col = enemyCard.slotIndex !== undefined ? (enemyCard.slotIndex % 3) : 0;
+    
+    let startPos = 95 - (col * 4);
+    let startY = 50;
+
+    if (enemyCard.slotIndex === undefined) {
+        startPos = 40 + (Math.random() * 55);
+        if (Math.random() < 0.5) startY = 10 + Math.random() * 30; else startY = 60 + Math.random() * 30;
+    } else {
+        startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
+    }
+
+    const localConfig = cardDatabase.find(c => c.id == enemyCard.id);
+    
+    let realId = enemyCard.id;
+    let finalTitle = enemyCard.title || "強敵";
+    let finalSkillKey = enemyCard.skillKey || 'HEAVY_STRIKE';
+    let finalSkillParams = enemyCard.skillParams || { dmgMult: 2.0 };
+    let finalAtk = enemyCard.atk || 100;
+    let finalHp = enemyCard.hp || 500;
+    let attackType = enemyCard.attackType || 'melee';
+    
+    if (localConfig) {
+        realId = localConfig.id;
+        finalTitle = localConfig.title || finalTitle;
+        attackType = localConfig.attackType;
         
-        // 預設值 (如果本地找不到)
-        let realId = enemyCard.id;
-        let finalTitle = enemyCard.title || "強敵";
-        let finalSkillKey = enemyCard.skillKey || 'HEAVY_STRIKE';
-        let finalSkillParams = enemyCard.skillParams || { dmgMult: 2.0 };
-        let finalAtk = enemyCard.atk || 100;
-        let finalHp = enemyCard.hp || 500;
-        let attackType = enemyCard.attackType || 'melee';
-
-        if (localConfig) {
-            // 強制使用本地基本設定
-            realId = localConfig.id;
-            finalTitle = localConfig.title || finalTitle;
-            attackType = localConfig.attackType;
-            
-            // 1. 同步最新技能 (解決亞歷山大沒有無敵的問題)
-            if (localConfig.skillKey) {
-                finalSkillKey = localConfig.skillKey;
-                finalSkillParams = localConfig.skillParams || finalSkillParams;
-            }
-
-            // 2. 根據等級重算數值 (防止作弊)
-            const level = enemyCard.level || 1;
-            const stars = enemyCard.stars || 1;
-            const levelBonus = (level - 1) * 0.03;
-            const starBonus = (stars - 1) * 0.20;
-
-            finalAtk = Math.floor(localConfig.atk * (1 + levelBonus) * (1 + starBonus));
-            finalHp = Math.floor(localConfig.hp * (1 + levelBonus) * (1 + starBonus));
+        if (localConfig.skillKey) {
+            finalSkillKey = localConfig.skillKey;
+            finalSkillParams = localConfig.skillParams || finalSkillParams;
         }
 
-        const typeIcon = attackType === 'ranged' ? '🏹' : '⚔️';
+        const level = enemyCard.level || 1;
+        const stars = enemyCard.stars || 1;
+        
+        const levelBonus = (level - 1) * 0.03;
+        const starBonus = (stars - 1) * 0.20;
 
-        const el = document.createElement('div');
-        el.className = `enemy-unit pvp-enemy ${enemyCard.rarity}`;
-        el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
-        el.style.backgroundSize = 'cover';
-        el.style.border = '2px solid #e74c3c';
-        el.style.left = `${startPos}%`;
-        el.style.top = `${startY}%`;
-        el.style.transform = 'translateY(-50%) scaleX(-1)';
+        if (enemyCard.level) {
+            finalAtk = Math.floor(localConfig.atk * (1 + levelBonus) * (1 + starBonus));
+            finalHp = Math.floor(localConfig.hp * (1 + levelBonus) * (1 + starBonus));
+        } else {
+            finalAtk = enemyCard.atk;
+            finalHp = enemyCard.hp;
+        }
+    }
 
-        el.innerHTML = `
-            <div class="enemy-hp-bar"><div style="width:100%"></div></div>
-            <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
-            <div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>
-        `;
-        container.appendChild(el);
+    const typeIcon = attackType === 'ranged' ? '🏹' : '⚔️';
 
-        if(attackType === 'ranged') finalHp = Math.floor(finalHp * 0.45);
+    const el = document.createElement('div');
+    el.className = `enemy-unit pvp-enemy ${enemyCard.rarity || 'R'}`;
+    el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
+    el.style.backgroundSize = 'cover';
+    el.style.border = '2px solid #e74c3c';
+    el.style.left = `${startPos}%`;
+    el.style.top = `${startY}%`;
+    el.style.transform = 'translateY(-50%) scaleX(-1)';
 
-        enemies.push({
-            ...enemyCard,
-            id: realId,
-            title: finalTitle,
-            maxHp: finalHp, currentHp: finalHp,
-            atk: finalAtk,
-            attackType: attackType,
-            maxMana: 100, currentMana: 0,
-            position: startPos, y: startY,
-            speed: 0.05,
-            range: attackType === 'ranged' ? 16 : 4, 
-            lastAttackTime: 0,
-            el: el,
-            isPvpHero: true,
-            skillKey: finalSkillKey,
-            skillParams: finalSkillParams
-        });
+    if(enemyCard.isBoss) {
+        el.style.width = '70px'; el.style.height = '70px'; el.style.zIndex = '30';
+        el.style.border = '3px solid #f1c40f'; el.style.boxShadow = '0 0 15px #f1c40f';
+    }
+
+    el.innerHTML = `
+        <div class="enemy-hp-bar"><div style="width:100%"></div></div>
+        <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
+        <div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>
+    `;
+    container.appendChild(el);
+
+    if(attackType === 'ranged') finalHp = Math.floor(finalHp * 0.45);
+
+    enemies.push({
+        ...enemyCard, 
+        id: realId,
+        title: finalTitle,
+        maxHp: finalHp, currentHp: finalHp,
+        atk: finalAtk,
+        attackType: attackType, 
+        maxMana: 100, currentMana: 0,
+        position: startPos, y: startY,
+        speed: 0.05,
+        range: attackType === 'ranged' ? 16 : 4, 
+        lastAttackTime: 0,
+        el: el,
+        isPvpHero: true, 
+        totalDamage: 0,
+        totalHealing: 0, // 🔥 新增：治療統計
+        skillKey: finalSkillKey,
+        skillParams: finalSkillParams
     });
 }
 
@@ -356,13 +378,12 @@ function spawnEnemy() {
         if (baseCard) {
             const enemyData = {
                 ...baseCard,
-                hp: Math.floor(baseCard.hp * (0.5 + battleState.wave * 0.2) * multHp),
+                hp: Math.floor(baseCard.hp * (0.5 + battleState.wave * 0.2) * multHp), 
                 atk: Math.floor(baseCard.atk * (0.5 + battleState.wave * 0.1) * multAtk),
-                slotIndex: undefined
+                slotIndex: undefined 
             };
-            // 這裡呼叫的是上面修改過的 spawnPvpEnemies 裡的邏輯，但為了方便直接重用邏輯，我們可簡單用 spawnSingleEnemyFromCard 概念
-            // 但因為 battle.js 結構，我們直接在這裡做簡化版生成，或者將 spawnPvpEnemies 內的邏輯提取。
-            // 由於 user 的原始程式碼結構，我們保持原樣，僅針對 Boss 做處理。
+            spawnSingleEnemyFromCard(enemyData, container);
+            return;
         }
     }
 
@@ -370,47 +391,19 @@ function spawnEnemy() {
         if (config.bossId) {
             const baseCard = cardDatabase.find(c => c.id === config.bossId);
             if (baseCard) {
-                // 使用英雄作為 Boss
-                const el = document.createElement('div');
-                el.className = `enemy-unit pvp-enemy SSR boss`; // Boss 樣式
-                el.style.backgroundImage = `url(assets/cards/${baseCard.id}.webp)`;
-                el.style.backgroundSize = 'cover';
-                el.style.width = '80px'; el.style.height = '80px';
-                el.style.border = '3px solid #f1c40f';
-                el.style.boxShadow = '0 0 20px #f1c40f';
-                
-                const bossX = 85; 
-                const bossY = 50;
-                el.style.left = `${bossX}%`; el.style.top = `${bossY}%`;
-                el.style.transform = 'translateY(-50%) scaleX(-1)';
-
-                el.innerHTML = `
-                    <div class="enemy-hp-bar" style="top:-20px; width:100px;"><div style="width:100%"></div></div>
-                    <div class="hero-mana-bar" style="top:-12px; width:100px;"><div style="width:0%"></div></div>
-                `;
-                container.appendChild(el);
-
-                enemies.push({
+                const bossData = {
                     ...baseCard,
-                    id: baseCard.id,
-                    maxHp: 30000 * multHp, currentHp: 30000 * multHp,
+                    hp: 30000 * multHp, 
                     atk: 500 * multAtk,
-                    maxMana: 100, currentMana: 0,
-                    position: bossX, y: bossY,
-                    speed: 0.02,
-                    range: 4,
-                    lastAttackTime: 0,
-                    el: el,
-                    isBoss: true,
-                    isPvpHero: true, // 讓 Boss 也能使用英雄技能
-                    skillKey: baseCard.skillKey,
-                    skillParams: baseCard.skillParams
-                });
+                    isBoss: true, 
+                    slotIndex: undefined 
+                };
+                spawnSingleEnemyFromCard(bossData, container);
+                enemies[enemies.length-1].isBoss = true; 
                 return;
             }
         }
-        
-        // Fallback Emoji Boss
+
         const bossX = 10 + Math.random() * 80; 
         const bossY = 10 + Math.random() * 80;
         const boss = { id: Date.now(), maxHp: 30000, currentHp: 30000, atk: 500, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
@@ -434,15 +427,6 @@ function fireBossSkill(boss) {
     const container = getBattleContainer();
     if(!container) return;
     
-    // 如果 Boss 是英雄型 Boss (有技能)，則優先使用技能
-    if (boss.isPvpHero && boss.skillKey) {
-        // 尋找目標並施放
-        let target = heroEntities[Math.floor(Math.random() * heroEntities.length)];
-        if(target) executeSkill(boss, target);
-        return;
-    }
-
-    // 舊版 Emoji Boss 技能
     const projectile = document.createElement('div'); projectile.className = 'boss-projectile';
     projectile.style.left = `${boss.position}%`; projectile.style.top = `${boss.y}%`;
     projectile.style.width = '80px'; projectile.style.height = '80px'; projectile.style.fontSize = '3em';
@@ -584,6 +568,16 @@ function dealDamage(source, target, multiplier) {
     safePlaySound('dismantle'); 
 }
 
+// 🔥 新增：輔助函數：計算治療並增加統計
+function healTarget(source, target, amount) {
+    const actualHeal = Math.min(target.maxHp - target.currentHp, amount);
+    if(actualHeal > 0) {
+        target.currentHp += actualHeal;
+        source.totalHealing = (source.totalHealing || 0) + actualHeal;
+        showDamageText(target.position, target.y, `+${actualHeal}`, 'gold-text');
+    }
+}
+
 function getCombatGroups(caster) {
     if (heroEntities.includes(caster)) {
         return { allies: heroEntities, foes: enemies };
@@ -603,8 +597,7 @@ const SKILL_LIBRARY = {
         const dmgMult = params.dmgMult || 1.5;
         
         const healAmount = Math.floor(hero.maxHp * healRate);
-        hero.currentHp = Math.min(hero.maxHp, hero.currentHp + healAmount);
-        showDamageText(hero.position, hero.y, `+${healAmount}`, 'gold-text');
+        healTarget(hero, hero, healAmount); // 🔥 改用 helper
         
         if(hero.el) {
             const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
@@ -648,8 +641,8 @@ const SKILL_LIBRARY = {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
                 const hAmt = Math.floor(ally.maxHp * healRate);
-                ally.currentHp = Math.min(ally.maxHp, ally.currentHp + hAmt);
-                showDamageText(ally.position, ally.y, `+${hAmt}`, 'gold-text');
+                healTarget(hero, ally, hAmt); // 🔥 改用 helper
+                
                 if(ally.el) {
                     const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
                     eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
@@ -791,8 +784,8 @@ const SKILL_LIBRARY = {
         allies.forEach(ally => {
             if(ally.currentHp > 0) {
                 const hAmt = Math.floor(ally.maxHp * healRate);
-                ally.currentHp = Math.min(ally.maxHp, ally.currentHp + hAmt);
-                showDamageText(ally.position, ally.y, `+${hAmt}`, 'gold-text');
+                healTarget(hero, ally, hAmt); // 🔥 改用 helper
+                
                 if(ally.el) {
                     const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
                     eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
@@ -841,7 +834,11 @@ const SKILL_LIBRARY = {
         });
         
         if(lowestAlly) {
+            // 🔥 計算實際補血量
+            const amount = lowestAlly.maxHp - lowestAlly.currentHp;
             lowestAlly.currentHp = lowestAlly.maxHp;
+            hero.totalHealing = (hero.totalHealing || 0) + amount;
+            
             showDamageText(lowestAlly.position, lowestAlly.y, `FULL HEAL`, 'gold-text');
             if(lowestAlly.el) {
                 const eff = document.createElement('div'); eff.className = 'damage-text'; eff.innerHTML = '❤️'; eff.style.fontSize = '3em';
@@ -899,8 +896,7 @@ const SKILL_LIBRARY = {
         fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
         
         const selfHeal = Math.floor(hero.maxHp * healRate);
-        hero.currentHp = Math.min(hero.maxHp, hero.currentHp + selfHeal);
-        showDamageText(hero.position, hero.y, `+${selfHeal}`, 'gold-text');
+        healTarget(hero, hero, selfHeal); // 🔥 改用 helper
         
         let nearestAlly = null; let minDist = 9999;
         allies.forEach(ally => {
@@ -912,8 +908,8 @@ const SKILL_LIBRARY = {
         
         if(nearestAlly && minDist <= range) {
             const allyHeal = Math.floor(nearestAlly.maxHp * healRate);
-            nearestAlly.currentHp = Math.min(nearestAlly.maxHp, nearestAlly.currentHp + allyHeal);
-            showDamageText(nearestAlly.position, nearestAlly.y, `+${allyHeal}`, 'gold-text');
+            healTarget(hero, nearestAlly, allyHeal); // 🔥 改用 helper
+            
             if(nearestAlly.el) {
                 const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
                 eff.style.left = `${nearestAlly.position}%`; eff.style.top = `${nearestAlly.y}%`;
@@ -930,7 +926,6 @@ const SKILL_LIBRARY = {
             dealDamage(hero, target, dmgMult);
             
             let executedCount = 0;
-            // 🔥 修正：只斬殺敵對目標 (foes)
             foes.forEach(enemy => {
                 if(enemy.currentHp > 0 && (enemy.currentHp / enemy.maxHp) < threshold && !enemy.isBoss) {
                     enemy.currentHp = 0; 
@@ -974,9 +969,6 @@ function executeSkill(hero, target) {
     
     showDamageText(hero.position, hero.y - 10, hero.title + "!", 'skill-title');
     safePlaySound('ssr'); 
-
-    // 🔥 Debug 用：在 Console 顯示觸發了什麼技能
-    console.log(`[Skill Trigger] Hero: ${hero.name}, SkillKey: ${hero.skillKey}`);
 
     const skillFunc = SKILL_LIBRARY[hero.skillKey];
     if (skillFunc) {
@@ -1118,6 +1110,7 @@ function gameLoop() {
 
         if (enemy.currentHp <= 0) {
             if(enemy.el) enemy.el.remove();
+            deadEnemies.push(enemy); // 🔥 紀錄死亡敵人
             enemies.splice(i, 1);
             
             if(!isPvpMode) { 
@@ -1148,15 +1141,11 @@ function gameLoop() {
             }
         });
 
-        // 🔥 敵方英雄 (PVP / PVE Hero) 的邏輯更新：回氣、放技能
-        // 只要標記為 isPvpHero 就會執行智慧戰鬥邏輯
         if (enemy.isPvpHero) {
-            // 回氣
             if (enemy.currentMana < enemy.maxMana) {
                 enemy.currentMana += 0.25 * gameSpeed; // 敵方回氣速度
                 if(enemy.currentMana > enemy.maxMana) enemy.currentMana = enemy.maxMana;
             }
-            // 更新敵人氣力條 UI
             if (enemy.el) {
                 const manaBar = enemy.el.querySelector('.hero-mana-bar div');
                 if(manaBar) {
@@ -1171,7 +1160,6 @@ function gameLoop() {
         if (enemy.isPvpHero && nearestHero && minTotalDist <= enemy.range) {
             blocked = true;
             if (now - enemy.lastAttackTime > 2000 / gameSpeed) {
-                // 🔥 敵人滿氣放招 (PVP/PVE通用)
                 if (enemy.currentMana >= enemy.maxMana) {
                     executeSkill(enemy, nearestHero);
                 } else {
@@ -1181,15 +1169,12 @@ function gameLoop() {
                             if(nearestHero.isInvincible) {
                                 showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
                             } else if (nearestHero.immunityStacks > 0) {
-                                // 我方英雄格擋
                                 nearestHero.immunityStacks--;
                                 showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
                                 safePlaySound('dismantle');
                             } else {
                                 dealDamage(enemy, nearestHero, 1.0);
                                 triggerHeroHit(nearestHero);
-                                
-                                // 敵人攻擊後稍微回氣
                                 enemy.currentMana = Math.min(enemy.maxMana, enemy.currentMana + 5);
                             }
                         }
@@ -1206,7 +1191,6 @@ function gameLoop() {
                         if(nearestHero.isInvincible) {
                             showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
                         } else if (nearestHero.immunityStacks > 0) {
-                            // PVE時我方英雄格擋
                             nearestHero.immunityStacks--;
                             showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
                             safePlaySound('dismantle');
@@ -1262,7 +1246,10 @@ function gameLoop() {
 
 function endBattle(isWin) {
     if(onBattleEndCallback) {
-        const allHeroes = [...heroEntities, ...deadHeroes];
-        onBattleEndCallback(isWin, battleGold, allHeroes);
+        // 🔥 彙整所有單位的統計數據
+        const allPlayerHeroes = [...heroEntities, ...deadHeroes];
+        const allEnemyHeroes = [...enemies, ...deadEnemies];
+        
+        onBattleEndCallback(isWin, battleGold, allPlayerHeroes, allEnemyHeroes);
     }
 }
