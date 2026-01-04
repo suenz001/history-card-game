@@ -583,11 +583,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     height: 100%; background: #3498db; width: 0%; transition: width 0.2s;
 }
 
-/* 🔥 新增：敵方側邊欄血條改為紅色 */
-#enemy-monitor-list .monitor-hp-fill {
-    background: #e74c3c !important;
-}
-
 /* 🔥 新增：側邊欄摺疊狀態 */
 .battle-monitor-sidebar.collapsed {
     width: 0;

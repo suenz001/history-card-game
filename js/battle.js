@@ -99,12 +99,10 @@ function setupBattleEnvironment() {
     const enemyContainer = document.getElementById('enemy-container');
     const heroContainer = document.getElementById('hero-container');
     const monitorList = document.getElementById('hero-monitor-list');
-    const enemyMonitorList = document.getElementById('enemy-monitor-list'); // 🔥 新增
     
     if(enemyContainer) enemyContainer.innerHTML = '';
     if(heroContainer) heroContainer.innerHTML = '';
     if(monitorList) monitorList.innerHTML = '';
-    if(enemyMonitorList) enemyMonitorList.innerHTML = ''; // 🔥 清空敵方監控
 
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) lanesWrapper.style.opacity = '0.3';
@@ -139,10 +137,6 @@ export function resetBattleState() {
     
     const monitorList = document.getElementById('hero-monitor-list');
     if(monitorList) monitorList.innerHTML = '';
-
-    // 🔥 清空敵方監控
-    const enemyMonitorList = document.getElementById('enemy-monitor-list');
-    if(enemyMonitorList) enemyMonitorList.innerHTML = '';
 
     const startBtn = document.getElementById('start-battle-btn');
     if(startBtn) {
@@ -325,29 +319,6 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
 
     if(attackType === 'ranged') finalHp = Math.floor(finalHp * 0.45);
 
-    // 🔥 新增：生成敵方監控面板 (僅針對 PVP 英雄或 Boss)
-    let monitorItem = null;
-    if (enemyCard.isBoss || enemyCard.slotIndex !== undefined || isPvpMode) { // 簡易判斷：Boss 或 PVP 有槽位
-        const enemyMonitorList = document.getElementById('enemy-monitor-list');
-        if (enemyMonitorList) {
-            monitorItem = document.createElement('div');
-            monitorItem.className = 'monitor-item';
-            monitorItem.innerHTML = `
-                <div class="monitor-icon" style="background-image: url('assets/cards/${realId}.webp'); border-color: #e74c3c;"></div>
-                <div class="monitor-info">
-                    <div class="monitor-name" style="color:#e74c3c;">${enemyCard.name || finalTitle}</div>
-                    <div class="monitor-hp-bg">
-                        <div class="monitor-hp-fill" style="width: 100%;"></div>
-                    </div>
-                    <div class="monitor-mana-bg">
-                        <div class="monitor-mana-fill" style="width: 0%;"></div>
-                    </div>
-                </div>
-            `;
-            enemyMonitorList.appendChild(monitorItem);
-        }
-    }
-
     enemies.push({
         ...enemyCard, 
         id: realId,
@@ -361,7 +332,6 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         range: attackType === 'ranged' ? 16 : 4, 
         lastAttackTime: 0,
         el: el,
-        monitorEl: monitorItem, // 🔥 綁定
         isPvpHero: true, 
         totalDamage: 0,
         totalHealing: 0,
@@ -1178,14 +1148,6 @@ function gameLoop() {
         const enemy = enemies[i];
 
         if (enemy.currentHp <= 0) {
-            // 🔥 新增：敵方陣亡監控更新
-            if (enemy.monitorEl) {
-                enemy.monitorEl.classList.add('dead');
-                enemy.monitorEl.querySelector('.monitor-name').innerText += " (陣亡)";
-                enemy.monitorEl.querySelector('.monitor-hp-fill').style.width = '0%';
-                enemy.monitorEl.querySelector('.monitor-mana-fill').style.width = '0%';
-            }
-
             if(enemy.el) enemy.el.remove();
             deadEnemies.push(enemy);
             enemies.splice(i, 1);
@@ -1206,17 +1168,6 @@ function gameLoop() {
             }
             safePlaySound('dismantle'); 
             continue; 
-        }
-        
-        // 🔥 新增：即時更新敵方監控
-        if (enemy.monitorEl) {
-            const hpPercent = Math.max(0, (enemy.currentHp / enemy.maxHp) * 100);
-            const manaPercent = Math.max(0, (enemy.currentMana / enemy.maxMana) * 100);
-
-            const fillHp = enemy.monitorEl.querySelector('.monitor-hp-fill');
-            const fillMana = enemy.monitorEl.querySelector('.monitor-mana-fill');
-            if (fillHp) fillHp.style.width = `${hpPercent}%`;
-            if (fillMana) fillMana.style.width = `${manaPercent}%`;
         }
 
         if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { fireBossSkill(enemy); enemy.lastAttackTime = now; }
@@ -1319,4 +1270,23 @@ function gameLoop() {
         enemy.position = Math.max(0, Math.min(100, enemy.position));
 
         if (enemy.el) {
-            enemy.el.style.
+            enemy.el.style.left = `${enemy.position}%`; enemy.el.style.top = `${enemy.y}%`;
+            enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
+            if (nearestHero && nearestHero.position > enemy.position) {
+                enemy.el.style.transform = 'translateY(-50%) scaleX(1)';
+            } else {
+                enemy.el.style.transform = 'translateY(-50%) scaleX(-1)';
+            }
+        }
+    }
+
+    gameLoopId = requestAnimationFrame(gameLoop);
+}
+
+function endBattle(isWin) {
+    if(onBattleEndCallback) {
+        const allPlayerHeroes = [...heroEntities, ...deadHeroes];
+        const allEnemyHeroes = [...enemies, ...deadEnemies];
+        onBattleEndCallback(isWin, battleGold, allPlayerHeroes, allEnemyHeroes);
+    }
+}
