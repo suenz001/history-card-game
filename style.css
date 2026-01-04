@@ -851,3 +851,139 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     color: #95a5a6;
     animation: pulse 2s infinite;
 }
+
+/* --- style.css 新增特效區 --- */
+
+/* 1. 施法時英雄的集氣發光特效 */
+.hero-casting {
+    filter: brightness(1.5) drop-shadow(0 0 10px gold);
+    transform: scale(1.1) !important;
+    transition: all 0.2s ease-out;
+    z-index: 100;
+}
+
+/* 2. 優化投射物 (火球/箭矢/劍氣) */
+.projectile {
+    position: absolute;
+    z-index: 999;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    will-change: left, top;
+}
+
+/* 技能光球 */
+.proj-skill {
+    font-size: 2.5em;
+    filter: drop-shadow(0 0 15px #f1c40f);
+    animation: spin 0.5s linear infinite;
+}
+
+/* 3. 螢幕震動特效 (打擊感核心) */
+@keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+.screen-shake {
+    animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* 4. 全螢幕閃光 (大招用) */
+.screen-flash-white {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: white; opacity: 0.8; z-index: 10000;
+    pointer-events: none;
+    animation: flashFade 0.4s forwards;
+}
+.screen-flash-dark {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: black; opacity: 0.7; z-index: 10000;
+    pointer-events: none;
+    animation: flashFade 0.6s forwards;
+}
+@keyframes flashFade { to { opacity: 0; } }
+
+/* 5. 各種技能落地特效 (VFX) */
+.vfx-container {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1000;
+    transform: translate(-50%, -50%); /* 中心對齊 */
+}
+
+/* (A) 爆炸/轟炸 */
+.vfx-explosion {
+    width: 120px; height: 120px;
+    background: radial-gradient(circle, #f1c40f 10%, #e67e22 40%, transparent 70%);
+    border-radius: 50%;
+    animation: explodeAnim 0.5s ease-out forwards;
+    filter: blur(2px);
+}
+@keyframes explodeAnim {
+    0% { transform: scale(0.1); opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { transform: scale(2.0); opacity: 0; }
+}
+
+/* (B) 斬擊 (斜向) */
+.vfx-slash {
+    width: 150px; height: 10px;
+    background: white;
+    box-shadow: 0 0 10px #e74c3c, 0 0 20px #c0392b;
+    animation: slashAnim 0.3s ease-out forwards;
+}
+@keyframes slashAnim {
+    0% { transform: scaleX(0) rotate(-45deg); opacity: 0; }
+    20% { transform: scaleX(1) rotate(-45deg); opacity: 1; }
+    100% { transform: scaleX(1.2) rotate(-45deg); opacity: 0; }
+}
+
+/* (C) 治療光柱 */
+.vfx-heal-pillar {
+    width: 60px; height: 200px;
+    background: linear-gradient(to top, rgba(46, 204, 113, 0.8), transparent);
+    animation: healAnim 0.8s ease-out forwards;
+}
+@keyframes healAnim {
+    0% { transform: scaleY(0); opacity: 0; }
+    20% { transform: scaleY(1); opacity: 1; }
+    100% { transform: scaleY(1.2) translateY(-20px); opacity: 0; }
+}
+
+/* (D) Buff 光環 */
+.vfx-buff-ring {
+    width: 100px; height: 100px;
+    border: 5px solid #3498db;
+    border-radius: 50%;
+    box-shadow: 0 0 15px #3498db;
+    opacity: 0;
+    animation: buffAnim 0.8s ease-out forwards;
+}
+@keyframes buffAnim {
+    0% { transform: scale(0.5); opacity: 0; }
+    50% { transform: scale(1.0); opacity: 1; border-width: 5px; }
+    100% { transform: scale(1.5); opacity: 0; border-width: 0px; }
+}
+
+/* (E) 斬殺特效 */
+.vfx-execute {
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, transparent 30%, #e74c3c 40%, transparent 50%);
+    animation: executeAnim 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+@keyframes executeAnim {
+    0% { transform: scale(0) rotate(0deg); opacity: 1; }
+    100% { transform: scale(1.5) rotate(180deg); opacity: 0; }
+}
+
+@keyframes spin { 100% { transform: rotate(360deg); } }

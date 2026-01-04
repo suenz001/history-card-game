@@ -9,7 +9,7 @@ export let battleSlots = new Array(9).fill(null);
 export let heroEntities = [];
 export let deadHeroes = []; 
 export let enemies = [];
-export let deadEnemies = []; // 🔥 新增：紀錄死亡敵人 (為了PVP統計)
+export let deadEnemies = [];
 export let currentDifficulty = 'normal';
 export let gameSpeed = 1;
 
@@ -94,7 +94,7 @@ function setupBattleEnvironment() {
     enemies = [];
     heroEntities = [];
     deadHeroes = [];
-    deadEnemies = []; // 重置
+    deadEnemies = [];
     
     const enemyContainer = document.getElementById('enemy-container');
     const heroContainer = document.getElementById('hero-container');
@@ -227,7 +227,7 @@ function spawnHeroes() {
             monitorEl: monitorItem, 
             patrolDir: 1, 
             totalDamage: 0,
-            totalHealing: 0, // 🔥 新增：治療統計
+            totalHealing: 0,
             isInvincible: false,
             immunityStacks: 0,
             skillKey: realSkillKey,
@@ -334,7 +334,7 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         el: el,
         isPvpHero: true, 
         totalDamage: 0,
-        totalHealing: 0, // 🔥 新增：治療統計
+        totalHealing: 0,
         skillKey: finalSkillKey,
         skillParams: finalSkillParams
     });
@@ -471,16 +471,20 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     const container = getBattleContainer();
     if(!container) return; 
 
-    const projectile = document.createElement('div'); projectile.className = 'projectile';
+    const projectile = document.createElement('div'); 
+    projectile.className = 'projectile';
     
     if (type === 'skill') {
-        projectile.innerText = '🌟'; 
-        projectile.style.fontSize = '3em'; 
-        projectile.style.filter = 'drop-shadow(0 0 10px gold)';
-    } else if (type === 'arrow') projectile.innerText = '🏹'; 
-    else if (type === 'fireball') projectile.innerText = '🔥'; 
-    else if (type === 'sword') projectile.innerText = '🗡️'; 
-    else projectile.innerText = '⚔️'; 
+        projectile.innerHTML = '<div class="proj-skill">🌟</div>';
+    } else if (type === 'arrow') {
+        projectile.innerHTML = '🏹';
+    } else if (type === 'fireball') {
+        projectile.innerHTML = '🔥';
+    } else if (type === 'sword') {
+        projectile.innerHTML = '🗡️';
+    } else {
+        projectile.innerHTML = '⚔️'; 
+    }
     
     const containerRect = container.getBoundingClientRect();
     const startRect = startEl.getBoundingClientRect(); const targetRect = targetEl.getBoundingClientRect();
@@ -490,6 +494,12 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     projectile.style.left = `${startX}px`; projectile.style.top = `${startY}px`;
     container.appendChild(projectile);
     
+    // 計算角度
+    const deltaX = endX - startX;
+    const deltaY = endY - startY;
+    const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+    projectile.style.transform = `rotate(${angle}deg)`;
+
     void projectile.offsetWidth; 
     projectile.style.left = `${endX}px`; projectile.style.top = `${endY}px`;
     setTimeout(() => { projectile.remove(); if(onHitCallback) { onHitCallback(); } }, 300);
@@ -506,6 +516,37 @@ function triggerHeroHit(heroObj) {
     if(heroObj.currentMana !== undefined && heroObj.currentMana < heroObj.maxMana) {
         heroObj.currentMana = Math.min(heroObj.maxMana, heroObj.currentMana + 2);
     }
+}
+
+// 🔥 新增：螢幕震動
+function shakeScreen() {
+    const container = document.body;
+    container.classList.remove('screen-shake');
+    void container.offsetWidth;
+    container.classList.add('screen-shake');
+    setTimeout(() => container.classList.remove('screen-shake'), 300);
+}
+
+// 🔥 新增：全螢幕閃光
+function flashScreen(type) {
+    const flash = document.createElement('div');
+    flash.className = type === 'white' ? 'screen-flash-white' : 'screen-flash-dark';
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 600);
+}
+
+// 🔥 新增：通用 VFX 生成器
+function createVfx(x, y, type) {
+    const container = getBattleContainer();
+    if(!container) return;
+    
+    const vfx = document.createElement('div');
+    vfx.className = `vfx-container ${type}`;
+    vfx.style.left = `${x}%`;
+    vfx.style.top = `${y}%`;
+    
+    container.appendChild(vfx);
+    setTimeout(() => vfx.remove(), 1000);
 }
 
 function getBattleContainer() {
@@ -545,7 +586,6 @@ function updateBattleUI() {
     }
 }
 
-// 輔助函數：造成傷害
 function dealDamage(source, target, multiplier) {
     if (!target.el || target.currentHp <= 0) return;
 
@@ -568,7 +608,6 @@ function dealDamage(source, target, multiplier) {
     safePlaySound('dismantle'); 
 }
 
-// 🔥 新增：輔助函數：計算治療並增加統計
 function healTarget(source, target, amount) {
     const actualHeal = Math.min(target.maxHp - target.currentHp, amount);
     if(actualHeal > 0) {
@@ -588,24 +627,21 @@ function getCombatGroups(caster) {
 }
 
 // ==========================================
-// 🔥 技能模組庫 (SKILL LIBRARY)
+// 🔥 技能模組庫 (全面升級 VFX)
 // ==========================================
 const SKILL_LIBRARY = {
     HEAL_AND_STRIKE: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
-        const healRate = params.healRate || 0.4;
         const dmgMult = params.dmgMult || 1.5;
-        
+        const healRate = params.healRate || 0.4;
         const healAmount = Math.floor(hero.maxHp * healRate);
-        healTarget(hero, hero, healAmount); // 🔥 改用 helper
         
-        if(hero.el) {
-            const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
-            eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
-            eff.style.width = '120px'; eff.style.height = '120px';
-            getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 1000);
-        }
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        healTarget(hero, hero, healAmount);
+        createVfx(hero.position, hero.y, 'vfx-heal-pillar'); // 補血光柱
+
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            createVfx(target.position, target.y, 'vfx-slash'); // 斬擊特效
+            dealDamage(hero, target, dmgMult);
+        });
     },
     SELF_BUFF_ATK: (hero, target, params) => {
         const buffRate = params.buffRate || 1.25;
@@ -613,124 +649,93 @@ const SKILL_LIBRARY = {
         
         hero.atk = Math.floor(hero.atk * buffRate);
         showDamageText(hero.position, hero.y, `ATK UP!`, 'gold-text');
+        createVfx(hero.position, hero.y, 'vfx-buff-ring'); // Buff 光環
         
-        if(hero.el) {
-            const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
-            eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
-            eff.style.borderColor = '#f1c40f'; eff.style.boxShadow = '0 0 20px #f1c40f';
-            getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
-        }
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            createVfx(target.position, target.y, 'vfx-slash');
+            dealDamage(hero, target, dmgMult);
+        });
     },
     HEAL_ALLIES: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { allies } = getCombatGroups(hero);
         const range = params.range || 20;
         const healRate = params.healRate || 0.2;
         const dmgMult = params.dmgMult || 1.5;
         
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        createVfx(hero.position, hero.y, 'vfx-buff-ring'); // 施法光環
         
-        if(hero.el) {
-            const wave = document.createElement('div'); wave.className = 'skill-effect-heal';
-            wave.style.left = `${hero.position}%`; wave.style.top = `${hero.y}%`;
-            wave.style.width = '200px'; wave.style.height = '200px'; wave.style.opacity = '0.5';
-            getBattleContainer().appendChild(wave); setTimeout(() => wave.remove(), 800);
-        }
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            createVfx(target.position, target.y, 'vfx-explosion'); // 攻擊爆炸
+            dealDamage(hero, target, dmgMult);
+        });
         
         allies.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
                 const hAmt = Math.floor(ally.maxHp * healRate);
-                healTarget(hero, ally, hAmt); // 🔥 改用 helper
-                
-                if(ally.el) {
-                    const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
-                    eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
-                    eff.style.width = '60px'; eff.style.height = '60px';
-                    getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
-                }
+                healTarget(hero, ally, hAmt);
+                createVfx(ally.position, ally.y, 'vfx-heal-pillar'); // 群體補血特效
             }
         });
     },
     HEAVY_STRIKE: (hero, target, params) => {
         const dmgMult = params.dmgMult || 5.0;
+        
         fireProjectile(hero.el, target.el, 'skill', () => {
              dealDamage(hero, target, dmgMult);
-             if(target.el) {
-                 const blast = document.createElement('div'); blast.className = 'aoe-blast';
-                 blast.style.left = `${target.position}%`; blast.style.top = `${target.y}%`;
-                 blast.style.width = '80px'; blast.style.height = '80px';
-                 blast.style.background = 'radial-gradient(circle, #fff, transparent)';
-                 getBattleContainer().appendChild(blast); setTimeout(() => blast.remove(), 300);
-             }
+             createVfx(target.position, target.y, 'vfx-slash'); // 斬擊
+             shakeScreen(); // 🔥 強力攻擊震動螢幕
         });
     },
     AOE_CIRCLE: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { foes } = getCombatGroups(hero);
         const radius = params.radius || 15;
         const dmgMult = params.dmgMult || 1.5;
         
-        if(hero.el) {
-            const eff = document.createElement('div'); eff.className = 'aoe-blast';
-            eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
-            eff.style.width = '180px'; eff.style.height = '180px';
-            eff.style.background = 'radial-gradient(circle, rgba(231, 76, 60, 0.6), transparent)';
-            getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 500);
-        }
+        createVfx(hero.position, hero.y, 'vfx-buff-ring');
         
         foes.forEach(enemy => {
             const dist = Math.sqrt(Math.pow(enemy.position - hero.position, 2) + Math.pow(enemy.y - hero.y, 2));
             if(dist < radius && enemy.currentHp > 0) {
                 dealDamage(hero, enemy, dmgMult);
+                createVfx(enemy.position, enemy.y, 'vfx-explosion'); // 範圍爆炸
             }
         });
+        shakeScreen();
     },
     BUFF_ALLIES_ATK: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { allies } = getCombatGroups(hero);
         const range = params.range || 20;
         const buffRate = params.buffRate || 1.10;
         const dmgMult = params.dmgMult || 1.5;
         
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        createVfx(hero.position, hero.y, 'vfx-buff-ring');
         
-        if(hero.el) {
-            const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
-            eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
-            eff.style.borderColor = '#3498db'; eff.style.boxShadow = '0 0 15px #3498db';
-            getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
-        }
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            dealDamage(hero, target, dmgMult);
+            createVfx(target.position, target.y, 'vfx-explosion');
+        });
         
         allies.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
                 ally.atk = Math.floor(ally.atk * buffRate);
                 showDamageText(ally.position, ally.y, `⚔️ UP`, 'gold-text');
-                if(ally.el) {
-                    const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
-                    eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
-                    eff.style.borderColor = '#3498db';
-                    getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
-                }
+                createVfx(ally.position, ally.y, 'vfx-buff-ring');
             }
         });
     },
     GLOBAL_BOMB: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { foes } = getCombatGroups(hero);
         const dmgMult = params.dmgMult || 0.5;
         
-        const flash = document.createElement('div'); flash.className = 'global-bomb-effect';
-        document.body.appendChild(flash); setTimeout(() => flash.remove(), 300);
+        flashScreen('white'); // 🔥 全螢幕閃光
+        shakeScreen();
         
         foes.forEach(enemy => {
             if(enemy.currentHp > 0) {
                 dealDamage(hero, enemy, dmgMult);
-                if(enemy.el) {
-                    const eff = document.createElement('div'); eff.className = 'aoe-blast';
-                    eff.style.width = '60px'; eff.style.height = '60px';
-                    eff.style.left = `${enemy.position}%`; eff.style.top = `${enemy.y}%`;
-                    eff.style.background = 'radial-gradient(circle, #f1c40f, transparent)';
-                    getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 500);
-                }
+                createVfx(enemy.position, enemy.y, 'vfx-explosion');
             }
         });
     },
@@ -740,6 +745,8 @@ const SKILL_LIBRARY = {
         
         hero.isInvincible = true;
         showDamageText(hero.position, hero.y, `無敵!`, 'gold-text');
+        createVfx(hero.position, hero.y, 'vfx-buff-ring');
+        
         if(hero.el) hero.el.classList.add('invincible-shield');
         
         setTimeout(() => {
@@ -749,10 +756,13 @@ const SKILL_LIBRARY = {
             }
         }, duration);
         
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            createVfx(target.position, target.y, 'vfx-slash');
+            dealDamage(hero, target, dmgMult);
+        });
     },
     MULTI_TARGET_STRIKE: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { foes } = getCombatGroups(hero);
         const count = params.count || 2;
         const dmgMult = params.dmgMult || 2.0;
         
@@ -763,67 +773,62 @@ const SKILL_LIBRARY = {
             }).slice(0, count);
             
         sortedEnemies.forEach((enemy, idx) => {
-            setTimeout(() => { fireProjectile(hero.el, enemy.el, 'skill', () => dealDamage(hero, enemy, dmgMult)); }, idx * 100);
+            setTimeout(() => { 
+                fireProjectile(hero.el, enemy.el, 'skill', () => {
+                    createVfx(enemy.position, enemy.y, 'vfx-slash');
+                    dealDamage(hero, enemy, dmgMult);
+                }); 
+            }, idx * 100);
         });
     },
     HEAL_ALL_ALLIES: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { allies } = getCombatGroups(hero);
         const healRate = params.healRate || 0.2;
         const dmgMult = params.dmgMult || 1.2;
         
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            dealDamage(hero, target, dmgMult);
+            createVfx(target.position, target.y, 'vfx-explosion');
+        });
         
-        if(hero.el) {
-            const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
-            eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
-            eff.style.width = '300px'; eff.style.height = '300px';
-            eff.style.background = 'radial-gradient(circle, rgba(255, 255, 255, 0.7) 0%, transparent 70%)';
-            getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 1000);
-        }
+        flashScreen('white'); // 聖光閃耀
         
         allies.forEach(ally => {
             if(ally.currentHp > 0) {
                 const hAmt = Math.floor(ally.maxHp * healRate);
-                healTarget(hero, ally, hAmt); // 🔥 改用 helper
-                
-                if(ally.el) {
-                    const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
-                    eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
-                    eff.style.width = '50px'; eff.style.height = '50px';
-                    getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
-                }
+                healTarget(hero, ally, hAmt);
+                createVfx(ally.position, ally.y, 'vfx-heal-pillar');
             }
         });
     },
     DEBUFF_GLOBAL_ATK: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { foes } = getCombatGroups(hero);
         const debuffRate = params.debuffRate || 0.8;
         const dmgMult = params.dmgMult || 2.0;
         
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            dealDamage(hero, target, dmgMult);
+            createVfx(target.position, target.y, 'vfx-explosion');
+        });
         
-        const flash = document.createElement('div'); flash.className = 'global-bomb-effect';
-        flash.style.background = 'rgba(0, 0, 0, 0.3)';
-        document.body.appendChild(flash); setTimeout(() => flash.remove(), 500);
+        flashScreen('dark'); // 暗影閃光
         
         foes.forEach(enemy => {
             if(enemy.currentHp > 0) {
                 enemy.atk = Math.floor(enemy.atk * debuffRate);
                 showDamageText(enemy.position, enemy.y, `ATK DOWN`, 'gold-text');
-                if(enemy.el) {
-                    const eff = document.createElement('div'); eff.className = 'aoe-blast';
-                    eff.style.left = `${enemy.position}%`; eff.style.top = `${enemy.y}%`;
-                    eff.style.background = 'radial-gradient(circle, #8e44ad, transparent)';
-                    getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 500);
-                }
+                createVfx(enemy.position, enemy.y, 'vfx-buff-ring');
             }
         });
     },
     FULL_HEAL_LOWEST: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { allies } = getCombatGroups(hero);
         const dmgMult = params.dmgMult || 1.0;
         
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            dealDamage(hero, target, dmgMult);
+            createVfx(target.position, target.y, 'vfx-explosion');
+        });
         
         let lowestAlly = null; let minPct = 1.1;
         allies.forEach(ally => {
@@ -834,46 +839,33 @@ const SKILL_LIBRARY = {
         });
         
         if(lowestAlly) {
-            // 🔥 計算實際補血量
             const amount = lowestAlly.maxHp - lowestAlly.currentHp;
             lowestAlly.currentHp = lowestAlly.maxHp;
             hero.totalHealing = (hero.totalHealing || 0) + amount;
             
             showDamageText(lowestAlly.position, lowestAlly.y, `FULL HEAL`, 'gold-text');
-            if(lowestAlly.el) {
-                const eff = document.createElement('div'); eff.className = 'damage-text'; eff.innerHTML = '❤️'; eff.style.fontSize = '3em';
-                eff.style.left = `${lowestAlly.position}%`; eff.style.top = `${lowestAlly.y}%`;
-                eff.style.animation = 'floatUp 1s forwards';
-                getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 1000);
-            }
+            createVfx(lowestAlly.position, lowestAlly.y, 'vfx-heal-pillar');
         }
     },
     RESTORE_MANA_ALLIES: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { allies } = getCombatGroups(hero);
         const range = params.range || 20;
         const manaAmount = params.manaAmount || 20;
         const dmgMult = params.dmgMult || 1.2;
         
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        createVfx(hero.position, hero.y, 'vfx-buff-ring');
         
-        if(hero.el) {
-            const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
-            eff.style.borderColor = '#3498db'; eff.style.boxShadow = '0 0 20px #3498db';
-            eff.style.left = `${hero.position}%`; eff.style.top = `${hero.y}%`;
-            getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
-        }
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            dealDamage(hero, target, dmgMult);
+            createVfx(target.position, target.y, 'vfx-explosion');
+        });
         
         allies.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0 && ally !== hero) {
                 ally.currentMana = Math.min(ally.maxMana, ally.currentMana + manaAmount);
                 showDamageText(ally.position, ally.y, `MP +${manaAmount}`, 'gold-text');
-                if(ally.el) {
-                    const eff = document.createElement('div'); eff.className = 'skill-effect-buff';
-                    eff.style.borderColor = '#3498db'; eff.style.width = '40px'; eff.style.height = '40px';
-                    eff.style.left = `${ally.position}%`; eff.style.top = `${ally.y}%`;
-                    getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 600);
-                }
+                createVfx(ally.position, ally.y, 'vfx-buff-ring');
             }
         });
     },
@@ -883,20 +875,27 @@ const SKILL_LIBRARY = {
         
         fireProjectile(hero.el, target.el, 'skill', () => {
             dealDamage(hero, target, dmgMult);
+            createVfx(target.position, target.y, 'vfx-slash');
+            
             hero.currentMana = Math.min(hero.maxMana, hero.currentMana + manaRestore);
             showDamageText(hero.position, hero.y, `MP +${manaRestore}`, 'gold-text');
+            createVfx(hero.position, hero.y, 'vfx-buff-ring');
         });
     },
     HEAL_SELF_AND_ALLY: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { allies } = getCombatGroups(hero);
         const healRate = params.healRate || 0.3;
         const range = params.range || 15;
         const dmgMult = params.dmgMult || 2.0;
         
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            dealDamage(hero, target, dmgMult);
+            createVfx(target.position, target.y, 'vfx-slash');
+        });
         
         const selfHeal = Math.floor(hero.maxHp * healRate);
-        healTarget(hero, hero, selfHeal); // 🔥 改用 helper
+        healTarget(hero, hero, selfHeal);
+        createVfx(hero.position, hero.y, 'vfx-heal-pillar');
         
         let nearestAlly = null; let minDist = 9999;
         allies.forEach(ally => {
@@ -908,42 +907,33 @@ const SKILL_LIBRARY = {
         
         if(nearestAlly && minDist <= range) {
             const allyHeal = Math.floor(nearestAlly.maxHp * healRate);
-            healTarget(hero, nearestAlly, allyHeal); // 🔥 改用 helper
-            
-            if(nearestAlly.el) {
-                const eff = document.createElement('div'); eff.className = 'skill-effect-heal';
-                eff.style.left = `${nearestAlly.position}%`; eff.style.top = `${nearestAlly.y}%`;
-                getBattleContainer().appendChild(eff); setTimeout(() => eff.remove(), 800);
-            }
+            healTarget(hero, nearestAlly, allyHeal);
+            createVfx(nearestAlly.position, nearestAlly.y, 'vfx-heal-pillar');
         }
     },
     EXECUTE_LOW_HP: (hero, target, params) => {
-        const { allies, foes } = getCombatGroups(hero);
+        const { foes } = getCombatGroups(hero);
         const threshold = params.threshold || 0.2;
         const dmgMult = params.dmgMult || 2.5;
 
         fireProjectile(hero.el, target.el, 'skill', () => {
             dealDamage(hero, target, dmgMult);
+            createVfx(target.position, target.y, 'vfx-slash');
             
             let executedCount = 0;
             foes.forEach(enemy => {
                 if(enemy.currentHp > 0 && (enemy.currentHp / enemy.maxHp) < threshold && !enemy.isBoss) {
                     enemy.currentHp = 0; 
                     showDamageText(enemy.position, enemy.y, `斬殺!`, 'skill-title');
-                    
-                    if(enemy.el) {
-                        const slash = document.createElement('div'); slash.className = 'aoe-blast';
-                        slash.style.left = `${enemy.position}%`; slash.style.top = `${enemy.y}%`;
-                        slash.style.background = 'linear-gradient(45deg, transparent, red, transparent)';
-                        slash.style.width = '100px'; slash.style.height = '10px';
-                        slash.style.transform = 'rotate(-45deg)';
-                        getBattleContainer().appendChild(slash); setTimeout(() => slash.remove(), 300);
-                    }
+                    createVfx(enemy.position, enemy.y, 'vfx-execute'); // 斬殺特效
                     executedCount++;
                 }
             });
             
-            if(executedCount > 0) safePlaySound('ssr');
+            if(executedCount > 0) {
+                shakeScreen();
+                safePlaySound('ssr');
+            }
         });
     },
     STACKABLE_IMMUNITY: (hero, target, params) => {
@@ -952,6 +942,7 @@ const SKILL_LIBRARY = {
         
         hero.immunityStacks = (hero.immunityStacks || 0) + count;
         showDamageText(hero.position, hero.y, `免疫x${hero.immunityStacks}`, 'gold-text');
+        createVfx(hero.position, hero.y, 'vfx-buff-ring');
         
         if(hero.el) {
             const shield = document.createElement('div'); shield.className = 'invincible-shield';
@@ -960,7 +951,10 @@ const SKILL_LIBRARY = {
             setTimeout(() => { if(shield.parentNode) shield.remove(); }, 1000); 
         }
 
-        fireProjectile(hero.el, target.el, 'skill', () => dealDamage(hero, target, dmgMult));
+        fireProjectile(hero.el, target.el, 'skill', () => {
+            dealDamage(hero, target, dmgMult);
+            createVfx(target.position, target.y, 'vfx-slash');
+        });
     }
 };
 
@@ -969,6 +963,12 @@ function executeSkill(hero, target) {
     
     showDamageText(hero.position, hero.y - 10, hero.title + "!", 'skill-title');
     safePlaySound('ssr'); 
+    
+    // 🔥 新增：英雄施法動作特效
+    if(hero.el) {
+        hero.el.classList.add('hero-casting');
+        setTimeout(() => hero.el.classList.remove('hero-casting'), 300);
+    }
 
     const skillFunc = SKILL_LIBRARY[hero.skillKey];
     if (skillFunc) {
@@ -1110,7 +1110,7 @@ function gameLoop() {
 
         if (enemy.currentHp <= 0) {
             if(enemy.el) enemy.el.remove();
-            deadEnemies.push(enemy); // 🔥 紀錄死亡敵人
+            deadEnemies.push(enemy);
             enemies.splice(i, 1);
             
             if(!isPvpMode) { 
@@ -1246,10 +1246,8 @@ function gameLoop() {
 
 function endBattle(isWin) {
     if(onBattleEndCallback) {
-        // 🔥 彙整所有單位的統計數據
         const allPlayerHeroes = [...heroEntities, ...deadHeroes];
         const allEnemyHeroes = [...enemies, ...deadEnemies];
-        
         onBattleEndCallback(isWin, battleGold, allPlayerHeroes, allEnemyHeroes);
     }
 }
