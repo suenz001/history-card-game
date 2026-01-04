@@ -444,17 +444,18 @@ function fireBossSkill(boss) {
         effect.style.left = `${target.position}%`; effect.style.top = `${target.y}%`;
         if(container) container.appendChild(effect);
         setTimeout(() => effect.remove(), 600);
-        safePlaySound('dismantle');
+        safePlaySound('explosion'); // 🔥 替換為爆炸音效
         
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position; const dy = hero.y - target.y; const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < 7) { 
                 if (hero.isInvincible) {
                     showDamageText(hero.position, hero.y, `免疫`, 'gold-text');
+                    safePlaySound('block'); // 🔥 免疫音效
                 } else if (hero.immunityStacks > 0) {
                     hero.immunityStacks--;
                     showDamageText(hero.position, hero.y, `格擋!`, 'gold-text');
-                    safePlaySound('dismantle');
+                    safePlaySound('block'); // 🔥 格擋音效
                 } else {
                     hero.currentHp -= 300; 
                     triggerHeroHit(hero); 
@@ -470,6 +471,12 @@ function fireProjectile(startEl, targetEl, type, onHitCallback) {
     if(!startEl || !targetEl) return;
     const container = getBattleContainer();
     if(!container) return; 
+
+    // 🔥 根據類型播放發射音效
+    if (type === 'arrow') safePlaySound('arrow');
+    else if (type === 'fireball') safePlaySound('fireball');
+    else if (type === 'skill') safePlaySound('magic');
+    else safePlaySound('slash');
 
     const projectile = document.createElement('div'); 
     projectile.className = 'projectile';
@@ -518,7 +525,6 @@ function triggerHeroHit(heroObj) {
     }
 }
 
-// 🔥 新增：螢幕震動
 function shakeScreen() {
     const container = document.body;
     container.classList.remove('screen-shake');
@@ -527,7 +533,6 @@ function shakeScreen() {
     setTimeout(() => container.classList.remove('screen-shake'), 300);
 }
 
-// 🔥 新增：全螢幕閃光
 function flashScreen(type) {
     const flash = document.createElement('div');
     flash.className = type === 'white' ? 'screen-flash-white' : 'screen-flash-dark';
@@ -535,7 +540,6 @@ function flashScreen(type) {
     setTimeout(() => flash.remove(), 600);
 }
 
-// 🔥 新增：通用 VFX 生成器
 function createVfx(x, y, type) {
     const container = getBattleContainer();
     if(!container) return;
@@ -605,7 +609,9 @@ function dealDamage(source, target, multiplier) {
         target.el.classList.add('taking-damage');
     }
     source.totalDamage += dmg;
-    safePlaySound('dismantle'); 
+    
+    // 如果沒有特效，至少要有個基礎音效 (如果有特效會由特效函式觸發)
+    // safePlaySound('slash'); 
 }
 
 function healTarget(source, target, amount) {
@@ -627,7 +633,7 @@ function getCombatGroups(caster) {
 }
 
 // ==========================================
-// 🔥 技能模組庫 (全面升級 VFX)
+// 🔥 技能模組庫 (全面升級 VFX & SFX)
 // ==========================================
 const SKILL_LIBRARY = {
     HEAL_AND_STRIKE: (hero, target, params) => {
@@ -635,11 +641,13 @@ const SKILL_LIBRARY = {
         const healRate = params.healRate || 0.4;
         const healAmount = Math.floor(hero.maxHp * healRate);
         
+        safePlaySound('heal');
         healTarget(hero, hero, healAmount);
-        createVfx(hero.position, hero.y, 'vfx-heal-pillar'); // 補血光柱
+        createVfx(hero.position, hero.y, 'vfx-heal-pillar'); 
 
         fireProjectile(hero.el, target.el, 'skill', () => {
-            createVfx(target.position, target.y, 'vfx-slash'); // 斬擊特效
+            safePlaySound('slash');
+            createVfx(target.position, target.y, 'vfx-slash'); 
             dealDamage(hero, target, dmgMult);
         });
     },
@@ -647,11 +655,13 @@ const SKILL_LIBRARY = {
         const buffRate = params.buffRate || 1.25;
         const dmgMult = params.dmgMult || 2.0;
         
+        safePlaySound('buff');
         hero.atk = Math.floor(hero.atk * buffRate);
         showDamageText(hero.position, hero.y, `ATK UP!`, 'gold-text');
-        createVfx(hero.position, hero.y, 'vfx-buff-ring'); // Buff 光環
+        createVfx(hero.position, hero.y, 'vfx-buff-ring'); 
         
         fireProjectile(hero.el, target.el, 'skill', () => {
+            safePlaySound('slash');
             createVfx(target.position, target.y, 'vfx-slash');
             dealDamage(hero, target, dmgMult);
         });
@@ -662,19 +672,22 @@ const SKILL_LIBRARY = {
         const healRate = params.healRate || 0.2;
         const dmgMult = params.dmgMult || 1.5;
         
-        createVfx(hero.position, hero.y, 'vfx-buff-ring'); // 施法光環
+        safePlaySound('magic');
+        createVfx(hero.position, hero.y, 'vfx-buff-ring'); 
         
         fireProjectile(hero.el, target.el, 'skill', () => {
-            createVfx(target.position, target.y, 'vfx-explosion'); // 攻擊爆炸
+            safePlaySound('explosion');
+            createVfx(target.position, target.y, 'vfx-explosion'); 
             dealDamage(hero, target, dmgMult);
         });
         
+        safePlaySound('heal'); // 群體治療音效
         allies.forEach(ally => {
             const dist = Math.sqrt(Math.pow(ally.position - hero.position, 2) + Math.pow(ally.y - hero.y, 2));
             if(dist < range && ally.currentHp > 0) {
                 const hAmt = Math.floor(ally.maxHp * healRate);
                 healTarget(hero, ally, hAmt);
-                createVfx(ally.position, ally.y, 'vfx-heal-pillar'); // 群體補血特效
+                createVfx(ally.position, ally.y, 'vfx-heal-pillar'); 
             }
         });
     },
@@ -682,9 +695,10 @@ const SKILL_LIBRARY = {
         const dmgMult = params.dmgMult || 5.0;
         
         fireProjectile(hero.el, target.el, 'skill', () => {
+             safePlaySound('explosion'); // 重擊音效
              dealDamage(hero, target, dmgMult);
-             createVfx(target.position, target.y, 'vfx-slash'); // 斬擊
-             shakeScreen(); // 🔥 強力攻擊震動螢幕
+             createVfx(target.position, target.y, 'vfx-slash'); 
+             shakeScreen(); 
         });
     },
     AOE_CIRCLE: (hero, target, params) => {
@@ -692,16 +706,20 @@ const SKILL_LIBRARY = {
         const radius = params.radius || 15;
         const dmgMult = params.dmgMult || 1.5;
         
+        safePlaySound('magic');
         createVfx(hero.position, hero.y, 'vfx-buff-ring');
         
-        foes.forEach(enemy => {
-            const dist = Math.sqrt(Math.pow(enemy.position - hero.position, 2) + Math.pow(enemy.y - hero.y, 2));
-            if(dist < radius && enemy.currentHp > 0) {
-                dealDamage(hero, enemy, dmgMult);
-                createVfx(enemy.position, enemy.y, 'vfx-explosion'); // 範圍爆炸
-            }
-        });
-        shakeScreen();
+        setTimeout(() => {
+            safePlaySound('explosion');
+            foes.forEach(enemy => {
+                const dist = Math.sqrt(Math.pow(enemy.position - hero.position, 2) + Math.pow(enemy.y - hero.y, 2));
+                if(dist < radius && enemy.currentHp > 0) {
+                    dealDamage(hero, enemy, dmgMult);
+                    createVfx(enemy.position, enemy.y, 'vfx-explosion'); 
+                }
+            });
+            shakeScreen();
+        }, 300);
     },
     BUFF_ALLIES_ATK: (hero, target, params) => {
         const { allies } = getCombatGroups(hero);
@@ -709,9 +727,11 @@ const SKILL_LIBRARY = {
         const buffRate = params.buffRate || 1.10;
         const dmgMult = params.dmgMult || 1.5;
         
+        safePlaySound('buff');
         createVfx(hero.position, hero.y, 'vfx-buff-ring');
         
         fireProjectile(hero.el, target.el, 'skill', () => {
+            safePlaySound('explosion');
             dealDamage(hero, target, dmgMult);
             createVfx(target.position, target.y, 'vfx-explosion');
         });
@@ -729,7 +749,8 @@ const SKILL_LIBRARY = {
         const { foes } = getCombatGroups(hero);
         const dmgMult = params.dmgMult || 0.5;
         
-        flashScreen('white'); // 🔥 全螢幕閃光
+        flashScreen('white'); 
+        safePlaySound('explosion');
         shakeScreen();
         
         foes.forEach(enemy => {
@@ -743,6 +764,7 @@ const SKILL_LIBRARY = {
         const duration = params.duration || 3000;
         const dmgMult = params.dmgMult || 1.5;
         
+        safePlaySound('block'); // 無敵音效
         hero.isInvincible = true;
         showDamageText(hero.position, hero.y, `無敵!`, 'gold-text');
         createVfx(hero.position, hero.y, 'vfx-buff-ring');
@@ -757,6 +779,7 @@ const SKILL_LIBRARY = {
         }, duration);
         
         fireProjectile(hero.el, target.el, 'skill', () => {
+            safePlaySound('slash');
             createVfx(target.position, target.y, 'vfx-slash');
             dealDamage(hero, target, dmgMult);
         });
@@ -775,6 +798,7 @@ const SKILL_LIBRARY = {
         sortedEnemies.forEach((enemy, idx) => {
             setTimeout(() => { 
                 fireProjectile(hero.el, enemy.el, 'skill', () => {
+                    safePlaySound('slash');
                     createVfx(enemy.position, enemy.y, 'vfx-slash');
                     dealDamage(hero, enemy, dmgMult);
                 }); 
@@ -787,11 +811,13 @@ const SKILL_LIBRARY = {
         const dmgMult = params.dmgMult || 1.2;
         
         fireProjectile(hero.el, target.el, 'skill', () => {
+            safePlaySound('explosion');
             dealDamage(hero, target, dmgMult);
             createVfx(target.position, target.y, 'vfx-explosion');
         });
         
-        flashScreen('white'); // 聖光閃耀
+        flashScreen('white'); 
+        safePlaySound('heal');
         
         allies.forEach(ally => {
             if(ally.currentHp > 0) {
@@ -807,11 +833,13 @@ const SKILL_LIBRARY = {
         const dmgMult = params.dmgMult || 2.0;
         
         fireProjectile(hero.el, target.el, 'skill', () => {
+            safePlaySound('explosion');
             dealDamage(hero, target, dmgMult);
             createVfx(target.position, target.y, 'vfx-explosion');
         });
         
-        flashScreen('dark'); // 暗影閃光
+        flashScreen('dark'); 
+        safePlaySound('magic');
         
         foes.forEach(enemy => {
             if(enemy.currentHp > 0) {
@@ -826,6 +854,7 @@ const SKILL_LIBRARY = {
         const dmgMult = params.dmgMult || 1.0;
         
         fireProjectile(hero.el, target.el, 'skill', () => {
+            safePlaySound('explosion');
             dealDamage(hero, target, dmgMult);
             createVfx(target.position, target.y, 'vfx-explosion');
         });
@@ -839,6 +868,7 @@ const SKILL_LIBRARY = {
         });
         
         if(lowestAlly) {
+            safePlaySound('heal');
             const amount = lowestAlly.maxHp - lowestAlly.currentHp;
             lowestAlly.currentHp = lowestAlly.maxHp;
             hero.totalHealing = (hero.totalHealing || 0) + amount;
@@ -853,9 +883,11 @@ const SKILL_LIBRARY = {
         const manaAmount = params.manaAmount || 20;
         const dmgMult = params.dmgMult || 1.2;
         
+        safePlaySound('buff');
         createVfx(hero.position, hero.y, 'vfx-buff-ring');
         
         fireProjectile(hero.el, target.el, 'skill', () => {
+            safePlaySound('explosion');
             dealDamage(hero, target, dmgMult);
             createVfx(target.position, target.y, 'vfx-explosion');
         });
@@ -874,9 +906,11 @@ const SKILL_LIBRARY = {
         const manaRestore = params.manaRestore || 40;
         
         fireProjectile(hero.el, target.el, 'skill', () => {
+            safePlaySound('slash');
             dealDamage(hero, target, dmgMult);
             createVfx(target.position, target.y, 'vfx-slash');
             
+            safePlaySound('magic');
             hero.currentMana = Math.min(hero.maxMana, hero.currentMana + manaRestore);
             showDamageText(hero.position, hero.y, `MP +${manaRestore}`, 'gold-text');
             createVfx(hero.position, hero.y, 'vfx-buff-ring');
@@ -889,10 +923,12 @@ const SKILL_LIBRARY = {
         const dmgMult = params.dmgMult || 2.0;
         
         fireProjectile(hero.el, target.el, 'skill', () => {
+            safePlaySound('slash');
             dealDamage(hero, target, dmgMult);
             createVfx(target.position, target.y, 'vfx-slash');
         });
         
+        safePlaySound('heal');
         const selfHeal = Math.floor(hero.maxHp * healRate);
         healTarget(hero, hero, selfHeal);
         createVfx(hero.position, hero.y, 'vfx-heal-pillar');
@@ -933,6 +969,8 @@ const SKILL_LIBRARY = {
             if(executedCount > 0) {
                 shakeScreen();
                 safePlaySound('ssr');
+            } else {
+                safePlaySound('slash');
             }
         });
     },
@@ -940,6 +978,7 @@ const SKILL_LIBRARY = {
         const count = params.count || 2;
         const dmgMult = params.dmgMult || 2.2;
         
+        safePlaySound('block');
         hero.immunityStacks = (hero.immunityStacks || 0) + count;
         showDamageText(hero.position, hero.y, `免疫x${hero.immunityStacks}`, 'gold-text');
         createVfx(hero.position, hero.y, 'vfx-buff-ring');
@@ -952,6 +991,7 @@ const SKILL_LIBRARY = {
         }
 
         fireProjectile(hero.el, target.el, 'skill', () => {
+            safePlaySound('slash');
             dealDamage(hero, target, dmgMult);
             createVfx(target.position, target.y, 'vfx-slash');
         });
@@ -962,9 +1002,8 @@ function executeSkill(hero, target) {
     hero.currentMana = 0;
     
     showDamageText(hero.position, hero.y - 10, hero.title + "!", 'skill-title');
-    safePlaySound('ssr'); 
+    safePlaySound('magic'); 
     
-    // 🔥 新增：英雄施法動作特效
     if(hero.el) {
         hero.el.classList.add('hero-casting');
         setTimeout(() => hero.el.classList.remove('hero-casting'), 300);
@@ -1171,7 +1210,7 @@ function gameLoop() {
                             } else if (nearestHero.immunityStacks > 0) {
                                 nearestHero.immunityStacks--;
                                 showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
-                                safePlaySound('dismantle');
+                                safePlaySound('block');
                             } else {
                                 dealDamage(enemy, nearestHero, 1.0);
                                 triggerHeroHit(nearestHero);
@@ -1193,7 +1232,7 @@ function gameLoop() {
                         } else if (nearestHero.immunityStacks > 0) {
                             nearestHero.immunityStacks--;
                             showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
-                            safePlaySound('dismantle');
+                            safePlaySound('block');
                         } else {
                             nearestHero.currentHp -= enemy.atk; 
                             triggerHeroHit(nearestHero); 
