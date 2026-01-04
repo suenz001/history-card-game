@@ -49,7 +49,6 @@ let currentDisplayList = [];
 let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 
-// 讀取上次記憶的排序方式
 let currentSortMethod = localStorage.getItem('userSortMethod') || 'time_desc';
 
 let isBatchMode = false;
@@ -59,8 +58,11 @@ let gachaIndex = 0;
 
 let pvpTargetInfo = { index: null, type: null };
 
-// 是否正在查看敵方卡片 (用於隱藏升級按鈕)
 let isViewingEnemy = false;
+
+// 🔥 新增：通知批量刪除相關變數
+let isNotifBatchMode = false;
+let selectedNotifIds = new Set();
 
 const SYSTEM_NOTIFICATIONS = [
     { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 }, isSystem: true }
@@ -197,6 +199,10 @@ if(document.getElementById('close-notification-btn')) {
     document.getElementById('close-notification-btn').addEventListener('click', () => {
         playSound('click');
         notificationModal.classList.add('hidden');
+        
+        // 關閉時重置批量模式
+        isNotifBatchMode = false;
+        selectedNotifIds.clear();
     });
 }
 
@@ -228,37 +234,149 @@ async function openNotificationModal() {
     renderNotifications();
 }
 
+// 🔥 新增：切換通知批量模式
+function toggleNotifBatchMode() {
+    isNotifBatchMode = !isNotifBatchMode;
+    selectedNotifIds.clear(); // 切換時清空選擇
+    playSound('click');
+    renderNotifications();
+}
+
+// 🔥 新增：處理單個通知的選取
+function toggleNotifSelection(id) {
+    if (selectedNotifIds.has(id)) {
+        selectedNotifIds.delete(id);
+    } else {
+        selectedNotifIds.add(id);
+    }
+    playSound('click');
+    renderNotifications(); // 重新渲染以更新樣式
+}
+
+// 🔥 新增：執行批量刪除
+async function executeBatchDelete() {
+    if (selectedNotifIds.size === 0) return alert("請至少選擇一條戰報！");
+    if (!confirm(`確定要刪除這 ${selectedNotifIds.size} 條紀錄嗎？`)) return;
+
+    // 保留那些「不在」選取清單中的戰報
+    const newLogs = battleLogs.filter((log, index) => {
+        // 重建一次 ID 來比對 (必須與 renderNotifications 的生成邏輯一致)
+        const tempId = `battle_log_${log.timestamp ? log.timestamp.seconds : Date.now()}_${index}`;
+        return !selectedNotifIds.has(tempId);
+    });
+
+    try {
+        const btn = document.getElementById('notif-batch-confirm-btn');
+        if(btn) btn.innerText = "刪除中...";
+
+        await updateDoc(doc(db, "users", currentUser.uid), {
+            battleLogs: newLogs
+        });
+        
+        battleLogs = newLogs;
+        isNotifBatchMode = false; // 刪除後退出批量模式
+        selectedNotifIds.clear();
+        
+        playSound('dismantle');
+        renderNotifications();
+        
+    } catch (e) {
+        console.error("批量刪除失敗", e);
+        alert("刪除失敗，請檢查網路");
+    }
+}
+
 function renderNotifications() {
     notificationList.innerHTML = "";
     
-    // 系統通知 (固定 ID)
+    // 🔥 1. 在列表頂部加入「工具列」
+    const toolbar = document.createElement('div');
+    toolbar.style.padding = "10px";
+    toolbar.style.display = "flex";
+    toolbar.style.justifyContent = "flex-end";
+    toolbar.style.borderBottom = "1px solid #555";
+    toolbar.style.marginBottom = "10px";
+    toolbar.style.gap = "10px";
+
+    if (!isNotifBatchMode) {
+        // 正常模式：顯示「批量刪除」按鈕
+        const batchBtn = document.createElement('button');
+        batchBtn.className = "btn-secondary";
+        batchBtn.innerText = "🗑️ 批量刪除";
+        batchBtn.style.padding = "5px 15px";
+        batchBtn.style.fontSize = "0.9em";
+        batchBtn.onclick = toggleNotifBatchMode;
+        toolbar.appendChild(batchBtn);
+    } else {
+        // 批量模式：顯示「確認」與「取消」
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = "btn-secondary";
+        cancelBtn.innerText = "❌ 取消";
+        cancelBtn.style.padding = "5px 15px";
+        cancelBtn.onclick = toggleNotifBatchMode;
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.id = "notif-batch-confirm-btn";
+        confirmBtn.className = "btn-danger";
+        confirmBtn.innerText = `✅ 刪除 (${selectedNotifIds.size})`;
+        confirmBtn.style.padding = "5px 15px";
+        confirmBtn.onclick = executeBatchDelete;
+        
+        if (selectedNotifIds.size === 0) confirmBtn.classList.add('btn-disabled');
+
+        toolbar.appendChild(cancelBtn);
+        toolbar.appendChild(confirmBtn);
+    }
+    notificationList.appendChild(toolbar);
+
+    // 準備資料
     const staticSystemItems = SYSTEM_NOTIFICATIONS.map(notif => ({
         ...notif,
         timestamp: 9999999999999, 
         type: 'system'
     }));
 
-    // 🔥 修正：戰鬥紀錄 (自動生成唯一 ID)
-    // 使用 timestamp + index 確保 ID 唯一，避免被過濾器刪除
     const logItems = battleLogs.map((log, index) => ({
         ...log,
-        // 為每個戰報生成一個獨特的臨時 ID，確保不被視為重複
+        // 為每個戰報生成一個獨特的臨時 ID
         id: `battle_log_${log.timestamp ? log.timestamp.seconds : Date.now()}_${index}`,
-        originalLog: log, // 保存原始物件以便刪除時比對
+        originalLog: log, 
         timestamp: log.timestamp ? log.timestamp.seconds * 1000 : Date.now(),
         isSystem: false
     }));
 
     const allItems = [...staticSystemItems, ...globalAnnouncements, ...logItems].sort((a, b) => b.timestamp - a.timestamp);
 
-    // 過濾重複項目 (現在戰報已有唯一 ID，不會被過濾掉)
     const uniqueItems = allItems.filter((item, index, self) => 
         index === self.findIndex((t) => (t.id === item.id))
     );
 
+    // 渲染列表
     uniqueItems.forEach(item => {
         const div = document.createElement('div');
+        div.style.transition = "all 0.2s";
         
+        // 🔥 批量模式樣式處理
+        if (isNotifBatchMode) {
+            if (item.type === 'system') {
+                // 系統公告不能被批量選取，變半透明
+                div.style.opacity = "0.5";
+                div.style.pointerEvents = "none";
+            } else {
+                // 戰報可以選取
+                div.style.cursor = "pointer";
+                if (selectedNotifIds.has(item.id)) {
+                    div.style.border = "2px solid #e74c3c";
+                    div.style.background = "rgba(231, 76, 60, 0.2)";
+                } else {
+                    div.style.border = "2px solid transparent";
+                }
+                
+                // 點擊事件：選取/取消
+                div.addEventListener('click', () => toggleNotifSelection(item.id));
+            }
+        }
+
         if (item.type === 'system') {
             const isClaimed = claimedNotifs.includes(item.id);
             const hasReward = item.reward && item.reward.type !== 'none' && item.reward.amount > 0;
@@ -277,17 +395,20 @@ function renderNotifications() {
                 <div class="notif-status">${isClaimed ? '✔' : (hasReward ? '🎁' : 'ℹ️')}</div>
             `;
             
-            if (!isClaimed && hasReward) {
-                div.addEventListener('click', () => claimReward(item));
-            } else if (!hasReward) {
-                div.addEventListener('click', async () => {
-                    if(!isClaimed && currentUser) {
-                         claimedNotifs.push(item.id);
-                         await updateDoc(doc(db, "users", currentUser.uid), { claimedNotifs: claimedNotifs });
-                         div.classList.add('claimed');
-                         div.querySelector('.notif-status').innerText = '✔';
-                    }
-                });
+            // 非批量模式下才綁定領取事件
+            if (!isNotifBatchMode) {
+                if (!isClaimed && hasReward) {
+                    div.addEventListener('click', () => claimReward(item));
+                } else if (!hasReward) {
+                    div.addEventListener('click', async () => {
+                        if(!isClaimed && currentUser) {
+                             claimedNotifs.push(item.id);
+                             await updateDoc(doc(db, "users", currentUser.uid), { claimedNotifs: claimedNotifs });
+                             div.classList.add('claimed');
+                             div.querySelector('.notif-status').innerText = '✔';
+                        }
+                    });
+                }
             }
         } else {
             const date = new Date(item.timestamp).toLocaleString();
@@ -295,45 +416,60 @@ function renderNotifications() {
             const colorClass = isWin ? 'log-def-win' : 'log-def-lose';
             const resultText = isWin ? '🛡️ 防守成功' : '💔 防守失敗';
             const moneyText = isWin ? '無損失' : `<span style="color:#e74c3c">損失 ${item.goldLost} G</span>`;
-            const revengeHint = item.attackerUid ? '<div class="revenge-tag" style="background:#e74c3c; padding:2px 5px; border-radius:3px; font-size:0.8em;">復仇 ⚔️</div>' : '';
+            
+            // 批量模式下不顯示復仇按鈕
+            const revengeHint = (!isNotifBatchMode && item.attackerUid) ? '<div class="revenge-tag" style="background:#e74c3c; padding:2px 5px; border-radius:3px; font-size:0.8em;">復仇 ⚔️</div>' : '';
 
             div.className = `notification-item notif-battle-log ${colorClass}`;
-            div.style.cursor = item.attackerUid ? 'pointer' : 'default'; 
-            div.style.position = 'relative'; // 為了定位刪除按鈕
+            if (!isNotifBatchMode) {
+                div.style.cursor = item.attackerUid ? 'pointer' : 'default'; 
+                div.style.position = 'relative'; 
+            }
             
+            // 批量模式增加前面的勾選框 (視覺用)
+            const checkMark = (isNotifBatchMode && selectedNotifIds.has(item.id)) ? `<span style="margin-right:10px; font-size:1.2em;">✅</span>` : (isNotifBatchMode ? `<span style="margin-right:10px; font-size:1.2em; opacity:0.3;">⬜</span>` : "");
+
             div.innerHTML = `
-                <div style="width:100%; padding-right: 30px;">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                        <span style="font-weight:bold; color:#fff;">⚔️ ${item.attackerName} 攻擊了你</span>
-                        <span style="font-size:0.8em; color:#aaa;">${date}</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <span style="font-weight:bold; ${isWin ? 'color:#2ecc71' : 'color:#e74c3c'}">${resultText}</span>
-                            <span style="margin-left:5px;">${moneyText}</span>
+                <div style="display:flex; align-items:center; width:100%;">
+                    ${checkMark}
+                    <div style="width:100%; padding-right: ${isNotifBatchMode ? '0' : '30px'};">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <span style="font-weight:bold; color:#fff;">⚔️ ${item.attackerName} 攻擊了你</span>
+                            <span style="font-size:0.8em; color:#aaa;">${date}</span>
                         </div>
-                        ${revengeHint}
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <span style="font-weight:bold; ${isWin ? 'color:#2ecc71' : 'color:#e74c3c'}">${resultText}</span>
+                                <span style="margin-left:5px;">${moneyText}</span>
+                            </div>
+                            ${revengeHint}
+                        </div>
                     </div>
                 </div>
-                <div class="delete-log-btn" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-size:1.2em; color:#e74c3c;">❌</div>
             `;
 
-            // 🔥 刪除按鈕事件
-            const deleteBtn = div.querySelector('.delete-log-btn');
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // 防止觸發復仇
-                if(confirm("確定要刪除這條戰鬥紀錄嗎？")) {
-                    deleteBattleLog(item.originalLog);
-                }
-            });
-
-            // 點擊本體 (復仇)
-            if (item.attackerUid) {
-                div.addEventListener('click', () => {
-                    playSound('click');
-                    document.getElementById('notification-modal').classList.add('hidden'); 
-                    startRevengeMatch(item.attackerUid); 
+            // 只有在非批量模式下才顯示單刪除按鈕和綁定復仇
+            if (!isNotifBatchMode) {
+                const deleteSingleBtn = document.createElement('div');
+                deleteSingleBtn.className = "delete-log-btn";
+                deleteSingleBtn.style.cssText = "position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-size:1.2em; color:#e74c3c;";
+                deleteSingleBtn.innerText = "❌";
+                
+                deleteSingleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); 
+                    if(confirm("確定要刪除這條戰鬥紀錄嗎？")) {
+                        deleteBattleLog(item.originalLog);
+                    }
                 });
+                div.appendChild(deleteSingleBtn);
+
+                if (item.attackerUid) {
+                    div.addEventListener('click', () => {
+                        playSound('click');
+                        document.getElementById('notification-modal').classList.add('hidden'); 
+                        startRevengeMatch(item.attackerUid); 
+                    });
+                }
             }
         }
         
@@ -341,20 +477,15 @@ function renderNotifications() {
     });
     
     if (uniqueItems.length === 0) {
-        notificationList.innerHTML = "<div style='text-align:center; padding:20px; color:#777;'>暫無通知</div>";
+        notificationList.innerHTML += "<div style='text-align:center; padding:20px; color:#777;'>暫無通知</div>";
     }
 }
 
-// 🔥 新增：刪除戰報功能
+// 單筆刪除戰報
 async function deleteBattleLog(logToRemove) {
     if (!currentUser) return;
     
-    // 透過比對時間戳記來找出要刪除的項目
-    // 因為 Firestore 的 arrayRemove 需要完全一樣的物件，但時間戳記轉來轉去可能會有些微誤差
-    // 所以我們採用「讀取 -> 過濾 -> 寫回」的方式，這是最穩定的
-    
     const newLogs = battleLogs.filter(log => {
-        // 比對時間戳記的秒數是否相同
         if(log.timestamp && logToRemove.timestamp) {
             return log.timestamp.seconds !== logToRemove.timestamp.seconds;
         }
@@ -365,12 +496,9 @@ async function deleteBattleLog(logToRemove) {
         await updateDoc(doc(db, "users", currentUser.uid), {
             battleLogs: newLogs
         });
-        
-        // 更新本地資料並重新渲染
         battleLogs = newLogs;
         renderNotifications();
         playSound('dismantle');
-        
     } catch (e) {
         console.error("刪除戰報失敗", e);
         alert("刪除失敗，請檢查網路");
