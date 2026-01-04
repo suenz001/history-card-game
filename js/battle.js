@@ -238,78 +238,92 @@ function spawnPvpEnemies(enemyTeam) {
     if(!container) return;
 
     enemyTeam.forEach(enemyCard => {
-        const lane = Math.floor(enemyCard.slotIndex / 3);
-        const col = enemyCard.slotIndex % 3;
-        const startPos = 95 - (col * 4); 
-        const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
-        const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
+        spawnSingleEnemyFromCard(enemyCard, container);
+    });
+}
 
-        // 🔥🔥🔥 核心修改：本地資料強制優先 (Local Authority) 🔥🔥🔥
-        // 確保技能與 data.js 同步，並解決 R 卡可能為 null 的問題
-        
-        let finalSkillKey = 'HEAVY_STRIKE';
-        let finalSkillParams = { dmgMult: 2.0 };
-        let finalTitle = enemyCard.title || "強敵";
-        let realId = enemyCard.id;
+// 🔥 新增：通用函式，從卡片資料生成敵人 (支援 PVP 與 PVE)
+function spawnSingleEnemyFromCard(enemyCard, container) {
+    const lane = enemyCard.slotIndex !== undefined ? Math.floor(enemyCard.slotIndex / 3) : -1;
+    const col = enemyCard.slotIndex !== undefined ? (enemyCard.slotIndex % 3) : 0;
+    
+    // 如果是 PVE，隨機位置；如果是 PVP，固定位置
+    let startPos = 95 - (col * 4);
+    let startY = 50;
 
-        // 1. 先查本地資料庫 (Source of Truth)
-        const localConfig = cardDatabase.find(c => c.id == enemyCard.id);
-        
-        if (localConfig) {
-            // 如果本地有設定，優先使用本地的 id 與 title
-            realId = localConfig.id;
-            finalTitle = localConfig.title || finalTitle;
+    if (enemyCard.slotIndex === undefined) {
+        // PVE 隨機生成位置
+        startPos = 40 + (Math.random() * 55);
+        if (Math.random() < 0.5) startY = 10 + Math.random() * 30; else startY = 60 + Math.random() * 30;
+    } else {
+        startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
+    }
 
-            // 只有當本地設定有技能時才覆蓋
-            if (localConfig.skillKey) {
-                console.log(`[PVP] Using LOCAL skill for ${localConfig.name}: ${localConfig.skillKey}`);
-                finalSkillKey = localConfig.skillKey;
-                finalSkillParams = localConfig.skillParams || finalSkillParams;
-            } 
-            // 如果本地沒有技能 (例如 R 卡)，則保持 HEAVY_STRIKE，不使用遠端可能殘留的舊技能
+    const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
+
+    // 本地資料強制優先
+    let finalSkillKey = 'HEAVY_STRIKE';
+    let finalSkillParams = { dmgMult: 2.0 };
+    let finalTitle = enemyCard.title || "強敵";
+    let realId = enemyCard.id;
+
+    const localConfig = cardDatabase.find(c => c.id == enemyCard.id);
+    if (localConfig) {
+        realId = localConfig.id;
+        finalTitle = localConfig.title || finalTitle;
+        if (localConfig.skillKey) {
+            finalSkillKey = localConfig.skillKey;
+            finalSkillParams = localConfig.skillParams || finalSkillParams;
         } 
-        else if (enemyCard.skillKey) {
-            // 2. 如果本地找不到這張卡 (極少見)，才勉強用對手身上的資料
-            console.log(`[PVP] Local miss, using REMOTE skill for ID:${enemyCard.id}: ${enemyCard.skillKey}`);
-            finalSkillKey = enemyCard.skillKey;
-            finalSkillParams = enemyCard.skillParams || finalSkillParams;
-        }
+    } 
+    else if (enemyCard.skillKey) {
+        finalSkillKey = enemyCard.skillKey;
+        finalSkillParams = enemyCard.skillParams || finalSkillParams;
+    }
 
-        const el = document.createElement('div');
-        el.className = `enemy-unit pvp-enemy ${enemyCard.rarity}`;
-        el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
-        el.style.backgroundSize = 'cover';
-        el.style.border = '2px solid #e74c3c';
-        el.style.left = `${startPos}%`;
-        el.style.top = `${startY}%`;
-        el.style.transform = 'translateY(-50%) scaleX(-1)';
+    const el = document.createElement('div');
+    el.className = `enemy-unit pvp-enemy ${enemyCard.rarity || 'R'}`; // 加上 pvp-enemy 樣式
+    el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
+    el.style.backgroundSize = 'cover';
+    el.style.border = '2px solid #e74c3c';
+    el.style.left = `${startPos}%`;
+    el.style.top = `${startY}%`;
+    el.style.transform = 'translateY(-50%) scaleX(-1)';
 
-        el.innerHTML = `
-            <div class="enemy-hp-bar"><div style="width:100%"></div></div>
-            <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
-            <div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>
-        `;
-        container.appendChild(el);
+    // 如果是 BOSS 級別，稍微放大
+    if(enemyCard.isBoss) {
+        el.style.width = '70px';
+        el.style.height = '70px';
+        el.style.zIndex = '30';
+        el.style.border = '3px solid #f1c40f';
+        el.style.boxShadow = '0 0 15px #f1c40f';
+    }
 
-        let finalHp = enemyCard.hp;
-        if(enemyCard.attackType === 'ranged') finalHp = Math.floor(enemyCard.hp * 0.45);
+    el.innerHTML = `
+        <div class="enemy-hp-bar"><div style="width:100%"></div></div>
+        <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
+        <div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>
+    `;
+    container.appendChild(el);
 
-        enemies.push({
-            ...enemyCard,
-            id: realId,
-            title: finalTitle,
-            maxHp: finalHp, currentHp: finalHp,
-            maxMana: 100, currentMana: 0,
-            position: startPos, y: startY,
-            speed: 0.05,
-            range: enemyCard.attackType === 'ranged' ? 16 : 4, 
-            atk: enemyCard.attackType === 'ranged' ? Math.floor(enemyCard.atk * 0.35) : enemyCard.atk, 
-            lastAttackTime: 0,
-            el: el,
-            isPvpHero: true,
-            skillKey: finalSkillKey, // 使用確認後的技能
-            skillParams: finalSkillParams
-        });
+    let finalHp = enemyCard.hp;
+    if(enemyCard.attackType === 'ranged') finalHp = Math.floor(enemyCard.hp * 0.45);
+
+    enemies.push({
+        ...enemyCard,
+        id: realId,
+        title: finalTitle,
+        maxHp: finalHp, currentHp: finalHp,
+        maxMana: 100, currentMana: 0,
+        position: startPos, y: startY,
+        speed: 0.05,
+        range: enemyCard.attackType === 'ranged' ? 16 : 4, 
+        atk: enemyCard.attackType === 'ranged' ? Math.floor(enemyCard.atk * 0.35) : enemyCard.atk, 
+        lastAttackTime: 0,
+        el: el,
+        isPvpHero: true, // 🔥 重要：設為 true 代表這是會用技能的單位 (不論 PVP/PVE)
+        skillKey: finalSkillKey,
+        skillParams: finalSkillParams
     });
 }
 
@@ -339,8 +353,52 @@ function spawnEnemy() {
     if(!container) return;
 
     const config = WAVE_CONFIG[battleState.wave];
-    
+    let multHp = 1, multAtk = 1;
+
+    if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
+    else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
+
+    // 🔥 1. 檢查是否有指定要生成的英雄 ID (PVE 英雄)
+    // 我們可以修改 data.js 的 WAVE_CONFIG，例如新增 enemyPool: [1, 8, 10]
+    if (config.enemyPool && config.enemyPool.length > 0) {
+        // 隨機從池中選一個英雄 ID
+        const randomId = config.enemyPool[Math.floor(Math.random() * config.enemyPool.length)];
+        const baseCard = cardDatabase.find(c => c.id === randomId);
+
+        if (baseCard) {
+            // 根據波次難度調整數值
+            const enemyData = {
+                ...baseCard,
+                hp: Math.floor(baseCard.hp * (0.5 + battleState.wave * 0.2) * multHp), // PVE 怪物血量調整
+                atk: Math.floor(baseCard.atk * (0.5 + battleState.wave * 0.1) * multAtk),
+                slotIndex: undefined // 讓它隨機位置
+            };
+            spawnSingleEnemyFromCard(enemyData, container);
+            return;
+        }
+    }
+
+    // 🔥 2. 波次 4 Boss 處理 (支援英雄型 Boss)
     if(battleState.wave === 4) {
+        // 如果 data.js 有設定 bossId (例如秦始皇 id:1)，則生成英雄 Boss
+        if (config.bossId) {
+            const baseCard = cardDatabase.find(c => c.id === config.bossId);
+            if (baseCard) {
+                const bossData = {
+                    ...baseCard,
+                    hp: 30000 * multHp, 
+                    atk: 500 * multAtk,
+                    isBoss: true, // 標記為 Boss (放大體型)
+                    slotIndex: undefined 
+                };
+                spawnSingleEnemyFromCard(bossData, container);
+                // 手動修正 Boss 列表，防止重複生成 (如果 totalToSpawn > 1)
+                enemies[enemies.length-1].isBoss = true; 
+                return;
+            }
+        }
+
+        // 否則生成預設的 Emoji Boss
         const bossX = 10 + Math.random() * 80; 
         const bossY = 10 + Math.random() * 80;
         const boss = { id: Date.now(), maxHp: 30000, currentHp: 30000, atk: 500, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
@@ -350,10 +408,7 @@ function spawnEnemy() {
         return;
     }
 
-    let multHp = 1, multAtk = 1;
-    if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
-    else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
-
+    // 🔥 3. 普通雜兵 (骷髏)
     const spawnX = 40 + (Math.random() * 55);
     let spawnY;
     if (Math.random() < 0.5) spawnY = 10 + Math.random() * 30; else spawnY = 60 + Math.random() * 30;
@@ -1078,11 +1133,12 @@ function gameLoop() {
             }
         });
 
-        // 🔥 敵人 (PVP英雄) 的邏輯更新：回氣、放技能
+        // 🔥 敵方英雄 (PVP / PVE Hero) 的邏輯更新：回氣、放技能
+        // 只要標記為 isPvpHero 就會執行智慧戰鬥邏輯
         if (enemy.isPvpHero) {
             // 回氣
             if (enemy.currentMana < enemy.maxMana) {
-                enemy.currentMana += 0.25 * gameSpeed; // PVP 回氣速度
+                enemy.currentMana += 0.25 * gameSpeed; // 敵方回氣速度
                 if(enemy.currentMana > enemy.maxMana) enemy.currentMana = enemy.maxMana;
             }
             // 更新敵人氣力條 UI
@@ -1100,7 +1156,7 @@ function gameLoop() {
         if (enemy.isPvpHero && nearestHero && minTotalDist <= enemy.range) {
             blocked = true;
             if (now - enemy.lastAttackTime > 2000 / gameSpeed) {
-                // 🔥 敵人滿氣放招
+                // 🔥 敵人滿氣放招 (PVP/PVE通用)
                 if (enemy.currentMana >= enemy.maxMana) {
                     executeSkill(enemy, nearestHero);
                 } else {
@@ -1110,7 +1166,7 @@ function gameLoop() {
                             if(nearestHero.isInvincible) {
                                 showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
                             } else if (nearestHero.immunityStacks > 0) {
-                                // 🔥 PVP時我方英雄格擋
+                                // 我方英雄格擋
                                 nearestHero.immunityStacks--;
                                 showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
                                 safePlaySound('dismantle');
@@ -1135,7 +1191,7 @@ function gameLoop() {
                         if(nearestHero.isInvincible) {
                             showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
                         } else if (nearestHero.immunityStacks > 0) {
-                            // 🔥 PVE時我方英雄格擋
+                            // PVE時我方英雄格擋
                             nearestHero.immunityStacks--;
                             showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
                             safePlaySound('dismantle');
