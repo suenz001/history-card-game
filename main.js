@@ -56,6 +56,9 @@ let gachaIndex = 0;
 
 let pvpTargetInfo = { index: null, type: null };
 
+// 🔥 新增：是否正在查看敵方卡片 (用於隱藏升級按鈕)
+let isViewingEnemy = false;
+
 const SYSTEM_NOTIFICATIONS = [
     { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 }, isSystem: true }
 ];
@@ -67,6 +70,7 @@ setOnBattleEnd(handleBattleEnd);
 // 初始化 PVP
 setTimeout(() => {
     if(document.getElementById('pvp-menu-btn')) {
+        // 🔥 修改：傳入 handleEnemyCardClick 作為第 5 個參數
         initPvp(db, currentUser, allUserCards, (slotIndex, type) => {
             pvpTargetInfo = { index: slotIndex, type: type };
             const title = type === 'defense' ? "👇 選擇 PVP 防守英雄" : "👇 選擇 PVP 進攻英雄";
@@ -74,9 +78,37 @@ setTimeout(() => {
             document.getElementById('inventory-modal').classList.remove('hidden');
             if(allUserCards.length === 0 && currentUser) loadInventory(currentUser.uid); 
             else filterInventory('ALL');
-        });
+        }, handleEnemyCardClick);
     }
 }, 500);
+
+// 🔥 新增：處理點擊敵方卡片的邏輯
+function handleEnemyCardClick(enemyCard) {
+    isViewingEnemy = true; // 標記為查看敵人模式
+
+    // 重新建構卡片資料 (因為 enemyCard 可能缺少年份/敘述，且數值需要即時計算)
+    const baseCard = cardDatabase.find(c => c.id == enemyCard.id);
+    let displayCard = { ...baseCard, ...enemyCard };
+
+    if (baseCard) {
+        // 根據等級與星數重新計算數值 (模擬 battle.js 的邏輯)
+        const level = displayCard.level || 1;
+        const stars = displayCard.stars || 1;
+        const levelBonus = (level - 1) * 0.03;
+        const starBonus = (stars - 1) * 0.20;
+        
+        displayCard.atk = Math.floor(baseCard.atk * (1 + levelBonus) * (1 + starBonus));
+        displayCard.hp = Math.floor(baseCard.hp * (1 + levelBonus) * (1 + starBonus));
+        displayCard.skillKey = baseCard.skillKey;
+        displayCard.skillParams = baseCard.skillParams;
+    }
+
+    currentDisplayList = [displayCard];
+    currentCardIndex = 0;
+    
+    document.getElementById('detail-modal').classList.remove('hidden');
+    renderDetailCard();
+}
 
 // 設定介面相關
 const settingsModal = document.getElementById('settings-modal');
@@ -805,6 +837,18 @@ function renderDetailCard() {
     const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); 
     const upgradeStarBtn = document.getElementById('upgrade-star-btn');
     
+    // 🔥 修正：若是觀看敵人卡片，隱藏升級和分解按鈕
+    const upgradeControls = document.querySelector('.upgrade-controls');
+    const dismantleBtn = document.getElementById('dismantle-btn');
+    
+    if(isViewingEnemy) {
+        if(upgradeControls) upgradeControls.style.display = 'none';
+        if(dismantleBtn) dismantleBtn.style.display = 'none';
+    } else {
+        if(upgradeControls) upgradeControls.style.display = 'flex';
+        if(dismantleBtn) dismantleBtn.style.display = 'block';
+    }
+
     if (card.level >= 30) { 
         upgradeLevelBtn.innerHTML = "已達 MAX"; upgradeLevelBtn.classList.add('btn-disabled'); upgradeLevelBtn.onclick = null; 
     } else { 
@@ -823,6 +867,7 @@ function renderDetailCard() {
 }
 
 async function upgradeCardLevel(cost) {
+    if(isViewingEnemy) return; // 防止作弊
     const card = currentDisplayList[currentCardIndex];
     if (gold < cost) return alert("金幣不足！");
     const currentDocId = card.docId; gold -= cost; playSound('coin'); card.level++; calculateCardStats(card); playSound('upgrade'); 
@@ -831,6 +876,7 @@ async function upgradeCardLevel(cost) {
 }
 
 async function upgradeCardStar() {
+    if(isViewingEnemy) return; // 防止作弊
     const card = currentDisplayList[currentCardIndex]; const currentDocId = card.docId;
     const duplicate = allUserCards.find(c => c.id === card.id && c.docId !== card.docId);
     if (!duplicate) return alert("沒有重複的卡片可以用來升星！");
@@ -845,6 +891,7 @@ async function upgradeCardStar() {
 function calculateCardStats(card) { const levelBonus = (card.level - 1) * 0.03; const starBonus = (card.stars - 1) * 0.20; card.atk = Math.floor(card.baseAtk * (1 + levelBonus) * (1 + starBonus)); card.hp = Math.floor(card.baseHp * (1 + levelBonus) * (1 + starBonus)); }
 
 async function dismantleCurrentCard() {
+    if(isViewingEnemy) return; // 防止作弊
     const card = currentDisplayList[currentCardIndex]; if (!card) return; const value = DISMANTLE_VALUES[card.rarity];
     if (card.rarity !== 'R') { if (!confirm(`確定要分解【${card.name}】嗎？\n獲得 ${value} 金幣。`)) return; }
     try { 
@@ -872,7 +919,17 @@ if(detailModal) {
 
 if(document.getElementById('prev-card-btn')) document.getElementById('prev-card-btn').addEventListener('click', () => changeCard('prev')); 
 if(document.getElementById('next-card-btn')) document.getElementById('next-card-btn').addEventListener('click', () => changeCard('next'));
-if(document.getElementById('close-detail-btn')) document.getElementById('close-detail-btn').addEventListener('click', () => { playSound('click'); document.getElementById('detail-modal').classList.add('hidden'); });
+if(document.getElementById('close-detail-btn')) document.getElementById('close-detail-btn').addEventListener('click', () => { 
+    playSound('click'); 
+    document.getElementById('detail-modal').classList.add('hidden'); 
+    isViewingEnemy = false; // 🔥 重置查看模式
+    
+    // 恢復按鈕顯示
+    const upgradeControls = document.querySelector('.upgrade-controls');
+    const dismantleBtn = document.getElementById('dismantle-btn');
+    if(upgradeControls) upgradeControls.style.display = 'flex';
+    if(dismantleBtn) dismantleBtn.style.display = 'block';
+});
 document.querySelectorAll('.filter-btn').forEach(btn => { btn.addEventListener('click', (e) => { playSound('click'); document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); e.target.classList.add('active'); filterInventory(e.target.getAttribute('data-filter')); }); });
 
 async function saveCardToCloud(card) {

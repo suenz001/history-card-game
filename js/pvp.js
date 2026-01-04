@@ -2,7 +2,7 @@
 import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, limit, orderBy, runTransaction, arrayUnion, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { startPvpMatch, setOnBattleEnd, resetBattleState } from './battle.js';
-import { cardDatabase } from './data.js';
+import { cardDatabase } from './data.js'; // 🔥 確保引用了 data.js
 
 let db;
 let currentUser;
@@ -16,12 +16,15 @@ export let currentEnemyData = null;
 
 // 回調函式，用來請求主程式打開背包
 let requestOpenInventory = null;
+// 🔥 新增：回調函式，用來請求主程式打開敵人卡片詳情
+let showEnemyCardCallback = null;
 
-export function initPvp(database, user, inventory, openInventoryCallback) {
+export function initPvp(database, user, inventory, openInventoryCallback, onCardClick) {
     db = database;
     currentUser = user;
     allUserCards = inventory;
     requestOpenInventory = openInventoryCallback; 
+    showEnemyCardCallback = onCardClick; // 儲存回調
 
     const pvpBtn = document.getElementById('pvp-menu-btn');
     if (pvpBtn) {
@@ -116,7 +119,7 @@ async function openPvpModal() {
     updateSaveButtonState();
 }
 
-// 當 main.js 選擇好卡片後，呼叫此函式寫入 PVP 欄位
+// 🔥 當 main.js 選擇好卡片後，呼叫此函式寫入 PVP 欄位
 export function setPvpHero(slotIndex, card, type) {
     const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
 
@@ -136,7 +139,7 @@ export function setPvpHero(slotIndex, card, type) {
         updateSaveButtonState();
         document.getElementById('pvp-setup-modal').classList.remove('hidden');
     } else {
-        // 進攻模式：自動存檔
+        // 🔥 進攻模式：自動存檔
         saveAttackTeam();
         document.getElementById('pvp-arena-modal').classList.remove('hidden');
     }
@@ -157,7 +160,7 @@ function handleSlotClick(slotElement, type) {
         if(type === 'defense') {
             updateSaveButtonState();
         } else {
-            // 進攻模式：移除時也要自動存檔
+            // 🔥 進攻模式：移除時也要自動存檔
             saveAttackTeam();
         }
     } 
@@ -199,7 +202,7 @@ function renderPvpSlots(type) {
 
 function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !== null).length; const btn = document.getElementById('save-pvp-team-btn'); if (count > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `💾 儲存防守陣容 (${count}/6)`; } else { btn.classList.add('btn-disabled'); btn.innerText = "請至少配置 1 名英雄"; } }
 
-// 🔥 核心修改：儲存防守陣容時，只存 Meta Data (ID/等級/星數)，不存固定數值
+// 🔥 核心修復：在儲存防守陣容時，更嚴謹地比對 ID 並寫入技能
 async function saveDefenseTeam() {
     if (!currentUser) return;
     const count = pvpDefenseSlots.filter(x => x !== null).length; 
@@ -214,16 +217,29 @@ async function saveDefenseTeam() {
         const teamData = []; 
         pvpDefenseSlots.forEach((hero, index) => { 
             if (hero) { 
+                // 🔥 強制將 ID 轉為字串比對，避免 1 == "1" 的潛在問題
+                const baseConfig = cardDatabase.find(c => String(c.id) === String(hero.id));
+                
+                // Debug log
+                if (baseConfig) {
+                    console.log(`Saving Defense Hero: ${hero.name}, Skill: ${baseConfig.skillKey}`);
+                } else {
+                    console.warn(`⚠️ Warning: No base config found for hero ID: ${hero.id}`);
+                }
+
                 // 這裡只儲存必要的索引資料，戰鬥時會根據這些資料重新計算數值
                 teamData.push({ 
                     id: hero.id, 
-                    docId: hero.docId, // 僅供除錯或比對
+                    docId: hero.docId, 
                     name: hero.name, 
                     rarity: hero.rarity, 
                     level: hero.level || 1, 
-                    stars: hero.stars || 1,
-                    slotIndex: index
-                    // 不再儲存 atk, hp, skillKey 等，全部由 battle.js 動態讀取
+                    stars: hero.stars || 1, 
+                    slotIndex: index,
+                    // 🔥 若找不到配置，則預設為 HEAVY_STRIKE
+                    title: baseConfig ? baseConfig.title : (hero.title || ""),
+                    skillKey: baseConfig ? baseConfig.skillKey : "HEAVY_STRIKE",
+                    skillParams: baseConfig ? baseConfig.skillParams : { dmgMult: 2.0 }
                 }); 
             } 
         });
@@ -296,7 +312,7 @@ function resetToOpponentList() {
     currentEnemyData = null;
 }
 
-// 搜尋邏輯 (混合策略：強者 + 弱者 + 全服頂尖)
+// 🔥 修改：搜尋邏輯 (混合策略：強者 + 弱者 + 全服頂尖)
 async function searchOpponent() {
     const loadingDiv = document.getElementById('pvp-loading');
     const listView = document.getElementById('pvp-opponent-list-view');
@@ -500,7 +516,18 @@ function renderMatchup() {
             if (enemyHero) {
                 slotDiv.classList.add('active'); slotDiv.style.background = 'rgba(231, 76, 60, 0.2)';
                 const cardDiv = document.createElement('div'); const charPath = `assets/cards/${enemyHero.id}.webp`; const framePath = `assets/frames/${enemyHero.rarity.toLowerCase()}.png`;
-                cardDiv.className = `card ${enemyHero.rarity}`; cardDiv.style.transform = 'scale(0.45)'; cardDiv.style.position = 'absolute'; cardDiv.style.top = '50%'; cardDiv.style.left = '50%'; cardDiv.style.translate = '-50% -50%'; cardDiv.style.margin = '0'; cardDiv.style.pointerEvents = 'none';
+                cardDiv.className = `card ${enemyHero.rarity}`; cardDiv.style.transform = 'scale(0.45)'; cardDiv.style.position = 'absolute'; cardDiv.style.top = '50%'; cardDiv.style.left = '50%'; cardDiv.style.translate = '-50% -50%'; cardDiv.style.margin = '0';
+                
+                // 🔥 修改：允許點擊查看詳情
+                cardDiv.style.pointerEvents = 'auto'; 
+                cardDiv.style.cursor = 'pointer';
+                cardDiv.addEventListener('click', () => {
+                    if(showEnemyCardCallback) {
+                        playSound('click');
+                        showEnemyCardCallback(enemyHero);
+                    }
+                });
+
                 cardDiv.innerHTML = `<img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
                 slotDiv.appendChild(cardDiv);
             } else { slotDiv.innerHTML = `<div class="slot-placeholder" style="color:#555;">+</div>`; }
