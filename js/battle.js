@@ -243,46 +243,72 @@ function spawnPvpEnemies(enemyTeam) {
 }
 
 // 🔥 新增：通用函式，從卡片資料生成敵人 (支援 PVP 與 PVE)
+// 現在具備「即時數值計算」功能
 function spawnSingleEnemyFromCard(enemyCard, container) {
     const lane = enemyCard.slotIndex !== undefined ? Math.floor(enemyCard.slotIndex / 3) : -1;
     const col = enemyCard.slotIndex !== undefined ? (enemyCard.slotIndex % 3) : 0;
     
-    // 如果是 PVE，隨機位置；如果是 PVP，固定位置
+    // PVE 隨機位置 vs PVP 固定位置
     let startPos = 95 - (col * 4);
     let startY = 50;
 
     if (enemyCard.slotIndex === undefined) {
-        // PVE 隨機生成位置
         startPos = 40 + (Math.random() * 55);
         if (Math.random() < 0.5) startY = 10 + Math.random() * 30; else startY = 60 + Math.random() * 30;
     } else {
         startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
     }
 
-    const typeIcon = enemyCard.attackType === 'ranged' ? '🏹' : '⚔️';
-
-    // 本地資料強制優先
-    let finalSkillKey = 'HEAVY_STRIKE';
-    let finalSkillParams = { dmgMult: 2.0 };
-    let finalTitle = enemyCard.title || "強敵";
-    let realId = enemyCard.id;
-
+    // 🔥🔥🔥 核心修改：從 cardDatabase 讀取「最新」基礎數值與技能 🔥🔥🔥
     const localConfig = cardDatabase.find(c => c.id == enemyCard.id);
+    
+    // 預設值 (如果找不到資料卡，就用傳入的資料當備案)
+    let realId = enemyCard.id;
+    let finalTitle = enemyCard.title || "強敵";
+    let finalSkillKey = enemyCard.skillKey || 'HEAVY_STRIKE';
+    let finalSkillParams = enemyCard.skillParams || { dmgMult: 2.0 };
+    let finalAtk = enemyCard.atk || 100;
+    let finalHp = enemyCard.hp || 500;
+    let attackType = enemyCard.attackType || 'melee';
+    
     if (localConfig) {
         realId = localConfig.id;
         finalTitle = localConfig.title || finalTitle;
+        attackType = localConfig.attackType;
+        
+        // 1. 同步最新技能
         if (localConfig.skillKey) {
             finalSkillKey = localConfig.skillKey;
             finalSkillParams = localConfig.skillParams || finalSkillParams;
-        } 
-    } 
-    else if (enemyCard.skillKey) {
-        finalSkillKey = enemyCard.skillKey;
-        finalSkillParams = enemyCard.skillParams || finalSkillParams;
+        }
+
+        // 2. 重新計算數值 (防止作弊，並同步平衡性調整)
+        // 公式與 main.js 保持一致：
+        // Atk = Base * (1 + (Lv-1)*0.03) * (1 + (Star-1)*0.20)
+        
+        const level = enemyCard.level || 1;
+        const stars = enemyCard.stars || 1;
+        
+        const levelBonus = (level - 1) * 0.03;
+        const starBonus = (stars - 1) * 0.20;
+
+        // 如果是 PVE 怪物(沒有 level 屬性)，直接用傳入的數值；如果是 PVP(有 level)，則重算
+        if (enemyCard.level) {
+            finalAtk = Math.floor(localConfig.atk * (1 + levelBonus) * (1 + starBonus));
+            finalHp = Math.floor(localConfig.hp * (1 + levelBonus) * (1 + starBonus));
+            
+            console.log(`[PVP Spawn] ${localConfig.name} Lv.${level} ${stars}★ -> ATK:${finalAtk} HP:${finalHp}`);
+        } else {
+            // PVE 情況，保留傳入的數值 (因為 spawnEnemy 已經乘過難度係數了)
+            finalAtk = enemyCard.atk;
+            finalHp = enemyCard.hp;
+        }
     }
 
+    const typeIcon = attackType === 'ranged' ? '🏹' : '⚔️';
+
     const el = document.createElement('div');
-    el.className = `enemy-unit pvp-enemy ${enemyCard.rarity || 'R'}`; // 加上 pvp-enemy 樣式
+    el.className = `enemy-unit pvp-enemy ${enemyCard.rarity || 'R'}`;
     el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
     el.style.backgroundSize = 'cover';
     el.style.border = '2px solid #e74c3c';
@@ -290,13 +316,9 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     el.style.top = `${startY}%`;
     el.style.transform = 'translateY(-50%) scaleX(-1)';
 
-    // 如果是 BOSS 級別，稍微放大
     if(enemyCard.isBoss) {
-        el.style.width = '70px';
-        el.style.height = '70px';
-        el.style.zIndex = '30';
-        el.style.border = '3px solid #f1c40f';
-        el.style.boxShadow = '0 0 15px #f1c40f';
+        el.style.width = '70px'; el.style.height = '70px'; el.style.zIndex = '30';
+        el.style.border = '3px solid #f1c40f'; el.style.boxShadow = '0 0 15px #f1c40f';
     }
 
     el.innerHTML = `
@@ -306,22 +328,23 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     `;
     container.appendChild(el);
 
-    let finalHp = enemyCard.hp;
-    if(enemyCard.attackType === 'ranged') finalHp = Math.floor(enemyCard.hp * 0.45);
+    // 遠程單位血量修正 (維持原本邏輯)
+    if(attackType === 'ranged') finalHp = Math.floor(finalHp * 0.45);
 
     enemies.push({
-        ...enemyCard,
+        ...enemyCard, // 保留其他屬性
         id: realId,
         title: finalTitle,
         maxHp: finalHp, currentHp: finalHp,
+        atk: finalAtk,
+        attackType: attackType, // 確保攻擊類型也同步
         maxMana: 100, currentMana: 0,
         position: startPos, y: startY,
         speed: 0.05,
-        range: enemyCard.attackType === 'ranged' ? 16 : 4, 
-        atk: enemyCard.attackType === 'ranged' ? Math.floor(enemyCard.atk * 0.35) : enemyCard.atk, 
+        range: attackType === 'ranged' ? 16 : 4, 
         lastAttackTime: 0,
         el: el,
-        isPvpHero: true, // 🔥 重要：設為 true 代表這是會用技能的單位 (不論 PVP/PVE)
+        isPvpHero: true, 
         skillKey: finalSkillKey,
         skillParams: finalSkillParams
     });

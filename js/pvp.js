@@ -2,7 +2,7 @@
 import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, limit, orderBy, runTransaction, arrayUnion, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { startPvpMatch, setOnBattleEnd, resetBattleState } from './battle.js';
-import { cardDatabase } from './data.js'; // 🔥 確保引用了 data.js
+import { cardDatabase } from './data.js';
 
 let db;
 let currentUser;
@@ -116,7 +116,7 @@ async function openPvpModal() {
     updateSaveButtonState();
 }
 
-// 🔥 當 main.js 選擇好卡片後，呼叫此函式寫入 PVP 欄位
+// 當 main.js 選擇好卡片後，呼叫此函式寫入 PVP 欄位
 export function setPvpHero(slotIndex, card, type) {
     const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
 
@@ -136,7 +136,7 @@ export function setPvpHero(slotIndex, card, type) {
         updateSaveButtonState();
         document.getElementById('pvp-setup-modal').classList.remove('hidden');
     } else {
-        // 🔥 進攻模式：自動存檔
+        // 進攻模式：自動存檔
         saveAttackTeam();
         document.getElementById('pvp-arena-modal').classList.remove('hidden');
     }
@@ -157,7 +157,7 @@ function handleSlotClick(slotElement, type) {
         if(type === 'defense') {
             updateSaveButtonState();
         } else {
-            // 🔥 進攻模式：移除時也要自動存檔
+            // 進攻模式：移除時也要自動存檔
             saveAttackTeam();
         }
     } 
@@ -199,7 +199,7 @@ function renderPvpSlots(type) {
 
 function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !== null).length; const btn = document.getElementById('save-pvp-team-btn'); if (count > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `💾 儲存防守陣容 (${count}/6)`; } else { btn.classList.add('btn-disabled'); btn.innerText = "請至少配置 1 名英雄"; } }
 
-// 🔥 核心修復：在儲存防守陣容時，更嚴謹地比對 ID 並寫入技能
+// 🔥 核心修改：儲存防守陣容時，只存 Meta Data (ID/等級/星數)，不存固定數值
 async function saveDefenseTeam() {
     if (!currentUser) return;
     const count = pvpDefenseSlots.filter(x => x !== null).length; 
@@ -214,33 +214,16 @@ async function saveDefenseTeam() {
         const teamData = []; 
         pvpDefenseSlots.forEach((hero, index) => { 
             if (hero) { 
-                // 🔥 強制將 ID 轉為字串比對，避免 1 == "1" 的潛在問題
-                const baseConfig = cardDatabase.find(c => String(c.id) === String(hero.id));
-                
-                // Debug log
-                if (baseConfig) {
-                    console.log(`Saving Defense Hero: ${hero.name}, Skill: ${baseConfig.skillKey}`);
-                } else {
-                    console.warn(`⚠️ Warning: No base config found for hero ID: ${hero.id}`);
-                }
-
+                // 這裡只儲存必要的索引資料，戰鬥時會根據這些資料重新計算數值
                 teamData.push({ 
                     id: hero.id, 
-                    docId: hero.docId, 
+                    docId: hero.docId, // 僅供除錯或比對
                     name: hero.name, 
                     rarity: hero.rarity, 
-                    level: hero.level, 
-                    stars: hero.stars, 
-                    atk: hero.atk, 
-                    hp: hero.hp, 
-                    maxHp: hero.hp, 
-                    currentHp: hero.hp, 
-                    attackType: hero.attackType || 'melee', 
-                    slotIndex: index,
-                    // 🔥 若找不到配置，則預設為 HEAVY_STRIKE
-                    title: baseConfig ? baseConfig.title : (hero.title || ""),
-                    skillKey: baseConfig ? baseConfig.skillKey : "HEAVY_STRIKE",
-                    skillParams: baseConfig ? baseConfig.skillParams : { dmgMult: 2.0 }
+                    level: hero.level || 1, 
+                    stars: hero.stars || 1,
+                    slotIndex: index
+                    // 不再儲存 atk, hp, skillKey 等，全部由 battle.js 動態讀取
                 }); 
             } 
         });
@@ -313,7 +296,7 @@ function resetToOpponentList() {
     currentEnemyData = null;
 }
 
-// 🔥 修改：搜尋邏輯 (混合策略：強者 + 弱者 + 全服頂尖)
+// 搜尋邏輯 (混合策略：強者 + 弱者 + 全服頂尖)
 async function searchOpponent() {
     const loadingDiv = document.getElementById('pvp-loading');
     const listView = document.getElementById('pvp-opponent-list-view');
