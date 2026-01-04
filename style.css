@@ -987,3 +987,15 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 }
 
 @keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* style.css 新增或修改 */
+
+/* 敵方血條顏色 (紅色) */
+.monitor-hp-fill.enemy {
+    background: #e74c3c !important;
+}
+
+/* 確保側邊欄內容過多時可以捲動，且標題不會被擠壓 */
+.battle-monitor-sidebar h3 {
+    flex-shrink: 0;
+}

@@ -98,11 +98,13 @@ function setupBattleEnvironment() {
     
     const enemyContainer = document.getElementById('enemy-container');
     const heroContainer = document.getElementById('hero-container');
-    const monitorList = document.getElementById('hero-monitor-list');
+    const heroMonitorList = document.getElementById('hero-monitor-list');
+    const enemyMonitorList = document.getElementById('enemy-monitor-list'); // 🔥 新增
     
     if(enemyContainer) enemyContainer.innerHTML = '';
     if(heroContainer) heroContainer.innerHTML = '';
-    if(monitorList) monitorList.innerHTML = '';
+    if(heroMonitorList) heroMonitorList.innerHTML = '';
+    if(enemyMonitorList) enemyMonitorList.innerHTML = ''; // 🔥 清空敵方監控
 
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) lanesWrapper.style.opacity = '0.3';
@@ -135,8 +137,10 @@ export function resetBattleState() {
     if(enemyContainer) enemyContainer.innerHTML = '';
     if(heroContainer) heroContainer.innerHTML = '';
     
-    const monitorList = document.getElementById('hero-monitor-list');
-    if(monitorList) monitorList.innerHTML = '';
+    const heroMonitorList = document.getElementById('hero-monitor-list');
+    const enemyMonitorList = document.getElementById('enemy-monitor-list'); // 🔥
+    if(heroMonitorList) heroMonitorList.innerHTML = '';
+    if(enemyMonitorList) enemyMonitorList.innerHTML = ''; // 🔥
 
     const startBtn = document.getElementById('start-battle-btn');
     if(startBtn) {
@@ -319,6 +323,29 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
 
     if(attackType === 'ranged') finalHp = Math.floor(finalHp * 0.45);
 
+    // 🔥 新增：生成側邊欄敵方監控 (僅限 PVP 英雄 或 Boss)
+    let monitorItem = null;
+    const enemyMonitorList = document.getElementById('enemy-monitor-list');
+    
+    // 如果是 PVP 或者是 Boss，才顯示在側邊欄 (避免小兵洗版)
+    if (enemyMonitorList && (isPvpMode || enemyCard.isBoss)) {
+        monitorItem = document.createElement('div');
+        monitorItem.className = 'monitor-item';
+        monitorItem.innerHTML = `
+            <div class="monitor-icon" style="background-image: url('assets/cards/${realId}.webp'); border-color: #e74c3c;"></div>
+            <div class="monitor-info">
+                <div class="monitor-name" style="color:#e74c3c;">${enemyCard.name || finalTitle}</div>
+                <div class="monitor-hp-bg">
+                    <div class="monitor-hp-fill enemy" style="width: 100%;"></div>
+                </div>
+                <div class="monitor-mana-bg">
+                    <div class="monitor-mana-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+        `;
+        enemyMonitorList.appendChild(monitorItem);
+    }
+
     enemies.push({
         ...enemyCard, 
         id: realId,
@@ -332,6 +359,7 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         range: attackType === 'ranged' ? 16 : 4, 
         lastAttackTime: 0,
         el: el,
+        monitorEl: monitorItem, // 🔥 綁定監控 DOM
         isPvpHero: true, 
         totalDamage: 0,
         totalHealing: 0,
@@ -1148,6 +1176,14 @@ function gameLoop() {
         const enemy = enemies[i];
 
         if (enemy.currentHp <= 0) {
+            // 🔥 新增：敵方死亡時更新側邊欄
+            if (enemy.monitorEl) { 
+                enemy.monitorEl.classList.add('dead'); 
+                enemy.monitorEl.querySelector('.monitor-name').innerText += " (陣亡)"; 
+                enemy.monitorEl.querySelector('.monitor-hp-fill').style.width = '0%'; 
+                enemy.monitorEl.querySelector('.monitor-mana-fill').style.width = '0%'; 
+            }
+
             if(enemy.el) enemy.el.remove();
             deadEnemies.push(enemy);
             enemies.splice(i, 1);
@@ -1168,6 +1204,17 @@ function gameLoop() {
             }
             safePlaySound('dismantle'); 
             continue; 
+        }
+
+        // 🔥 新增：更新側邊欄敵方血量與氣力
+        if (enemy.monitorEl) { 
+            const hpPercent = Math.max(0, (enemy.currentHp / enemy.maxHp) * 100); 
+            const manaPercent = Math.max(0, (enemy.currentMana / enemy.maxMana) * 100);
+
+            const fillHp = enemy.monitorEl.querySelector('.monitor-hp-fill'); 
+            const fillMana = enemy.monitorEl.querySelector('.monitor-mana-fill'); 
+            if (fillHp) fillHp.style.width = `${hpPercent}%`; 
+            if (fillMana) fillMana.style.width = `${manaPercent}%`; 
         }
 
         if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { fireBossSkill(enemy); enemy.lastAttackTime = now; }
