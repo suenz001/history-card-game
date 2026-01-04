@@ -1,8 +1,8 @@
 // js/battle.js
 import { WAVE_CONFIG, cardDatabase } from './data.js';
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
-import { executeSkill } from './skills.js'; // 🔥 引入技能
-import { fireProjectile, createVfx, showDamageText, shakeScreen, triggerHeroHit } from './vfx.js'; // 🔥 引入特效
+import { executeSkill } from './skills.js'; 
+import { fireProjectile, createVfx, showDamageText, shakeScreen, triggerHeroHit } from './vfx.js'; 
 
 export let isBattleActive = false;
 export let isPvpMode = false; 
@@ -493,28 +493,6 @@ function fireBossSkill(boss) {
             }
         });
     }, 500); 
-}
-
-function getBattleContainer() {
-    return document.querySelector('.battle-field-container') || 
-           document.getElementById('battle-screen') || 
-           document.body; 
-}
-
-function showDamageText(x, y, text, type) {
-    const container = getBattleContainer();
-    if(!container) return; 
-
-    const el = document.createElement('div');
-    el.className = `damage-text ${type}`;
-    el.innerHTML = text; 
-    el.style.left = `${x}%`;
-    el.style.top = `${y}%`;
-    el.style.position = 'absolute'; 
-    el.style.zIndex = '9999'; 
-    
-    container.appendChild(el);
-    setTimeout(() => el.remove(), 1200); 
 }
 
 function updateBattleUI() {
