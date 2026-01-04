@@ -72,7 +72,7 @@ const SYSTEM_NOTIFICATIONS = [
 ];
 
 // 初始化戰鬥模組
-initBattle();
+// initBattle(); // 注意：這行移除了，因為改由關卡選擇後再 init
 setOnBattleEnd(handleBattleEnd);
 
 // 初始化 PVP
@@ -1275,15 +1275,39 @@ if(batchConfirmBtn) batchConfirmBtn.addEventListener('click', async () => { play
 updateInventoryCounts();
 alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
+// 🔥 修改：點擊「前往戰場」改為打開關卡選單
 if(document.getElementById('enter-battle-mode-btn')) document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
     if(!currentUser) return alert("請先登入");
     if(allUserCards.length === 0) await loadInventory(currentUser.uid);
-    if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
-    document.getElementById('battle-screen').classList.remove('hidden');
-    renderBattleSlots();
-    updateStartButton();
+    
+    // 開啟關卡選擇視窗
+    document.getElementById('level-selection-modal').classList.remove('hidden');
 });
+
+// 🔥 新增：關卡選擇按鈕邏輯
+document.querySelectorAll('.level-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if(btn.classList.contains('locked')) return; // 鎖定關卡不可點
+        
+        playSound('click');
+        const levelId = parseInt(btn.dataset.level);
+        
+        // 關閉選單
+        document.getElementById('level-selection-modal').classList.add('hidden');
+        
+        // 呼叫 battle.js 初始化特定關卡
+        initBattle(levelId);
+    });
+});
+
+// 🔥 新增：關閉關卡選擇視窗
+if(document.getElementById('close-level-select-btn')) {
+    document.getElementById('close-level-select-btn').addEventListener('click', () => {
+        playSound('click');
+        document.getElementById('level-selection-modal').classList.add('hidden');
+    });
+}
 
 let deployTargetSlot = null;
 

@@ -1,5 +1,5 @@
 // js/battle.js
-import { WAVE_CONFIG, cardDatabase } from './data.js';
+import { LEVEL_CONFIGS, cardDatabase } from './data.js'; // 🔥 改用 LEVEL_CONFIGS
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { executeSkill } from './skills.js'; 
 import { fireProjectile, createVfx, showDamageText, shakeScreen, triggerHeroHit } from './vfx.js'; 
@@ -14,6 +14,9 @@ export let enemies = [];
 export let deadEnemies = [];
 export let currentDifficulty = 'normal';
 export let gameSpeed = 1;
+
+// 🔥 新增：當前關卡 ID
+let currentLevelId = 1; 
 
 let pvpPlayerTeamData = [];
 
@@ -32,7 +35,21 @@ export function setDifficulty(diff) { currentDifficulty = diff; }
 export function setGameSpeed(speed) { gameSpeed = speed; } 
 export function setOnBattleEnd(callback) { onBattleEndCallback = callback; }
 
-export function initBattle() {
+// 🔥 修改：initBattle 接收 levelId
+export function initBattle(levelId = 1) {
+    currentLevelId = levelId;
+    
+    // 初始化 UI 監聽器 (只需執行一次，避免重複綁定)
+    if (!document.getElementById('start-battle-btn').dataset.initialized) {
+        setupBattleListeners();
+        document.getElementById('start-battle-btn').dataset.initialized = "true";
+    }
+
+    // 呼叫開始準備邏輯
+    prepareLevel();
+}
+
+function setupBattleListeners() {
     const startBtn = document.getElementById('start-battle-btn');
     if(startBtn) startBtn.addEventListener('click', startBattle);
     
@@ -53,6 +70,59 @@ export function initBattle() {
     if(savedSpeed) {
         gameSpeed = parseFloat(savedSpeed);
     }
+}
+
+// 🔥 新增：準備關卡 (設定背景、標題)
+function prepareLevel() {
+    isPvpMode = false;
+    const config = LEVEL_CONFIGS[currentLevelId];
+    
+    // 設定背景圖 (預設找不到圖就用深色背景)
+    const container = document.querySelector('.battle-field-container');
+    if(container) {
+        container.style.backgroundImage = `url('${config.bg}'), linear-gradient(#2c3e50 1px, transparent 1px), linear-gradient(90deg, #2c3e50 1px, transparent 1px)`;
+        container.style.backgroundSize = "cover"; // 確保背景圖覆蓋
+        container.style.backgroundBlendMode = "normal"; // 混合模式
+    }
+
+    // 更新標題
+    const levelTitle = document.getElementById('level-title-display');
+    if(levelTitle) levelTitle.innerText = config.name;
+
+    const diffControls = document.getElementById('difficulty-controls');
+    if(diffControls) diffControls.style.display = 'flex'; 
+    
+    document.getElementById('battle-screen').classList.remove('hidden');
+    renderBattleSlots();
+    updateStartButton();
+    
+    // 播放背景音樂
+    if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
+}
+
+// 內部使用：渲染部屬槽位 (從 main.js 移過來或共用)
+function renderBattleSlots() {
+    const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
+    battleSlotsEl.forEach(slotDiv => {
+        const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
+        const placeholder = slotDiv.querySelector('.slot-placeholder'); 
+        const existingCard = slotDiv.querySelector('.card'); if (existingCard) existingCard.remove();
+        
+        if (hero) {
+            placeholder.style.display = 'none'; slotDiv.classList.add('active');
+            const cardDiv = document.createElement('div'); const charPath = `assets/cards/${hero.id}.webp`; const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
+            cardDiv.className = `card ${hero.rarity}`; cardDiv.innerHTML = `<img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
+            slotDiv.appendChild(cardDiv); 
+        } else { 
+            placeholder.style.display = 'block'; slotDiv.classList.remove('active'); 
+        }
+    });
+}
+
+function updateStartButton() {
+    const btn = document.getElementById('start-battle-btn'); const deployedCount = battleSlots.filter(s => s !== null).length;
+    if (deployedCount > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `⚔️ 開始戰鬥 (${deployedCount}/9)`; } 
+    else { btn.classList.add('btn-disabled'); btn.innerText = `請先部署英雄`; }
 }
 
 function startBattle() {
@@ -77,6 +147,13 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
 
     setupBattleEnvironment();
     
+    // PVP 時清除背景圖
+    const container = document.querySelector('.battle-field-container');
+    if(container) {
+        container.style.backgroundImage = "";
+        container.style.backgroundSize = "40px 40px";
+    }
+
     const waveNotif = document.getElementById('wave-notification');
     const waveCount = document.getElementById('wave-count');
     if(waveNotif) waveNotif.innerText = "⚔️ PVP 對決開始 ⚔️";
@@ -163,6 +240,7 @@ export function resetBattleState() {
 }
 
 function spawnHeroes() {
+    // ... (維持原樣)
     const container = document.getElementById('hero-container');
     const monitorList = document.getElementById('hero-monitor-list');
     if(!container) return;
@@ -243,6 +321,7 @@ function spawnHeroes() {
 }
 
 function spawnPvpEnemies(enemyTeam) {
+    // ... (維持原樣，不需修改)
     const container = document.getElementById('enemy-container');
     if(!container) return;
 
@@ -252,6 +331,7 @@ function spawnPvpEnemies(enemyTeam) {
 }
 
 function spawnSingleEnemyFromCard(enemyCard, container) {
+    // ... (維持原樣，不需修改)
     const lane = enemyCard.slotIndex !== undefined ? Math.floor(enemyCard.slotIndex / 3) : -1;
     const col = enemyCard.slotIndex !== undefined ? (enemyCard.slotIndex % 3) : 0;
     
@@ -372,7 +452,11 @@ function startWave(waveNum) {
     if(isPvpMode) return;
     battleState.wave = waveNum;
     battleState.spawned = 0;
-    battleState.totalToSpawn = WAVE_CONFIG[waveNum].count;
+    
+    // 🔥 修改：讀取 currentLevelId 的設定
+    const levelConfig = LEVEL_CONFIGS[currentLevelId];
+    battleState.totalToSpawn = levelConfig.waves[waveNum].count;
+    
     battleState.lastSpawnTime = Date.now();
     battleState.phase = 'SPAWNING'; 
     updateBattleUI();
@@ -393,12 +477,16 @@ function spawnEnemy() {
     const container = document.getElementById('enemy-container');
     if(!container) return;
 
-    const config = WAVE_CONFIG[battleState.wave];
+    // 🔥 修改：讀取 currentLevelId 的設定
+    const levelConfig = LEVEL_CONFIGS[currentLevelId];
+    const config = levelConfig.waves[battleState.wave];
+    
     let multHp = 1, multAtk = 1;
 
     if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
     else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
 
+    // (波次池判斷邏輯保持不變，若 config.enemyPool 有資料則隨機抽)
     if (config.enemyPool && config.enemyPool.length > 0) {
         const randomId = config.enemyPool[Math.floor(Math.random() * config.enemyPool.length)];
         const baseCard = cardDatabase.find(c => c.id === randomId);
@@ -451,6 +539,7 @@ function spawnEnemy() {
     container.appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
+// ... (後面的 fireBossSkill, updateBattleUI, dealDamage, gameLoop, endBattle 保持不變)
 function fireBossSkill(boss) {
     const container = document.querySelector('.battle-field-container');
     if(!container) return;

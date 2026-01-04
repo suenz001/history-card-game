@@ -2,16 +2,28 @@
 export const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// 波次設定
-export const WAVE_CONFIG = {
+// 🔥 預設的波次設定 (用於快速複製)
+const DEFAULT_WAVES = {
     1: { count: 8, hp: 800, atk: 50 },
     2: { count: 16, hp: 1500, atk: 100 },
     3: { count: 30, hp: 3000, atk: 200 },
-    4: { count: 1, hp: 30000, atk: 500, bossId: 1 } // Boss (設定 bossId 讓秦始皇登場)
+    4: { count: 1, hp: 30000, atk: 500, bossId: 1 } // 秦始皇
 };
 
-// 卡片資料庫 (共 30 張)
-// 🔥 已修正：亞歷山大綁定「無敵技能」
+// 🔥 關卡設定模組 (Level Configs)
+// 你可以在這裡針對每一關設定不同的背景圖片 (bg) 和波次內容 (waves)
+export const LEVEL_CONFIGS = {
+    1: { name: "第一章：秦嶺邊境", bg: "assets/bg/level_1.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    2: { name: "第二章：黃河古道", bg: "assets/bg/level_2.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    3: { name: "第三章：長安城外", bg: "assets/bg/level_3.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    4: { name: "第四章：兵馬俑坑", bg: "assets/bg/level_4.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    5: { name: "第五章：阿房宮殿", bg: "assets/bg/level_5.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    6: { name: "第六章：萬里長城", bg: "assets/bg/level_6.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    7: { name: "第七章：泰山封禪", bg: "assets/bg/level_7.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    8: { name: "第八章：地宮深處", bg: "assets/bg/level_8.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) }
+};
+
+// 卡片資料庫 (維持不變)
 export const cardDatabase = [
     // ================= SSR (8張) =================
     { 
@@ -20,7 +32,7 @@ export const cardDatabase = [
     },
     { 
         id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王", attackType: "melee",
-        skillKey: "INVINCIBLE_STRIKE", skillParams: { duration: 3000, dmgMult: 1.5 } // ✅ 修正：改為無敵
+        skillKey: "INVINCIBLE_STRIKE", skillParams: { duration: 3000, dmgMult: 1.5 } 
     },
     { 
         id: 3, name: "拿破崙", rarity: "SSR", atk: 1550, hp: 2000, title: "戰爭之神", attackType: "ranged",
@@ -32,7 +44,7 @@ export const cardDatabase = [
     },
     { 
         id: 14, name: "凱撒大帝", rarity: "SSR", atk: 1500, hp: 2300, title: "羅馬獨裁者", attackType: "melee",
-        skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 3, dmgMult: 2.0 } // 🔄 調整：改為多重打擊 (避免與亞歷山大重複)
+        skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 3, dmgMult: 2.0 } 
     },
     { 
         id: 15, name: "漢尼拔", rarity: "SSR", atk: 1580, hp: 2100, title: "戰略之父", attackType: "melee",
@@ -50,7 +62,7 @@ export const cardDatabase = [
     // ================= SR (10張) =================
     { 
         id: 7, name: "愛因斯坦", rarity: "SR", atk: 1300, hp: 1000, title: "物理之父", attackType: "ranged", 
-        skillKey: "AOE_CIRCLE", skillParams: { radius: 15, dmgMult: 1.8 } // 🔄 調整：給予範圍攻擊
+        skillKey: "AOE_CIRCLE", skillParams: { radius: 15, dmgMult: 1.8 } 
     },
     { 
         id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, title: "第六天魔王", attackType: "ranged", 
@@ -89,7 +101,7 @@ export const cardDatabase = [
         skillKey: "STACKABLE_IMMUNITY", skillParams: { count: 2, dmgMult: 2.2 } 
     },
 
-    // ================= R (12張 - 預設技能) =================
+    // ================= R (12張) =================
     { id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士", attackType: "melee" },
     { id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, title: "龜甲陣列", attackType: "melee" },
     { id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, title: "武士道", attackType: "melee" },

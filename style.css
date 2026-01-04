@@ -999,3 +999,50 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .battle-monitor-sidebar h3 {
     flex-shrink: 0;
 }
+
+/* style.css 新增 */
+
+/* 關卡選擇 Grid */
+.level-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.level-btn {
+    background: #34495e;
+    border: 2px solid #7f8c8d;
+    color: white;
+    padding: 20px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+}
+
+.level-btn:hover {
+    background: #2c3e50;
+    border-color: #f1c40f;
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(241, 196, 15, 0.3);
+}
+
+.level-btn .level-name {
+    margin-top: 5px;
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #f1c40f;
+}
+
+/* 鎖定的關卡樣式 (預留用) */
+.level-btn.locked {
+    opacity: 0.6;
+    filter: grayscale(1);
+    /* cursor: not-allowed; */ /* 目前先不鎖，方便測試 */
+}
