@@ -144,7 +144,6 @@ async function openPvpModal() {
     updateSaveButtonState();
 }
 
-// 🔥 修改：限制 PVP 同名英雄上陣
 export function setPvpHero(slotIndex, card, type) {
     const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
 
@@ -229,6 +228,7 @@ function renderPvpSlots(type) {
 
 function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !== null).length; const btn = document.getElementById('save-pvp-team-btn'); if (count > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `💾 儲存防守陣容 (${count}/6)`; } else { btn.classList.add('btn-disabled'); btn.innerText = "請至少配置 1 名英雄"; } }
 
+// 🔥 修正：確保所有欄位都有預設值，防止 undefined 錯誤
 async function saveDefenseTeam() {
     if (!currentUser) return;
     const count = pvpDefenseSlots.filter(x => x !== null).length; 
@@ -245,6 +245,11 @@ async function saveDefenseTeam() {
             if (hero) { 
                 const baseConfig = cardDatabase.find(c => String(c.id) === String(hero.id));
                 
+                // 嚴格檢查：如果 data.js 裡沒有設定，則使用預設值
+                const safeTitle = (baseConfig && baseConfig.title) || hero.title || "";
+                const safeSkillKey = (baseConfig && baseConfig.skillKey) || "HEAVY_STRIKE";
+                const safeSkillParams = (baseConfig && baseConfig.skillParams) || { dmgMult: 2.0 };
+
                 teamData.push({ 
                     id: hero.id, 
                     docId: hero.docId, 
@@ -253,9 +258,9 @@ async function saveDefenseTeam() {
                     level: hero.level || 1, 
                     stars: hero.stars || 1, 
                     slotIndex: index,
-                    title: baseConfig ? baseConfig.title : (hero.title || ""),
-                    skillKey: baseConfig ? baseConfig.skillKey : "HEAVY_STRIKE",
-                    skillParams: baseConfig ? baseConfig.skillParams : { dmgMult: 2.0 }
+                    title: safeTitle,
+                    skillKey: safeSkillKey,
+                    skillParams: safeSkillParams
                 }); 
             } 
         });
