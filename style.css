@@ -1152,3 +1152,31 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     color: #95a5a6;
     opacity: 0.8;
 }
+
+/* style.css 最下方新增 */
+
+/* 工作室 Logo 容器 */
+.studio-logo-container {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1); /* 上方加一條淡淡的分隔線 */
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Logo 圖片樣式 */
+#studio-logo {
+    max-width: 120px; /* 限制最大寬度，依你的圖片大小可自行調整 */
+    height: auto;     /* 保持比例 */
+    display: block;
+    opacity: 0.9;     /* 稍微一點透明度，看起來比較有質感 */
+    transition: transform 0.3s ease;
+}
+
+/* 滑鼠移過去時的特效 (可選) */
+#studio-logo:hover {
+    transform: scale(1.05);
+    opacity: 1;
+}
