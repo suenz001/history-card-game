@@ -2,27 +2,45 @@
 export const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// 🔥 預設的波次設定 (用於快速複製)
+// 🔥 預設的波次設定 (作為基礎樣板)
 const DEFAULT_WAVES = {
     1: { count: 8, hp: 800, atk: 50 },
     2: { count: 16, hp: 1500, atk: 100 },
     3: { count: 30, hp: 3000, atk: 200 },
-    4: { count: 1, hp: 30000, atk: 500, bossId: 1 } // 秦始皇
+    4: { count: 1, hp: 30000, atk: 500, bossId: 1 } // 預設 Boss
 };
+
+// 🛠️ 輔助函式：複製一份乾淨的波次設定 (避免修改到原始 DEFAULT_WAVES)
+function getWaves() {
+    return JSON.parse(JSON.stringify(DEFAULT_WAVES));
+}
+
+// -----------------------------------------------------------
+// 👇 第一關客製化：Boss 秦始皇 (ID:1)，血量改為 50000
+const wavesLevel1 = getWaves();
+wavesLevel1[4] = { count: 1, hp: 50000, atk: 500, bossId: 1 }; 
+
+// 👇 第二關客製化：Boss 亞歷山大 (ID:2)，血量改為 60000
+const wavesLevel2 = getWaves();
+wavesLevel2[4] = { count: 1, hp: 60000, atk: 600, bossId: 2 }; // atk 也稍微提升一點
+// -----------------------------------------------------------
 
 // 🔥 關卡設定模組 (Level Configs)
 export const LEVEL_CONFIGS = {
-    1: { name: "第一章：橫掃六國", bg: "assets/bg/level_1.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    2: { name: "第二章：無敗之王", bg: "assets/bg/level_2.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    3: { name: "第三章：改寫世界的人", bg: "assets/bg/level_3.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    4: { name: "第四章：無法阻擋的鐵蹄", bg: "assets/bg/level_4.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    5: { name: "第五章：我來 我見 我征服", bg: "assets/bg/level_5.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    6: { name: "第六章：戰象翻山", bg: "assets/bg/level_6.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    7: { name: "第七章：帝國的魅影", bg: "assets/bg/level_7.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    8: { name: "第八章：決戰巖流島", bg: "assets/bg/level_8.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) }
+    // 使用客製化的波次設定
+    1: { name: "第一章：橫掃六國", bg: "assets/bg/level_1.png", waves: wavesLevel1 },
+    2: { name: "第二章：無敗之王", bg: "assets/bg/level_2.png", waves: wavesLevel2 },
+    
+    // 其他關卡維持預設
+    3: { name: "第三章：改寫世界的人", bg: "assets/bg/level_3.png", waves: getWaves() },
+    4: { name: "第四章：無法阻擋的鐵蹄", bg: "assets/bg/level_4.png", waves: getWaves() },
+    5: { name: "第五章：我來 我見 我征服", bg: "assets/bg/level_5.png", waves: getWaves() },
+    6: { name: "第六章：戰象翻山", bg: "assets/bg/level_6.png", waves: getWaves() },
+    7: { name: "第七章：帝國的魅影", bg: "assets/bg/level_7.png", waves: getWaves() },
+    8: { name: "第八章：決戰巖流島", bg: "assets/bg/level_8.png", waves: getWaves() }
 };
 
-// 卡片資料庫
+// 卡片資料庫 (保持不變)
 export const cardDatabase = [
     // ================= SSR (8張) =================
     { 
