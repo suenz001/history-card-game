@@ -1,22 +1,34 @@
 // js/data.js
+
 export const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// 🔥 預設的波次設定 (基礎樣板)
+// ==========================================
+// 🔥 預設波次設定 (基礎樣板)
+// ==========================================
 const DEFAULT_WAVES = {
-    1: { count: 8, hp: 800, atk: 50 },
-    2: { count: 16, hp: 1500, atk: 100 },
-    3: { count: 30, hp: 3000, atk: 200 },
-    // 預設魔王 (會被下方各關卡覆蓋)
+    1: { 
+        count: 8, 
+        hpMult: 0.8,   // 基礎血量倍率 (相對於卡片原值)
+        atkMult: 0.8,  // 基礎攻擊倍率
+        enemyPool: [8, 9] // 預設: 斯巴達, 羅馬軍團
+    },
+    2: { 
+        count: 12, 
+        hpMult: 1.0, 
+        atkMult: 1.0, 
+        enemyPool: [8, 9, 28] // 預設: 斯巴達, 羅馬, 祖魯
+    },
+    3: { 
+        count: 20, 
+        hpMult: 1.2, 
+        atkMult: 1.1, 
+        enemyPool: [10, 11, 24] // 預設: 武士, 維京, 長弓兵
+    },
+    // 第 4 波 (魔王) 會在下方各關卡單獨設定
     4: { 
         count: 1, hp: 30000, atk: 500, bossId: 1,
-        // 🔥 魔王 AOE 設定 (預設)
-        aoeConfig: { 
-            radius: 15,          // 範圍半徑 (10~30)
-            damageMult: 1.0,     // 傷害倍率 (相對於攻擊力)
-            effect: 'shockwave', // 特效類型: shockwave, storm, laser
-            color: '#e74c3c'     // 特效顏色
-        }
+        aoeConfig: { radius: 15, damageMult: 1.0, effect: 'shockwave', color: '#e74c3c' }
     } 
 };
 
@@ -26,68 +38,121 @@ function getWaves() {
 }
 
 // ==========================================
-// ⚔️ 各關卡 Boss 設定 (第4波)
-// 您可以在這裡調整魔王的 AOE 參數
+// ⚔️ 各關卡詳細設定 (Level 1 - 8)
 // ==========================================
 
-// 第 1 關：秦始皇 (霸氣震波)
+// --- 第 1 關：秦始皇 (橫掃六國) ---
 const wavesLevel1 = getWaves();
+wavesLevel1[1].enemyPool = [8, 9]; // 初期步兵
+wavesLevel1[2].enemyPool = [8, 9, 28]; // 混入長矛兵
+wavesLevel1[3].enemyPool = [24, 8, 9]; // 混入弓兵
 wavesLevel1[4] = { 
-    count: 1, hp: 40000, atk: 500, bossId: 1,
+    count: 1, hp: 40000, atk: 500, bossId: 1, // 秦始皇
     aoeConfig: { radius: 18, damageMult: 1.2, effect: 'shockwave', color: '#f1c40f' } 
 };
 
-// 第 2 關：亞歷山大 (征服重擊)
+// --- 第 2 關：亞歷山大 (無敗之王) ---
 const wavesLevel2 = getWaves();
+// 難度微調
+wavesLevel2[1].hpMult = 0.9; wavesLevel2[1].atkMult = 0.9;
+wavesLevel2[2].hpMult = 1.1; wavesLevel2[2].atkMult = 1.0;
+wavesLevel2[3].hpMult = 1.3; wavesLevel2[3].atkMult = 1.1;
+// 敵人配置 (馬其頓方陣風格)
+wavesLevel2[1].enemyPool = [8, 28]; // 斯巴達(盾), 祖魯(矛)
+wavesLevel2[2].enemyPool = [8, 28, 30]; // + 埃及戰車
+wavesLevel2[3].enemyPool = [8, 24, 30]; // 步弓騎混合
 wavesLevel2[4] = { 
-    count: 1, hp: 55000, atk: 600, bossId: 2,
+    count: 1, hp: 55000, atk: 600, bossId: 2, // 亞歷山大
     aoeConfig: { radius: 20, damageMult: 1.3, effect: 'shockwave', color: '#e67e22' } 
 };
 
-// 第 3 關：拿破崙 (火砲轟炸)
+// --- 第 3 關：拿破崙 (改寫世界的人) ---
 const wavesLevel3 = getWaves();
+wavesLevel3[1].hpMult = 1.0; wavesLevel3[1].atkMult = 1.0;
+wavesLevel3[2].hpMult = 1.2; wavesLevel3[2].atkMult = 1.1;
+wavesLevel3[3].hpMult = 1.5; wavesLevel3[3].atkMult = 1.2;
+// 敵人配置 (熱兵器時代)
+wavesLevel3[1].enemyPool = [29, 24]; // 火槍手, 長弓
+wavesLevel3[2].enemyPool = [29, 12, 24]; // + 條頓騎士(重甲)
+wavesLevel3[3].enemyPool = [29, 30, 25]; // + 戰車, 蒙古騎兵(高機動)
 wavesLevel3[4] = { 
-    count: 1, hp: 70000, atk: 800, bossId: 3,
+    count: 1, hp: 70000, atk: 800, bossId: 3, // 拿破崙
     aoeConfig: { radius: 25, damageMult: 1.5, effect: 'explosion', color: '#c0392b' } 
 };
 
-// 第 4 關：成吉思汗 (箭雨風暴)
+// --- 第 4 關：成吉思汗 (無法阻擋的鐵蹄) ---
 const wavesLevel4 = getWaves();
+wavesLevel4[1].hpMult = 1.2; wavesLevel4[1].atkMult = 1.1;
+wavesLevel4[2].hpMult = 1.4; wavesLevel4[2].atkMult = 1.2;
+wavesLevel4[3].hpMult = 1.7; wavesLevel4[3].atkMult = 1.3;
+// 敵人配置 (高機動部隊)
+wavesLevel4[1].enemyPool = [25, 30]; // 蒙古騎兵, 戰車
+wavesLevel4[2].enemyPool = [25, 29, 24]; // 騎射混編
+wavesLevel4[3].enemyPool = [25, 12, 10]; // 騎兵 + 重步兵掩護
 wavesLevel4[4] = { 
-    count: 1, hp: 90000, atk: 1000, bossId: 13,
+    count: 1, hp: 90000, atk: 1000, bossId: 13, // 成吉思汗
     aoeConfig: { radius: 22, damageMult: 1.4, effect: 'storm', color: '#27ae60' } 
 };
 
-// 第 5 關：凱撒大帝 (羅馬踐踏)
+// --- 第 5 關：凱撒大帝 (我來 我見 我征服) ---
 const wavesLevel5 = getWaves();
+wavesLevel5[1].hpMult = 1.3; wavesLevel5[1].atkMult = 1.2;
+wavesLevel5[2].hpMult = 1.5; wavesLevel5[2].atkMult = 1.3;
+wavesLevel5[3].hpMult = 1.8; wavesLevel5[3].atkMult = 1.4;
+// 敵人配置 (羅馬軍團)
+wavesLevel5[1].enemyPool = [9, 8]; // 羅馬軍團, 斯巴達
+wavesLevel5[2].enemyPool = [9, 12, 28]; // 重裝步兵團
+wavesLevel5[3].enemyPool = [9, 24, 30]; // 羅馬方陣
 wavesLevel5[4] = { 
-    count: 1, hp: 120000, atk: 1200, bossId: 14,
+    count: 1, hp: 120000, atk: 1200, bossId: 14, // 凱撒
     aoeConfig: { radius: 20, damageMult: 1.6, effect: 'shockwave', color: '#8e44ad' } 
 };
 
-// 第 6 關：漢尼拔 (戰象衝擊)
+// --- 第 6 關：漢尼拔 (戰象翻山) ---
 const wavesLevel6 = getWaves();
+wavesLevel6[1].hpMult = 1.4; wavesLevel6[1].atkMult = 1.3;
+wavesLevel6[2].hpMult = 1.7; wavesLevel6[2].atkMult = 1.4;
+wavesLevel6[3].hpMult = 2.0; wavesLevel6[3].atkMult = 1.5;
+// 敵人配置 (混合兵種)
+wavesLevel6[1].enemyPool = [28, 30]; // 祖魯, 戰車
+wavesLevel6[2].enemyPool = [28, 9, 25]; // 矛兵剋騎兵
+wavesLevel6[3].enemyPool = [12, 30, 29]; // 重甲 + 火力
 wavesLevel6[4] = { 
-    count: 1, hp: 150000, atk: 1500, bossId: 15,
+    count: 1, hp: 150000, atk: 1500, bossId: 15, // 漢尼拔
     aoeConfig: { radius: 25, damageMult: 1.8, effect: 'shockwave', color: '#7f8c8d' } 
 };
 
-// 第 7 關：埃及豔后 (劇毒迷霧)
+// --- 第 7 關：埃及豔后 (帝國的魅影) ---
 const wavesLevel7 = getWaves();
+wavesLevel7[1].hpMult = 1.5; wavesLevel7[1].atkMult = 1.4;
+wavesLevel7[2].hpMult = 1.8; wavesLevel7[2].atkMult = 1.5;
+wavesLevel7[3].hpMult = 2.2; wavesLevel7[3].atkMult = 1.6;
+// 敵人配置 (埃及/沙漠風格)
+wavesLevel7[1].enemyPool = [30, 28]; // 戰車, 祖魯
+wavesLevel7[2].enemyPool = [30, 24, 26]; // 遠程 + 刺客(忍者)
+wavesLevel7[3].enemyPool = [26, 25, 29]; // 高傷害脆皮群
 wavesLevel7[4] = { 
-    count: 1, hp: 180000, atk: 1800, bossId: 16,
+    count: 1, hp: 180000, atk: 1800, bossId: 16, // 埃及豔后
     aoeConfig: { radius: 28, damageMult: 1.5, effect: 'storm', color: '#9b59b6' } 
 };
 
-// 第 8 關：宮本武藏 (劍氣風暴)
+// --- 第 8 關：宮本武藏 (決戰巖流島) ---
 const wavesLevel8 = getWaves();
+wavesLevel8[1].hpMult = 1.6; wavesLevel8[1].atkMult = 1.5;
+wavesLevel8[2].hpMult = 2.0; wavesLevel8[2].atkMult = 1.7;
+wavesLevel8[3].hpMult = 2.5; wavesLevel8[3].atkMult = 1.8;
+// 敵人配置 (東洋風格)
+wavesLevel8[1].enemyPool = [10, 26]; // 武士, 忍者
+wavesLevel8[2].enemyPool = [10, 26, 25]; // + 蒙古騎兵
+wavesLevel8[3].enemyPool = [10, 26, 29]; // + 火槍手 (戰國風格)
 wavesLevel8[4] = { 
-    count: 1, hp: 250000, atk: 2200, bossId: 17,
+    count: 1, hp: 250000, atk: 2200, bossId: 17, // 宮本武藏
     aoeConfig: { radius: 20, damageMult: 2.5, effect: 'slash_spin', color: '#3498db' } 
 };
 
-
-// 🔥 關卡設定模組 (Level Configs)
+// ==========================================
+// 📦 匯出關卡配置模組
+// ==========================================
 export const LEVEL_CONFIGS = {
     1: { name: "第一章：橫掃六國", bg: "assets/bg/level_1.webp", waves: wavesLevel1 },
     2: { name: "第二章：無敗之王", bg: "assets/bg/level_2.webp", waves: wavesLevel2 },
@@ -99,7 +164,9 @@ export const LEVEL_CONFIGS = {
     8: { name: "第八章：決戰巖流島", bg: "assets/bg/level_8.webp", waves: wavesLevel8 }
 };
 
-// 卡片資料庫 (保持不變)
+// ==========================================
+// 🎴 卡片資料庫
+// ==========================================
 export const cardDatabase = [
     // ================= SSR (8張) =================
     { 

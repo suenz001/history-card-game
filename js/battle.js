@@ -19,7 +19,7 @@ let currentLevelId = 1;
 
 let pvpPlayerTeamData = [];
 
-// 🔥 修改：battleState 增加 isBossSpawning 旗標，防止魔王登場前誤判勝利
+// 🔥 battleState
 let battleState = {
     wave: 1, 
     spawned: 0, 
@@ -490,7 +490,6 @@ function showBossWarning() {
     });
 }
 
-// 🔥 新增：魔王登場震退效果
 function triggerBossEntranceEffect(boss) {
     if (!boss) return;
 
@@ -520,7 +519,6 @@ function triggerBossEntranceEffect(boss) {
         }
     });
     
-    // 螢幕小震一下增加力道感 (登場時保留震動，若想移除請將此段刪除)
     const body = document.body;
     body.style.transform = "translate(0, 5px)";
     setTimeout(() => body.style.transform = "none", 100);
@@ -548,6 +546,7 @@ function startWave(waveNum) {
     }
 }
 
+// 🔥 重構：依賴 data.js 的資料驅動生成
 function spawnEnemy() {
     if(isPvpMode) return; 
     
@@ -557,20 +556,28 @@ function spawnEnemy() {
     const levelConfig = LEVEL_CONFIGS[currentLevelId];
     const config = levelConfig.waves[battleState.wave];
     
-    let multHp = 1, multAtk = 1;
+    let diffMultHp = 1, diffMultAtk = 1;
 
-    if (currentDifficulty === 'easy') { multHp = 0.6; multAtk = 0.6; }
-    else if (currentDifficulty === 'hard') { multHp = 1.5; multAtk = 1.5; }
+    if (currentDifficulty === 'easy') { diffMultHp = 0.6; diffMultAtk = 0.6; }
+    else if (currentDifficulty === 'hard') { diffMultHp = 1.5; diffMultAtk = 1.5; }
 
-    if (config.enemyPool && config.enemyPool.length > 0) {
-        const randomId = config.enemyPool[Math.floor(Math.random() * config.enemyPool.length)];
+    // 🔥 波次 1-3：生成雜魚 (讀取 data.js 的 enemyPool 與 hpMult)
+    if (battleState.wave < 4) {
+        
+        // 如果沒有設定 enemyPool，預設 ID:8 (斯巴達) 當作 fallback
+        const pool = config.enemyPool || [8]; 
+        const randomId = pool[Math.floor(Math.random() * pool.length)];
         const baseCard = cardDatabase.find(c => c.id === randomId);
 
         if (baseCard) {
+            // 使用 config.hpMult 來調整強度，不再寫死公式
+            const finalHp = Math.floor(baseCard.hp * (config.hpMult || 1) * diffMultHp);
+            const finalAtk = Math.floor(baseCard.atk * (config.atkMult || 1) * diffMultAtk);
+
             const enemyData = {
                 ...baseCard,
-                hp: Math.floor(baseCard.hp * (0.5 + battleState.wave * 0.2) * multHp), 
-                atk: Math.floor(baseCard.atk * (0.5 + battleState.wave * 0.1) * multAtk),
+                hp: finalHp, 
+                atk: finalAtk,
                 slotIndex: undefined 
             };
             spawnSingleEnemyFromCard(enemyData, container);
@@ -578,8 +585,8 @@ function spawnEnemy() {
         }
     }
 
+    // 🔥 波次 4：生成 BOSS
     if(battleState.wave === 4) {
-        // 🔥 封裝 Boss 生成邏輯
         const performBossSpawn = () => {
             if (!isBattleActive) return;
 
@@ -588,10 +595,8 @@ function spawnEnemy() {
                 if (baseCard) {
                     const bossData = {
                         ...baseCard,
-                        // 🔥 修正：優先使用 config (data.js) 中的數值，若無則用預設
-                        hp: (config.hp || 30000) * multHp, 
-                        atk: (config.atk || 500) * multAtk,
-                        // 🔥 讀取 AOE 設定並存入實體
+                        hp: (config.hp || 30000) * diffMultHp, 
+                        atk: (config.atk || 500) * diffMultAtk,
                         aoeConfig: config.aoeConfig || null,
                         isBoss: true, 
                         slotIndex: undefined 
@@ -600,17 +605,24 @@ function spawnEnemy() {
                     
                     const bossEntity = enemies[enemies.length-1];
                     bossEntity.isBoss = true; 
-                    bossEntity.aoeConfig = bossData.aoeConfig; // 確保有存進去
+                    bossEntity.aoeConfig = bossData.aoeConfig; 
                     
-                    triggerBossEntranceEffect(bossEntity); // 登場震退!
+                    triggerBossEntranceEffect(bossEntity); 
                     return;
                 }
             }
 
-            // Fallback Boss
+            // Fallback Boss (如果 data.js 沒設定 bossId)
             const bossX = 10 + Math.random() * 80; 
             const bossY = 10 + Math.random() * 80;
-            const boss = { id: Date.now(), maxHp: 30000, currentHp: 30000, atk: 500, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
+            const boss = { 
+                id: Date.now(), 
+                maxHp: 30000 * diffMultHp, 
+                currentHp: 30000 * diffMultHp, 
+                atk: 500 * diffMultAtk, 
+                lane: -1, position: bossX, y: bossY, 
+                speed: 0.02, el: null, lastAttackTime: 0, isBoss: true 
+            };
             const el = document.createElement('div'); el.className = 'enemy-unit boss'; el.innerHTML = `😈<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
             el.style.top = `${boss.y}%`; el.style.left = `${boss.position}%`;
             container.appendChild(el); boss.el = el; enemies.push(boss);
@@ -628,18 +640,9 @@ function spawnEnemy() {
         }
         return;
     }
-
-    const spawnX = 40 + (Math.random() * 55);
-    let spawnY;
-    if (Math.random() < 0.5) spawnY = 10 + Math.random() * 30; else spawnY = 60 + Math.random() * 30;
-    
-    const enemy = { id: Date.now(), maxHp: config.hp * multHp, currentHp: config.hp * multHp, atk: config.atk * multAtk, lane: -1, position: spawnX, y: spawnY, speed: 0.04 + (battleState.wave * 0.01), el: null, lastAttackTime: 0 };
-    const el = document.createElement('div'); el.className = 'enemy-unit'; el.innerHTML = `💀<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
-    el.style.top = `${enemy.y}%`; el.style.left = `${enemy.position}%`; 
-    container.appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
-// 🔥 重寫魔王技能：完全依賴 data.js 的 AOE 參數
+// 🔥 魔王技能：依賴 data.js 的 AOE 參數
 function fireBossSkill(boss) {
     const container = document.querySelector('.battle-field-container');
     if(!container) return;
@@ -682,7 +685,6 @@ function fireBossSkill(boss) {
         // 4. 產生 AOE 爆炸特效
         createBossVfx(target.position, target.y, aoe.effect, aoe.color);
         safePlaySound('explosion');
-        // shakeScreen(); // 🔥 移除畫面震動，應您的要求
         
         // 5. 計算範圍傷害
         heroEntities.forEach(hero => {
@@ -794,7 +796,7 @@ function gameLoop() {
     } 
     else if (!isPvpMode && battleState.phase === 'COMBAT') {
         if (enemies.length === 0) {
-            // 🔥 關鍵修正：必須確認「不是正在生成Boss」才能判定過關
+            // 🔥 必須確認「不是正在生成Boss」才能判定過關
             if (!battleState.isBossSpawning) {
                 battleState.phase = 'WAITING';
                 battleState.waitTimer = now;
@@ -975,7 +977,6 @@ function gameLoop() {
         });
 
         if (enemy.isPvpHero) {
-            // ... (PVP 英雄邏輯保持不變) ...
             if (enemy.currentMana < enemy.maxMana) {
                 enemy.currentMana += 0.25 * gameSpeed; 
                 if(enemy.currentMana > enemy.maxMana) enemy.currentMana = enemy.maxMana;
