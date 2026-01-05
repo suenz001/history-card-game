@@ -1411,16 +1411,12 @@ document.querySelectorAll('.defense-slot').forEach(slot => {
 });
 
 function deployHeroToSlot(card) {
-    // 1. 檢查這張卡片實體是否已經在場上 (防呆)
     const isAlreadyDeployed = battleSlots.some(s => s && s.docId === card.docId);
-    if(isAlreadyDeployed) { alert("這張卡片已經在場上了！"); return; }
-
-    // 2. 🔥 新增：檢查是否有同名英雄 (同 ID) 已經在場上
-    const isDuplicateHero = battleSlots.some(s => s && s.id == card.id);
-    if(isDuplicateHero) {
-        alert(`⚠️ ${card.name} 已經在隊伍中！無法重複上陣。`);
-        return;
-    }
+    if(isAlreadyDeployed) { alert("這位英雄已經在場上了！"); return; }
+    
+    // 🔥 新增：檢查同名英雄是否已經上陣
+    const isSameHeroIdDeployed = battleSlots.some(s => s && s.id === card.id);
+    if(isSameHeroIdDeployed) { alert("同名英雄不能重複上陣！"); return; }
 
     if (deployTargetSlot !== null) {
         const newSlots = [...battleSlots];
@@ -1465,11 +1461,26 @@ function updateStartButton() {
 if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-deploy-btn').addEventListener('click', () => {
     if(isBattleActive) return;
     playSound('click');
-    const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
+
+    // 1. 依照戰力 (HP + ATK) 由高到低排序
+    const sortedHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp));
+    
+    // 2. 🔥 新增：過濾重複的英雄 ID，只取前 9 名不同的英雄
     const newSlots = new Array(9).fill(null);
-    topHeroes.forEach((hero, index) => { 
-        newSlots[index] = { ...hero }; 
-    });
+    const seenIds = new Set();
+    let slotIdx = 0;
+
+    for (const hero of sortedHeroes) {
+        if (slotIdx >= 9) break; // 填滿 9 格就停止
+        
+        // 如果這個英雄 ID 還沒出現過，則加入隊伍
+        if (!seenIds.has(hero.id)) {
+            newSlots[slotIdx] = { ...hero };
+            seenIds.add(hero.id);
+            slotIdx++;
+        }
+    }
+
     setBattleSlots(newSlots);
     renderBattleSlots();
     updateStartButton();
