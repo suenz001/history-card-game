@@ -1655,62 +1655,64 @@ function filterGallery(rarity) {
     fullList.forEach(baseCard => {
         const isOwned = ownedCardIds.has(baseCard.id);
         
+        // 🔥 關鍵修改：建立一個統一的「展示用卡片」物件 (Lv.1, 無星等)
+        const displayCard = { 
+            ...baseCard, 
+            level: 1, 
+            stars: 1,
+            // 確保數值是基礎數值
+            atk: baseCard.atk, 
+            hp: baseCard.hp 
+        };
+
+        // 建立 DOM
+        const cardDiv = document.createElement('div');
+        const charPath = `assets/cards/${displayCard.id}.webp`;
+        const framePath = `assets/frames/${displayCard.rarity.toLowerCase()}.png`;
+        const idString = String(displayCard.id).padStart(3, '0');
+        const typeIcon = displayCard.attackType === 'ranged' ? '🏹' : '⚔️';
+
+        // 如果未擁有，加上 locked 樣式
+        const lockedClass = isOwned ? '' : 'locked';
+        cardDiv.className = `card ${displayCard.rarity} ${lockedClass}`;
+
+        // 🔥 關鍵修改：移除星星顯示，統一顯示 Lv.1
+        cardDiv.innerHTML = `
+            <div class="card-id-badge">#${idString}</div>
+            <div class="card-rarity-badge ${displayCard.rarity}">${displayCard.rarity}</div>
+            <img src="${charPath}" alt="${displayCard.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+            <div class="card-info-overlay">
+                <div class="card-title">${displayCard.title || ""}</div>
+                <div class="card-name">${displayCard.name}</div>
+                
+                <div class="card-level-star" style="font-size: 0.8em; margin-bottom: 3px;">Lv.1</div>
+                
+                <div class="card-stats">
+                    <span class="type-icon">${typeIcon}</span> 
+                    👊${displayCard.atk} ❤️${displayCard.hp}
+                </div>
+            </div>
+            <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
+        `;
+
         if (isOwned) {
-            // ✅ 已獲得：顯示彩色，點擊可看詳情
-            // 我們從玩家背包中找出這張卡(取等級最高的一張來顯示)
-            const userCard = allUserCards
-                .filter(c => c.id === baseCard.id)
-                .sort((a, b) => (b.level + b.stars * 10) - (a.level + a.stars * 10))[0];
-            
-            // 使用現有的 renderCard 函式，但要注意它會綁定點擊事件
-            const cardDiv = renderCard(userCard, container);
-            
-            // 覆蓋點擊事件：圖鑑模式下，點擊只單純開啟詳情，不觸發其他選擇邏輯
+            // 已獲得：點擊顯示詳情 (詳情頁也會使用 displayCard，即 Lv.1 狀態)
             cardDiv.onclick = () => {
                 playSound('click');
-                // 為了讓詳情頁正常運作，我們將 currentDisplayList 設為單張卡片
-                currentDisplayList = [userCard];
+                currentDisplayList = [displayCard]; // 傳入 Lv.1 的卡片
                 currentCardIndex = 0;
                 
-                // 強制開啟詳情頁
                 const detailModal = document.getElementById('detail-modal');
                 detailModal.classList.remove('hidden');
                 detailModal.style.zIndex = "99999";
                 renderDetailCard();
             };
-
         } else {
-            // 🔒 未獲得：顯示灰色，不可點擊
-            // 建立一個假的卡片物件，只包含基本資料
-            const dummyCard = { ...baseCard, level: 1, stars: 1 };
-            
-            // 手動建立卡片 DOM (類似 renderCard 但加上 locked class)
-            const cardDiv = document.createElement('div');
-            const charPath = `assets/cards/${dummyCard.id}.webp`;
-            const framePath = `assets/frames/${dummyCard.rarity.toLowerCase()}.png`;
-            const idString = String(dummyCard.id).padStart(3, '0');
-            const typeIcon = dummyCard.attackType === 'ranged' ? '🏹' : '⚔️';
-
-            cardDiv.className = `card ${dummyCard.rarity} locked`; // 🔥 加上 locked class
-            
-            cardDiv.innerHTML = `
-                <div class="card-id-badge">#${idString}</div>
-                <div class="card-rarity-badge ${dummyCard.rarity}">${dummyCard.rarity}</div>
-                <img src="${charPath}" alt="${dummyCard.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
-                <div class="card-info-overlay">
-                    <div class="card-title">${dummyCard.title || ""}</div>
-                    <div class="card-name">${dummyCard.name}</div>
-                    <div class="card-stats">未獲得</div>
-                </div>
-                <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
-            `;
-            
-            cardDiv.addEventListener('click', () => {
-                // 點擊未獲得的卡片，不發生任何事，或是播放錯誤音效
-            });
-
-            container.appendChild(cardDiv);
+            // 未獲得：無點擊反應 (或可加音效)
+            cardDiv.onclick = () => {};
         }
+
+        container.appendChild(cardDiv);
     });
 
     if (fullList.length === 0) {
