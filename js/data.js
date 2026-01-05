@@ -6,22 +6,22 @@ export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 // 🔥 1. 難度設定 (新增 gemReward)
 export const DIFFICULTY_SETTINGS = {
     easy:   { 
-        hpMult: 0.1,    // 敵人血量倍率
+        hpMult: 0.6,    // 敵人血量倍率
         atkMult: 0.6,   // 敵人攻擊倍率
         goldMult: 0.6,  // 戰鬥掉落金幣倍率
-        gemReward: 250  // 🔥 通關獲得鑽石
+        gemReward: 150  // 🔥 通關獲得鑽石
     },
     normal: { 
         hpMult: 1.0, 
         atkMult: 1.0, 
         goldMult: 1.0, 
-        gemReward: 350 
+        gemReward: 250 
     },
     hard:   { 
         hpMult: 1.5, 
         atkMult: 1.5, 
         goldMult: 1.5, 
-        gemReward: 500 
+        gemReward: 350 
     }
 };
 
@@ -30,7 +30,7 @@ export const DIFFICULTY_SETTINGS = {
 // ==========================================
 const DEFAULT_WAVES = {
     1: { 
-        count: 99, 
+        count: 8, 
         hpMult: 0.8,   
         atkMult: 0.8,  
         enemyPool: [8, 9] 
@@ -67,7 +67,7 @@ wavesLevel1[1].enemyPool = [8, 9];
 wavesLevel1[2].enemyPool = [8, 9, 28]; 
 wavesLevel1[3].enemyPool = [24, 8, 9]; 
 wavesLevel1[4] = { 
-    count: 1, hp: 40000, atk: 500, bossId: 1, 
+    count: 1, hp: 4000000, atk: 500, bossId: 1, 
     aoeConfig: { radius: 18, damageMult: 1.2, effect: 'shockwave', color: '#f1c40f' } 
 };
 
@@ -196,3 +196,4 @@ export const cardDatabase = [
     { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } }
 
 ];
+
