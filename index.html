@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=120">
+    <link rel="stylesheet" href="style.css?v=121">
 </head>
 <body>
 
@@ -118,19 +118,16 @@
                 <span id="level-title-display" style="color: #fff; margin-right: 10px; font-weight: bold; color: #f1c40f;"></span>
                 <span>⚔️ 存活: <span id="hero-count-display">0</span></span>
                 <span id="wave-display-container">💀 波次: <span id="wave-count">1</span>/4</span>
-                
                 <span id="battle-gold-container">💰 <span id="battle-gold">0</span> G</span>
             </div>
             <button id="retreat-btn" class="btn-danger" style="padding: 5px 15px; font-size: 0.9em;">🏳️ 撤退</button>
         </div>
 
         <div class="battle-content-wrapper" style="flex: 1; display: flex; overflow: hidden; position: relative;">
-            
             <div class="battle-field-container">
                 <div id="wave-notification" class="hidden">第 1 波</div>
                 <div class="spawn-line left"></div>
                 <div id="hero-container"></div>
-
                 <div class="lanes-wrapper" style="opacity: 0.3;">
                     <div class="lane-row" id="lane-0">
                         <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
@@ -148,21 +145,13 @@
                         <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
                     </div>
                 </div>
-
                 <div id="enemy-container"></div>
             </div>
-
             <button id="toggle-sidebar-btn">▶</button>
-
             <div class="battle-monitor-sidebar">
-                <h3 style="margin: 0 0 10px 0; color: #f1c40f; border-bottom: 1px solid #555; padding-bottom: 5px;">
-                    🛡️ 我方狀態
-                </h3>
+                <h3 style="margin: 0 0 10px 0; color: #f1c40f; border-bottom: 1px solid #555; padding-bottom: 5px;">🛡️ 我方狀態</h3>
                 <div id="hero-monitor-list"></div>
-
-                <h3 style="margin: 15px 0 10px 0; color: #e74c3c; border-bottom: 1px solid #555; padding-bottom: 5px;">
-                    💀 敵方狀態
-                </h3>
+                <h3 style="margin: 15px 0 10px 0; color: #e74c3c; border-bottom: 1px solid #555; padding-bottom: 5px;">💀 敵方狀態</h3>
                 <div id="enemy-monitor-list"></div>
             </div>
         </div>
@@ -173,7 +162,6 @@
                 <button class="difficulty-btn active" data-diff="normal" style="background:#f39c12;">🟡 普通</button>
                 <button class="difficulty-btn" data-diff="hard" style="background:#e74c3c;">🔴 困難</button>
             </div>
-            
             <div style="display: flex; gap: 10px; width: 95%; margin: 0 auto; align-items: center;">
                 <button id="auto-deploy-btn" class="btn-secondary" style="flex: 1; padding: 10px; font-size: 1em; background: #8e44ad;">⚡ 自動</button>
                 <button id="clear-deploy-btn" class="btn-secondary" style="flex: 0.5; padding: 10px; font-size: 1em; background: #95a5a6;">🗑️ 清空</button>
@@ -189,9 +177,7 @@
             <div id="result-desc" style="color:#ccc; margin-bottom:5px;">戰鬥獎勵</div>
             <div id="result-gold" class="result-gold">💰 +0</div>
             <div id="result-gems" class="result-gold" style="color:#2ecc71;">💎 +0</div>
-            
             <div id="dps-chart" class="dps-container"></div>
-
             <button id="close-result-btn" class="btn-primary" style="width:100%; margin-top: 15px;">回到大廳</button>
         </div>
     </div>
@@ -308,7 +294,6 @@
                         <button id="settings-save-name-btn" class="btn-primary">儲存</button>
                     </div>
                 </div>
-                
                 <div class="setting-item">
                     <label>🎁 輸入序號</label>
                     <div style="display:flex; gap:5px;">
@@ -316,7 +301,6 @@
                         <button id="redeem-btn" class="btn-secondary" style="background:#8e44ad;">兌換</button>
                     </div>
                 </div>
-
                 <hr style="border-color: #555; margin: 15px 0;">
                 <div class="setting-item">
                     <label>背景音樂 (BGM)</label>
@@ -342,12 +326,10 @@
                 <h2>🛡️ 佈署防守軍隊</h2>
                 <button id="close-pvp-modal-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
             </div>
-            
             <div style="color: #ccc; font-size: 0.9em; margin-bottom: 10px; text-align: center;">
                 請在 3x3 的方格中配置您的防守陣型 (最多 6 人)<br>
                 <span style="color: #f1c40f;">左側為前排，右側為後排</span>
             </div>
-
             <div class="pvp-grid-container" style="background: #34495e; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
                 <div class="lane-row">
                     <div class="defense-slot pvp-defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
@@ -365,7 +347,6 @@
                     <div class="defense-slot pvp-defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
                 </div>
             </div>
-
             <button id="save-pvp-team-btn" class="btn-upgrade" style="width: 100%; font-size: 1.2em; padding: 15px;">💾 儲存防守陣容</button>
         </div>
     </div>
@@ -376,19 +357,15 @@
                 <h2 style="color: #e74c3c;">⚔️ PVP 競技場</h2>
                 <button id="close-arena-btn" class="btn-primary" style="background:#7f8c8d;">離開</button>
             </div>
-
             <div id="pvp-loading" class="hidden" style="text-align: center; padding: 50px;">
                 <div style="font-size: 3em; animation: spin 1s infinite linear;">🔍</div>
                 <h3>正在搜尋旗鼓相當的對手...</h3>
             </div>
-
             <div id="pvp-opponent-list-view" class="hidden" style="padding: 10px;">
                 <button id="refresh-opponent-btn" class="btn-secondary" style="margin-bottom:15px; width: 100%;">🔄 刷新列表</button>
                 <h3 style="text-align:center; color:#f1c40f; margin-top: 0;">請選擇挑戰對手</h3>
-                <div id="pvp-opponent-list" class="opponent-list-container">
-                    </div>
+                <div id="pvp-opponent-list" class="opponent-list-container"></div>
             </div>
-
             <div id="pvp-match-content" class="hidden" style="padding-bottom: 20px;">
                 <div class="vs-container" style="padding: 10px;">
                     <div class="player-card self">
@@ -401,13 +378,11 @@
                         <div class="p-power">戰力: <span id="arena-enemy-power">???</span></div>
                     </div>
                 </div>
-
                 <div style="display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px;">
                     <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; border: 1px solid #e74c3c;">
                         <h3 style="text-align: center; color: #e74c3c; margin: 0 0 10px 0;">⚠️ 敵方防守佈署</h3>
                         <div id="enemy-preview-grid" class="pvp-grid-container readonly"></div>
                     </div>
-
                     <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; border: 1px solid #3498db;">
                         <h3 style="text-align: center; color: #3498db; margin: 0 0 10px 0;">⚔️ 我方進攻佈署 (點擊配置)</h3>
                         <div class="pvp-grid-container" id="my-attack-grid" style="background: #2c3e50;">
@@ -429,7 +404,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div style="display: flex; gap: 10px;">
                     <button id="back-to-list-btn" class="btn-secondary" style="flex: 1;">⬅️ 返回列表</button>
                     <button id="save-attack-team-btn" class="btn-secondary" style="flex: 1; background: #8e44ad;">💾 儲存陣容</button> 

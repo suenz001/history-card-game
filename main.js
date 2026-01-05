@@ -1721,3 +1721,141 @@ function filterGallery(rarity) {
         container.innerHTML = "<p style='width:100%; text-align:center; padding:20px;'>無資料</p>";
     }
 }
+
+// main.js 的最下方加入
+
+// =========================================
+// 📖 圖鑑系統邏輯 (Gallery System)
+// =========================================
+
+let currentGalleryFilter = 'ALL';
+
+// 初始化圖鑑按鈕事件
+if(document.getElementById('gallery-btn')) {
+    document.getElementById('gallery-btn').addEventListener('click', () => {
+        playSound('click');
+        openGalleryModal();
+    });
+}
+
+// 關閉按鈕
+if(document.getElementById('close-gallery-btn')) {
+    document.getElementById('close-gallery-btn').addEventListener('click', () => {
+        playSound('click');
+        document.getElementById('gallery-modal').classList.add('hidden');
+    });
+}
+
+// 篩選按鈕事件
+document.querySelectorAll('.gallery-filter-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        playSound('click');
+        // 移除其他按鈕的 active 樣式
+        document.querySelectorAll('.gallery-filter-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        
+        // 執行篩選
+        filterGallery(e.target.getAttribute('data-filter'));
+    });
+});
+
+function openGalleryModal() {
+    if(!currentUser) return alert("請先登入");
+    
+    // 如果背包是空的，先嘗試讀取一次
+    if(allUserCards.length === 0) loadInventory(currentUser.uid);
+
+    document.getElementById('gallery-modal').classList.remove('hidden');
+    filterGallery('ALL'); // 預設顯示全部
+}
+
+function filterGallery(rarity) {
+    currentGalleryFilter = rarity;
+    const container = document.getElementById('gallery-grid');
+    container.innerHTML = "";
+
+    // 1. 取得所有卡片資料 (來自 data.js 的 cardDatabase)
+    // 依 ID 排序 (確保序號 1, 2, 3... 排列)
+    let fullList = [...cardDatabase].sort((a, b) => a.id - b.id);
+
+    // 2. 根據篩選器過濾
+    if (rarity !== 'ALL') {
+        fullList = fullList.filter(card => card.rarity === rarity);
+    }
+
+    // 3. 建立玩家已擁有的卡片 ID Set (加速比對)
+    const ownedCardIds = new Set(allUserCards.map(c => c.id));
+    
+    // 計算收集進度 (基於目前篩選範圍)
+    let ownedCount = 0;
+    fullList.forEach(card => {
+        if (ownedCardIds.has(card.id)) ownedCount++;
+    });
+    document.getElementById('gallery-progress').innerText = `(收集進度: ${ownedCount}/${fullList.length})`;
+
+    // 4. 渲染卡片
+    fullList.forEach(baseCard => {
+        const isOwned = ownedCardIds.has(baseCard.id);
+        
+        if (isOwned) {
+            // ✅ 已獲得：顯示彩色，點擊可看詳情
+            // 我們從玩家背包中找出這張卡(取等級最高的一張來顯示)
+            const userCard = allUserCards
+                .filter(c => c.id === baseCard.id)
+                .sort((a, b) => (b.level + b.stars * 10) - (a.level + a.stars * 10))[0];
+            
+            // 使用現有的 renderCard 函式，但要注意它會綁定點擊事件
+            const cardDiv = renderCard(userCard, container);
+            
+            // 覆蓋點擊事件：圖鑑模式下，點擊只單純開啟詳情，不觸發其他選擇邏輯
+            cardDiv.onclick = () => {
+                playSound('click');
+                // 為了讓詳情頁正常運作，我們將 currentDisplayList 設為單張卡片
+                currentDisplayList = [userCard];
+                currentCardIndex = 0;
+                
+                // 強制開啟詳情頁
+                const detailModal = document.getElementById('detail-modal');
+                detailModal.classList.remove('hidden');
+                detailModal.style.zIndex = "99999";
+                renderDetailCard();
+            };
+
+        } else {
+            // 🔒 未獲得：顯示灰色，不可點擊
+            // 建立一個假的卡片物件，只包含基本資料
+            const dummyCard = { ...baseCard, level: 1, stars: 1 };
+            
+            // 手動建立卡片 DOM (類似 renderCard 但加上 locked class)
+            const cardDiv = document.createElement('div');
+            const charPath = `assets/cards/${dummyCard.id}.webp`;
+            const framePath = `assets/frames/${dummyCard.rarity.toLowerCase()}.png`;
+            const idString = String(dummyCard.id).padStart(3, '0');
+            const typeIcon = dummyCard.attackType === 'ranged' ? '🏹' : '⚔️';
+
+            cardDiv.className = `card ${dummyCard.rarity} locked`; // 🔥 加上 locked class
+            
+            cardDiv.innerHTML = `
+                <div class="card-id-badge">#${idString}</div>
+                <div class="card-rarity-badge ${dummyCard.rarity}">${dummyCard.rarity}</div>
+                <img src="${charPath}" alt="${dummyCard.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+                <div class="card-info-overlay">
+                    <div class="card-title">${dummyCard.title || ""}</div>
+                    <div class="card-name">${dummyCard.name}</div>
+                    <div class="card-stats">未獲得</div>
+                </div>
+                <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
+            `;
+            
+            cardDiv.addEventListener('click', () => {
+                // 點擊未獲得的卡片，不發生任何事，或是播放錯誤音效
+            });
+
+            container.appendChild(cardDiv);
+        }
+    });
+
+    if (fullList.length === 0) {
+        container.innerHTML = "<p style='width:100%; text-align:center; padding:20px;'>無資料</p>";
+    }
+}

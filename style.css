@@ -1188,18 +1188,37 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     transform: scale(1.05);
     opacity: 1;
 }
+/* =========================================
+   🔥 圖鑑系統專用樣式 (請加在 style.css 最下方)
+   ========================================= */
 
-/* style.css 新增 */
-
-/* 圖鑑：未獲得的卡片樣式 */
-.card.locked {
-    filter: grayscale(100%); /* 黑白濾鏡 */
-    opacity: 0.6;            /* 半透明 */
-    cursor: not-allowed;     /* 滑鼠游標變成禁止符號 */
-    position: relative;
+/* 1. 圖鑑容器佈局 (關鍵修正：讓它能滑動且不超出視窗) */
+#gallery-grid {
+    flex: 1;                     /* 自動填滿 Modal 剩餘空間 */
+    overflow-y: auto;            /* 內容超出時顯示垂直捲軸 */
+    align-content: flex-start;   /* 卡片從上方開始排列，不要分散對齊 */
+    min-height: 0;               /* 防止 Flex 子元素溢出容器 */
+    padding: 10px;               /* 內距 */
+    
+    /* 繼承 card-container 的排版特性 */
+    display: flex;         
+    flex-wrap: wrap;       
+    justify-content: flex-start; /* 靠左對齊 */
+    gap: 15px;                   /* 卡片間距 */
 }
 
-/* 在未獲得的卡片上加一個鎖頭圖示 */
+/* 2. 未獲得的卡片樣式：灰階 + 鎖頭 */
+.card.locked {
+    filter: grayscale(100%);     /* 黑白濾鏡 */
+    opacity: 0.6;                /* 半透明 */
+    cursor: not-allowed;         /* 禁止手勢 */
+    position: relative;
+    border-color: #555 !important; /* 強制灰色邊框 */
+    box-shadow: none !important;   /* 移除發光特效 */
+    animation: none !important;    /* 移除 SSR 跳動特效 */
+}
+
+/* 鎖頭圖示 (覆蓋在卡片上) */
 .card.locked::after {
     content: "🔒";
     position: absolute;
@@ -1210,10 +1229,28 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     color: rgba(255, 255, 255, 0.8);
     text-shadow: 0 0 5px #000;
     pointer-events: none;
+    z-index: 10;
 }
 
-/* 確保圖鑑內的卡片排列整齊 */
-#gallery-grid {
-    align-content: flex-start;
-    min-height: 300px;
+/* 3. 圖鑑過濾按鈕 (獨立樣式，避免跟背包衝突) */
+.gallery-filter-btn {
+    background: transparent;
+    border: 2px solid #ddd;
+    color: #ddd;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+    margin: 0 2px;
+}
+
+.gallery-filter-btn:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.gallery-filter-btn.active {
+    background: #fff;
+    color: #2c3e50 !important;
+    border-color: #fff !important;
 }
