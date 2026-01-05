@@ -63,6 +63,8 @@ let pvpTargetInfo = { index: null, type: null };
 
 // 是否正在查看敵方卡片 (用於隱藏升級按鈕)
 let isViewingEnemy = false;
+// 🔥 新增：是否正在查看圖鑑 (用於隱藏升級按鈕)
+let isViewingGallery = false;
 
 // 🔥 通知批量刪除相關變數
 let isNotifBatchMode = false;
@@ -1112,7 +1114,8 @@ function renderDetailCard() {
     const upgradeControls = document.querySelector('.upgrade-controls');
     const dismantleBtn = document.getElementById('dismantle-btn');
     
-    if(isViewingEnemy) {
+    // 🔥 修改：如果是「敵方卡片」或「圖鑑模式」，隱藏所有升級按鈕
+    if(isViewingEnemy || isViewingGallery) {
         if(upgradeControls) upgradeControls.style.display = 'none';
         if(dismantleBtn) dismantleBtn.style.display = 'none';
     } else {
@@ -1138,7 +1141,7 @@ function renderDetailCard() {
 }
 
 async function upgradeCardLevel(cost) {
-    if(isViewingEnemy) return; 
+    if(isViewingEnemy || isViewingGallery) return; // 🔥 防呆
     const card = currentDisplayList[currentCardIndex];
     if (gold < cost) return alert("金幣不足！");
     const currentDocId = card.docId; gold -= cost; playSound('coin'); card.level++; calculateCardStats(card); playSound('upgrade'); 
@@ -1147,7 +1150,7 @@ async function upgradeCardLevel(cost) {
 }
 
 async function upgradeCardStar() {
-    if(isViewingEnemy) return; 
+    if(isViewingEnemy || isViewingGallery) return; // 🔥 防呆
     const card = currentDisplayList[currentCardIndex]; const currentDocId = card.docId;
     const duplicate = allUserCards.find(c => c.id === card.id && c.docId !== card.docId);
     if (!duplicate) return alert("沒有重複的卡片可以用來升星！");
@@ -1162,7 +1165,7 @@ async function upgradeCardStar() {
 function calculateCardStats(card) { const levelBonus = (card.level - 1) * 0.03; const starBonus = (card.stars - 1) * 0.20; card.atk = Math.floor(card.baseAtk * (1 + levelBonus) * (1 + starBonus)); card.hp = Math.floor(card.baseHp * (1 + levelBonus) * (1 + starBonus)); }
 
 async function dismantleCurrentCard() {
-    if(isViewingEnemy) return; 
+    if(isViewingEnemy || isViewingGallery) return; // 🔥 防呆
     const card = currentDisplayList[currentCardIndex]; if (!card) return; const value = DISMANTLE_VALUES[card.rarity];
     if (card.rarity !== 'R') { if (!confirm(`確定要分解【${card.name}】嗎？\n獲得 ${value} 金幣。`)) return; }
     try { 
@@ -1194,6 +1197,7 @@ if(document.getElementById('close-detail-btn')) document.getElementById('close-d
     playSound('click'); 
     document.getElementById('detail-modal').classList.add('hidden'); 
     isViewingEnemy = false; 
+    isViewingGallery = false; // 🔥 關閉視窗時，重置圖鑑狀態
     
     const upgradeControls = document.querySelector('.upgrade-controls');
     const dismantleBtn = document.getElementById('dismantle-btn');
@@ -1702,6 +1706,8 @@ function filterGallery(rarity) {
                 currentDisplayList = [displayCard]; // 傳入 Lv.1 的卡片
                 currentCardIndex = 0;
                 
+                isViewingGallery = true; // 🔥 設定為圖鑑模式 (隱藏升級按鈕)
+
                 const detailModal = document.getElementById('detail-modal');
                 detailModal.classList.remove('hidden');
                 detailModal.style.zIndex = "99999";
