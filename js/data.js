@@ -67,7 +67,7 @@ wavesLevel1[1].enemyPool = [8, 9];
 wavesLevel1[2].enemyPool = [8, 9, 28]; 
 wavesLevel1[3].enemyPool = [24, 8, 9]; 
 wavesLevel1[4] = { 
-    count: 1, hp: 4000000, atk: 500, bossId: 1, 
+    count: 1, hp: 40000, atk: 500, bossId: 1, 
     aoeConfig: { radius: 18, damageMult: 1.2, effect: 'shockwave', color: '#f1c40f' } 
 };
 
@@ -196,6 +196,7 @@ export const cardDatabase = [
     { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } }
 
 ];
+
 
 
 
