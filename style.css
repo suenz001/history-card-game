@@ -1188,3 +1188,32 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     transform: scale(1.05);
     opacity: 1;
 }
+
+/* style.css 新增 */
+
+/* 圖鑑：未獲得的卡片樣式 */
+.card.locked {
+    filter: grayscale(100%); /* 黑白濾鏡 */
+    opacity: 0.6;            /* 半透明 */
+    cursor: not-allowed;     /* 滑鼠游標變成禁止符號 */
+    position: relative;
+}
+
+/* 在未獲得的卡片上加一個鎖頭圖示 */
+.card.locked::after {
+    content: "🔒";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3em;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 0 5px #000;
+    pointer-events: none;
+}
+
+/* 確保圖鑑內的卡片排列整齊 */
+#gallery-grid {
+    align-content: flex-start;
+    min-height: 300px;
+}

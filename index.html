@@ -40,6 +40,7 @@
                 <span id="user-name" style="font-size:1.2em; font-weight:bold;">玩家：載入中...</span>
                 <div style="display: flex; gap: 5px;">
                     <button id="notification-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #e67e22;">🔔 通知</button>
+                    <button id="gallery-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #1abc9c;">📖 圖鑑</button>
                     <button id="settings-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">⚙️ 設定</button>
                     <button id="logout-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">登出</button>
                 </div>
@@ -62,9 +63,8 @@
 
                     <button id="enter-battle-mode-btn" class="btn-danger" style="width: 100%; margin-bottom: 10px; font-size: 1.2em; border: 2px solid #fff; box-shadow: 0 0 10px #c0392b;">⚔️ 前往戰場 (選擇關卡)</button>
 
-<div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                         <button id="pvp-menu-btn" class="btn-primary" style="flex: 1; background: #2980b9; border: 2px solid #fff;">🛡️ 設定防守隊伍</button>
-                        
                         <button id="pvp-search-btn" class="btn-secondary" style="flex: 1; background: #d35400; border: 2px solid #fff; box-shadow: 0 0 10px #e67e22;">🔍 尋找對手</button>
                     </div>
 
@@ -80,7 +80,7 @@
                     <div id="card-display-area" class="card-container"></div>
                 </div>
 
-<div class="leaderboard-area">
+                <div class="leaderboard-area">
                     <h2 style="margin-top:0; color:#f1c40f; text-align: center;">🏆 全服戰力榜</h2>
                     <div id="leaderboard-list"><p style="text-align:center;">載入中...</p></div>
 
@@ -89,6 +89,7 @@
                         <div style="font-size: 0.8em; color: #7f8c8d; margin-top: 5px;">Designed by SoonYoung Studio</div>
                     </div>
                 </div>
+            </div>
         </div>
     </div>
 
@@ -224,6 +225,27 @@
                 <div id="batch-info">已選 0 張，獲得 0 G</div>
                 <button id="batch-confirm-btn">確認分解</button>
             </div>
+        </div>
+    </div>
+
+    <div id="gallery-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                    <h2>📖 英雄圖鑑</h2>
+                    <span id="gallery-progress" style="font-size: 0.9em; color: #f1c40f;">(收集進度: 0/0)</span>
+                </div>
+                <button id="close-gallery-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
+            </div>
+            
+            <div class="filter-bar">
+                <button class="gallery-filter-btn active" data-filter="ALL">全部</button>
+                <button class="gallery-filter-btn" data-filter="SSR" style="color:#f1c40f; border-color:#f1c40f;">SSR</button>
+                <button class="gallery-filter-btn" data-filter="SR" style="color:#9b59b6; border-color:#9b59b6;">SR</button>
+                <button class="gallery-filter-btn" data-filter="R" style="color:#3498db; border-color:#3498db;">R</button>
+            </div>
+
+            <div id="gallery-grid" class="card-container" style="justify-content: flex-start;"></div>
         </div>
     </div>
 
