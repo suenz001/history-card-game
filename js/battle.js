@@ -520,7 +520,7 @@ function triggerBossEntranceEffect(boss) {
         }
     });
     
-    // 螢幕小震一下增加力道感
+    // 螢幕小震一下增加力道感 (登場時保留震動，若想移除請將此段刪除)
     const body = document.body;
     body.style.transform = "translate(0, 5px)";
     setTimeout(() => body.style.transform = "none", 100);
@@ -682,8 +682,8 @@ function fireBossSkill(boss) {
         // 4. 產生 AOE 爆炸特效
         createBossVfx(target.position, target.y, aoe.effect, aoe.color);
         safePlaySound('explosion');
-        shakeScreen(); // 畫面震動
-
+        // shakeScreen(); // 🔥 移除畫面震動，應您的要求
+        
         // 5. 計算範圍傷害
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position; 
