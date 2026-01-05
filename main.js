@@ -3,7 +3,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// 🔥 引入模組
 import { HERO_BIOS } from './js/bios.js';
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
@@ -50,7 +49,6 @@ let currentDisplayList = [];
 let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 
-// 讀取上次記憶的排序方式
 let currentSortMethod = localStorage.getItem('userSortMethod') || 'time_desc';
 
 let isBatchMode = false;
@@ -59,11 +57,8 @@ let gachaQueue = [];
 let gachaIndex = 0;
 
 let pvpTargetInfo = { index: null, type: null };
-
-// 是否正在查看敵方卡片 (用於隱藏升級按鈕)
 let isViewingEnemy = false;
 
-// 🔥 通知批量刪除相關變數
 let isNotifBatchMode = false;
 let selectedNotifIds = new Set();
 
@@ -71,10 +66,8 @@ const SYSTEM_NOTIFICATIONS = [
     { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 }, isSystem: true }
 ];
 
-// 設定戰鬥結束的回調
 setOnBattleEnd(handleBattleEnd);
 
-// 初始化 PVP
 setTimeout(() => {
     if(document.getElementById('pvp-menu-btn')) {
         initPvp(db, currentUser, allUserCards, (slotIndex, type) => {
@@ -83,7 +76,6 @@ setTimeout(() => {
             document.getElementById('inventory-title').innerText = title; 
             document.getElementById('inventory-modal').classList.remove('hidden');
             
-            // 確保排序選單與記憶同步
             const sortSelect = document.getElementById('sort-select');
             if(sortSelect) sortSelect.value = currentSortMethod;
 
@@ -93,10 +85,8 @@ setTimeout(() => {
     }
 }, 500);
 
-// 處理點擊敵方卡片的邏輯
 function handleEnemyCardClick(enemyCard) {
     isViewingEnemy = true; 
-
     const baseCard = cardDatabase.find(c => c.id == enemyCard.id);
     let displayCard = { ...baseCard, ...enemyCard };
 
@@ -115,7 +105,6 @@ function handleEnemyCardClick(enemyCard) {
     currentDisplayList = [displayCard];
     currentCardIndex = 0;
     
-    // 強制將詳情視窗的 Z-Index 設為最高
     const detailModal = document.getElementById('detail-modal');
     detailModal.classList.remove('hidden');
     detailModal.style.zIndex = "99999"; 
@@ -123,7 +112,6 @@ function handleEnemyCardClick(enemyCard) {
     renderDetailCard();
 }
 
-// 設定介面相關
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
 const sfxToggle = document.getElementById('sfx-toggle');
@@ -203,8 +191,6 @@ if(document.getElementById('close-notification-btn')) {
     document.getElementById('close-notification-btn').addEventListener('click', () => {
         playSound('click');
         notificationModal.classList.add('hidden');
-        
-        // 關閉時重置批量模式
         isNotifBatchMode = false;
         selectedNotifIds.clear();
     });
@@ -259,7 +245,6 @@ async function executeBatchDelete() {
     if (selectedNotifIds.size === 0) return alert("請至少選擇一條戰報！");
     if (!confirm(`確定要刪除這 ${selectedNotifIds.size} 條紀錄嗎？`)) return;
 
-    // 保留那些「不在」選取清單中的戰報
     const newLogs = battleLogs.filter((log, index) => {
         const tempId = `battle_log_${log.timestamp ? log.timestamp.seconds : Date.now()}_${index}`;
         return !selectedNotifIds.has(tempId);
@@ -289,7 +274,6 @@ async function executeBatchDelete() {
 function renderNotifications() {
     notificationList.innerHTML = "";
     
-    // 工具列
     const toolbar = document.createElement('div');
     toolbar.style.padding = "10px";
     toolbar.style.display = "flex";
@@ -327,14 +311,12 @@ function renderNotifications() {
     }
     notificationList.appendChild(toolbar);
 
-    // 準備資料
     const staticSystemItems = SYSTEM_NOTIFICATIONS.map(notif => ({
         ...notif,
         timestamp: 9999999999999, 
         type: 'system'
     }));
 
-    // 🔥 生成唯一ID防止覆蓋
     const logItems = battleLogs.map((log, index) => ({
         ...log,
         id: `battle_log_${log.timestamp ? log.timestamp.seconds : Date.now()}_${index}`,
@@ -349,12 +331,10 @@ function renderNotifications() {
         index === self.findIndex((t) => (t.id === item.id))
     );
 
-    // 渲染列表
     uniqueItems.forEach(item => {
         const div = document.createElement('div');
         div.style.transition = "all 0.2s";
         
-        // 批量模式樣式
         if (isNotifBatchMode) {
             if (item.type === 'system') {
                 div.style.opacity = "0.5";
@@ -439,7 +419,6 @@ function renderNotifications() {
                 </div>
             `;
 
-            // 單筆刪除按鈕
             if (!isNotifBatchMode) {
                 const deleteSingleBtn = document.createElement('div');
                 deleteSingleBtn.className = "delete-log-btn";
@@ -866,7 +845,6 @@ async function loadInventory(uid) {
     }
 }
 
-// 監聽排序變更時，儲存到 localStorage
 if(document.getElementById('sort-select')) document.getElementById('sort-select').addEventListener('change', (e) => { 
     playSound('click'); 
     currentSortMethod = e.target.value; 
@@ -900,7 +878,6 @@ function openDetailModal(index) {
     playSound('click'); 
     currentCardIndex = index; 
     
-    // 強制將詳情視窗的 Z-Index 設為最高
     const detailModal = document.getElementById('detail-modal');
     detailModal.classList.remove('hidden'); 
     detailModal.style.zIndex = "99999"; 
@@ -951,7 +928,6 @@ function getSkillDescription(skillKey, params) {
     }
 }
 
-// 🔥🔥 修改：支援 iOS 捲動 (防止滑動時誤觸翻轉)
 function renderDetailCard() {
     const container = document.getElementById('large-card-view');
     container.innerHTML = "";
@@ -1017,7 +993,6 @@ function renderDetailCard() {
     cardWrapper.appendChild(cardInner);
     container.appendChild(cardWrapper);
 
-    // 🔥🔥 修改：防誤觸機制 (滑動時不翻轉)
     let isDragging = false;
     let startX, startY;
 
@@ -1036,12 +1011,11 @@ function renderDetailCard() {
     }, { passive: true });
 
     cardWrapper.addEventListener('click', (e) => {
-        if (isDragging) return; // 如果是滑動操作，忽略點擊
+        if (isDragging) return; 
         playSound('click');
         cardWrapper.classList.toggle('is-flipped');
     });
 
-    // 設定按鈕事件
     document.getElementById('dismantle-btn').onclick = () => dismantleCurrentCard();
     const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); 
     const upgradeStarBtn = document.getElementById('upgrade-star-btn');
@@ -1131,7 +1105,6 @@ if(document.getElementById('close-detail-btn')) document.getElementById('close-d
     document.getElementById('detail-modal').classList.add('hidden'); 
     isViewingEnemy = false; 
     
-    // 恢復按鈕顯示
     const upgradeControls = document.querySelector('.upgrade-controls');
     const dismantleBtn = document.getElementById('dismantle-btn');
     if(upgradeControls) upgradeControls.style.display = 'flex';
@@ -1228,15 +1201,12 @@ if(document.getElementById('draw-10-btn')) document.getElementById('draw-10-btn'
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
 });
 
-// 🔥 監聽背包按鈕，開啟時自動解除全軍 + 帶入上次排序
 if(document.getElementById('inventory-btn')) document.getElementById('inventory-btn').addEventListener('click', () => { 
     playSound('inventory'); 
     if(!currentUser) return alert("請先登入"); 
     
-    // 自動解除全軍 (讓介面看起來是清空的)
     clearDeployment();
 
-    // 恢復上次的排序選擇
     const sortSelect = document.getElementById('sort-select');
     if(sortSelect && currentSortMethod) {
         sortSelect.value = currentSortMethod;
@@ -1279,33 +1249,27 @@ if(batchConfirmBtn) batchConfirmBtn.addEventListener('click', async () => { play
 updateInventoryCounts();
 alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
-// 🔥 修改：點擊「前往戰場」改為打開關卡選單
 if(document.getElementById('enter-battle-mode-btn')) document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
     if(!currentUser) return alert("請先登入");
     if(allUserCards.length === 0) await loadInventory(currentUser.uid);
     
-    // 開啟關卡選擇視窗
     document.getElementById('level-selection-modal').classList.remove('hidden');
 });
 
-// 🔥 新增：關卡選擇按鈕邏輯
 document.querySelectorAll('.level-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-        if(btn.classList.contains('locked')) return; // 鎖定關卡不可點
+        if(btn.classList.contains('locked')) return; 
         
         playSound('click');
         const levelId = parseInt(btn.dataset.level);
         
-        // 關閉選單
         document.getElementById('level-selection-modal').classList.add('hidden');
         
-        // 呼叫 battle.js 初始化特定關卡
         initBattle(levelId);
     });
 });
 
-// 🔥 新增：關閉關卡選擇視窗
 if(document.getElementById('close-level-select-btn')) {
     document.getElementById('close-level-select-btn').addEventListener('click', () => {
         playSound('click');
@@ -1334,9 +1298,17 @@ document.querySelectorAll('.defense-slot').forEach(slot => {
     });
 });
 
+// 🔥 修改：限制同名英雄上陣 (PVE)
 function deployHeroToSlot(card) {
     const isAlreadyDeployed = battleSlots.some(s => s && s.docId === card.docId);
     if(isAlreadyDeployed) { alert("這位英雄已經在場上了！"); return; }
+
+    const isSameHeroTypeDeployed = battleSlots.some((s, index) => s && s.id == card.id && index !== deployTargetSlot);
+    if(isSameHeroTypeDeployed) {
+        alert("同名英雄只能上陣一位！");
+        return;
+    }
+
     if (deployTargetSlot !== null) {
         const newSlots = [...battleSlots];
         newSlots[deployTargetSlot] = { 
@@ -1377,20 +1349,35 @@ function updateStartButton() {
     else { btn.classList.add('btn-disabled'); btn.innerText = `請先部署英雄`; }
 }
 
+// 🔥 修改：自動部屬也需遵守同名限制
 if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-deploy-btn').addEventListener('click', () => {
     if(isBattleActive) return;
     playSound('click');
-    const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
+    
+    // 依戰力排序
+    const sortedCards = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp));
+    const uniqueHeroes = [];
+    const seenIds = new Set();
+
+    // 篩選出不重複 ID 的英雄
+    for (const card of sortedCards) {
+        if (!seenIds.has(card.id)) {
+            uniqueHeroes.push(card);
+            seenIds.add(card.id);
+        }
+        if (uniqueHeroes.length >= 9) break; 
+    }
+
     const newSlots = new Array(9).fill(null);
-    topHeroes.forEach((hero, index) => { 
+    uniqueHeroes.forEach((hero, index) => { 
         newSlots[index] = { ...hero }; 
     });
+    
     setBattleSlots(newSlots);
     renderBattleSlots();
     updateStartButton();
 });
 
-// 🔥 更新後的結算邏輯：加入傷害/治療切換頁籤，且保留 enemyStats 參數
 async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     
@@ -1430,11 +1417,9 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     await updateCurrencyCloud(); 
     updateUIDisplay();
 
-    // 🔥 渲染 PVE 圖表邏輯 (含切換按鈕)
     const dpsContainer = document.getElementById('dps-chart');
     dpsContainer.innerHTML = "";
 
-    // 插入切換按鈕
     const tabs = document.createElement('div');
     tabs.style.display = "flex";
     tabs.style.justifyContent = "center";
@@ -1456,14 +1441,13 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
         const statKey = currentMode === 'damage' ? 'totalDamage' : 'totalHealing';
         const color = currentMode === 'damage' ? '#e74c3c' : '#2ecc71';
 
-        // PVE 模式只顯示我方
         if (heroStats && heroStats.length > 0) {
             const sortedHeroes = [...heroStats].sort((a, b) => (b[statKey] || 0) - (a[statKey] || 0));
             const maxVal = sortedHeroes[0][statKey] || 1; 
             
             sortedHeroes.forEach(h => {
                 if(!h[statKey]) h[statKey] = 0;
-                if(h[statKey] === 0 && currentMode === 'healing') return; // 隱藏0治療
+                if(h[statKey] === 0 && currentMode === 'healing') return; 
 
                 const percent = (h[statKey] / maxVal) * 100;
                 
@@ -1490,7 +1474,6 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
 
     renderList();
 
-    // 綁定按鈕事件
     const dmgBtn = tabs.querySelector('#show-dmg-btn');
     const healBtn = tabs.querySelector('#show-heal-btn');
 

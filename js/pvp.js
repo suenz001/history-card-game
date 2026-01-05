@@ -92,19 +92,13 @@ export function updatePvpContext(user, inventory) {
     allUserCards = inventory;
 }
 
-// 🔥 Helper: 計算單張卡片的戰力 (ATK + HP)
-// 支援兩種格式：
-// 1. 我方卡片 (直接有 atk/hp)
-// 2. 敵方卡片 (只有 level/stars，需重新計算)
 function getCardPower(card) {
     if (!card) return 0;
     
-    // 如果是自己背包的卡，屬性已經計算好了
     if (card.atk !== undefined && card.hp !== undefined) {
         return card.atk + card.hp;
     }
 
-    // 如果是敵人的卡 (通常只存了 id, level, stars)，需要反推數值
     const baseConfig = cardDatabase.find(c => String(c.id) === String(card.id));
     if (baseConfig) {
         const level = card.level || 1;
@@ -122,7 +116,6 @@ function getCardPower(card) {
     return 0;
 }
 
-// 🔥 Helper: 更新介面上「我方」的即時戰力 (只計算上陣的)
 function updateMyArenaPowerDisplay() {
     const powerEl = document.getElementById('arena-my-power');
     if (!powerEl) return;
@@ -151,12 +144,19 @@ async function openPvpModal() {
     updateSaveButtonState();
 }
 
+// 🔥 修改：限制 PVP 同名英雄上陣
 export function setPvpHero(slotIndex, card, type) {
     const targetArray = (type === 'attack') ? pvpAttackSlots : pvpDefenseSlots;
 
     const isAlreadyDeployed = targetArray.some(h => h && h.docId === card.docId);
     if(isAlreadyDeployed) {
         alert("該英雄已經在此陣容中！");
+        return false;
+    }
+
+    const isSameHeroTypeDeployed = targetArray.some((h, index) => h && h.id == card.id && index !== slotIndex);
+    if(isSameHeroTypeDeployed) {
+        alert("同名英雄只能上陣一位！");
         return false;
     }
 
@@ -222,7 +222,6 @@ function renderPvpSlots(type) {
         } else { placeholder.style.display = 'block'; slotDiv.classList.remove('active'); }
     });
 
-    // 🔥 如果是攻擊陣容變動，即時更新我方戰力數字
     if (type === 'attack') {
         updateMyArenaPowerDisplay();
     }
@@ -503,13 +502,11 @@ async function loadLastAttackTeam() {
     }
 }
 
-// 🔥 修正：計算並顯示「當前對陣雙方」的上陣戰力
 function renderMatchup() {
     if (!currentEnemyData) return;
     
     document.getElementById('arena-my-name').innerText = currentUser.displayName || "我方";
     
-    // 計算敵方上陣英雄戰力總和
     let enemyTeamPower = 0;
     if (currentEnemyData.defenseTeam) {
         currentEnemyData.defenseTeam.forEach(hero => {
@@ -518,9 +515,8 @@ function renderMatchup() {
     }
 
     document.getElementById('arena-enemy-name').innerText = currentEnemyData.name || "神秘客";
-    document.getElementById('arena-enemy-power').innerText = enemyTeamPower; // 🔥 顯示敵方上陣總戰力
+    document.getElementById('arena-enemy-power').innerText = enemyTeamPower;
     
-    // 初始化顯示我方戰力 (會在 renderPvpSlots 中更新，但這裡先預設顯示)
     updateMyArenaPowerDisplay();
 
     const grid = document.getElementById('enemy-preview-grid'); grid.innerHTML = ""; 
@@ -574,7 +570,6 @@ async function startActualPvp() {
     startPvpMatch(currentEnemyData.defenseTeam || [], pvpAttackSlots);
 }
 
-// 🔥 新增：PVP 結算時接收敵我雙方數據，並渲染雙排列表
 async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
     const resultModal = document.getElementById('battle-result-modal');
     const title = document.getElementById('result-title');
@@ -585,7 +580,6 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
     const dpsContainer = document.getElementById('dps-chart');
     dpsContainer.innerHTML = "";
 
-    // 插入切換按鈕
     const tabs = document.createElement('div');
     tabs.style.display = "flex";
     tabs.style.justifyContent = "center";
@@ -597,7 +591,6 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
     `;
     dpsContainer.appendChild(tabs);
 
-    // 建立雙欄位容器 (我方 vs 敵方)
     const listWrapper = document.createElement('div');
     listWrapper.style.display = "flex";
     listWrapper.style.gap = "10px";
@@ -618,9 +611,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
 
     let currentMode = 'damage';
 
-    // 輔助函式：渲染單邊列表
     const renderSide = (stats, container, color) => {
-        // 清空列表內容但保留標題
         while (container.childNodes.length > 1) {
             container.removeChild(container.lastChild);
         }
@@ -638,7 +629,6 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
                 const percent = (h[statKey] / maxVal) * 100;
                 const row = document.createElement('div');
                 row.className = 'dps-row';
-                // 簡化樣式以適應雙欄
                 row.style.marginBottom = "5px";
                 
                 row.innerHTML = `
@@ -669,7 +659,6 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
 
     updateView();
 
-    // 綁定切換按鈕
     const dmgBtn = tabs.querySelector('#pvp-show-dmg-btn');
     const healBtn = tabs.querySelector('#pvp-show-heal-btn');
 
