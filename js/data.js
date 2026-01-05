@@ -11,7 +11,6 @@ const DEFAULT_WAVES = {
 };
 
 // 🔥 關卡設定模組 (Level Configs)
-// 你可以在這裡針對每一關設定不同的背景圖片 (bg) 和波次內容 (waves)
 export const LEVEL_CONFIGS = {
     1: { name: "第一章：秦嶺邊境", bg: "assets/bg/level_1.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
     2: { name: "第二章：黃河古道", bg: "assets/bg/level_2.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
@@ -23,7 +22,7 @@ export const LEVEL_CONFIGS = {
     8: { name: "第八章：地宮深處", bg: "assets/bg/level_8.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) }
 };
 
-// 卡片資料庫 (維持不變)
+// 卡片資料庫
 export const cardDatabase = [
     // ================= SSR (8張) =================
     { 
@@ -102,16 +101,53 @@ export const cardDatabase = [
     },
 
     // ================= R (12張) =================
-    { id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士", attackType: "melee" },
-    { id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, title: "龜甲陣列", attackType: "melee" },
-    { id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, title: "武士道", attackType: "melee" },
-    { id: 11, name: "維京海盜", rarity: "R", atk: 550, hp: 700, title: "狂戰士", attackType: "melee" },
-    { id: 12, name: "條頓騎士", rarity: "R", atk: 450, hp: 850, title: "鐵十字", attackType: "melee" },
-    { id: 24, name: "英國長弓兵", rarity: "R", atk: 600, hp: 300, title: "遠程打擊", attackType: "ranged" },
-    { id: 25, name: "蒙古騎兵", rarity: "R", atk: 550, hp: 500, title: "騎射手", attackType: "ranged" },
-    { id: 26, name: "忍者", rarity: "R", atk: 650, hp: 300, title: "影之軍團", attackType: "ranged" },
-    { id: 27, name: "十字軍", rarity: "R", atk: 400, hp: 800, title: "聖殿騎士", attackType: "melee" },
-    { id: 28, name: "祖魯戰士", rarity: "R", atk: 500, hp: 600, title: "長矛兵", attackType: "melee" },
-    { id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, title: "熱兵器", attackType: "ranged" },
-    { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged" }
+    // 🔥 全部統一設定：技能為 HEAVY_STRIKE，倍率為 1.5
+    { 
+        id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士", attackType: "melee",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, title: "龜甲陣列", attackType: "melee",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, title: "武士道", attackType: "melee",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 11, name: "維京海盜", rarity: "R", atk: 550, hp: 700, title: "狂戰士", attackType: "melee",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 12, name: "條頓騎士", rarity: "R", atk: 450, hp: 850, title: "鐵十字", attackType: "melee",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 24, name: "英國長弓兵", rarity: "R", atk: 600, hp: 300, title: "遠程打擊", attackType: "ranged",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 25, name: "蒙古騎兵", rarity: "R", atk: 550, hp: 500, title: "騎射手", attackType: "ranged",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 26, name: "忍者", rarity: "R", atk: 650, hp: 300, title: "影之軍團", attackType: "ranged",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 27, name: "十字軍", rarity: "R", atk: 400, hp: 800, title: "聖殿騎士", attackType: "melee",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 28, name: "祖魯戰士", rarity: "R", atk: 500, hp: 600, title: "長矛兵", attackType: "melee",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, title: "熱兵器", attackType: "ranged",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    },
+    { 
+        id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged",
+        skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }
+    }
 ];
