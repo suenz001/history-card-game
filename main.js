@@ -44,7 +44,7 @@ let totalPower = 0;
 let allUserCards = [];
 let claimedNotifs = []; 
 let battleLogs = []; 
-let deletedSystemNotifs = []; // 🔥 新增：紀錄已刪除的系統通知 ID
+let deletedSystemNotifs = []; 
 let globalAnnouncements = [];
 
 let currentDisplayList = [];
@@ -1233,7 +1233,16 @@ function renderCard(card, targetContainer) {
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
 
     cardDiv.className = `card ${card.rarity}`; 
-    if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { cardDiv.classList.add('is-deployed'); }
+    
+    // 🔥 修改：只有在非 PVP 選擇模式下，才檢查 PVE 部署狀態
+    const isPvpSelection = pvpTargetInfo && pvpTargetInfo.index !== null;
+
+    if (!isPvpSelection) {
+        if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { 
+            cardDiv.classList.add('is-deployed'); 
+        }
+    }
+    
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats"><span class="type-icon">${typeIcon}</span> 👊${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
