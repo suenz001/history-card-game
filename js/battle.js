@@ -1,5 +1,6 @@
 // js/battle.js
-import { LEVEL_CONFIGS, cardDatabase } from './data.js';
+// 🔥 引入 DIFFICULTY_SETTINGS
+import { LEVEL_CONFIGS, cardDatabase, DIFFICULTY_SETTINGS } from './data.js';
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { executeSkill } from './skills.js'; 
 import { fireProjectile, createVfx, createBossVfx, showDamageText, shakeScreen, triggerHeroHit } from './vfx.js'; 
@@ -12,14 +13,13 @@ export let heroEntities = [];
 export let deadHeroes = []; 
 export let enemies = [];
 export let deadEnemies = [];
-export let currentDifficulty = 'normal';
+export let currentDifficulty = 'normal'; // 預設普通
 export let gameSpeed = 1;
 
 let currentLevelId = 1; 
 
 let pvpPlayerTeamData = [];
 
-// 🔥 battleState
 let battleState = {
     wave: 1, 
     spawned: 0, 
@@ -74,13 +74,17 @@ function setupBattleListeners() {
         });
     }
     
+    // 綁定難度按鈕 (如果有 class="difficulty-btn")
     document.querySelectorAll('.difficulty-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             if(isBattleActive) return; 
             safePlaySound('click');
             document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
-            currentDifficulty = e.target.getAttribute('data-diff');
+            
+            // 確保這裡抓到的是 'easy', 'normal', 'hard' 其中之一
+            currentDifficulty = e.target.getAttribute('data-diff') || 'normal';
+            console.log("難度已切換為:", currentDifficulty);
         });
     });
 
@@ -226,7 +230,7 @@ export function resetBattleState() {
     if(isBgmOn) { audioBgm.currentTime = 0; audioBgm.play().catch(()=>{}); }
     
     battleState.phase = 'IDLE'; 
-    battleState.isBossSpawning = false; // 重置旗標
+    battleState.isBossSpawning = false;
     enemies = [];
     heroEntities = [];
     deadHeroes = [];
@@ -259,7 +263,6 @@ export function resetBattleState() {
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'flex';
     
-    // 移除可能存在的警告遮罩
     const warning = document.getElementById('boss-warning-overlay');
     if(warning) warning.remove();
 }
@@ -546,7 +549,7 @@ function startWave(waveNum) {
     }
 }
 
-// 🔥 重構：依賴 data.js 的資料驅動生成
+// 🔥 重構：讀取 data.js 的 DIFFICULTY_SETTINGS 和敵軍設定
 function spawnEnemy() {
     if(isPvpMode) return; 
     
@@ -556,21 +559,20 @@ function spawnEnemy() {
     const levelConfig = LEVEL_CONFIGS[currentLevelId];
     const config = levelConfig.waves[battleState.wave];
     
-    let diffMultHp = 1, diffMultAtk = 1;
+    // 🔥 讀取難度設定 (預設 fallback 為 normal)
+    const diffSettings = DIFFICULTY_SETTINGS[currentDifficulty] || DIFFICULTY_SETTINGS['normal'];
+    const diffMultHp = diffSettings.hpMult;
+    const diffMultAtk = diffSettings.atkMult;
 
-    if (currentDifficulty === 'easy') { diffMultHp = 0.6; diffMultAtk = 0.6; }
-    else if (currentDifficulty === 'hard') { diffMultHp = 1.5; diffMultAtk = 1.5; }
-
-    // 🔥 波次 1-3：生成雜魚 (讀取 data.js 的 enemyPool 與 hpMult)
+    // 波次 1-3：生成雜魚
     if (battleState.wave < 4) {
         
-        // 如果沒有設定 enemyPool，預設 ID:8 (斯巴達) 當作 fallback
         const pool = config.enemyPool || [8]; 
         const randomId = pool[Math.floor(Math.random() * pool.length)];
         const baseCard = cardDatabase.find(c => c.id === randomId);
 
         if (baseCard) {
-            // 使用 config.hpMult 來調整強度，不再寫死公式
+            // 🔥 使用倍率計算數值
             const finalHp = Math.floor(baseCard.hp * (config.hpMult || 1) * diffMultHp);
             const finalAtk = Math.floor(baseCard.atk * (config.atkMult || 1) * diffMultAtk);
 
@@ -582,10 +584,12 @@ function spawnEnemy() {
             };
             spawnSingleEnemyFromCard(enemyData, container);
             return;
+        } else {
+            console.error("找不到卡片ID:", randomId, "請檢查 data.js 的 cardDatabase");
         }
     }
 
-    // 🔥 波次 4：生成 BOSS
+    // 波次 4：生成 BOSS
     if(battleState.wave === 4) {
         const performBossSpawn = () => {
             if (!isBattleActive) return;
@@ -612,7 +616,7 @@ function spawnEnemy() {
                 }
             }
 
-            // Fallback Boss (如果 data.js 沒設定 bossId)
+            // Fallback
             const bossX = 10 + Math.random() * 80; 
             const bossY = 10 + Math.random() * 80;
             const boss = { 
@@ -642,26 +646,21 @@ function spawnEnemy() {
     }
 }
 
-// 🔥 魔王技能：依賴 data.js 的 AOE 參數
 function fireBossSkill(boss) {
     const container = document.querySelector('.battle-field-container');
     if(!container) return;
 
-    // 1. 讀取 AOE 設定
     const aoe = boss.aoeConfig || { radius: 15, damageMult: 1.0, effect: 'shockwave', color: '#e74c3c' };
 
-    // 2. 顯示準備發招 (集氣文字)
     showDamageText(boss.position, boss.y - 15, "蓄力中...", "skill-title");
     safePlaySound('magic');
 
-    // 3. 投射物動畫 (魔球)
     const projectile = document.createElement('div'); 
     projectile.className = 'boss-projectile';
     projectile.style.left = `${boss.position}%`; 
     projectile.style.top = `${boss.y}%`;
     container.appendChild(projectile);
     
-    // 鎖定一個目標 (優先鎖定最近的，若無則隨機)
     let target = null;
     let minDist = 9999;
     heroEntities.forEach(h => {
@@ -672,21 +671,17 @@ function fireBossSkill(boss) {
     });
 
     if (!target && heroEntities.length > 0) target = heroEntities[Math.floor(Math.random() * heroEntities.length)];
-    if (!target) target = { position: 20, y: 50 }; // 假目標
+    if (!target) target = { position: 20, y: 50 }; 
     
-    // 飛向目標
     void projectile.offsetWidth;
     projectile.style.left = `${target.position}%`; 
     projectile.style.top = `${target.y}%`;
     
     setTimeout(() => {
         projectile.remove();
-        
-        // 4. 產生 AOE 爆炸特效
         createBossVfx(target.position, target.y, aoe.effect, aoe.color);
         safePlaySound('explosion');
         
-        // 5. 計算範圍傷害
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position; 
             const dy = hero.y - target.y; 
@@ -706,8 +701,6 @@ function fireBossSkill(boss) {
                     triggerHeroHit(hero); 
                     showDamageText(hero.position, hero.y, `-${dmg}`, 'hero-dmg');
                 }
-                
-                // 輕微擊退效果
                 if(hero.position < boss.position) hero.position -= 1; else hero.position += 1;
             }
         });
@@ -796,7 +789,6 @@ function gameLoop() {
     } 
     else if (!isPvpMode && battleState.phase === 'COMBAT') {
         if (enemies.length === 0) {
-            // 🔥 必須確認「不是正在生成Boss」才能判定過關
             if (!battleState.isBossSpawning) {
                 battleState.phase = 'WAITING';
                 battleState.waitTimer = now;
@@ -936,9 +928,13 @@ function gameLoop() {
             
             if(!isPvpMode) { 
                 try {
-                    battleGold += 50 + (battleState.wave * 10);
+                    // 🔥 使用 DIFFICULTY_SETTINGS 中的金幣倍率
+                    const diffSettings = DIFFICULTY_SETTINGS[currentDifficulty] || DIFFICULTY_SETTINGS['normal'];
+                    const goldGain = Math.floor((50 + (battleState.wave * 10)) * diffSettings.goldMult);
+
+                    battleGold += goldGain;
                     updateBattleUI(); 
-                    showDamageText(enemy.position, enemy.y, `+50G`, 'gold-text'); 
+                    showDamageText(enemy.position, enemy.y, `+${goldGain}G`, 'gold-text'); 
                     
                     let killer = heroEntities.find(h => Math.abs(h.position - enemy.position) < 20); 
                     if(killer && killer.currentMana < killer.maxMana) {
@@ -962,7 +958,7 @@ function gameLoop() {
             if (fillMana) fillMana.style.width = `${manaPercent}%`; 
         }
 
-        // 🔥 魔王攻擊邏輯：時間到就放 AOE
+        // Boss 攻擊
         if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { 
             fireBossSkill(enemy); 
             enemy.lastAttackTime = now; 
@@ -1010,7 +1006,6 @@ function gameLoop() {
             }
         }
         else if (!enemy.isBoss && !enemy.isPvpHero && nearestHero && minTotalDist <= 3) { 
-            // 一般雜魚的攻擊邏輯
             blocked = true;
             if (now - enemy.lastAttackTime > 800 / gameSpeed) {
                 fireProjectile(enemy.el, nearestHero.el, 'fireball', () => {
@@ -1033,7 +1028,6 @@ function gameLoop() {
             }
         }
 
-        // 雜魚的閃避邏輯
         for (let other of enemies) {
             if (other !== enemy && other.currentHp > 0) {
                 let dist = Math.abs(enemy.position - other.position);
