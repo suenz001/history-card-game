@@ -1070,15 +1070,47 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     padding-bottom: 10px;
 }
 
-/* 下半部：人物生平 (剩餘空間全部給它，並允許捲動) */
+/* style.css - 修正 iOS 捲動問題 */
+
+/* 下半部：人物生平 */
 .card-bio-section {
-    flex: 1; /* 佔據剩餘空間 */
+    flex: 1;
     width: 100%;
-    overflow-y: auto; /* 🔥 關鍵：內容過多時顯示垂直捲軸 */
-    min-height: 0; /* Firefox Flexbox 捲動修正 */
-    text-align: left; /* 文字靠左比較好閱讀 */
-    padding-right: 5px; /* 避免文字貼到捲軸 */
+    overflow-y: auto;
+    
+    /* 🔥 iOS 修正關鍵 1：開啟慣性捲動 */
+    -webkit-overflow-scrolling: touch; 
+    
+    /* 🔥 iOS 修正關鍵 2：解決 3D 翻轉後無法捲動的 Bug */
+    transform: translate3d(0,0,0);
+    
+    /* 其他樣式 */
+    min-height: 0;
+    text-align: left;
+    padding-right: 5px;
+    
+    /* 讓點擊事件可以穿透到 JS 偵測 */
+    pointer-events: auto; 
 }
+
+/* 確保背面容器的層級正確 */
+.large-card-back {
+    /* ...原有樣式... */
+    background: linear-gradient(135deg, #34495e 0%, #1a252f 100%);
+    color: white;
+    transform: rotateY(180deg);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box;
+    border: 3px solid #7f8c8d;
+    text-align: left;
+    overflow: hidden; /* 這裡設為 hidden，捲動交給 bio-section */
+    height: 100%;
+    
+    /* 🔥 iOS 修正關鍵 3：確保背面在翻轉後能接收觸控 */
+    z-index: 10; 
+}}
 
 /* 優化捲軸樣式 (讓它好看一點) */
 .card-bio-section::-webkit-scrollbar {

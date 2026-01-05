@@ -951,7 +951,7 @@ function getSkillDescription(skillKey, params) {
     }
 }
 
-// 🔥 更新後的卡片詳情渲染 (支援手機版捲動)
+// 🔥🔥 修改：支援 iOS 捲動 (防止滑動時誤觸翻轉)
 function renderDetailCard() {
     const container = document.getElementById('large-card-view');
     container.innerHTML = "";
@@ -967,25 +967,12 @@ function renderDetailCard() {
     const idString = String(card.id).padStart(3, '0');
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
     
-    // 取得技能描述
     const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
-
-    // 取得生平描述
     const bioData = HERO_BIOS[card.id]; 
-    let bioHtml = "";
-    
-    if (bioData) {
-        bioHtml = `
-            <div style="font-size: 0.9em; color: #f39c12; margin-bottom: 8px; font-weight: bold; text-align: center;">
-                【${bioData.era}】
-            </div>
-            <div style="font-size: 0.95em; line-height: 1.6; text-align: justify; color: #ddd;">
-                ${bioData.text}
-            </div>
-        `;
-    } else {
-        bioHtml = `<div class="card-back-text" style="color:#bdc3c7; text-align:center;">(資料查詢中...)</div>`;
-    }
+    let bioHtml = bioData ? `
+        <div style="font-size: 0.9em; color: #f39c12; margin-bottom: 8px; font-weight: bold; text-align: center;">【${bioData.era}】</div>
+        <div style="font-size: 0.95em; line-height: 1.6; text-align: justify; color: #ddd;">${bioData.text}</div>
+    ` : `<div class="card-back-text" style="color:#bdc3c7; text-align:center;">(資料查詢中...)</div>`;
 
     const cardWrapper = document.createElement('div');
     cardWrapper.className = `large-card ${card.rarity}`;
@@ -993,7 +980,6 @@ function renderDetailCard() {
     const cardInner = document.createElement('div');
     cardInner.className = 'large-card-inner';
 
-    // === 正面 ===
     const frontFace = document.createElement('div');
     frontFace.className = 'large-card-front';
     if(card.rarity === 'SSR') frontFace.classList.add('ssr-effect');
@@ -1011,7 +997,6 @@ function renderDetailCard() {
         <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
     `;
 
-    // === 背面 (支援捲動結構) ===
     const backFace = document.createElement('div');
     backFace.className = `large-card-back ${card.rarity}`;
     
@@ -1020,12 +1005,10 @@ function renderDetailCard() {
             <div class="card-back-title">✨ 技能效果</div>
             <div class="card-back-text" style="text-align: center;">${skillDesc}</div>
         </div>
-        
         <div class="card-bio-section">
             <div class="card-back-title">📜 人物生平</div>
             ${bioHtml}
         </div>
-        
         <div class="flip-hint">(再次點擊翻回正面)</div>
     `;
 
@@ -1034,17 +1017,34 @@ function renderDetailCard() {
     cardWrapper.appendChild(cardInner);
     container.appendChild(cardWrapper);
 
-    // 點擊翻轉事件
-    cardWrapper.addEventListener('click', () => {
+    // 🔥🔥 修改：防誤觸機制 (滑動時不翻轉)
+    let isDragging = false;
+    let startX, startY;
+
+    cardWrapper.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        isDragging = false;
+    }, { passive: true });
+
+    cardWrapper.addEventListener('touchmove', (e) => {
+        const moveX = e.touches[0].clientX;
+        const moveY = e.touches[0].clientY;
+        if (Math.abs(moveX - startX) > 10 || Math.abs(moveY - startY) > 10) {
+            isDragging = true;
+        }
+    }, { passive: true });
+
+    cardWrapper.addEventListener('click', (e) => {
+        if (isDragging) return; // 如果是滑動操作，忽略點擊
         playSound('click');
         cardWrapper.classList.toggle('is-flipped');
     });
 
-    // 設定按鈕事件 (升級、分解等)
+    // 設定按鈕事件
     document.getElementById('dismantle-btn').onclick = () => dismantleCurrentCard();
     const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); 
     const upgradeStarBtn = document.getElementById('upgrade-star-btn');
-    
     const upgradeControls = document.querySelector('.upgrade-controls');
     const dismantleBtn = document.getElementById('dismantle-btn');
     
