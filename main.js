@@ -71,8 +71,7 @@ const SYSTEM_NOTIFICATIONS = [
     { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 }, isSystem: true }
 ];
 
-// 初始化戰鬥模組
-// initBattle(); // 注意：這行移除了，因為改由關卡選擇後再 init
+// 設定戰鬥結束的回調
 setOnBattleEnd(handleBattleEnd);
 
 // 初始化 PVP
@@ -239,7 +238,6 @@ async function openNotificationModal() {
     renderNotifications();
 }
 
-// 🔥 新增：切換通知批量模式
 function toggleNotifBatchMode() {
     isNotifBatchMode = !isNotifBatchMode;
     selectedNotifIds.clear(); 
@@ -247,7 +245,6 @@ function toggleNotifBatchMode() {
     renderNotifications();
 }
 
-// 🔥 新增：處理單個通知的選取
 function toggleNotifSelection(id) {
     if (selectedNotifIds.has(id)) {
         selectedNotifIds.delete(id);
@@ -258,7 +255,6 @@ function toggleNotifSelection(id) {
     renderNotifications(); 
 }
 
-// 🔥 新增：執行批量刪除
 async function executeBatchDelete() {
     if (selectedNotifIds.size === 0) return alert("請至少選擇一條戰報！");
     if (!confirm(`確定要刪除這 ${selectedNotifIds.size} 條紀錄嗎？`)) return;
@@ -912,7 +908,6 @@ function openDetailModal(index) {
     renderDetailCard(); 
 }
 
-// 全面優化：確保文字敘述與程式邏輯完全一致
 function getSkillDescription(skillKey, params) {
     if (!params) return "造成強力傷害。";
 
@@ -956,6 +951,7 @@ function getSkillDescription(skillKey, params) {
     }
 }
 
+// 🔥 更新後的卡片詳情渲染 (支援手機版捲動)
 function renderDetailCard() {
     const container = document.getElementById('large-card-view');
     container.innerHTML = "";
@@ -971,22 +967,24 @@ function renderDetailCard() {
     const idString = String(card.id).padStart(3, '0');
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
     
+    // 取得技能描述
     const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
 
+    // 取得生平描述
     const bioData = HERO_BIOS[card.id]; 
     let bioHtml = "";
     
     if (bioData) {
         bioHtml = `
-            <div style="font-size: 0.85em; color: #f39c12; margin-bottom: 5px; font-weight: bold;">
-                ${bioData.era}
+            <div style="font-size: 0.9em; color: #f39c12; margin-bottom: 8px; font-weight: bold; text-align: center;">
+                【${bioData.era}】
             </div>
-            <div style="font-size: 0.9em; line-height: 1.6; text-align: justify;">
+            <div style="font-size: 0.95em; line-height: 1.6; text-align: justify; color: #ddd;">
                 ${bioData.text}
             </div>
         `;
     } else {
-        bioHtml = `<div class="card-back-text" style="color:#bdc3c7;">(資料查詢中...)</div>`;
+        bioHtml = `<div class="card-back-text" style="color:#bdc3c7; text-align:center;">(資料查詢中...)</div>`;
     }
 
     const cardWrapper = document.createElement('div');
@@ -995,6 +993,7 @@ function renderDetailCard() {
     const cardInner = document.createElement('div');
     cardInner.className = 'large-card-inner';
 
+    // === 正面 ===
     const frontFace = document.createElement('div');
     frontFace.className = 'large-card-front';
     if(card.rarity === 'SSR') frontFace.classList.add('ssr-effect');
@@ -1012,18 +1011,21 @@ function renderDetailCard() {
         <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
     `;
 
+    // === 背面 (支援捲動結構) ===
     const backFace = document.createElement('div');
     backFace.className = `large-card-back ${card.rarity}`;
     
     backFace.innerHTML = `
-        <div class="card-back-section">
+        <div class="card-skill-section">
             <div class="card-back-title">✨ 技能效果</div>
-            <div class="card-back-text">${skillDesc}</div>
+            <div class="card-back-text" style="text-align: center;">${skillDesc}</div>
         </div>
-        <div class="card-back-section" style="flex: 1; overflow-y: auto;">
+        
+        <div class="card-bio-section">
             <div class="card-back-title">📜 人物生平</div>
             ${bioHtml}
         </div>
+        
         <div class="flip-hint">(再次點擊翻回正面)</div>
     `;
 
@@ -1032,11 +1034,13 @@ function renderDetailCard() {
     cardWrapper.appendChild(cardInner);
     container.appendChild(cardWrapper);
 
+    // 點擊翻轉事件
     cardWrapper.addEventListener('click', () => {
         playSound('click');
         cardWrapper.classList.toggle('is-flipped');
     });
 
+    // 設定按鈕事件 (升級、分解等)
     document.getElementById('dismantle-btn').onclick = () => dismantleCurrentCard();
     const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); 
     const upgradeStarBtn = document.getElementById('upgrade-star-btn');

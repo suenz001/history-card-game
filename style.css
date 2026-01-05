@@ -1046,3 +1046,77 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     filter: grayscale(1);
     /* cursor: not-allowed; */ /* 目前先不鎖，方便測試 */
 }
+
+/* style.css 新增或取代以下內容 */
+
+/* 卡片背面容器：設定為彈性佈局，確保高度固定 */
+.large-card-back {
+    display: flex;
+    flex-direction: column; /* 垂直排列 */
+    justify-content: flex-start;
+    align-items: center;
+    padding: 20px 15px; /* 增加內距 */
+    box-sizing: border-box;
+    overflow: hidden; /* 隱藏超出容器的部分，交給子元素捲動 */
+    height: 100%; /* 確保佔滿整個卡片高度 */
+}
+
+/* 上半部：技能說明 (固定高度，不捲動) */
+.card-skill-section {
+    flex: 0 0 auto; /* 不會縮放 */
+    width: 100%;
+    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 10px;
+}
+
+/* 下半部：人物生平 (剩餘空間全部給它，並允許捲動) */
+.card-bio-section {
+    flex: 1; /* 佔據剩餘空間 */
+    width: 100%;
+    overflow-y: auto; /* 🔥 關鍵：內容過多時顯示垂直捲軸 */
+    min-height: 0; /* Firefox Flexbox 捲動修正 */
+    text-align: left; /* 文字靠左比較好閱讀 */
+    padding-right: 5px; /* 避免文字貼到捲軸 */
+}
+
+/* 優化捲軸樣式 (讓它好看一點) */
+.card-bio-section::-webkit-scrollbar {
+    width: 6px;
+}
+.card-bio-section::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+.card-bio-section::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 3px;
+}
+.card-bio-section::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.6);
+}
+
+/* 確保標題樣式清晰 */
+.card-back-title {
+    color: #f1c40f;
+    font-size: 1.1em;
+    font-weight: bold;
+    margin-bottom: 5px;
+    text-align: center;
+}
+
+.card-back-text {
+    font-size: 0.9em;
+    line-height: 1.5;
+    color: #ecf0f1;
+    white-space: pre-wrap; /* 保留換行格式 */
+}
+
+/* 底部提示字 */
+.flip-hint {
+    flex: 0 0 auto;
+    margin-top: 10px;
+    font-size: 0.8em;
+    color: #95a5a6;
+    opacity: 0.8;
+}
