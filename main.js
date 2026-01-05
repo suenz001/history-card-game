@@ -1411,8 +1411,17 @@ document.querySelectorAll('.defense-slot').forEach(slot => {
 });
 
 function deployHeroToSlot(card) {
+    // 1. 檢查這張卡片實體是否已經在場上 (防呆)
     const isAlreadyDeployed = battleSlots.some(s => s && s.docId === card.docId);
-    if(isAlreadyDeployed) { alert("這位英雄已經在場上了！"); return; }
+    if(isAlreadyDeployed) { alert("這張卡片已經在場上了！"); return; }
+
+    // 2. 🔥 新增：檢查是否有同名英雄 (同 ID) 已經在場上
+    const isDuplicateHero = battleSlots.some(s => s && s.id == card.id);
+    if(isDuplicateHero) {
+        alert(`⚠️ ${card.name} 已經在隊伍中！無法重複上陣。`);
+        return;
+    }
+
     if (deployTargetSlot !== null) {
         const newSlots = [...battleSlots];
         newSlots[deployTargetSlot] = { 
