@@ -19,9 +19,17 @@ let currentLevelId = 1;
 
 let pvpPlayerTeamData = [];
 
+// 🔥 修改：battleState 增加 isBossSpawning 旗標，防止魔王登場前誤判勝利
 let battleState = {
-    wave: 1, spawned: 0, totalToSpawn: 0, lastSpawnTime: 0, phase: 'IDLE', waitTimer: 0
+    wave: 1, 
+    spawned: 0, 
+    totalToSpawn: 0, 
+    lastSpawnTime: 0, 
+    phase: 'IDLE', 
+    waitTimer: 0,
+    isBossSpawning: false 
 };
+
 let gameLoopId = null;
 let onBattleEndCallback = null;
 
@@ -34,7 +42,6 @@ export function setDifficulty(diff) { currentDifficulty = diff; }
 export function setGameSpeed(speed) { gameSpeed = speed; } 
 export function setOnBattleEnd(callback) { onBattleEndCallback = callback; }
 
-// 🔥 獨立出一個函式來確保按鈕監聽器已安裝
 function ensureBattleListeners() {
     const startBtn = document.getElementById('start-battle-btn');
     if (startBtn && !startBtn.dataset.initialized) {
@@ -45,7 +52,7 @@ function ensureBattleListeners() {
 
 export function initBattle(levelId = 1) {
     currentLevelId = levelId;
-    ensureBattleListeners(); // 確保 PVE 有監聽器
+    ensureBattleListeners(); 
     prepareLevel();
 }
 
@@ -57,14 +64,12 @@ function setupBattleListeners() {
     if(retreatBtn) {
         retreatBtn.addEventListener('click', () => { 
             safePlaySound('click'); 
-            
-            // 🔥 區分 PVP 與 PVE 的撤退邏輯
             if (isPvpMode) {
                 if (confirm("🏳️ 確定要投降嗎？\n\n這將被判定為戰敗。")) {
-                    endBattle(false); // 觸發戰敗結算
+                    endBattle(false); 
                 }
             } else {
-                resetBattleState(); // PVE 直接重置
+                resetBattleState(); 
             }
         });
     }
@@ -102,7 +107,6 @@ function prepareLevel() {
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'flex'; 
 
-    // PVE 模式下按鈕文字
     const retreatBtn = document.getElementById('retreat-btn');
     if(retreatBtn) retreatBtn.innerText = "🏳️ 撤退";
     
@@ -155,7 +159,6 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
     isPvpMode = true; 
     pvpPlayerTeamData = playerTeamData; 
 
-    // 🔥 修正：確保 PVP 開場時也會綁定按鈕監聽器
     ensureBattleListeners();
 
     const diffControls = document.getElementById('difficulty-controls');
@@ -163,7 +166,6 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
 
     setupBattleEnvironment();
     
-    // PVP 模式下按鈕文字
     const retreatBtn = document.getElementById('retreat-btn');
     if(retreatBtn) retreatBtn.innerText = "🏳️ 投降";
     
@@ -224,6 +226,7 @@ export function resetBattleState() {
     if(isBgmOn) { audioBgm.currentTime = 0; audioBgm.play().catch(()=>{}); }
     
     battleState.phase = 'IDLE'; 
+    battleState.isBossSpawning = false; // 重置旗標
     enemies = [];
     heroEntities = [];
     deadHeroes = [];
@@ -255,6 +258,10 @@ export function resetBattleState() {
 
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'flex';
+    
+    // 移除可能存在的警告遮罩
+    const warning = document.getElementById('boss-warning-overlay');
+    if(warning) warning.remove();
 }
 
 function spawnHeroes() {
@@ -397,21 +404,17 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
 
     const typeIcon = attackType === 'ranged' ? '🏹' : '⚔️';
 
-    // 🔥 修改：創建敵人元素，如果是 Boss 則加入 .boss 類別
     const el = document.createElement('div');
     const bossClass = enemyCard.isBoss ? ' boss' : '';
     el.className = `enemy-unit pvp-enemy ${enemyCard.rarity || 'R'}${bossClass}`;
     
-    // 設定背景圖 (Boss 與一般敵人都使用)
     el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
     el.style.backgroundSize = 'cover';
     
-    // 設定位置
     el.style.left = `${startPos}%`;
     el.style.top = `${startY}%`;
     el.style.transform = 'translateY(-50%) scaleX(-1)';
 
-    // 🔥 移除舊的 inline style 設定，改由 CSS 處理外觀
     if(!enemyCard.isBoss) {
         el.style.border = '2px solid #e74c3c';
     }
@@ -455,7 +458,7 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         attackType: attackType, 
         maxMana: 100, currentMana: 0,
         position: startPos, y: startY,
-        speed: enemyCard.isBoss ? 0.02 : 0.05, // Boss 走慢一點
+        speed: enemyCard.isBoss ? 0.02 : 0.05, 
         range: attackType === 'ranged' ? 16 : 4, 
         lastAttackTime: 0,
         el: el,
@@ -468,10 +471,9 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     });
 }
 
-// 🔥 新增：BOSS 警告特效 (現在返回 Promise 供等待，且不震動)
 function showBossWarning() {
     return new Promise((resolve) => {
-        safePlaySound('dismantle'); // 播放警報音效
+        safePlaySound('dismantle'); 
         
         const warningOverlay = document.createElement('div');
         warningOverlay.id = 'boss-warning-overlay';
@@ -481,11 +483,11 @@ function showBossWarning() {
         `;
         document.body.appendChild(warningOverlay);
 
-        // 🔥 移除：shakeScreen();
+        // 🔥 修改：移除了螢幕震動 shakeScreen()
 
         setTimeout(() => {
             if(warningOverlay.parentNode) warningOverlay.remove();
-            resolve(); // 2.5秒後完成 Promise
+            resolve();
         }, 2500);
     });
 }
@@ -494,39 +496,36 @@ function showBossWarning() {
 function triggerBossEntranceEffect(boss) {
     if (!boss) return;
 
-    // 1. 視覺與音效
     createVfx(boss.position, boss.y, 'vfx-explosion'); 
-    safePlaySound('explosion'); // 假設 audio.js 有 explosion，若無則用 dismantle 或 boom
+    safePlaySound('explosion'); 
 
-    // 2. 震退所有英雄
+    // 震退所有英雄
     heroEntities.forEach(hero => {
         if (hero.isDead) return;
         
-        // 計算距離
         const dx = hero.position - boss.position;
         const dy = hero.y - boss.y;
         const dist = Math.sqrt(dx*dx + dy*dy);
         
-        const impactRadius = 30; // 影響範圍 (畫面30%)
+        const impactRadius = 30; // 影響範圍
         
         if (dist < impactRadius) {
-            // 推開方向 (主要看 X 軸)
             let dirX = dx < 0 ? -1 : 1; 
-            
-            // 力道：越近推越遠
             const force = (impactRadius - dist) / impactRadius; 
-            const pushDistance = 20 * force; // 最大推 20%
+            const pushDistance = 20 * force; 
             
             hero.position += dirX * pushDistance;
-            
-            // 邊界檢查
             hero.position = Math.max(0, Math.min(100, hero.position));
             
-            // 受擊反應
             triggerHeroHit(hero);
             showDamageText(hero.position, hero.y, "擊退!", "gold-text");
         }
     });
+    
+    // 螢幕小震一下增加力道感 (僅一瞬間)
+    const body = document.body;
+    body.style.transform = "translate(0, 5px)";
+    setTimeout(() => body.style.transform = "none", 100);
 }
 
 function startWave(waveNum) {
@@ -584,7 +583,7 @@ function spawnEnemy() {
     if(battleState.wave === 4) {
         // 🔥 封裝 Boss 生成邏輯
         const performBossSpawn = () => {
-            if (!isBattleActive) return; // 防止等待期間戰鬥已結束
+            if (!isBattleActive) return;
 
             if (config.bossId) {
                 const baseCard = cardDatabase.find(c => c.id === config.bossId);
@@ -598,15 +597,14 @@ function spawnEnemy() {
                     };
                     spawnSingleEnemyFromCard(bossData, container);
                     
-                    // 取得剛生成的 Boss 並觸發登場特效
                     const bossEntity = enemies[enemies.length-1];
                     bossEntity.isBoss = true; 
-                    triggerBossEntranceEffect(bossEntity);
+                    triggerBossEntranceEffect(bossEntity); // 登場震退!
                     return;
                 }
             }
 
-            // Fallback Boss (如果沒有指定 bossId)
+            // Fallback Boss
             const bossX = 10 + Math.random() * 80; 
             const bossY = 10 + Math.random() * 80;
             const boss = { id: Date.now(), maxHp: 30000, currentHp: 30000, atk: 500, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
@@ -616,11 +614,14 @@ function spawnEnemy() {
             triggerBossEntranceEffect(boss);
         };
 
-        // 🔥 判斷是否為第一隻 (Boss 本體)，如果是，先播警告動畫
+        // 🔥 修正 Bug 關鍵：若為 Boss 第一隻，先設定狀態為 isBossSpawning，防止勝利判定
         if (battleState.spawned === 0) {
-            showBossWarning().then(performBossSpawn);
+            battleState.isBossSpawning = true; // 鎖定狀態
+            showBossWarning().then(() => {
+                performBossSpawn();
+                battleState.isBossSpawning = false; // 解除鎖定
+            });
         } else {
-            // 如果這波還有小怪，直接生成 (通常 Boss 波 count=1，這行很少用到)
             performBossSpawn(); 
         }
         return;
@@ -685,7 +686,6 @@ function updateBattleUI() {
         const goldEl = document.getElementById('battle-gold');
         if(goldEl) goldEl.innerText = battleGold; 
         
-        // 🔥 修正：PVP 模式隱藏金幣顯示
         const goldContainer = document.getElementById('battle-gold-container');
         if (goldContainer) {
             goldContainer.style.display = isPvpMode ? 'none' : 'inline';
@@ -763,9 +763,12 @@ function gameLoop() {
     } 
     else if (!isPvpMode && battleState.phase === 'COMBAT') {
         if (enemies.length === 0) {
-            battleState.phase = 'WAITING';
-            battleState.waitTimer = now;
-            if (battleState.wave < 4) showDamageText(50, 40, "3秒後 下一波...", '');
+            // 🔥 關鍵修正：必須確認「不是正在生成Boss」才能判定過關
+            if (!battleState.isBossSpawning) {
+                battleState.phase = 'WAITING';
+                battleState.waitTimer = now;
+                if (battleState.wave < 4) showDamageText(50, 40, "3秒後 下一波...", '');
+            }
         }
     }
     else if (!isPvpMode && battleState.phase === 'WAITING') {
