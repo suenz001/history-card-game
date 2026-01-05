@@ -397,18 +397,23 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
 
     const typeIcon = attackType === 'ranged' ? '🏹' : '⚔️';
 
+    // 🔥 修改：創建敵人元素，如果是 Boss 則加入 .boss 類別
     const el = document.createElement('div');
-    el.className = `enemy-unit pvp-enemy ${enemyCard.rarity || 'R'}`;
+    const bossClass = enemyCard.isBoss ? ' boss' : '';
+    el.className = `enemy-unit pvp-enemy ${enemyCard.rarity || 'R'}${bossClass}`;
+    
+    // 設定背景圖 (Boss 與一般敵人都使用)
     el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
     el.style.backgroundSize = 'cover';
-    el.style.border = '2px solid #e74c3c';
+    
+    // 設定位置
     el.style.left = `${startPos}%`;
     el.style.top = `${startY}%`;
     el.style.transform = 'translateY(-50%) scaleX(-1)';
 
-    if(enemyCard.isBoss) {
-        el.style.width = '70px'; el.style.height = '70px'; el.style.zIndex = '30';
-        el.style.border = '3px solid #f1c40f'; el.style.boxShadow = '0 0 15px #f1c40f';
+    // 🔥 移除舊的 inline style 設定，改由 CSS 處理外觀
+    if(!enemyCard.isBoss) {
+        el.style.border = '2px solid #e74c3c';
     }
 
     el.innerHTML = `
@@ -450,7 +455,7 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         attackType: attackType, 
         maxMana: 100, currentMana: 0,
         position: startPos, y: startY,
-        speed: 0.05,
+        speed: enemyCard.isBoss ? 0.02 : 0.05, // Boss 走慢一點
         range: attackType === 'ranged' ? 16 : 4, 
         lastAttackTime: 0,
         el: el,
@@ -461,6 +466,25 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         skillKey: finalSkillKey,
         skillParams: finalSkillParams
     });
+}
+
+// 🔥 新增：BOSS 警告特效
+function showBossWarning() {
+    safePlaySound('dismantle'); // 播放警報音效
+    
+    const warningOverlay = document.createElement('div');
+    warningOverlay.id = 'boss-warning-overlay';
+    warningOverlay.innerHTML = `
+        <div class="warning-text">⚠️ WARNING ⚠️</div>
+        <div class="warning-text" style="font-size: 2em; animation-delay: 0.1s;">BOSS APPROACHING</div>
+    `;
+    document.body.appendChild(warningOverlay);
+
+    shakeScreen();
+
+    setTimeout(() => {
+        warningOverlay.remove();
+    }, 2500);
 }
 
 function startWave(waveNum) {
@@ -519,6 +543,11 @@ function spawnEnemy() {
         if (config.bossId) {
             const baseCard = cardDatabase.find(c => c.id === config.bossId);
             if (baseCard) {
+                // 🔥 如果是 Boss 波次且尚未生成過，顯示警告
+                if (battleState.spawned === 0) {
+                    showBossWarning();
+                }
+
                 const bossData = {
                     ...baseCard,
                     hp: 30000 * multHp, 
@@ -532,6 +561,10 @@ function spawnEnemy() {
             }
         }
 
+        // Fallback Boss (如果沒有指定 bossId)
+        if (battleState.spawned === 0) {
+            showBossWarning();
+        }
         const bossX = 10 + Math.random() * 80; 
         const bossY = 10 + Math.random() * 80;
         const boss = { id: Date.now(), maxHp: 30000, currentHp: 30000, atk: 500, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };

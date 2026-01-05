@@ -1254,3 +1254,121 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     color: #2c3e50 !important;
     border-color: #fff !important;
 }
+
+/* =========================================
+   👹 BOSS 專屬特效樣式
+   ========================================= */
+
+/* 1. Boss 本體樣式 (巨大化 + 霸氣外框) */
+.enemy-unit.boss {
+    width: 110px !important;  /* 變大：原本是 40px */
+    height: 110px !important;
+    
+    /* 邊框設計：雙層發光邊框 */
+    border: 3px solid #fff;
+    box-shadow: 
+        0 0 15px #e74c3c,      /* 紅色外發光 */
+        0 0 30px #c0392b,      /* 深紅擴散 */
+        inset 0 0 20px #000;   /* 內陰影增加立體感 */
+        
+    background-color: #2c3e50; /* 底色 */
+    background-size: cover;
+    z-index: 50; /* 確保 Boss 在最上層 */
+    
+    /* 出場動畫 */
+    animation: bossEnter 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, bossPulse 3s infinite;
+}
+
+/* 2. Boss 背後的旋轉光環 (增加神聖/邪惡感) */
+.enemy-unit.boss::before {
+    content: '';
+    position: absolute;
+    top: -20%; left: -20%;
+    width: 140%; height: 140%;
+    border: 2px dashed rgba(241, 196, 15, 0.6); /* 金色虛線 */
+    border-radius: 50%;
+    z-index: -1;
+    animation: rotateAura 10s linear infinite;
+}
+
+.enemy-unit.boss::after {
+    content: '';
+    position: absolute;
+    top: -10%; left: -10%;
+    width: 120%; height: 120%;
+    border: 2px solid rgba(231, 76, 60, 0.5); /* 紅色實線 */
+    border-radius: 50%;
+    z-index: -1;
+    animation: rotateAura 5s linear infinite reverse;
+}
+
+/* 3. Boss 的血條調整 (因為本體變大了，血條也要寬一點) */
+.enemy-unit.boss .enemy-hp-bar {
+    width: 100px;
+    height: 8px;
+    top: -15px;
+    border: 1px solid white;
+    box-shadow: 0 0 5px black;
+}
+
+/* --- 動畫定義 --- */
+
+/* 出場動畫：從天而降並彈跳 */
+@keyframes bossEnter {
+    0% {
+        transform: translateY(-200%) scale(0.5);
+        opacity: 0;
+    }
+    60% {
+        transform: translateY(-40%) scale(1.2); /* 稍微過頭一點製造衝擊感 */
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-50%) scale(1);
+    }
+}
+
+/* 待機動畫：像心跳一樣緩慢縮放 */
+@keyframes bossPulse {
+    0% { transform: translateY(-50%) scale(1); box-shadow: 0 0 15px #e74c3c; }
+    50% { transform: translateY(-50%) scale(1.05); box-shadow: 0 0 40px #ff0000; }
+    100% { transform: translateY(-50%) scale(1); box-shadow: 0 0 15px #e74c3c; }
+}
+
+/* 光環旋轉 */
+@keyframes rotateAura {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ⚠️ BOSS WARNING 警告文字特效 */
+#boss-warning-overlay {
+    position: fixed;
+    top: 50%; left: 0; width: 100%;
+    transform: translateY(-50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.warning-text {
+    font-family: 'Impact', sans-serif;
+    font-size: 5em;
+    color: #e74c3c;
+    text-transform: uppercase;
+    letter-spacing: 10px;
+    text-shadow: 0 0 20px #000, 0 0 10px red;
+    animation: warningFlash 0.2s infinite alternate;
+    background: rgba(0,0,0,0.7);
+    width: 100%;
+    padding: 20px 0;
+}
+
+@keyframes warningFlash {
+    from { opacity: 1; text-shadow: 0 0 20px red; color: #fff; }
+    to { opacity: 0.5; text-shadow: 0 0 5px darkred; color: #e74c3c; }
+}
