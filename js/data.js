@@ -7,7 +7,17 @@ const DEFAULT_WAVES = {
     1: { count: 8, hp: 800, atk: 50 },
     2: { count: 16, hp: 1500, atk: 100 },
     3: { count: 30, hp: 3000, atk: 200 },
-    4: { count: 1, hp: 30000, atk: 500, bossId: 1 } // 預設值，會被覆蓋
+    // 預設魔王 (會被下方各關卡覆蓋)
+    4: { 
+        count: 1, hp: 30000, atk: 500, bossId: 1,
+        // 🔥 魔王 AOE 設定 (預設)
+        aoeConfig: { 
+            radius: 15,          // 範圍半徑 (10~30)
+            damageMult: 1.0,     // 傷害倍率 (相對於攻擊力)
+            effect: 'shockwave', // 特效類型: shockwave, storm, laser
+            color: '#e74c3c'     // 特效顏色
+        }
+    } 
 };
 
 // 🛠️ 輔助函式：複製一份乾淨的波次設定
@@ -17,39 +27,64 @@ function getWaves() {
 
 // ==========================================
 // ⚔️ 各關卡 Boss 設定 (第4波)
+// 您可以在這裡調整魔王的 AOE 參數
 // ==========================================
 
-// 第 1 關：秦始皇 (ID: 1)
+// 第 1 關：秦始皇 (霸氣震波)
 const wavesLevel1 = getWaves();
-wavesLevel1[4] = { count: 1, hp: 50000, atk: 500, bossId: 1 };
+wavesLevel1[4] = { 
+    count: 1, hp: 40000, atk: 500, bossId: 1,
+    aoeConfig: { radius: 18, damageMult: 1.2, effect: 'shockwave', color: '#f1c40f' } 
+};
 
-// 第 2 關：亞歷山大 (ID: 2)
+// 第 2 關：亞歷山大 (征服重擊)
 const wavesLevel2 = getWaves();
-wavesLevel2[4] = { count: 1, hp: 60000, atk: 600, bossId: 2 };
+wavesLevel2[4] = { 
+    count: 1, hp: 55000, atk: 600, bossId: 2,
+    aoeConfig: { radius: 20, damageMult: 1.3, effect: 'shockwave', color: '#e67e22' } 
+};
 
-// 第 3 關：拿破崙 (ID: 3)
+// 第 3 關：拿破崙 (火砲轟炸)
 const wavesLevel3 = getWaves();
-wavesLevel3[4] = { count: 1, hp: 80000, atk: 800, bossId: 3 };
+wavesLevel3[4] = { 
+    count: 1, hp: 70000, atk: 800, bossId: 3,
+    aoeConfig: { radius: 25, damageMult: 1.5, effect: 'explosion', color: '#c0392b' } 
+};
 
-// 第 4 關：成吉思汗 (ID: 13)
+// 第 4 關：成吉思汗 (箭雨風暴)
 const wavesLevel4 = getWaves();
-wavesLevel4[4] = { count: 1, hp: 100000, atk: 1000, bossId: 13 };
+wavesLevel4[4] = { 
+    count: 1, hp: 90000, atk: 1000, bossId: 13,
+    aoeConfig: { radius: 22, damageMult: 1.4, effect: 'storm', color: '#27ae60' } 
+};
 
-// 第 5 關：凱撒大帝 (ID: 14)
+// 第 5 關：凱撒大帝 (羅馬踐踏)
 const wavesLevel5 = getWaves();
-wavesLevel5[4] = { count: 1, hp: 130000, atk: 1200, bossId: 14 };
+wavesLevel5[4] = { 
+    count: 1, hp: 120000, atk: 1200, bossId: 14,
+    aoeConfig: { radius: 20, damageMult: 1.6, effect: 'shockwave', color: '#8e44ad' } 
+};
 
-// 第 6 關：漢尼拔 (ID: 15)
+// 第 6 關：漢尼拔 (戰象衝擊)
 const wavesLevel6 = getWaves();
-wavesLevel6[4] = { count: 1, hp: 160000, atk: 1500, bossId: 15 };
+wavesLevel6[4] = { 
+    count: 1, hp: 150000, atk: 1500, bossId: 15,
+    aoeConfig: { radius: 25, damageMult: 1.8, effect: 'shockwave', color: '#7f8c8d' } 
+};
 
-// 第 7 關：埃及豔后 (ID: 16)
+// 第 7 關：埃及豔后 (劇毒迷霧)
 const wavesLevel7 = getWaves();
-wavesLevel7[4] = { count: 1, hp: 200000, atk: 1800, bossId: 16 };
+wavesLevel7[4] = { 
+    count: 1, hp: 180000, atk: 1800, bossId: 16,
+    aoeConfig: { radius: 28, damageMult: 1.5, effect: 'storm', color: '#9b59b6' } 
+};
 
-// 第 8 關：宮本武藏 (ID: 17)
+// 第 8 關：宮本武藏 (劍氣風暴)
 const wavesLevel8 = getWaves();
-wavesLevel8[4] = { count: 1, hp: 250000, atk: 2200, bossId: 17 };
+wavesLevel8[4] = { 
+    count: 1, hp: 250000, atk: 2200, bossId: 17,
+    aoeConfig: { radius: 20, damageMult: 2.5, effect: 'slash_spin', color: '#3498db' } 
+};
 
 
 // 🔥 關卡設定模組 (Level Configs)
@@ -143,7 +178,6 @@ export const cardDatabase = [
     },
 
     // ================= R (12張) =================
-    // 🔥 全部統一設定：技能為 HEAVY_STRIKE，倍率為 1.5
     { 
         id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士", attackType: "melee",
         skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 }

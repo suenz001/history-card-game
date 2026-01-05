@@ -2,7 +2,7 @@
 import { LEVEL_CONFIGS, cardDatabase } from './data.js';
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { executeSkill } from './skills.js'; 
-import { fireProjectile, createVfx, showDamageText, shakeScreen, triggerHeroHit } from './vfx.js'; 
+import { fireProjectile, createVfx, createBossVfx, showDamageText, shakeScreen, triggerHeroHit } from './vfx.js'; 
 
 export let isBattleActive = false;
 export let isPvpMode = false; 
@@ -483,8 +483,6 @@ function showBossWarning() {
         `;
         document.body.appendChild(warningOverlay);
 
-        // 🔥 修改：移除了螢幕震動 shakeScreen()
-
         setTimeout(() => {
             if(warningOverlay.parentNode) warningOverlay.remove();
             resolve();
@@ -522,7 +520,7 @@ function triggerBossEntranceEffect(boss) {
         }
     });
     
-    // 螢幕小震一下增加力道感 (僅一瞬間)
+    // 螢幕小震一下增加力道感
     const body = document.body;
     body.style.transform = "translate(0, 5px)";
     setTimeout(() => body.style.transform = "none", 100);
@@ -590,8 +588,11 @@ function spawnEnemy() {
                 if (baseCard) {
                     const bossData = {
                         ...baseCard,
-                        hp: 30000 * multHp, 
-                        atk: 500 * multAtk,
+                        // 🔥 修正：優先使用 config (data.js) 中的數值，若無則用預設
+                        hp: (config.hp || 30000) * multHp, 
+                        atk: (config.atk || 500) * multAtk,
+                        // 🔥 讀取 AOE 設定並存入實體
+                        aoeConfig: config.aoeConfig || null,
                         isBoss: true, 
                         slotIndex: undefined 
                     };
@@ -599,6 +600,8 @@ function spawnEnemy() {
                     
                     const bossEntity = enemies[enemies.length-1];
                     bossEntity.isBoss = true; 
+                    bossEntity.aoeConfig = bossData.aoeConfig; // 確保有存進去
+                    
                     triggerBossEntranceEffect(bossEntity); // 登場震退!
                     return;
                 }
@@ -614,12 +617,11 @@ function spawnEnemy() {
             triggerBossEntranceEffect(boss);
         };
 
-        // 🔥 修正 Bug 關鍵：若為 Boss 第一隻，先設定狀態為 isBossSpawning，防止勝利判定
         if (battleState.spawned === 0) {
-            battleState.isBossSpawning = true; // 鎖定狀態
+            battleState.isBossSpawning = true; 
             showBossWarning().then(() => {
                 performBossSpawn();
-                battleState.isBossSpawning = false; // 解除鎖定
+                battleState.isBossSpawning = false; 
             });
         } else {
             performBossSpawn(); 
@@ -637,32 +639,58 @@ function spawnEnemy() {
     container.appendChild(el); enemy.el = el; enemies.push(enemy);
 }
 
+// 🔥 重寫魔王技能：完全依賴 data.js 的 AOE 參數
 function fireBossSkill(boss) {
     const container = document.querySelector('.battle-field-container');
     if(!container) return;
-    
-    const projectile = document.createElement('div'); projectile.className = 'boss-projectile';
-    projectile.style.left = `${boss.position}%`; projectile.style.top = `${boss.y}%`;
-    projectile.style.width = '80px'; projectile.style.height = '80px'; projectile.style.fontSize = '3em';
+
+    // 1. 讀取 AOE 設定
+    const aoe = boss.aoeConfig || { radius: 15, damageMult: 1.0, effect: 'shockwave', color: '#e74c3c' };
+
+    // 2. 顯示準備發招 (集氣文字)
+    showDamageText(boss.position, boss.y - 15, "蓄力中...", "skill-title");
+    safePlaySound('magic');
+
+    // 3. 投射物動畫 (魔球)
+    const projectile = document.createElement('div'); 
+    projectile.className = 'boss-projectile';
+    projectile.style.left = `${boss.position}%`; 
+    projectile.style.top = `${boss.y}%`;
     container.appendChild(projectile);
     
-    let target = heroEntities[Math.floor(Math.random() * heroEntities.length)];
-    if (!target) target = { position: 20, y: 50 };
+    // 鎖定一個目標 (優先鎖定最近的，若無則隨機)
+    let target = null;
+    let minDist = 9999;
+    heroEntities.forEach(h => {
+        const dx = h.position - boss.position;
+        const dy = h.y - boss.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < minDist) { minDist = dist; target = h; }
+    });
+
+    if (!target && heroEntities.length > 0) target = heroEntities[Math.floor(Math.random() * heroEntities.length)];
+    if (!target) target = { position: 20, y: 50 }; // 假目標
     
+    // 飛向目標
     void projectile.offsetWidth;
-    projectile.style.left = `${target.position}%`; projectile.style.top = `${target.y}%`;
+    projectile.style.left = `${target.position}%`; 
+    projectile.style.top = `${target.y}%`;
     
     setTimeout(() => {
         projectile.remove();
-        const effect = document.createElement('div'); effect.className = 'boss-aoe-effect';
-        effect.style.left = `${target.position}%`; effect.style.top = `${target.y}%`;
-        if(container) container.appendChild(effect);
-        setTimeout(() => effect.remove(), 600);
-        safePlaySound('explosion');
         
+        // 4. 產生 AOE 爆炸特效
+        createBossVfx(target.position, target.y, aoe.effect, aoe.color);
+        safePlaySound('explosion');
+        shakeScreen(); // 畫面震動
+
+        // 5. 計算範圍傷害
         heroEntities.forEach(hero => {
-            const dx = hero.position - target.position; const dy = hero.y - target.y; const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < 7) { 
+            const dx = hero.position - target.position; 
+            const dy = hero.y - target.y; 
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < aoe.radius) { 
                 if (hero.isInvincible) {
                     showDamageText(hero.position, hero.y, `免疫`, 'gold-text');
                     safePlaySound('block');
@@ -671,14 +699,17 @@ function fireBossSkill(boss) {
                     showDamageText(hero.position, hero.y, `格擋!`, 'gold-text');
                     safePlaySound('block');
                 } else {
-                    hero.currentHp -= 300; 
+                    const dmg = Math.floor(boss.atk * aoe.damageMult);
+                    hero.currentHp -= dmg; 
                     triggerHeroHit(hero); 
-                    showDamageText(hero.position, hero.y, `-300`, 'hero-dmg');
+                    showDamageText(hero.position, hero.y, `-${dmg}`, 'hero-dmg');
                 }
-                if(hero.position < boss.position) hero.position -= 2; else hero.position += 2;
+                
+                // 輕微擊退效果
+                if(hero.position < boss.position) hero.position -= 1; else hero.position += 1;
             }
         });
-    }, 500); 
+    }, 600); 
 }
 
 function updateBattleUI() {
@@ -929,7 +960,11 @@ function gameLoop() {
             if (fillMana) fillMana.style.width = `${manaPercent}%`; 
         }
 
-        if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { fireBossSkill(enemy); enemy.lastAttackTime = now; }
+        // 🔥 魔王攻擊邏輯：時間到就放 AOE
+        if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { 
+            fireBossSkill(enemy); 
+            enemy.lastAttackTime = now; 
+        }
 
         let blocked = false; let dodgeY = 0; let nearestHero = null; let minTotalDist = 9999;
         heroEntities.forEach(hero => {
@@ -940,55 +975,41 @@ function gameLoop() {
         });
 
         if (enemy.isPvpHero) {
+            // ... (PVP 英雄邏輯保持不變) ...
             if (enemy.currentMana < enemy.maxMana) {
-                enemy.currentMana += 0.25 * gameSpeed; // 敵方回氣速度
+                enemy.currentMana += 0.25 * gameSpeed; 
                 if(enemy.currentMana > enemy.maxMana) enemy.currentMana = enemy.maxMana;
             }
-            if (enemy.el) {
-                const manaBar = enemy.el.querySelector('.hero-mana-bar div');
-                if(manaBar) {
-                    const manaPct = (enemy.currentMana / enemy.maxMana) * 100;
-                    manaBar.style.width = `${manaPct}%`;
-                }
-                if(enemy.currentMana >= enemy.maxMana) enemy.el.classList.add('mana-full');
-                else enemy.el.classList.remove('mana-full');
-            }
-        }
-
-        if (enemy.isPvpHero && nearestHero && minTotalDist <= enemy.range) {
-            blocked = true;
-            if (now - enemy.lastAttackTime > 2000 / gameSpeed) {
-                if (enemy.currentMana >= enemy.maxMana) {
-                    const combatContext = {
-                        dealDamage,
-                        healTarget,
-                        getCombatGroups,
-                        enemies,
-                        heroEntities
-                    };
-                    executeSkill(enemy, nearestHero, combatContext);
-                } else {
-                    const projType = enemy.attackType === 'ranged' ? 'arrow' : 'sword';
-                    fireProjectile(enemy.el, nearestHero.el, projType, () => {
-                        if (nearestHero.el && nearestHero.currentHp > 0) {
-                            if(nearestHero.isInvincible) {
-                                showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
-                            } else if (nearestHero.immunityStacks > 0) {
-                                nearestHero.immunityStacks--;
-                                showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
-                                safePlaySound('block');
-                            } else {
-                                dealDamage(enemy, nearestHero, 1.0);
-                                triggerHeroHit(nearestHero);
-                                enemy.currentMana = Math.min(enemy.maxMana, enemy.currentMana + 5);
+            if (enemy.isPvpHero && nearestHero && minTotalDist <= enemy.range) {
+                blocked = true;
+                if (now - enemy.lastAttackTime > 2000 / gameSpeed) {
+                    if (enemy.currentMana >= enemy.maxMana) {
+                        const combatContext = { dealDamage, healTarget, getCombatGroups, enemies, heroEntities };
+                        executeSkill(enemy, nearestHero, combatContext);
+                    } else {
+                        const projType = enemy.attackType === 'ranged' ? 'arrow' : 'sword';
+                        fireProjectile(enemy.el, nearestHero.el, projType, () => {
+                            if (nearestHero.el && nearestHero.currentHp > 0) {
+                                if(nearestHero.isInvincible) {
+                                    showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
+                                } else if (nearestHero.immunityStacks > 0) {
+                                    nearestHero.immunityStacks--;
+                                    showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
+                                    safePlaySound('block');
+                                } else {
+                                    dealDamage(enemy, nearestHero, 1.0);
+                                    triggerHeroHit(nearestHero);
+                                    enemy.currentMana = Math.min(enemy.maxMana, enemy.currentMana + 5);
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
+                    enemy.lastAttackTime = now;
                 }
-                enemy.lastAttackTime = now;
             }
         }
         else if (!enemy.isBoss && !enemy.isPvpHero && nearestHero && minTotalDist <= 3) { 
+            // 一般雜魚的攻擊邏輯
             blocked = true;
             if (now - enemy.lastAttackTime > 800 / gameSpeed) {
                 fireProjectile(enemy.el, nearestHero.el, 'fireball', () => {
@@ -1011,6 +1032,7 @@ function gameLoop() {
             }
         }
 
+        // 雜魚的閃避邏輯
         for (let other of enemies) {
             if (other !== enemy && other.currentHp > 0) {
                 let dist = Math.abs(enemy.position - other.position);

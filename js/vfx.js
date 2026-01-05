@@ -44,6 +44,36 @@ export function createVfx(x, y, type) {
     setTimeout(() => vfx.remove(), 1000);
 }
 
+// 🔥 新增：魔王專屬 AOE 特效生成器
+export function createBossVfx(x, y, type, color) {
+    const container = getBattleContainer();
+    if(!container) return;
+    
+    const vfx = document.createElement('div');
+    
+    // 根據 type 決定 CSS class，若無則預設為震波
+    let className = 'vfx-boss-shockwave';
+    if(type === 'explosion') className = 'vfx-boss-explosion';
+    if(type === 'storm') className = 'vfx-boss-storm';
+    if(type === 'slash_spin') className = 'vfx-boss-slash-spin';
+
+    vfx.className = className;
+    vfx.style.left = `${x}%`;
+    vfx.style.top = `${y}%`;
+    
+    // 🔥 動態注入顏色
+    if (color) {
+        vfx.style.boxShadow = `0 0 20px ${color}, inset 0 0 10px ${color}`;
+        vfx.style.borderColor = color;
+        // 針對不同特效調整顏色屬性
+        if(type === 'storm') vfx.style.background = `radial-gradient(circle, ${color} 0%, transparent 70%)`;
+        if(type === 'explosion') vfx.style.background = `radial-gradient(circle, ${color} 10%, transparent 70%)`;
+    }
+
+    container.appendChild(vfx);
+    setTimeout(() => vfx.remove(), 1000);
+}
+
 // 發射投射物 (火球、箭矢、劍氣)
 export function fireProjectile(startEl, targetEl, type, onHitCallback) {
     if(!startEl || !targetEl) return;
