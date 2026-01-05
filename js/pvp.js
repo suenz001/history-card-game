@@ -92,6 +92,49 @@ export function updatePvpContext(user, inventory) {
     allUserCards = inventory;
 }
 
+// 🔥 Helper: 計算單張卡片的戰力 (ATK + HP)
+// 支援兩種格式：
+// 1. 我方卡片 (直接有 atk/hp)
+// 2. 敵方卡片 (只有 level/stars，需重新計算)
+function getCardPower(card) {
+    if (!card) return 0;
+    
+    // 如果是自己背包的卡，屬性已經計算好了
+    if (card.atk !== undefined && card.hp !== undefined) {
+        return card.atk + card.hp;
+    }
+
+    // 如果是敵人的卡 (通常只存了 id, level, stars)，需要反推數值
+    const baseConfig = cardDatabase.find(c => String(c.id) === String(card.id));
+    if (baseConfig) {
+        const level = card.level || 1;
+        const stars = card.stars || 1;
+        
+        const levelBonus = (level - 1) * 0.03;
+        const starBonus = (stars - 1) * 0.20;
+        
+        const finalAtk = Math.floor(baseConfig.atk * (1 + levelBonus) * (1 + starBonus));
+        const finalHp = Math.floor(baseConfig.hp * (1 + levelBonus) * (1 + starBonus));
+        
+        return finalAtk + finalHp;
+    }
+    
+    return 0;
+}
+
+// 🔥 Helper: 更新介面上「我方」的即時戰力 (只計算上陣的)
+function updateMyArenaPowerDisplay() {
+    const powerEl = document.getElementById('arena-my-power');
+    if (!powerEl) return;
+
+    let currentTeamPower = 0;
+    pvpAttackSlots.forEach(card => {
+        currentTeamPower += getCardPower(card);
+    });
+    
+    powerEl.innerText = currentTeamPower;
+}
+
 async function openPvpModal() {
     if (!currentUser) return alert("請先登入");
     document.getElementById('pvp-setup-modal').classList.remove('hidden');
@@ -178,6 +221,11 @@ function renderPvpSlots(type) {
             slotDiv.appendChild(cardDiv);
         } else { placeholder.style.display = 'block'; slotDiv.classList.remove('active'); }
     });
+
+    // 🔥 如果是攻擊陣容變動，即時更新我方戰力數字
+    if (type === 'attack') {
+        updateMyArenaPowerDisplay();
+    }
 }
 
 function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !== null).length; const btn = document.getElementById('save-pvp-team-btn'); if (count > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `💾 儲存防守陣容 (${count}/6)`; } else { btn.classList.add('btn-disabled'); btn.innerText = "請至少配置 1 名英雄"; } }
@@ -455,14 +503,26 @@ async function loadLastAttackTeam() {
     }
 }
 
+// 🔥 修正：計算並顯示「當前對陣雙方」的上陣戰力
 function renderMatchup() {
     if (!currentEnemyData) return;
-    document.getElementById('arena-my-name').innerText = currentUser.displayName || "我方";
-    let myPower = 0; allUserCards.forEach(c => myPower += (c.atk + c.hp)); 
-    document.getElementById('arena-my-power').innerText = myPower;
-    document.getElementById('arena-enemy-name').innerText = currentEnemyData.name || "神秘客";
-    document.getElementById('arena-enemy-power').innerText = currentEnemyData.combatPower || "???";
     
+    document.getElementById('arena-my-name').innerText = currentUser.displayName || "我方";
+    
+    // 計算敵方上陣英雄戰力總和
+    let enemyTeamPower = 0;
+    if (currentEnemyData.defenseTeam) {
+        currentEnemyData.defenseTeam.forEach(hero => {
+            enemyTeamPower += getCardPower(hero);
+        });
+    }
+
+    document.getElementById('arena-enemy-name').innerText = currentEnemyData.name || "神秘客";
+    document.getElementById('arena-enemy-power').innerText = enemyTeamPower; // 🔥 顯示敵方上陣總戰力
+    
+    // 初始化顯示我方戰力 (會在 renderPvpSlots 中更新，但這裡先預設顯示)
+    updateMyArenaPowerDisplay();
+
     const grid = document.getElementById('enemy-preview-grid'); grid.innerHTML = ""; 
     const enemyTeam = currentEnemyData.defenseTeam || [];
 
