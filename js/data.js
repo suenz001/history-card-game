@@ -12,14 +12,14 @@ const DEFAULT_WAVES = {
 
 // 🔥 關卡設定模組 (Level Configs)
 export const LEVEL_CONFIGS = {
-    1: { name: "第一章：秦嶺邊境", bg: "assets/bg/level_1.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    2: { name: "第二章：黃河古道", bg: "assets/bg/level_2.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    3: { name: "第三章：長安城外", bg: "assets/bg/level_3.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    4: { name: "第四章：兵馬俑坑", bg: "assets/bg/level_4.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    5: { name: "第五章：阿房宮殿", bg: "assets/bg/level_5.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    6: { name: "第六章：萬里長城", bg: "assets/bg/level_6.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    7: { name: "第七章：泰山封禪", bg: "assets/bg/level_7.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
-    8: { name: "第八章：地宮深處", bg: "assets/bg/level_8.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) }
+    1: { name: "第一章：橫掃六國", bg: "assets/bg/level_1.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    2: { name: "第二章：無敗之王", bg: "assets/bg/level_2.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    3: { name: "第三章：改寫世界的人", bg: "assets/bg/level_3.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    4: { name: "第四章：無法阻擋的鐵蹄", bg: "assets/bg/level_4.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    5: { name: "第五章：我來 我見 我征服", bg: "assets/bg/level_5.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    6: { name: "第六章：戰象翻山", bg: "assets/bg/level_6.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    7: { name: "第七章：帝國的魅影", bg: "assets/bg/level_7.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) },
+    8: { name: "第八章：決戰巖流島", bg: "assets/bg/level_8.png", waves: JSON.parse(JSON.stringify(DEFAULT_WAVES)) }
 };
 
 // 卡片資料庫
