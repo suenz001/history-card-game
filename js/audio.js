@@ -9,7 +9,7 @@ try {
     audioCtx = new AudioContext();
 } catch(e) { console.warn("Web Audio API not supported"); }
 
-export let isBgmOn = true;
+export let isBgmOn = false;
 export let isSfxOn = true;
 export let bgmVolume = 0.5;
 export let sfxVolume = 1.0;
@@ -243,4 +243,5 @@ function synthesizeDismantle() {
 // 點擊頁面以啟動 AudioContext (Chrome 政策)
 document.body.addEventListener('click', () => {
     if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
+
 }, { once: true });
