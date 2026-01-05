@@ -2,42 +2,66 @@
 export const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// 🔥 預設的波次設定 (作為基礎樣板)
+// 🔥 預設的波次設定 (基礎樣板)
 const DEFAULT_WAVES = {
     1: { count: 8, hp: 800, atk: 50 },
     2: { count: 16, hp: 1500, atk: 100 },
     3: { count: 30, hp: 3000, atk: 200 },
-    4: { count: 1, hp: 30000, atk: 500, bossId: 1 } // 預設 Boss
+    4: { count: 1, hp: 30000, atk: 500, bossId: 1 } // 預設值，會被覆蓋
 };
 
-// 🛠️ 輔助函式：複製一份乾淨的波次設定 (避免修改到原始 DEFAULT_WAVES)
+// 🛠️ 輔助函式：複製一份乾淨的波次設定
 function getWaves() {
     return JSON.parse(JSON.stringify(DEFAULT_WAVES));
 }
 
-// -----------------------------------------------------------
-// 👇 第一關客製化：Boss 秦始皇 (ID:1)，血量改為 50000
-const wavesLevel1 = getWaves();
-wavesLevel1[4] = { count: 1, hp: 50000, atk: 500, bossId: 1 }; 
+// ==========================================
+// ⚔️ 各關卡 Boss 設定 (第4波)
+// ==========================================
 
-// 👇 第二關客製化：Boss 亞歷山大 (ID:2)，血量改為 60000
+// 第 1 關：秦始皇 (ID: 1)
+const wavesLevel1 = getWaves();
+wavesLevel1[4] = { count: 1, hp: 50000, atk: 500, bossId: 1 };
+
+// 第 2 關：亞歷山大 (ID: 2)
 const wavesLevel2 = getWaves();
-wavesLevel2[4] = { count: 1, hp: 60000, atk: 600, bossId: 2 }; // atk 也稍微提升一點
-// -----------------------------------------------------------
+wavesLevel2[4] = { count: 1, hp: 60000, atk: 600, bossId: 2 };
+
+// 第 3 關：拿破崙 (ID: 3)
+const wavesLevel3 = getWaves();
+wavesLevel3[4] = { count: 1, hp: 80000, atk: 800, bossId: 3 };
+
+// 第 4 關：成吉思汗 (ID: 13)
+const wavesLevel4 = getWaves();
+wavesLevel4[4] = { count: 1, hp: 100000, atk: 1000, bossId: 13 };
+
+// 第 5 關：凱撒大帝 (ID: 14)
+const wavesLevel5 = getWaves();
+wavesLevel5[4] = { count: 1, hp: 130000, atk: 1200, bossId: 14 };
+
+// 第 6 關：漢尼拔 (ID: 15)
+const wavesLevel6 = getWaves();
+wavesLevel6[4] = { count: 1, hp: 160000, atk: 1500, bossId: 15 };
+
+// 第 7 關：埃及豔后 (ID: 16)
+const wavesLevel7 = getWaves();
+wavesLevel7[4] = { count: 1, hp: 200000, atk: 1800, bossId: 16 };
+
+// 第 8 關：宮本武藏 (ID: 17)
+const wavesLevel8 = getWaves();
+wavesLevel8[4] = { count: 1, hp: 250000, atk: 2200, bossId: 17 };
+
 
 // 🔥 關卡設定模組 (Level Configs)
 export const LEVEL_CONFIGS = {
-    // 使用客製化的波次設定
     1: { name: "第一章：橫掃六國", bg: "assets/bg/level_1.png", waves: wavesLevel1 },
     2: { name: "第二章：無敗之王", bg: "assets/bg/level_2.png", waves: wavesLevel2 },
-    
-    // 其他關卡維持預設
-    3: { name: "第三章：改寫世界的人", bg: "assets/bg/level_3.png", waves: getWaves() },
-    4: { name: "第四章：無法阻擋的鐵蹄", bg: "assets/bg/level_4.png", waves: getWaves() },
-    5: { name: "第五章：我來 我見 我征服", bg: "assets/bg/level_5.png", waves: getWaves() },
-    6: { name: "第六章：戰象翻山", bg: "assets/bg/level_6.png", waves: getWaves() },
-    7: { name: "第七章：帝國的魅影", bg: "assets/bg/level_7.png", waves: getWaves() },
-    8: { name: "第八章：決戰巖流島", bg: "assets/bg/level_8.png", waves: getWaves() }
+    3: { name: "第三章：改寫世界的人", bg: "assets/bg/level_3.png", waves: wavesLevel3 },
+    4: { name: "第四章：無法阻擋的鐵蹄", bg: "assets/bg/level_4.png", waves: wavesLevel4 },
+    5: { name: "第五章：我來 我見 我征服", bg: "assets/bg/level_5.png", waves: wavesLevel5 },
+    6: { name: "第六章：戰象翻山", bg: "assets/bg/level_6.png", waves: wavesLevel6 },
+    7: { name: "第七章：帝國的魅影", bg: "assets/bg/level_7.png", waves: wavesLevel7 },
+    8: { name: "第八章：決戰巖流島", bg: "assets/bg/level_8.png", waves: wavesLevel8 }
 };
 
 // 卡片資料庫 (保持不變)
