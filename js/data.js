@@ -54,14 +54,14 @@ wavesLevel8[4] = { count: 1, hp: 250000, atk: 2200, bossId: 17 };
 
 // 🔥 關卡設定模組 (Level Configs)
 export const LEVEL_CONFIGS = {
-    1: { name: "第一章：橫掃六國", bg: "assets/bg/level_1.png", waves: wavesLevel1 },
-    2: { name: "第二章：無敗之王", bg: "assets/bg/level_2.png", waves: wavesLevel2 },
-    3: { name: "第三章：改寫世界的人", bg: "assets/bg/level_3.png", waves: wavesLevel3 },
-    4: { name: "第四章：無法阻擋的鐵蹄", bg: "assets/bg/level_4.png", waves: wavesLevel4 },
-    5: { name: "第五章：我來 我見 我征服", bg: "assets/bg/level_5.png", waves: wavesLevel5 },
-    6: { name: "第六章：戰象翻山", bg: "assets/bg/level_6.png", waves: wavesLevel6 },
-    7: { name: "第七章：帝國的魅影", bg: "assets/bg/level_7.png", waves: wavesLevel7 },
-    8: { name: "第八章：決戰巖流島", bg: "assets/bg/level_8.png", waves: wavesLevel8 }
+    1: { name: "第一章：橫掃六國", bg: "assets/bg/level_1.webp", waves: wavesLevel1 },
+    2: { name: "第二章：無敗之王", bg: "assets/bg/level_2.webp", waves: wavesLevel2 },
+    3: { name: "第三章：改寫世界的人", bg: "assets/bg/level_3.webp", waves: wavesLevel3 },
+    4: { name: "第四章：無法阻擋的鐵蹄", bg: "assets/bg/level_4.webp", waves: wavesLevel4 },
+    5: { name: "第五章：我來 我見 我征服", bg: "assets/bg/level_5.webp", waves: wavesLevel5 },
+    6: { name: "第六章：戰象翻山", bg: "assets/bg/level_6.webp", waves: wavesLevel6 },
+    7: { name: "第七章：帝國的魅影", bg: "assets/bg/level_7.webp", waves: wavesLevel7 },
+    8: { name: "第八章：決戰巖流島", bg: "assets/bg/level_8.webp", waves: wavesLevel8 }
 };
 
 // 卡片資料庫 (保持不變)
