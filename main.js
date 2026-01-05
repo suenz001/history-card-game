@@ -3,6 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+// 🔥 引入模組
 import { HERO_BIOS } from './js/bios.js';
 import { cardDatabase, RATES, DISMANTLE_VALUES } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
@@ -43,12 +44,14 @@ let totalPower = 0;
 let allUserCards = [];
 let claimedNotifs = []; 
 let battleLogs = []; 
+let deletedSystemNotifs = []; // 🔥 新增：紀錄已刪除的系統通知 ID
 let globalAnnouncements = [];
 
 let currentDisplayList = [];
 let currentCardIndex = 0;
 let currentFilterRarity = 'ALL';
 
+// 讀取上次記憶的排序方式
 let currentSortMethod = localStorage.getItem('userSortMethod') || 'time_desc';
 
 let isBatchMode = false;
@@ -57,17 +60,24 @@ let gachaQueue = [];
 let gachaIndex = 0;
 
 let pvpTargetInfo = { index: null, type: null };
+
+// 是否正在查看敵方卡片 (用於隱藏升級按鈕)
 let isViewingEnemy = false;
 
+// 🔥 通知批量刪除相關變數
 let isNotifBatchMode = false;
 let selectedNotifIds = new Set();
+// 暫存當前顯示的通知列表 (用於全選功能)
+let currentVisibleNotifs = [];
 
 const SYSTEM_NOTIFICATIONS = [
     { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 }, isSystem: true }
 ];
 
+// 設定戰鬥結束的回調
 setOnBattleEnd(handleBattleEnd);
 
+// 初始化 PVP
 setTimeout(() => {
     if(document.getElementById('pvp-menu-btn')) {
         initPvp(db, currentUser, allUserCards, (slotIndex, type) => {
@@ -76,6 +86,7 @@ setTimeout(() => {
             document.getElementById('inventory-title').innerText = title; 
             document.getElementById('inventory-modal').classList.remove('hidden');
             
+            // 確保排序選單與記憶同步
             const sortSelect = document.getElementById('sort-select');
             if(sortSelect) sortSelect.value = currentSortMethod;
 
@@ -85,8 +96,10 @@ setTimeout(() => {
     }
 }, 500);
 
+// 處理點擊敵方卡片的邏輯
 function handleEnemyCardClick(enemyCard) {
     isViewingEnemy = true; 
+
     const baseCard = cardDatabase.find(c => c.id == enemyCard.id);
     let displayCard = { ...baseCard, ...enemyCard };
 
@@ -105,6 +118,7 @@ function handleEnemyCardClick(enemyCard) {
     currentDisplayList = [displayCard];
     currentCardIndex = 0;
     
+    // 強制將詳情視窗的 Z-Index 設為最高
     const detailModal = document.getElementById('detail-modal');
     detailModal.classList.remove('hidden');
     detailModal.style.zIndex = "99999"; 
@@ -112,6 +126,7 @@ function handleEnemyCardClick(enemyCard) {
     renderDetailCard();
 }
 
+// 設定介面相關
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
 const sfxToggle = document.getElementById('sfx-toggle');
@@ -191,6 +206,8 @@ if(document.getElementById('close-notification-btn')) {
     document.getElementById('close-notification-btn').addEventListener('click', () => {
         playSound('click');
         notificationModal.classList.add('hidden');
+        
+        // 關閉時重置批量模式
         isNotifBatchMode = false;
         selectedNotifIds.clear();
     });
@@ -231,6 +248,29 @@ function toggleNotifBatchMode() {
     renderNotifications();
 }
 
+// 🔥 新增：全選功能
+function toggleSelectAllNotifs() {
+    playSound('click');
+    const selectableItems = currentVisibleNotifs.filter(item => {
+        // 只選取可以被刪除的項目 (戰報 或 已領取/無獎勵的系統通知)
+        if (item.type === 'system') {
+            const isClaimed = claimedNotifs.includes(item.id);
+            const hasReward = item.reward && item.reward.type !== 'none' && item.reward.amount > 0;
+            if (hasReward && !isClaimed) return false; // 未領取獎勵的不能選
+        }
+        return true;
+    });
+
+    if (selectedNotifIds.size === selectableItems.length) {
+        // 如果已經全選，則全取消
+        selectedNotifIds.clear();
+    } else {
+        // 否則全選
+        selectableItems.forEach(item => selectedNotifIds.add(item.id));
+    }
+    renderNotifications();
+}
+
 function toggleNotifSelection(id) {
     if (selectedNotifIds.has(id)) {
         selectedNotifIds.delete(id);
@@ -242,12 +282,21 @@ function toggleNotifSelection(id) {
 }
 
 async function executeBatchDelete() {
-    if (selectedNotifIds.size === 0) return alert("請至少選擇一條戰報！");
+    if (selectedNotifIds.size === 0) return alert("請至少選擇一條通知！");
     if (!confirm(`確定要刪除這 ${selectedNotifIds.size} 條紀錄嗎？`)) return;
 
-    const newLogs = battleLogs.filter((log, index) => {
+    // 1. 處理戰報刪除 (保留未被選中的)
+    const newBattleLogs = battleLogs.filter((log, index) => {
         const tempId = `battle_log_${log.timestamp ? log.timestamp.seconds : Date.now()}_${index}`;
         return !selectedNotifIds.has(tempId);
+    });
+
+    // 2. 處理系統通知刪除 (將 ID 加入 deletedSystemNotifs)
+    const newDeletedSystemNotifs = [...deletedSystemNotifs];
+    selectedNotifIds.forEach(id => {
+        if (!id.startsWith('battle_log_') && !newDeletedSystemNotifs.includes(id)) {
+            newDeletedSystemNotifs.push(id);
+        }
     });
 
     try {
@@ -255,10 +304,13 @@ async function executeBatchDelete() {
         if(btn) btn.innerText = "刪除中...";
 
         await updateDoc(doc(db, "users", currentUser.uid), {
-            battleLogs: newLogs
+            battleLogs: newBattleLogs,
+            deletedSystemNotifs: newDeletedSystemNotifs
         });
         
-        battleLogs = newLogs;
+        battleLogs = newBattleLogs;
+        deletedSystemNotifs = newDeletedSystemNotifs;
+        
         isNotifBatchMode = false;
         selectedNotifIds.clear();
         
@@ -274,6 +326,7 @@ async function executeBatchDelete() {
 function renderNotifications() {
     notificationList.innerHTML = "";
     
+    // 工具列
     const toolbar = document.createElement('div');
     toolbar.style.padding = "10px";
     toolbar.style.display = "flex";
@@ -291,6 +344,13 @@ function renderNotifications() {
         batchBtn.onclick = toggleNotifBatchMode;
         toolbar.appendChild(batchBtn);
     } else {
+        // 🔥 新增：全選按鈕
+        const selectAllBtn = document.createElement('button');
+        selectAllBtn.className = "btn-secondary";
+        selectAllBtn.innerText = "✅ 全選";
+        selectAllBtn.style.padding = "5px 15px";
+        selectAllBtn.onclick = toggleSelectAllNotifs;
+
         const cancelBtn = document.createElement('button');
         cancelBtn.className = "btn-secondary";
         cancelBtn.innerText = "❌ 取消";
@@ -300,23 +360,26 @@ function renderNotifications() {
         const confirmBtn = document.createElement('button');
         confirmBtn.id = "notif-batch-confirm-btn";
         confirmBtn.className = "btn-danger";
-        confirmBtn.innerText = `✅ 刪除 (${selectedNotifIds.size})`;
+        confirmBtn.innerText = `🗑️ 刪除 (${selectedNotifIds.size})`;
         confirmBtn.style.padding = "5px 15px";
         confirmBtn.onclick = executeBatchDelete;
         
         if (selectedNotifIds.size === 0) confirmBtn.classList.add('btn-disabled');
 
+        toolbar.appendChild(selectAllBtn); // 加入全選按鈕
         toolbar.appendChild(cancelBtn);
         toolbar.appendChild(confirmBtn);
     }
     notificationList.appendChild(toolbar);
 
+    // 準備資料
     const staticSystemItems = SYSTEM_NOTIFICATIONS.map(notif => ({
         ...notif,
         timestamp: 9999999999999, 
         type: 'system'
     }));
 
+    // 🔥 生成唯一ID防止覆蓋
     const logItems = battleLogs.map((log, index) => ({
         ...log,
         id: `battle_log_${log.timestamp ? log.timestamp.seconds : Date.now()}_${index}`,
@@ -331,12 +394,33 @@ function renderNotifications() {
         index === self.findIndex((t) => (t.id === item.id))
     );
 
-    uniqueItems.forEach(item => {
+    // 🔥 過濾掉已刪除的系統通知
+    currentVisibleNotifs = uniqueItems.filter(item => {
+        if (item.type === 'system' && deletedSystemNotifs.includes(item.id)) return false;
+        return true;
+    });
+
+    // 渲染列表
+    currentVisibleNotifs.forEach(item => {
         const div = document.createElement('div');
         div.style.transition = "all 0.2s";
         
+        // 批量模式樣式
         if (isNotifBatchMode) {
+            let isSelectable = true;
+
+            // 🔥 修改：允許選取「已領取」或「無獎勵」的系統通知
             if (item.type === 'system') {
+                const isClaimed = claimedNotifs.includes(item.id);
+                const hasReward = item.reward && item.reward.type !== 'none' && item.reward.amount > 0;
+                
+                // 如果有獎勵且尚未領取，則禁止選取 (防止誤刪)
+                if (hasReward && !isClaimed) {
+                    isSelectable = false;
+                }
+            }
+
+            if (!isSelectable) {
                 div.style.opacity = "0.5";
                 div.style.pointerEvents = "none";
             } else {
@@ -373,6 +457,7 @@ function renderNotifications() {
                 if (!isClaimed && hasReward) {
                     div.addEventListener('click', () => claimReward(item));
                 } else if (!hasReward) {
+                    // 純公告點擊標記為已讀
                     div.addEventListener('click', async () => {
                         if(!isClaimed && currentUser) {
                              claimedNotifs.push(item.id);
@@ -419,6 +504,7 @@ function renderNotifications() {
                 </div>
             `;
 
+            // 單筆刪除按鈕
             if (!isNotifBatchMode) {
                 const deleteSingleBtn = document.createElement('div');
                 deleteSingleBtn.className = "delete-log-btn";
@@ -446,7 +532,7 @@ function renderNotifications() {
         notificationList.appendChild(div);
     });
     
-    if (uniqueItems.length === 0) {
+    if (currentVisibleNotifs.length === 0) {
         notificationList.innerHTML += "<div style='text-align:center; padding:20px; color:#777;'>暫無通知</div>";
     }
 }
@@ -565,6 +651,8 @@ async function loadUserData(user) {
         gems = data.gems; 
         gold = data.gold;
         claimedNotifs = data.claimedNotifs || [];
+        // 🔥 讀取已刪除的系統通知紀錄
+        deletedSystemNotifs = data.deletedSystemNotifs || [];
         battleLogs = data.battleLogs || [];
 
         const updateData = { lastLoginAt: serverTimestamp() };
@@ -577,6 +665,7 @@ async function loadUserData(user) {
         gems = 1000; 
         gold = 5000; 
         claimedNotifs = [];
+        deletedSystemNotifs = [];
         battleLogs = [];
         await setDoc(userRef, { 
             name: user.displayName || "未命名", 
@@ -585,6 +674,7 @@ async function loadUserData(user) {
             gold, 
             combatPower: 0, 
             claimedNotifs: [],
+            deletedSystemNotifs: [],
             battleLogs: [],
             createdAt: new Date(),
             lastLoginAt: serverTimestamp() 
@@ -1201,12 +1291,15 @@ if(document.getElementById('draw-10-btn')) document.getElementById('draw-10-btn'
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
 });
 
+// 🔥 監聽背包按鈕，開啟時自動解除全軍 + 帶入上次排序
 if(document.getElementById('inventory-btn')) document.getElementById('inventory-btn').addEventListener('click', () => { 
     playSound('inventory'); 
     if(!currentUser) return alert("請先登入"); 
     
+    // 自動解除全軍 (讓介面看起來是清空的)
     clearDeployment();
 
+    // 恢復上次的排序選擇
     const sortSelect = document.getElementById('sort-select');
     if(sortSelect && currentSortMethod) {
         sortSelect.value = currentSortMethod;
@@ -1249,27 +1342,33 @@ if(batchConfirmBtn) batchConfirmBtn.addEventListener('click', async () => { play
 updateInventoryCounts();
 alert(`批量分解成功！獲得 ${totalGold} 金幣`); } catch (e) { console.error("批量分解失敗", e); alert("分解過程中發生錯誤，請重試"); batchConfirmBtn.innerText = "確認分解"; } });
 
+// 🔥 修改：點擊「前往戰場」改為打開關卡選單
 if(document.getElementById('enter-battle-mode-btn')) document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
     if(!currentUser) return alert("請先登入");
     if(allUserCards.length === 0) await loadInventory(currentUser.uid);
     
+    // 開啟關卡選擇視窗
     document.getElementById('level-selection-modal').classList.remove('hidden');
 });
 
+// 🔥 新增：關卡選擇按鈕邏輯
 document.querySelectorAll('.level-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-        if(btn.classList.contains('locked')) return; 
+        if(btn.classList.contains('locked')) return; // 鎖定關卡不可點
         
         playSound('click');
         const levelId = parseInt(btn.dataset.level);
         
+        // 關閉選單
         document.getElementById('level-selection-modal').classList.add('hidden');
         
+        // 呼叫 battle.js 初始化特定關卡
         initBattle(levelId);
     });
 });
 
+// 🔥 新增：關閉關卡選擇視窗
 if(document.getElementById('close-level-select-btn')) {
     document.getElementById('close-level-select-btn').addEventListener('click', () => {
         playSound('click');
@@ -1298,17 +1397,9 @@ document.querySelectorAll('.defense-slot').forEach(slot => {
     });
 });
 
-// 🔥 修改：限制同名英雄上陣 (PVE)
 function deployHeroToSlot(card) {
     const isAlreadyDeployed = battleSlots.some(s => s && s.docId === card.docId);
     if(isAlreadyDeployed) { alert("這位英雄已經在場上了！"); return; }
-
-    const isSameHeroTypeDeployed = battleSlots.some((s, index) => s && s.id == card.id && index !== deployTargetSlot);
-    if(isSameHeroTypeDeployed) {
-        alert("同名英雄只能上陣一位！");
-        return;
-    }
-
     if (deployTargetSlot !== null) {
         const newSlots = [...battleSlots];
         newSlots[deployTargetSlot] = { 
@@ -1349,35 +1440,20 @@ function updateStartButton() {
     else { btn.classList.add('btn-disabled'); btn.innerText = `請先部署英雄`; }
 }
 
-// 🔥 修改：自動部屬也需遵守同名限制
 if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-deploy-btn').addEventListener('click', () => {
     if(isBattleActive) return;
     playSound('click');
-    
-    // 依戰力排序
-    const sortedCards = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp));
-    const uniqueHeroes = [];
-    const seenIds = new Set();
-
-    // 篩選出不重複 ID 的英雄
-    for (const card of sortedCards) {
-        if (!seenIds.has(card.id)) {
-            uniqueHeroes.push(card);
-            seenIds.add(card.id);
-        }
-        if (uniqueHeroes.length >= 9) break; 
-    }
-
+    const topHeroes = [...allUserCards].sort((a, b) => (b.atk + b.hp) - (a.atk + a.hp)).slice(0, 9);
     const newSlots = new Array(9).fill(null);
-    uniqueHeroes.forEach((hero, index) => { 
+    topHeroes.forEach((hero, index) => { 
         newSlots[index] = { ...hero }; 
     });
-    
     setBattleSlots(newSlots);
     renderBattleSlots();
     updateStartButton();
 });
 
+// 🔥 更新後的結算邏輯：加入傷害/治療切換頁籤，且保留 enemyStats 參數
 async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     let goldMultiplier = 1; if (currentDifficulty === 'easy') goldMultiplier = 0.5; else if (currentDifficulty === 'hard') goldMultiplier = 2.0;
     
@@ -1417,9 +1493,11 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     await updateCurrencyCloud(); 
     updateUIDisplay();
 
+    // 🔥 渲染 PVE 圖表邏輯 (含切換按鈕)
     const dpsContainer = document.getElementById('dps-chart');
     dpsContainer.innerHTML = "";
 
+    // 插入切換按鈕
     const tabs = document.createElement('div');
     tabs.style.display = "flex";
     tabs.style.justifyContent = "center";
@@ -1441,13 +1519,14 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
         const statKey = currentMode === 'damage' ? 'totalDamage' : 'totalHealing';
         const color = currentMode === 'damage' ? '#e74c3c' : '#2ecc71';
 
+        // PVE 模式只顯示我方
         if (heroStats && heroStats.length > 0) {
             const sortedHeroes = [...heroStats].sort((a, b) => (b[statKey] || 0) - (a[statKey] || 0));
             const maxVal = sortedHeroes[0][statKey] || 1; 
             
             sortedHeroes.forEach(h => {
                 if(!h[statKey]) h[statKey] = 0;
-                if(h[statKey] === 0 && currentMode === 'healing') return; 
+                if(h[statKey] === 0 && currentMode === 'healing') return; // 隱藏0治療
 
                 const percent = (h[statKey] / maxVal) * 100;
                 
@@ -1474,6 +1553,7 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
 
     renderList();
 
+    // 綁定按鈕事件
     const dmgBtn = tabs.querySelector('#show-dmg-btn');
     const healBtn = tabs.querySelector('#show-heal-btn');
 
