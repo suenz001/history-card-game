@@ -3,11 +3,26 @@
 export const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
 export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
-// 🔥 1. 在這裡調整難度倍率 (新功能)
+// 🔥 1. 難度設定 (新增 gemReward)
 export const DIFFICULTY_SETTINGS = {
-    easy:   { hpMult: 0.6, atkMult: 0.6, goldMult: 0.8 }, // 簡單：敵人血攻 60%, 金幣 80%
-    normal: { hpMult: 1.0, atkMult: 1.0, goldMult: 1.0 }, // 普通：標準
-    hard:   { hpMult: 1.5, atkMult: 1.5, goldMult: 1.5 }  // 困難：敵人血攻 150%, 金幣 150%
+    easy:   { 
+        hpMult: 0.6,    // 敵人血量倍率
+        atkMult: 0.6,   // 敵人攻擊倍率
+        goldMult: 0.8,  // 戰鬥掉落金幣倍率
+        gemReward: 200  // 🔥 通關獲得鑽石
+    },
+    normal: { 
+        hpMult: 1.0, 
+        atkMult: 1.0, 
+        goldMult: 1.0, 
+        gemReward: 350 
+    },
+    hard:   { 
+        hpMult: 1.5, 
+        atkMult: 1.5, 
+        goldMult: 1.5, 
+        gemReward: 500 
+    }
 };
 
 // ==========================================
@@ -144,8 +159,7 @@ export const LEVEL_CONFIGS = {
 };
 
 export const cardDatabase = [
-    // ... 這裡請保留你原本的卡片資料 (SSR, SR, R) ...
-    // 為節省篇幅，請確保這裡有剛剛你上傳的那些卡片資料
+    // SSR
     { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝", attackType: "melee", skillKey: "HEAL_AND_STRIKE", skillParams: { healRate: 0.40, dmgMult: 1.5 } },
     { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王", attackType: "melee", skillKey: "INVINCIBLE_STRIKE", skillParams: { duration: 3000, dmgMult: 1.5 } },
     { id: 3, name: "拿破崙", rarity: "SSR", atk: 1550, hp: 2000, title: "戰爭之神", attackType: "ranged", skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.5 } },
