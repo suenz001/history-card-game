@@ -468,23 +468,65 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     });
 }
 
-// 🔥 新增：BOSS 警告特效
+// 🔥 新增：BOSS 警告特效 (現在返回 Promise 供等待，且不震動)
 function showBossWarning() {
-    safePlaySound('dismantle'); // 播放警報音效
-    
-    const warningOverlay = document.createElement('div');
-    warningOverlay.id = 'boss-warning-overlay';
-    warningOverlay.innerHTML = `
-        <div class="warning-text">⚠️ WARNING ⚠️</div>
-        <div class="warning-text" style="font-size: 2em; animation-delay: 0.1s;">BOSS APPROACHING</div>
-    `;
-    document.body.appendChild(warningOverlay);
+    return new Promise((resolve) => {
+        safePlaySound('dismantle'); // 播放警報音效
+        
+        const warningOverlay = document.createElement('div');
+        warningOverlay.id = 'boss-warning-overlay';
+        warningOverlay.innerHTML = `
+            <div class="warning-text">⚠️ WARNING ⚠️</div>
+            <div class="warning-text" style="font-size: 2em; animation-delay: 0.1s;">BOSS APPROACHING</div>
+        `;
+        document.body.appendChild(warningOverlay);
 
-    shakeScreen();
+        // 🔥 移除：shakeScreen();
 
-    setTimeout(() => {
-        warningOverlay.remove();
-    }, 2500);
+        setTimeout(() => {
+            if(warningOverlay.parentNode) warningOverlay.remove();
+            resolve(); // 2.5秒後完成 Promise
+        }, 2500);
+    });
+}
+
+// 🔥 新增：魔王登場震退效果
+function triggerBossEntranceEffect(boss) {
+    if (!boss) return;
+
+    // 1. 視覺與音效
+    createVfx(boss.position, boss.y, 'vfx-explosion'); 
+    safePlaySound('explosion'); // 假設 audio.js 有 explosion，若無則用 dismantle 或 boom
+
+    // 2. 震退所有英雄
+    heroEntities.forEach(hero => {
+        if (hero.isDead) return;
+        
+        // 計算距離
+        const dx = hero.position - boss.position;
+        const dy = hero.y - boss.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        
+        const impactRadius = 30; // 影響範圍 (畫面30%)
+        
+        if (dist < impactRadius) {
+            // 推開方向 (主要看 X 軸)
+            let dirX = dx < 0 ? -1 : 1; 
+            
+            // 力道：越近推越遠
+            const force = (impactRadius - dist) / impactRadius; 
+            const pushDistance = 20 * force; // 最大推 20%
+            
+            hero.position += dirX * pushDistance;
+            
+            // 邊界檢查
+            hero.position = Math.max(0, Math.min(100, hero.position));
+            
+            // 受擊反應
+            triggerHeroHit(hero);
+            showDamageText(hero.position, hero.y, "擊退!", "gold-text");
+        }
+    });
 }
 
 function startWave(waveNum) {
@@ -540,37 +582,47 @@ function spawnEnemy() {
     }
 
     if(battleState.wave === 4) {
-        if (config.bossId) {
-            const baseCard = cardDatabase.find(c => c.id === config.bossId);
-            if (baseCard) {
-                // 🔥 如果是 Boss 波次且尚未生成過，顯示警告
-                if (battleState.spawned === 0) {
-                    showBossWarning();
+        // 🔥 封裝 Boss 生成邏輯
+        const performBossSpawn = () => {
+            if (!isBattleActive) return; // 防止等待期間戰鬥已結束
+
+            if (config.bossId) {
+                const baseCard = cardDatabase.find(c => c.id === config.bossId);
+                if (baseCard) {
+                    const bossData = {
+                        ...baseCard,
+                        hp: 30000 * multHp, 
+                        atk: 500 * multAtk,
+                        isBoss: true, 
+                        slotIndex: undefined 
+                    };
+                    spawnSingleEnemyFromCard(bossData, container);
+                    
+                    // 取得剛生成的 Boss 並觸發登場特效
+                    const bossEntity = enemies[enemies.length-1];
+                    bossEntity.isBoss = true; 
+                    triggerBossEntranceEffect(bossEntity);
+                    return;
                 }
-
-                const bossData = {
-                    ...baseCard,
-                    hp: 30000 * multHp, 
-                    atk: 500 * multAtk,
-                    isBoss: true, 
-                    slotIndex: undefined 
-                };
-                spawnSingleEnemyFromCard(bossData, container);
-                enemies[enemies.length-1].isBoss = true; 
-                return;
             }
-        }
 
-        // Fallback Boss (如果沒有指定 bossId)
+            // Fallback Boss (如果沒有指定 bossId)
+            const bossX = 10 + Math.random() * 80; 
+            const bossY = 10 + Math.random() * 80;
+            const boss = { id: Date.now(), maxHp: 30000, currentHp: 30000, atk: 500, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
+            const el = document.createElement('div'); el.className = 'enemy-unit boss'; el.innerHTML = `😈<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
+            el.style.top = `${boss.y}%`; el.style.left = `${boss.position}%`;
+            container.appendChild(el); boss.el = el; enemies.push(boss);
+            triggerBossEntranceEffect(boss);
+        };
+
+        // 🔥 判斷是否為第一隻 (Boss 本體)，如果是，先播警告動畫
         if (battleState.spawned === 0) {
-            showBossWarning();
+            showBossWarning().then(performBossSpawn);
+        } else {
+            // 如果這波還有小怪，直接生成 (通常 Boss 波 count=1，這行很少用到)
+            performBossSpawn(); 
         }
-        const bossX = 10 + Math.random() * 80; 
-        const bossY = 10 + Math.random() * 80;
-        const boss = { id: Date.now(), maxHp: 30000, currentHp: 30000, atk: 500, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
-        const el = document.createElement('div'); el.className = 'enemy-unit boss'; el.innerHTML = `😈<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
-        el.style.top = `${boss.y}%`; el.style.left = `${boss.position}%`;
-        container.appendChild(el); boss.el = el; enemies.push(boss);
         return;
     }
 
