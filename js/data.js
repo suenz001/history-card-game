@@ -6,7 +6,7 @@ export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 // 🔥 1. 難度設定 (新增 gemReward)
 export const DIFFICULTY_SETTINGS = {
     easy:   { 
-        hpMult: 0.0001,    // 敵人血量倍率
+        hpMult: 0.6,    // 敵人血量倍率
         atkMult: 0.6,   // 敵人攻擊倍率
         goldMult: 0.6,  // 戰鬥掉落金幣倍率
         gemReward: 150  // 🔥 通關獲得鑽石
@@ -18,9 +18,9 @@ export const DIFFICULTY_SETTINGS = {
         gemReward: 250 
     },
     hard:   { 
-        hpMult: 1.5, 
-        atkMult: 1.5, 
-        goldMult: 1.5, 
+        hpMult: 2.0, 
+        atkMult: 2.0, 
+        goldMult: 2.0, 
         gemReward: 350 
     }
 };
@@ -196,5 +196,6 @@ export const cardDatabase = [
     { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } }
 
 ];
+
 
 
