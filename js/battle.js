@@ -319,6 +319,8 @@ export function resetBattleState() {
     if(warning) warning.remove();
 }
 
+// js/battle.js - 取代 spawnHeroes 函式
+
 function spawnHeroes() {
     const container = document.getElementById('hero-container');
     const monitorList = document.getElementById('hero-monitor-list');
@@ -333,10 +335,24 @@ function spawnHeroes() {
         const col = index % 3;
         const startPos = 5 + (col * 4); 
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
-        const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
-        const badgeClass = card.attackType === 'ranged' ? 'hero-type-badge ranged' : 'hero-type-badge';
 
         const baseCardConfig = cardDatabase.find(c => c.id == card.id);
+        
+        // 🔥 --- [修改] 兵種與圖示邏輯 --- 🔥
+        const uType = baseCardConfig ? (baseCardConfig.unitType || 'INFANTRY') : 'INFANTRY';
+        
+        let typeIcon = '⚔️'; 
+        let badgeClass = 'hero-type-badge'; // 預設藍色 (步兵)
+
+        if (uType === 'CAVALRY') {
+            typeIcon = '🐴';
+            badgeClass += ' cavalry'; // 套用綠色樣式
+        } else if (uType === 'ARCHER') {
+            typeIcon = '🏹';
+            badgeClass += ' ranged'; // 套用紅色樣式
+        }
+        // 🔥 --- [修改] 結束 --- 🔥
+
         const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : (card.skillKey || 'HEAVY_STRIKE');
         const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : (card.skillParams || { dmgMult: 2.0 });
         const realTitle = baseCardConfig ? baseCardConfig.title : card.title;
@@ -432,6 +448,13 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     let finalHp = enemyCard.hp || 500;
     let attackType = enemyCard.attackType || 'melee';
     
+    // 🔥 --- [修改] 敵方圖示判斷 --- 🔥
+    const uType = localConfig ? (localConfig.unitType || 'INFANTRY') : 'INFANTRY';
+    let typeIcon = '⚔️';
+    if (uType === 'CAVALRY') typeIcon = '🐴';
+    else if (uType === 'ARCHER') typeIcon = '🏹';
+    // 🔥 --- [修改] 結束 --- 🔥
+    
     if (localConfig) {
         realId = localConfig.id;
         finalTitle = localConfig.title || finalTitle;
@@ -457,8 +480,6 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         }
     }
 
-    const typeIcon = attackType === 'ranged' ? '🏹' : '⚔️';
-
     const el = document.createElement('div');
     const bossClass = enemyCard.isBoss ? ' boss' : '';
     el.className = `enemy-unit pvp-enemy ${enemyCard.rarity || 'R'}${bossClass}`;
@@ -474,6 +495,7 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         el.style.border = '2px solid #e74c3c';
     }
 
+    // 注意：敵人的標籤底色我保留紅色 (#c0392b)，以區分敵我，但圖示會變成馬頭
     el.innerHTML = `
         <div class="enemy-hp-bar"><div style="width:100%"></div></div>
         <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
