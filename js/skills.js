@@ -417,3 +417,4 @@ export function getSkillDescription(skillKey, params) {
         default:
             return "造成強力傷害。";
     }
+}
