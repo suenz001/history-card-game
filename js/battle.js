@@ -1,5 +1,4 @@
 // js/battle.js
-// 🔥 引入 DIFFICULTY_SETTINGS
 import { LEVEL_CONFIGS, cardDatabase, DIFFICULTY_SETTINGS } from './data.js';
 import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { executeSkill } from './skills.js'; 
@@ -19,6 +18,8 @@ export let gameSpeed = 1;
 let currentLevelId = 1; 
 
 let pvpPlayerTeamData = [];
+// 🔥 新增：儲存使用者通關進度
+let userProgress = {}; 
 
 let battleState = {
     wave: 1, 
@@ -50,8 +51,10 @@ function ensureBattleListeners() {
     }
 }
 
-export function initBattle(levelId = 1) {
+// 🔥 修改：initBattle 接收 progress 參數
+export function initBattle(levelId = 1, progress = {}) {
     currentLevelId = levelId;
+    userProgress = progress; // 存下進度
     ensureBattleListeners(); 
     prepareLevel();
 }
@@ -74,15 +77,18 @@ function setupBattleListeners() {
         });
     }
     
-    // 綁定難度按鈕 (如果有 class="difficulty-btn")
+    // 綁定難度按鈕
     document.querySelectorAll('.difficulty-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             if(isBattleActive) return; 
+            
+            // 🔥 防止點擊鎖定的按鈕 (雖然 CSS 有 pointer-events: none，但雙重保險)
+            if(e.target.classList.contains('locked')) return;
+
             safePlaySound('click');
             document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             
-            // 確保這裡抓到的是 'easy', 'normal', 'hard' 其中之一
             currentDifficulty = e.target.getAttribute('data-diff') || 'normal';
             console.log("難度已切換為:", currentDifficulty);
         });
@@ -109,7 +115,12 @@ function prepareLevel() {
     if(levelTitle) levelTitle.innerText = config.name;
 
     const diffControls = document.getElementById('difficulty-controls');
-    if(diffControls) diffControls.style.display = 'flex'; 
+    if(diffControls) {
+        diffControls.style.display = 'flex'; 
+        
+        // 🔥 更新難度按鈕鎖定狀態
+        updateDifficultyButtons();
+    }
 
     const retreatBtn = document.getElementById('retreat-btn');
     if(retreatBtn) retreatBtn.innerText = "🏳️ 撤退";
@@ -121,6 +132,47 @@ function prepareLevel() {
     
     if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
 }
+
+// 🔥 新增：更新難度按鈕狀態
+function updateDifficultyButtons() {
+    const btns = document.querySelectorAll('.difficulty-btn');
+    const easyBtn = document.querySelector('.difficulty-btn[data-diff="easy"]');
+    const normalBtn = document.querySelector('.difficulty-btn[data-diff="normal"]');
+    const hardBtn = document.querySelector('.difficulty-btn[data-diff="hard"]');
+
+    // 1. 簡單：永遠解鎖 (因為能進這關代表關卡已解鎖)
+    easyBtn.classList.remove('locked');
+
+    // 2. 普通：需要「簡單」通關
+    const isEasyCleared = userProgress[`${currentLevelId}_easy`];
+    if (isEasyCleared) {
+        normalBtn.classList.remove('locked');
+    } else {
+        normalBtn.classList.add('locked');
+    }
+
+    // 3. 困難：需要「普通」通關
+    const isNormalCleared = userProgress[`${currentLevelId}_normal`];
+    if (isNormalCleared) {
+        hardBtn.classList.remove('locked');
+    } else {
+        hardBtn.classList.add('locked');
+    }
+
+    // 🔥 自動切換選取狀態：如果當前選的難度被鎖住，強制切回 easy
+    const currentBtn = document.querySelector(`.difficulty-btn[data-diff="${currentDifficulty}"]`);
+    if (currentBtn && currentBtn.classList.contains('locked')) {
+        btns.forEach(b => b.classList.remove('active'));
+        easyBtn.classList.add('active');
+        currentDifficulty = 'easy';
+    } else {
+        // 確保 UI 顯示正確的 active
+        btns.forEach(b => b.classList.remove('active'));
+        const activeBtn = document.querySelector(`.difficulty-btn[data-diff="${currentDifficulty}"]`);
+        if(activeBtn) activeBtn.classList.add('active');
+    }
+}
+
 
 function renderBattleSlots() {
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
