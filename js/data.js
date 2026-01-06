@@ -198,7 +198,7 @@ export const cardDatabase = [
     { id: 27, name: "十字軍", rarity: "R", atk: 400, hp: 800, title: "聖殿騎士", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
     { id: 28, name: "祖魯戰士", rarity: "R", atk: 500, hp: 600, title: "長矛兵", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
     { id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, title: "熱兵器", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 },
+    { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
 
 
 // 請將以下內容複製並貼上到 data.js 的 cardDatabase 陣列中 (接在最後一張卡片後面)
