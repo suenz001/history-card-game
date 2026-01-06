@@ -451,6 +451,8 @@ function clearDeployment() {
     setBattleSlots(new Array(9).fill(null));
     renderBattleSlots();
     updateStartButton();
+    // 🔥 強制刷新背包，移除灰色狀態
+    Inventory.refreshInventory();
 }
 
 if(document.getElementById('clear-deploy-btn')) {
