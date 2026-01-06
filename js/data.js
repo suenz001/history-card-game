@@ -401,7 +401,7 @@ export const cardDatabase = [
     },
     { 
         id: 47, name: "亞馬遜戰士", rarity: "R", atk: 620, hp: 450, 
-        unitType: "INFANTRY", // 步兵 (女戰士)
+        unitType: "ARCHER", // 弓兵 (女戰士)
         title: "叢林女傑", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
     },
     { 
