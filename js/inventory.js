@@ -14,27 +14,21 @@ let currentDisplayList = [];
 let currentCardIndex = 0;
 let currentSortMethod = localStorage.getItem('userSortMethod') || 'time_desc';
 
-// 🔥 新增：複數篩選狀態 (使用 Set 來儲存多選)
-// 背包用的篩選
-let invRarityFilters = new Set(); // 存 'SSR', 'SR', 'R'
-let invTypeFilters = new Set();   // 存 'INFANTRY', 'CAVALRY', 'ARCHER'
+// 🔥 複數篩選狀態
+let invRarityFilters = new Set(); 
+let invTypeFilters = new Set();   
 
-// 圖鑑用的篩選
 let galRarityFilters = new Set();
 let galTypeFilters = new Set();
 
-// 批量操作狀態
 let isBatchMode = false;
 let selectedBatchCards = new Set();
 
-// 外部回調
 let onCurrencyUpdate = null; 
 let onPvpSelectionDone = null;
 
-// PVP 選擇模式狀態
 let pvpTargetInfo = { index: null, type: null };
 
-// 狀態標記
 let isViewingEnemy = false;
 let isViewingGallery = false;
 
@@ -61,7 +55,6 @@ export async function loadInventory(uid) {
     if(!uid) uid = currentUser?.uid;
     if(!uid) return;
 
-    // 重置篩選狀態 (預設顯示全部)
     invRarityFilters.clear();
     invTypeFilters.clear();
     updateFilterButtonsUI('inventory');
@@ -91,7 +84,7 @@ export async function loadInventory(uid) {
         });
         
         updateInventoryCounts();
-        filterInventory(); // 執行篩選
+        filterInventory(); 
     } catch (e) {
         console.error("Load Inventory Failed:", e);
         if(container) container.innerHTML = "<p>讀取失敗，請重新整理</p>";
@@ -164,41 +157,34 @@ export function renderCard(card, targetContainer) {
     return cardDiv;
 }
 
-// 🔥 新增：處理按鈕點擊邏輯 (通用)
+// 處理按鈕點擊邏輯 (通用)
 function handleFilterClick(mode, filterValue) {
     const raritySet = mode === 'inventory' ? invRarityFilters : galRarityFilters;
     const typeSet = mode === 'inventory' ? invTypeFilters : galTypeFilters;
 
     if (filterValue === 'ALL') {
-        // 清空所有條件 = 全部顯示
         raritySet.clear();
         typeSet.clear();
     } else {
-        // 判斷是 稀有度 還是 兵種
         if (['SSR', 'SR', 'R'].includes(filterValue)) {
             if (raritySet.has(filterValue)) raritySet.delete(filterValue);
             else raritySet.add(filterValue);
         } else {
-            // 兵種
             if (typeSet.has(filterValue)) typeSet.delete(filterValue);
             else typeSet.add(filterValue);
         }
     }
 
-    // 更新 UI 亮燈狀態
     updateFilterButtonsUI(mode);
 
-    // 執行篩選
     if (mode === 'inventory') filterInventory();
     else filterGallery();
 }
 
-// 🔥 新增：更新按鈕 UI
 function updateFilterButtonsUI(mode) {
     const raritySet = mode === 'inventory' ? invRarityFilters : galRarityFilters;
     const typeSet = mode === 'inventory' ? invTypeFilters : galTypeFilters;
     
-    // 決定使用哪個 class
     const btnClass = mode === 'inventory' ? '.filter-btn' : '.gallery-filter-btn';
     const buttons = document.querySelectorAll(btnClass);
 
@@ -209,7 +195,6 @@ function updateFilterButtonsUI(mode) {
         if (val === 'ALL') {
             if (isAll) btn.classList.add('active'); else btn.classList.remove('active');
         } else {
-            // 檢查該值是否在任一集合中
             if (raritySet.has(val) || typeSet.has(val)) {
                 btn.classList.add('active');
             } else {
@@ -219,18 +204,15 @@ function updateFilterButtonsUI(mode) {
     });
 }
 
-// 🔥 修改：背包篩選邏輯 (支援複選 + 混合)
+// 修改：背包篩選邏輯 (支援複選 + 混合 + 排序)
 export function filterInventory(ignoreVal) {
     const container = document.getElementById('inventory-grid');
     if(!container) return; 
     container.innerHTML = "";
     
-    // 邏輯：(稀有度集合為空 OR 命中) AND (兵種集合為空 OR 命中)
     const filteredList = allUserCards.filter(card => {
-        // 1. 稀有度檢查
         const passRarity = (invRarityFilters.size === 0) || invRarityFilters.has(card.rarity);
         
-        // 2. 兵種檢查 (需查表)
         const base = cardDatabase.find(db => db.id == card.id);
         const uType = base ? (base.unitType || 'INFANTRY') : 'INFANTRY';
         const passType = (invTypeFilters.size === 0) || invTypeFilters.has(uType);
@@ -413,7 +395,7 @@ async function upgradeCardStar() {
     await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
     
     updateInventoryCounts();
-    filterInventory(); // 重新篩選
+    filterInventory(); 
     renderDetailCard(); 
     alert(`升星成功！目前 ${card.stars} ★`);
 }
@@ -434,7 +416,7 @@ async function dismantleCurrentCard() {
         
         updateInventoryCounts();
         document.getElementById('detail-modal').classList.add('hidden'); 
-        filterInventory(); // 重新篩選
+        filterInventory(); 
         alert(`已分解！獲得 ${value} 金幣`); 
     } catch (e) { console.error("分解失敗", e); }
 }
@@ -552,7 +534,7 @@ export async function autoStarUp() {
         playSound('upgrade');
         allUserCards = newCardsState; 
         updateInventoryCounts();
-        filterInventory(); // 重新篩選
+        filterInventory(); 
         
         if(onCurrencyUpdate) onCurrencyUpdate('refresh');
         
@@ -568,7 +550,6 @@ export async function autoStarUp() {
 // --- 圖鑑系統 ---
 export function openGalleryModal() {
     isViewingGallery = true;
-    // 重置圖鑑篩選
     galRarityFilters.clear();
     galTypeFilters.clear();
     updateFilterButtonsUI('gallery');
@@ -577,7 +558,6 @@ export function openGalleryModal() {
     filterGallery(); 
 }
 
-// 🔥 修改：圖鑑篩選邏輯 (支援複選)
 export function filterGallery() {
     const container = document.getElementById('gallery-grid');
     if(!container) return;
@@ -585,7 +565,7 @@ export function filterGallery() {
 
     let fullList = [...cardDatabase].sort((a, b) => a.id - b.id);
     
-    // 篩選邏輯：(稀有度集合為空 OR 命中) AND (兵種集合為空 OR 命中)
+    // 篩選邏輯
     fullList = fullList.filter(card => {
         const passRarity = (galRarityFilters.size === 0) || galRarityFilters.has(card.rarity);
         const uType = card.unitType || 'INFANTRY';
@@ -682,6 +662,21 @@ function bindInventoryEvents() {
             handleFilterClick('gallery', val);
         }); 
     });
+
+    // 🔥 新增：排序下拉選單監聽
+    const sortSelect = document.getElementById('sort-select');
+    if (sortSelect) {
+        // 初始化時設定選單值
+        sortSelect.value = currentSortMethod;
+        
+        sortSelect.addEventListener('change', (e) => {
+            playSound('click');
+            currentSortMethod = e.target.value;
+            localStorage.setItem('userSortMethod', currentSortMethod);
+            // 重新執行篩選 (因為 filterInventory 內部會呼叫 sortCards)
+            filterInventory();
+        });
+    }
 
     // 關閉 Modal
     document.getElementById('close-inventory-btn')?.addEventListener('click', () => {
