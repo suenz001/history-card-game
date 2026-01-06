@@ -64,7 +64,7 @@ export async function loadInventory(uid) {
         
         querySnapshot.forEach((docSnap) => { 
             let data = docSnap.data();
-            // 資料校正邏輯 (同原版)
+            // 資料校正邏輯
             const baseCard = cardDatabase.find(c => c.id == data.id);
             if(baseCard) {
                  if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; }
@@ -139,7 +139,7 @@ export function renderCard(card, targetContainer) {
         if (cardDiv.classList.contains('is-deployed')) return; 
         if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } 
         
-        // PVP 選擇模式
+        // PVP / PVE 選擇模式
         if (pvpTargetInfo.index !== null && onPvpSelectionDone) {
             const success = onPvpSelectionDone(pvpTargetInfo.index, card, pvpTargetInfo.type);
             if(success) {
@@ -149,11 +149,6 @@ export function renderCard(card, targetContainer) {
             return;
         }
 
-        // 部署模式 (如果 main.js 有全局變數 deployTargetSlot，這裡需要依賴注入，為簡化假設部署由 Battle/Main 處理，或點擊僅開啟詳情)
-        // 這裡我們直接開啟詳情，部署邏輯建議在 main.js 的 slot 點擊時處理，或此處需擴充
-        // 為了相容：若需要部署，main.js 應該會呼叫 setPvpSelectionMode 類似的方法，或者將 deployTargetSlot 傳入
-        // 這裡暫時只處理「開啟詳情」
-        
         let index = currentDisplayList.indexOf(card); 
         if (index === -1) { currentDisplayList = [card]; index = 0; } 
         openDetailModal(index); 
@@ -166,7 +161,7 @@ export function renderCard(card, targetContainer) {
 export function filterInventory(filterType) {
     currentFilterType = filterType; 
     const container = document.getElementById('inventory-grid');
-    if(!container) return; // 防呆
+    if(!container) return; 
     container.innerHTML = "";
     
     let filteredList = [];
@@ -251,7 +246,6 @@ function renderDetailCard() {
     const card = currentDisplayList[currentCardIndex];
     if (!card) return;
 
-    // ... (這裡複製原本 main.js 的 renderDetailCard 內部生成 HTML 的邏輯) ...
     const charPath = `assets/cards/${card.id}.webp`;
     const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
     const level = card.level || 1;
@@ -421,18 +415,101 @@ function calculateBatchTotal() {
     }
 }
 
-// --- 自動升星 (原封不動搬移) ---
+// --- 自動升星 (核心邏輯) ---
 export async function autoStarUp() {
     if (!currentUser) return alert("請先登入");
     if (isBatchMode) return alert("請先關閉批量分解模式");
     if (allUserCards.length < 2) return alert("卡片數量不足以進行升星");
 
-    const confirmed = confirm("⚡ 一鍵升星會自動合併重複的卡片...");
+    const confirmed = confirm("⚡ 一鍵升星會自動合併重複的卡片，將每種英雄等級最高的卡片升到最高星數。\n\n確定要執行嗎？");
     if (!confirmed) return;
 
-    // ... (這裡保留原本的自動升星邏輯，篇幅考量省略重複代碼，請直接複製原 main.js 的 autoStarUp 內容填入) ...
-    // 關鍵: 更新後記得呼叫 updateInventoryCounts() 和 filterInventory()
-    alert("自動升星功能請複製原程式碼至此，並確保更新 allUserCards");
+    const groups = {};
+    allUserCards.forEach(card => {
+        if (!groups[card.id]) groups[card.id] = [];
+        groups[card.id].push(card);
+    });
+
+    let upgradedCount = 0;
+    let consumedCount = 0;
+    const deletePromises = [];
+    const updatePromises = [];
+    const newCardsState = [];
+    const deletedDocIds = new Set();
+
+    for (const id in groups) {
+        let cards = groups[id];
+        if (cards.length < 2) {
+            newCardsState.push(...cards);
+            continue;
+        }
+
+        cards.sort((a, b) => {
+            if (b.stars !== a.stars) return b.stars - a.stars;
+            return b.level - a.level;
+        });
+
+        for (let i = 0; i < cards.length; i++) {
+            let mainCard = cards[i];
+            
+            if (deletedDocIds.has(mainCard.docId)) continue;
+            
+            if (mainCard.stars >= 5) {
+                newCardsState.push(mainCard);
+                continue;
+            }
+
+            let originalStars = mainCard.stars;
+
+            for (let j = i + 1; j < cards.length; j++) {
+                let fodder = cards[j];
+                
+                if (deletedDocIds.has(fodder.docId)) continue;
+                if (mainCard.stars >= 5) break;
+
+                deletedDocIds.add(fodder.docId);
+                deletePromises.push(deleteDoc(doc(db, "inventory", fodder.docId)));
+                consumedCount++;
+
+                mainCard.stars++;
+                calculateCardStats(mainCard);
+            }
+
+            if (mainCard.stars > originalStars) {
+                upgradedCount++;
+                updatePromises.push(updateDoc(doc(db, "inventory", mainCard.docId), {
+                    stars: mainCard.stars,
+                    atk: mainCard.atk,
+                    hp: mainCard.hp
+                }));
+            }
+            newCardsState.push(mainCard);
+        }
+    }
+
+    if (upgradedCount === 0 && consumedCount === 0) {
+        return alert("目前沒有可升星的卡片組合");
+    }
+
+    try {
+        document.getElementById('auto-star-btn').innerText = "處理中...";
+        await Promise.all([...deletePromises, ...updatePromises]);
+        
+        playSound('upgrade');
+        allUserCards = newCardsState; 
+        updateInventoryCounts();
+        filterInventory(currentFilterType);
+        
+        // 更新主介面戰力
+        if(onCurrencyUpdate) onCurrencyUpdate('refresh');
+        
+        alert(`升星完成！\n共升級了 ${upgradedCount} 次\n消耗了 ${consumedCount} 張素材卡`);
+    } catch (e) {
+        console.error("自動升星失敗", e);
+        alert("升星過程中發生錯誤，請重試");
+    } finally {
+        document.getElementById('auto-star-btn').innerText = "⚡ 一鍵升星";
+    }
 }
 
 // --- 圖鑑系統 ---
@@ -444,7 +521,9 @@ export function openGalleryModal() {
 
 export function filterGallery(filterType) {
     const container = document.getElementById('gallery-grid');
+    if(!container) return;
     container.innerHTML = "";
+
     let fullList = [...cardDatabase].sort((a, b) => a.id - b.id);
     
     // 篩選
@@ -456,16 +535,71 @@ export function filterGallery(filterType) {
     const ownedCardIds = new Set(allUserCards.map(c => c.id));
     let ownedCount = 0;
     fullList.forEach(card => { if (ownedCardIds.has(card.id)) ownedCount++; });
-    document.getElementById('gallery-progress').innerText = `(收集進度: ${ownedCount}/${fullList.length})`;
+    const progEl = document.getElementById('gallery-progress');
+    if(progEl) progEl.innerText = `(收集進度: ${ownedCount}/${fullList.length})`;
 
     fullList.forEach(baseCard => {
         const isOwned = ownedCardIds.has(baseCard.id);
-        // ... (這裡複製原 main.js 的 filterGallery 渲染邏輯) ...
-        // 點擊事件
-        if(isOwned) {
-             // ...
+        
+        const displayCard = { 
+            ...baseCard, 
+            level: 1, 
+            stars: 1,
+            atk: baseCard.atk, 
+            hp: baseCard.hp 
+        };
+
+        const cardDiv = document.createElement('div');
+        const charPath = `assets/cards/${displayCard.id}.webp`;
+        const framePath = `assets/frames/${displayCard.rarity.toLowerCase()}.png`;
+        const idString = String(displayCard.id).padStart(3, '0');
+        
+        const baseConfig = cardDatabase.find(c => c.id == baseCard.id);
+        const uType = baseConfig ? (baseConfig.unitType || 'INFANTRY') : 'INFANTRY';
+        let typeIcon = uType === 'CAVALRY' ? '🐴' : (uType === 'ARCHER' ? '🏹' : '⚔️');
+
+        const lockedClass = isOwned ? '' : 'locked';
+        cardDiv.className = `card ${displayCard.rarity} ${lockedClass}`;
+
+        cardDiv.innerHTML = `
+            <div class="card-id-badge">#${idString}</div>
+            <div class="card-rarity-badge ${displayCard.rarity}">${displayCard.rarity}</div>
+            <img src="${charPath}" alt="${displayCard.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+            <div class="card-info-overlay">
+                <div class="card-title">${displayCard.title || ""}</div>
+                <div class="card-name">${displayCard.name}</div>
+                <div class="card-level-star" style="font-size: 0.8em; margin-bottom: 3px;">Lv.1</div>
+                <div class="card-stats">
+                    <span class="type-icon">${typeIcon}</span> 
+                    👊${displayCard.atk} ❤️${displayCard.hp}
+                </div>
+            </div>
+            <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
+        `;
+
+        if (isOwned) {
+            cardDiv.onclick = () => {
+                playSound('click');
+                currentDisplayList = [displayCard]; 
+                currentCardIndex = 0;
+                
+                isViewingGallery = true; 
+
+                const detailModal = document.getElementById('detail-modal');
+                detailModal.classList.remove('hidden');
+                detailModal.style.zIndex = "99999";
+                renderDetailCard();
+            };
+        } else {
+            cardDiv.onclick = () => {};
         }
+
+        container.appendChild(cardDiv);
     });
+
+    if (fullList.length === 0) {
+        container.innerHTML = "<p style='width:100%; text-align:center; padding:20px;'>無資料</p>";
+    }
 }
 
 // --- 事件綁定 ---
@@ -479,12 +613,27 @@ function bindInventoryEvents() {
             filterInventory(e.target.getAttribute('data-filter')); 
         }); 
     });
+    
+    // 圖鑑篩選按鈕
+    document.querySelectorAll('.gallery-filter-btn').forEach(btn => { 
+        btn.addEventListener('click', (e) => { 
+            playSound('click'); 
+            document.querySelectorAll('.gallery-filter-btn').forEach(b => b.classList.remove('active')); 
+            e.target.classList.add('active'); 
+            filterGallery(e.target.getAttribute('data-filter')); 
+        }); 
+    });
 
     // 關閉 Modal
     document.getElementById('close-inventory-btn')?.addEventListener('click', () => {
         playSound('click');
         document.getElementById('inventory-modal').classList.add('hidden');
         pvpTargetInfo = { index: null, type: null };
+    });
+    
+    document.getElementById('close-gallery-btn')?.addEventListener('click', () => {
+        playSound('click');
+        document.getElementById('gallery-modal').classList.add('hidden');
     });
 
     document.getElementById('close-detail-btn')?.addEventListener('click', () => {
@@ -510,6 +659,51 @@ function bindInventoryEvents() {
         }
         calculateBatchTotal();
         filterInventory(currentFilterType);
+    });
+    
+    // 批量分解確認
+    document.getElementById('batch-confirm-btn')?.addEventListener('click', async () => {
+        playSound('click'); 
+        if (selectedBatchCards.size === 0) return; 
+        if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; 
+        
+        let totalGold = 0; 
+        const deletePromises = []; 
+        const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); 
+        
+        cardsToRemove.forEach(card => { 
+            totalGold += DISMANTLE_VALUES[card.rarity]; 
+            if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); 
+        }); 
+        
+        try { 
+            const btn = document.getElementById('batch-confirm-btn');
+            btn.innerText = "分解中..."; 
+            await Promise.all(deletePromises); 
+            
+            playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
+            
+            if(onCurrencyUpdate) onCurrencyUpdate('add', totalGold);
+            
+            allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); 
+            selectedBatchCards.clear(); 
+            isBatchMode = false; 
+            
+            // 更新 UI
+            const toggleBtn = document.getElementById('batch-toggle-btn');
+            const bar = document.getElementById('batch-action-bar');
+            toggleBtn.classList.remove('active'); toggleBtn.innerText = "🔧 批量分解"; bar.classList.add('hidden'); 
+            
+            updateInventoryCounts();
+            filterInventory(currentFilterType); 
+            
+            alert(`批量分解成功！獲得 ${totalGold} 金幣`); 
+        } catch (e) { 
+            console.error("批量分解失敗", e); 
+            alert("分解過程中發生錯誤，請重試"); 
+        } finally {
+            document.getElementById('batch-confirm-btn').innerText = "確認分解";
+        }
     });
     
     // 一鍵升星
