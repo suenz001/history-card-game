@@ -1471,3 +1471,32 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .difficulty-btn.locked::after {
     font-size: 1.2em; /* 難度按鈕較小，鎖頭縮小 */
 }
+
+/* style.css 新增：通知紅點 */
+#notification-btn {
+    position: relative; /* 讓紅點可以絕對定位 */
+}
+
+.notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: #e74c3c;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 0.75em;
+    font-weight: bold;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    z-index: 10;
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.notification-badge.hidden {
+    display: none;
+}

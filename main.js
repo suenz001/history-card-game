@@ -1724,3 +1724,46 @@ function filterGallery(rarity) {
         container.innerHTML = "<p style='width:100%; text-align:center; padding:20px;'>無資料</p>";
     }
 }
+
+// main.js 新增函式
+
+function checkUnreadNotifications() {
+    if (!currentUser) return;
+
+    // 1. 計算「未領取獎勵」的系統公告
+    // 合併靜態公告與資料庫公告
+    const allSystemNotifs = [...SYSTEM_NOTIFICATIONS, ...globalAnnouncements];
+    
+    let unreadCount = 0;
+
+    allSystemNotifs.forEach(notif => {
+        // 如果有獎勵 且 還沒領取 (不在 claimedNotifs 列表中)
+        if (notif.reward && notif.reward.amount > 0 && !claimedNotifs.includes(notif.id)) {
+            unreadCount++;
+        }
+    });
+
+    // 2. 計算「新戰報」 (比對上次開啟通知的時間)
+    const lastReadTime = parseInt(localStorage.getItem(`lastReadNotifTime_${currentUser.uid}`) || "0");
+    
+    battleLogs.forEach(log => {
+        // 戰報的時間戳記 (Firebase Timestamp 轉毫秒 或 直接用 Date.now())
+        const logTime = log.timestamp ? (log.timestamp.seconds * 1000) : 0;
+        
+        // 如果戰報時間 > 上次讀取時間，算作未讀
+        if (logTime > lastReadTime) {
+            unreadCount++;
+        }
+    });
+
+    // 3. 更新 UI
+    const badge = document.getElementById('notif-badge');
+    if (badge) {
+        if (unreadCount > 0) {
+            badge.innerText = unreadCount > 99 ? '99+' : unreadCount;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+}
