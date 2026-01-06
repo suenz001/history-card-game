@@ -81,8 +81,6 @@ function setupBattleListeners() {
     document.querySelectorAll('.difficulty-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             if(isBattleActive) return; 
-            
-            // 🔥 防止點擊鎖定的按鈕 (雖然 CSS 有 pointer-events: none，但雙重保險)
             if(e.target.classList.contains('locked')) return;
 
             safePlaySound('click');
@@ -90,7 +88,6 @@ function setupBattleListeners() {
             e.target.classList.add('active');
             
             currentDifficulty = e.target.getAttribute('data-diff') || 'normal';
-            console.log("難度已切換為:", currentDifficulty);
         });
     });
 
@@ -117,8 +114,6 @@ function prepareLevel() {
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) {
         diffControls.style.display = 'flex'; 
-        
-        // 🔥 更新難度按鈕鎖定狀態
         updateDifficultyButtons();
     }
 
@@ -133,46 +128,31 @@ function prepareLevel() {
     if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
 }
 
-// 🔥 新增：更新難度按鈕狀態
 function updateDifficultyButtons() {
     const btns = document.querySelectorAll('.difficulty-btn');
     const easyBtn = document.querySelector('.difficulty-btn[data-diff="easy"]');
     const normalBtn = document.querySelector('.difficulty-btn[data-diff="normal"]');
     const hardBtn = document.querySelector('.difficulty-btn[data-diff="hard"]');
 
-    // 1. 簡單：永遠解鎖 (因為能進這關代表關卡已解鎖)
     easyBtn.classList.remove('locked');
 
-    // 2. 普通：需要「簡單」通關
     const isEasyCleared = userProgress[`${currentLevelId}_easy`];
-    if (isEasyCleared) {
-        normalBtn.classList.remove('locked');
-    } else {
-        normalBtn.classList.add('locked');
-    }
+    if (isEasyCleared) normalBtn.classList.remove('locked'); else normalBtn.classList.add('locked');
 
-    // 3. 困難：需要「普通」通關
     const isNormalCleared = userProgress[`${currentLevelId}_normal`];
-    if (isNormalCleared) {
-        hardBtn.classList.remove('locked');
-    } else {
-        hardBtn.classList.add('locked');
-    }
+    if (isNormalCleared) hardBtn.classList.remove('locked'); else hardBtn.classList.add('locked');
 
-    // 🔥 自動切換選取狀態：如果當前選的難度被鎖住，強制切回 easy
     const currentBtn = document.querySelector(`.difficulty-btn[data-diff="${currentDifficulty}"]`);
     if (currentBtn && currentBtn.classList.contains('locked')) {
         btns.forEach(b => b.classList.remove('active'));
         easyBtn.classList.add('active');
         currentDifficulty = 'easy';
     } else {
-        // 確保 UI 顯示正確的 active
         btns.forEach(b => b.classList.remove('active'));
         const activeBtn = document.querySelector(`.difficulty-btn[data-diff="${currentDifficulty}"]`);
         if(activeBtn) activeBtn.classList.add('active');
     }
 }
-
 
 function renderBattleSlots() {
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
@@ -319,8 +299,6 @@ export function resetBattleState() {
     if(warning) warning.remove();
 }
 
-// js/battle.js - 取代 spawnHeroes 函式
-
 function spawnHeroes() {
     const container = document.getElementById('hero-container');
     const monitorList = document.getElementById('hero-monitor-list');
@@ -337,21 +315,13 @@ function spawnHeroes() {
         const startY = (lane === 0 ? 20 : (lane === 1 ? 50 : 80));
 
         const baseCardConfig = cardDatabase.find(c => c.id == card.id);
-        
-        // 🔥 --- [修改] 兵種與圖示邏輯 --- 🔥
         const uType = baseCardConfig ? (baseCardConfig.unitType || 'INFANTRY') : 'INFANTRY';
         
         let typeIcon = '⚔️'; 
-        let badgeClass = 'hero-type-badge'; // 預設藍色 (步兵)
+        let badgeClass = 'hero-type-badge'; 
 
-        if (uType === 'CAVALRY') {
-            typeIcon = '🐴';
-            badgeClass += ' cavalry'; // 套用綠色樣式
-        } else if (uType === 'ARCHER') {
-            typeIcon = '🏹';
-            badgeClass += ' ranged'; // 套用紅色樣式
-        }
-        // 🔥 --- [修改] 結束 --- 🔥
+        if (uType === 'CAVALRY') { typeIcon = '🐴'; badgeClass += ' cavalry'; } 
+        else if (uType === 'ARCHER') { typeIcon = '🏹'; badgeClass += ' ranged'; }
 
         const realSkillKey = baseCardConfig ? baseCardConfig.skillKey : (card.skillKey || 'HEAVY_STRIKE');
         const realSkillParams = baseCardConfig ? baseCardConfig.skillParams : (card.skillParams || { dmgMult: 2.0 });
@@ -362,6 +332,7 @@ function spawnHeroes() {
         el.style.backgroundImage = `url(assets/cards/${card.id}.webp)`;
         el.style.left = `${startPos}%`;
         el.style.top = `${startY}%`;
+        // 🔥 移除行內 transform，改由 CSS 控制
         
         el.innerHTML = `
             <div class="hero-hp-bar"><div style="width:100%"></div></div>
@@ -381,12 +352,8 @@ function spawnHeroes() {
                 <div class="monitor-icon" style="background-image: url('assets/cards/${card.id}.webp');"></div>
                 <div class="monitor-info">
                     <div class="monitor-name">${card.name}</div>
-                    <div class="monitor-hp-bg">
-                        <div class="monitor-hp-fill" style="width: 100%;"></div>
-                    </div>
-                    <div class="monitor-mana-bg">
-                        <div class="monitor-mana-fill" style="width: 0%;"></div>
-                    </div>
+                    <div class="monitor-hp-bg"><div class="monitor-hp-fill" style="width: 100%;"></div></div>
+                    <div class="monitor-mana-bg"><div class="monitor-mana-fill" style="width: 0%;"></div></div>
                 </div>
             `;
             monitorList.appendChild(monitorItem);
@@ -418,10 +385,7 @@ function spawnHeroes() {
 function spawnPvpEnemies(enemyTeam) {
     const container = document.getElementById('enemy-container');
     if(!container) return;
-
-    enemyTeam.forEach(enemyCard => {
-        spawnSingleEnemyFromCard(enemyCard, container);
-    });
+    enemyTeam.forEach(enemyCard => { spawnSingleEnemyFromCard(enemyCard, container); });
 }
 
 function spawnSingleEnemyFromCard(enemyCard, container) {
@@ -439,7 +403,6 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     }
 
     const localConfig = cardDatabase.find(c => c.id == enemyCard.id);
-    
     let realId = enemyCard.id;
     let finalTitle = enemyCard.title || "強敵";
     let finalSkillKey = enemyCard.skillKey || 'HEAVY_STRIKE';
@@ -448,29 +411,20 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     let finalHp = enemyCard.hp || 500;
     let attackType = enemyCard.attackType || 'melee';
     
-    // 🔥 --- [修改] 敵方圖示判斷 --- 🔥
     const uType = localConfig ? (localConfig.unitType || 'INFANTRY') : 'INFANTRY';
     let typeIcon = '⚔️';
     if (uType === 'CAVALRY') typeIcon = '🐴';
     else if (uType === 'ARCHER') typeIcon = '🏹';
-    // 🔥 --- [修改] 結束 --- 🔥
     
     if (localConfig) {
         realId = localConfig.id;
         finalTitle = localConfig.title || finalTitle;
         attackType = localConfig.attackType;
-        
-        if (localConfig.skillKey) {
-            finalSkillKey = localConfig.skillKey;
-            finalSkillParams = localConfig.skillParams || finalSkillParams;
-        }
-
+        if (localConfig.skillKey) { finalSkillKey = localConfig.skillKey; finalSkillParams = localConfig.skillParams || finalSkillParams; }
         const level = enemyCard.level || 1;
         const stars = enemyCard.stars || 1;
-        
         const levelBonus = (level - 1) * 0.03;
         const starBonus = (stars - 1) * 0.20;
-
         if (enemyCard.level) {
             finalAtk = Math.floor(localConfig.atk * (1 + levelBonus) * (1 + starBonus));
             finalHp = Math.floor(localConfig.hp * (1 + levelBonus) * (1 + starBonus));
@@ -486,16 +440,14 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     
     el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
     el.style.backgroundSize = 'cover';
-    
     el.style.left = `${startPos}%`;
     el.style.top = `${startY}%`;
-    el.style.transform = 'translateY(-50%) scaleX(-1)';
+    
+    // 🔥 修正：敵人預設面向左，這裡加上 unit-flipped class
+    el.classList.add('unit-flipped');
 
-    if(!enemyCard.isBoss) {
-        el.style.border = '2px solid #e74c3c';
-    }
+    if(!enemyCard.isBoss) { el.style.border = '2px solid #e74c3c'; }
 
-    // 注意：敵人的標籤底色我保留紅色 (#c0392b)，以區分敵我，但圖示會變成馬頭
     el.innerHTML = `
         <div class="enemy-hp-bar"><div style="width:100%"></div></div>
         <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
@@ -515,12 +467,8 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
             <div class="monitor-icon" style="background-image: url('assets/cards/${realId}.webp'); border-color: #e74c3c;"></div>
             <div class="monitor-info">
                 <div class="monitor-name" style="color:#e74c3c;">${enemyCard.name || finalTitle}</div>
-                <div class="monitor-hp-bg">
-                    <div class="monitor-hp-fill enemy" style="width: 100%;"></div>
-                </div>
-                <div class="monitor-mana-bg">
-                    <div class="monitor-mana-fill" style="width: 0%;"></div>
-                </div>
+                <div class="monitor-hp-bg"><div class="monitor-hp-fill enemy" style="width: 100%;"></div></div>
+                <div class="monitor-mana-bg"><div class="monitor-mana-fill" style="width: 0%;"></div></div>
             </div>
         `;
         enemyMonitorList.appendChild(monitorItem);
@@ -551,171 +499,97 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
 function showBossWarning() {
     return new Promise((resolve) => {
         safePlaySound('dismantle'); 
-        
         const warningOverlay = document.createElement('div');
         warningOverlay.id = 'boss-warning-overlay';
-        warningOverlay.innerHTML = `
-            <div class="warning-text">⚠️ WARNING ⚠️</div>
-            <div class="warning-text" style="font-size: 2em; animation-delay: 0.1s;">BOSS APPROACHING</div>
-        `;
+        warningOverlay.innerHTML = `<div class="warning-text">⚠️ WARNING ⚠️</div><div class="warning-text" style="font-size: 2em; animation-delay: 0.1s;">BOSS APPROACHING</div>`;
         document.body.appendChild(warningOverlay);
-
-        setTimeout(() => {
-            if(warningOverlay.parentNode) warningOverlay.remove();
-            resolve();
-        }, 2500);
+        setTimeout(() => { if(warningOverlay.parentNode) warningOverlay.remove(); resolve(); }, 2500);
     });
 }
 
 function triggerBossEntranceEffect(boss) {
     if (!boss) return;
-
-    createVfx(boss.position, boss.y, 'vfx-explosion'); 
-    safePlaySound('explosion'); 
-
-    // 震退所有英雄
+    createVfx(boss.position, boss.y, 'vfx-explosion'); safePlaySound('explosion'); 
     heroEntities.forEach(hero => {
         if (hero.isDead) return;
-        
         const dx = hero.position - boss.position;
         const dy = hero.y - boss.y;
         const dist = Math.sqrt(dx*dx + dy*dy);
-        
-        const impactRadius = 30; // 影響範圍
-        
+        const impactRadius = 30; 
         if (dist < impactRadius) {
             let dirX = dx < 0 ? -1 : 1; 
             const force = (impactRadius - dist) / impactRadius; 
             const pushDistance = 20 * force; 
-            
             hero.position += dirX * pushDistance;
             hero.position = Math.max(0, Math.min(100, hero.position));
-            
             triggerHeroHit(hero);
             showDamageText(hero.position, hero.y, "擊退!", "gold-text");
         }
     });
-    
-    const body = document.body;
-    body.style.transform = "translate(0, 5px)";
-    setTimeout(() => body.style.transform = "none", 100);
+    const body = document.body; body.style.transform = "translate(0, 5px)"; setTimeout(() => body.style.transform = "none", 100);
 }
 
 function startWave(waveNum) {
     if(isPvpMode) return;
     battleState.wave = waveNum;
     battleState.spawned = 0;
-    
     const levelConfig = LEVEL_CONFIGS[currentLevelId];
     battleState.totalToSpawn = levelConfig.waves[waveNum].count;
-    
     battleState.lastSpawnTime = Date.now();
     battleState.phase = 'SPAWNING'; 
     updateBattleUI();
-    
     const waveNotif = document.getElementById('wave-notification');
     if(waveNotif) {
         waveNotif.innerText = waveNum === 4 ? `😈 魔王來襲 😈` : `第 ${waveNum} 波 來襲!`;
-        waveNotif.classList.remove('hidden');
-        waveNotif.style.animation = 'none';
-        waveNotif.offsetHeight; 
-        waveNotif.style.animation = 'waveFade 2s forwards';
+        waveNotif.classList.remove('hidden'); waveNotif.style.animation = 'none'; waveNotif.offsetHeight; waveNotif.style.animation = 'waveFade 2s forwards';
     }
 }
 
-// 🔥 重構：讀取 data.js 的 DIFFICULTY_SETTINGS 和敵軍設定
 function spawnEnemy() {
     if(isPvpMode) return; 
-    
     const container = document.getElementById('enemy-container');
     if(!container) return;
 
     const levelConfig = LEVEL_CONFIGS[currentLevelId];
     const config = levelConfig.waves[battleState.wave];
-    
-    // 🔥 讀取難度設定 (預設 fallback 為 normal)
     const diffSettings = DIFFICULTY_SETTINGS[currentDifficulty] || DIFFICULTY_SETTINGS['normal'];
     const diffMultHp = diffSettings.hpMult;
     const diffMultAtk = diffSettings.atkMult;
 
-    // 波次 1-3：生成雜魚
     if (battleState.wave < 4) {
-        
         const pool = config.enemyPool || [8]; 
         const randomId = pool[Math.floor(Math.random() * pool.length)];
         const baseCard = cardDatabase.find(c => c.id === randomId);
-
         if (baseCard) {
-            // 🔥 使用倍率計算數值
             const finalHp = Math.floor(baseCard.hp * (config.hpMult || 1) * diffMultHp);
             const finalAtk = Math.floor(baseCard.atk * (config.atkMult || 1) * diffMultAtk);
-
-            const enemyData = {
-                ...baseCard,
-                hp: finalHp, 
-                atk: finalAtk,
-                slotIndex: undefined 
-            };
+            const enemyData = { ...baseCard, hp: finalHp, atk: finalAtk, slotIndex: undefined };
             spawnSingleEnemyFromCard(enemyData, container);
             return;
-        } else {
-            console.error("找不到卡片ID:", randomId, "請檢查 data.js 的 cardDatabase");
         }
     }
 
-    // 波次 4：生成 BOSS
     if(battleState.wave === 4) {
         const performBossSpawn = () => {
             if (!isBattleActive) return;
-
             if (config.bossId) {
                 const baseCard = cardDatabase.find(c => c.id === config.bossId);
                 if (baseCard) {
-                    const bossData = {
-                        ...baseCard,
-                        hp: (config.hp || 30000) * diffMultHp, 
-                        atk: (config.atk || 500) * diffMultAtk,
-                        aoeConfig: config.aoeConfig || null,
-                        isBoss: true, 
-                        slotIndex: undefined 
-                    };
+                    const bossData = { ...baseCard, hp: (config.hp || 30000) * diffMultHp, atk: (config.atk || 500) * diffMultAtk, aoeConfig: config.aoeConfig || null, isBoss: true, slotIndex: undefined };
                     spawnSingleEnemyFromCard(bossData, container);
-                    
-                    const bossEntity = enemies[enemies.length-1];
-                    bossEntity.isBoss = true; 
-                    bossEntity.aoeConfig = bossData.aoeConfig; 
-                    
-                    triggerBossEntranceEffect(bossEntity); 
-                    return;
+                    const bossEntity = enemies[enemies.length-1]; bossEntity.isBoss = true; bossEntity.aoeConfig = bossData.aoeConfig; 
+                    triggerBossEntranceEffect(bossEntity); return;
                 }
             }
-
-            // Fallback
-            const bossX = 10 + Math.random() * 80; 
-            const bossY = 10 + Math.random() * 80;
-            const boss = { 
-                id: Date.now(), 
-                maxHp: 30000 * diffMultHp, 
-                currentHp: 30000 * diffMultHp, 
-                atk: 500 * diffMultAtk, 
-                lane: -1, position: bossX, y: bossY, 
-                speed: 0.02, el: null, lastAttackTime: 0, isBoss: true 
-            };
+            const bossX = 10 + Math.random() * 80; const bossY = 10 + Math.random() * 80;
+            const boss = { id: Date.now(), maxHp: 30000 * diffMultHp, currentHp: 30000 * diffMultHp, atk: 500 * diffMultAtk, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
             const el = document.createElement('div'); el.className = 'enemy-unit boss'; el.innerHTML = `😈<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
             el.style.top = `${boss.y}%`; el.style.left = `${boss.position}%`;
-            container.appendChild(el); boss.el = el; enemies.push(boss);
-            triggerBossEntranceEffect(boss);
+            container.appendChild(el); boss.el = el; enemies.push(boss); triggerBossEntranceEffect(boss);
         };
-
         if (battleState.spawned === 0) {
-            battleState.isBossSpawning = true; 
-            showBossWarning().then(() => {
-                performBossSpawn();
-                battleState.isBossSpawning = false; 
-            });
-        } else {
-            performBossSpawn(); 
-        }
+            battleState.isBossSpawning = true; showBossWarning().then(() => { performBossSpawn(); battleState.isBossSpawning = false; });
+        } else { performBossSpawn(); }
         return;
     }
 }
@@ -723,57 +597,30 @@ function spawnEnemy() {
 function fireBossSkill(boss) {
     const container = document.querySelector('.battle-field-container');
     if(!container) return;
-
     const aoe = boss.aoeConfig || { radius: 15, damageMult: 1.0, effect: 'shockwave', color: '#e74c3c' };
-
-    showDamageText(boss.position, boss.y - 15, "蓄力中...", "skill-title");
-    safePlaySound('magic');
-
-    const projectile = document.createElement('div'); 
-    projectile.className = 'boss-projectile';
-    projectile.style.left = `${boss.position}%`; 
-    projectile.style.top = `${boss.y}%`;
+    showDamageText(boss.position, boss.y - 15, "蓄力中...", "skill-title"); safePlaySound('magic');
+    const projectile = document.createElement('div'); projectile.className = 'boss-projectile';
+    projectile.style.left = `${boss.position}%`; projectile.style.top = `${boss.y}%`;
     container.appendChild(projectile);
     
-    let target = null;
-    let minDist = 9999;
+    let target = null; let minDist = 9999;
     heroEntities.forEach(h => {
-        const dx = h.position - boss.position;
-        const dy = h.y - boss.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
+        const dx = h.position - boss.position; const dy = h.y - boss.y; const dist = Math.sqrt(dx*dx + dy*dy);
         if(dist < minDist) { minDist = dist; target = h; }
     });
-
     if (!target && heroEntities.length > 0) target = heroEntities[Math.floor(Math.random() * heroEntities.length)];
     if (!target) target = { position: 20, y: 50 }; 
-    
-    void projectile.offsetWidth;
-    projectile.style.left = `${target.position}%`; 
-    projectile.style.top = `${target.y}%`;
+    void projectile.offsetWidth; projectile.style.left = `${target.position}%`; projectile.style.top = `${target.y}%`;
     
     setTimeout(() => {
-        projectile.remove();
-        createBossVfx(target.position, target.y, aoe.effect, aoe.color);
-        safePlaySound('explosion');
-        
+        projectile.remove(); createBossVfx(target.position, target.y, aoe.effect, aoe.color); safePlaySound('explosion');
         heroEntities.forEach(hero => {
-            const dx = hero.position - target.position; 
-            const dy = hero.y - target.y; 
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            
+            const dx = hero.position - target.position; const dy = hero.y - target.y; const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < aoe.radius) { 
-                if (hero.isInvincible) {
-                    showDamageText(hero.position, hero.y, `免疫`, 'gold-text');
-                    safePlaySound('block');
-                } else if (hero.immunityStacks > 0) {
-                    hero.immunityStacks--;
-                    showDamageText(hero.position, hero.y, `格擋!`, 'gold-text');
-                    safePlaySound('block');
-                } else {
-                    const dmg = Math.floor(boss.atk * aoe.damageMult);
-                    hero.currentHp -= dmg; 
-                    triggerHeroHit(hero); 
-                    showDamageText(hero.position, hero.y, `-${dmg}`, 'hero-dmg');
+                if (hero.isInvincible) { showDamageText(hero.position, hero.y, `免疫`, 'gold-text'); safePlaySound('block'); } 
+                else if (hero.immunityStacks > 0) { hero.immunityStacks--; showDamageText(hero.position, hero.y, `格擋!`, 'gold-text'); safePlaySound('block'); } 
+                else {
+                    const dmg = Math.floor(boss.atk * aoe.damageMult); hero.currentHp -= dmg; triggerHeroHit(hero); showDamageText(hero.position, hero.y, `-${dmg}`, 'hero-dmg');
                 }
                 if(hero.position < boss.position) hero.position -= 1; else hero.position += 1;
             }
@@ -783,96 +630,44 @@ function fireBossSkill(boss) {
 
 function updateBattleUI() {
     try {
-        const goldEl = document.getElementById('battle-gold');
-        if(goldEl) goldEl.innerText = battleGold; 
-        
-        const goldContainer = document.getElementById('battle-gold-container');
-        if (goldContainer) {
-            goldContainer.style.display = isPvpMode ? 'none' : 'inline';
-        }
-
-        const waveContainer = document.getElementById('wave-display-container');
-        if (waveContainer) {
-            waveContainer.style.display = isPvpMode ? 'none' : 'inline';
-        }
-
-        if (!isPvpMode) {
-            const waveEl = document.getElementById('wave-count');
-            if(waveEl) waveEl.innerText = battleState.wave;
-        }
-        
-        const countEl = document.getElementById('hero-count-display');
-        if(countEl) countEl.innerText = heroEntities.length;
-        
-    } catch(e) {
-        console.warn("UI Update Warning:", e); 
-    }
+        const goldEl = document.getElementById('battle-gold'); if(goldEl) goldEl.innerText = battleGold; 
+        const goldContainer = document.getElementById('battle-gold-container'); if (goldContainer) goldContainer.style.display = isPvpMode ? 'none' : 'inline';
+        const waveContainer = document.getElementById('wave-display-container'); if (waveContainer) waveContainer.style.display = isPvpMode ? 'none' : 'inline';
+        if (!isPvpMode) { const waveEl = document.getElementById('wave-count'); if(waveEl) waveEl.innerText = battleState.wave; }
+        const countEl = document.getElementById('hero-count-display'); if(countEl) countEl.innerText = heroEntities.length;
+    } catch(e) { console.warn("UI Update Warning:", e); }
 }
 
 function dealDamage(source, target, multiplier) {
     if (!target.el || target.currentHp <= 0) return;
-
-    // 🔥 --- [新增] 兵種相剋邏輯開始 --- 🔥
-    // 1. 從資料庫取得雙方原始設定 (確保能讀到 unitType)
     const sourceConfig = cardDatabase.find(c => c.id == source.id);
     const targetConfig = cardDatabase.find(c => c.id == target.id);
-    
-    // 2. 取得兵種 (若沒設定則預設為步兵 INFANTRY，避免報錯)
     const sType = sourceConfig ? (sourceConfig.unitType || 'INFANTRY') : 'INFANTRY';
     const tType = targetConfig ? (targetConfig.unitType || 'INFANTRY') : 'INFANTRY';
-
-    // 3. 計算相剋加成 (這裡設定為 1.5 倍，你可以自行調整)
     const COUNTER_BONUS = 1.5; 
 
-    // 步兵 > 騎兵
-    if (sType === 'INFANTRY' && tType === 'CAVALRY') {
-        multiplier *= COUNTER_BONUS;
-        // (可選) 顯示特效：showDamageText(target.position, target.y, "剋制!", "critical-text");
-    } 
-    // 騎兵 > 弓兵
-    else if (sType === 'CAVALRY' && tType === 'ARCHER') {
-        multiplier *= COUNTER_BONUS;
-    } 
-    // 弓兵 > 步兵
-    else if (sType === 'ARCHER' && tType === 'INFANTRY') {
-        multiplier *= COUNTER_BONUS;
-    }
-    // 🔥 --- [新增] 兵種相剋邏輯結束 --- 🔥
+    if (sType === 'INFANTRY' && tType === 'CAVALRY') multiplier *= COUNTER_BONUS;
+    else if (sType === 'CAVALRY' && tType === 'ARCHER') multiplier *= COUNTER_BONUS;
+    else if (sType === 'ARCHER' && tType === 'INFANTRY') multiplier *= COUNTER_BONUS;
 
     if (isPvpMode) multiplier *= 0.25;
-
     const dmg = Math.floor(source.atk * multiplier);
     target.currentHp -= dmg;
     
     const isPlayerUnit = heroEntities.includes(target);
     const textClass = isPlayerUnit ? 'enemy-dmg' : 'hero-dmg';
-    
     showDamageText(target.position, target.y, `-${dmg}`, textClass); 
-    
-    if(target.el) {
-        target.el.classList.remove('taking-damage');
-        void target.el.offsetWidth;
-        target.el.classList.add('taking-damage');
-    }
+    if(target.el) { target.el.classList.remove('taking-damage'); void target.el.offsetWidth; target.el.classList.add('taking-damage'); }
     source.totalDamage += dmg;
 }
 
 function healTarget(source, target, amount) {
     const actualHeal = Math.min(target.maxHp - target.currentHp, amount);
-    if(actualHeal > 0) {
-        target.currentHp += actualHeal;
-        source.totalHealing = (source.totalHealing || 0) + actualHeal;
-        showDamageText(target.position, target.y, `+${actualHeal}`, 'gold-text');
-    }
+    if(actualHeal > 0) { target.currentHp += actualHeal; source.totalHealing = (source.totalHealing || 0) + actualHeal; showDamageText(target.position, target.y, `+${actualHeal}`, 'gold-text'); }
 }
 
 function getCombatGroups(caster) {
-    if (heroEntities.includes(caster)) {
-        return { allies: heroEntities, foes: enemies };
-    } 
-    else {
-        return { allies: enemies, foes: heroEntities };
-    }
+    if (heroEntities.includes(caster)) return { allies: heroEntities, foes: enemies }; else return { allies: enemies, foes: heroEntities };
 }
 
 function gameLoop() {
@@ -881,29 +676,22 @@ function gameLoop() {
 
     if (!isPvpMode && battleState.phase === 'SPAWNING') {
         if (battleState.spawned < battleState.totalToSpawn) {
-            if (now - battleState.lastSpawnTime > 1500 / gameSpeed) { 
-                spawnEnemy();
-                battleState.spawned++;
-                battleState.lastSpawnTime = now;
-            }
+            if (now - battleState.lastSpawnTime > 1500 / gameSpeed) { spawnEnemy(); battleState.spawned++; battleState.lastSpawnTime = now; }
         } else { battleState.phase = 'COMBAT'; }
     } 
     else if (!isPvpMode && battleState.phase === 'COMBAT') {
         if (enemies.length === 0) {
             if (!battleState.isBossSpawning) {
-                battleState.phase = 'WAITING';
-                battleState.waitTimer = now;
+                battleState.phase = 'WAITING'; battleState.waitTimer = now;
                 if (battleState.wave < 4) showDamageText(50, 40, "3秒後 下一波...", '');
             }
         }
     }
     else if (!isPvpMode && battleState.phase === 'WAITING') {
         if (now - battleState.waitTimer > 3000 / gameSpeed) {
-            if (battleState.wave < 4) { startWave(battleState.wave + 1); } 
-            else { endBattle(true); return; } 
+            if (battleState.wave < 4) { startWave(battleState.wave + 1); } else { endBattle(true); return; } 
         }
     }
-    
     if (isPvpMode && battleState.phase === 'COMBAT') {
         if (enemies.length === 0) { endBattle(true); return; }
         if (heroEntities.length === 0) { endBattle(false); return; }
@@ -912,36 +700,22 @@ function gameLoop() {
     heroEntities.sort((a, b) => b.position - a.position);
     for (let i = heroEntities.length - 1; i >= 0; i--) {
         const hero = heroEntities[i];
-
         if (hero.currentHp <= 0) {
             if (hero.monitorEl) { 
-                hero.monitorEl.classList.add('dead'); 
-                hero.monitorEl.querySelector('.monitor-name').innerText += " (陣亡)"; 
-                hero.monitorEl.querySelector('.monitor-hp-fill').style.width = '0%'; 
-                hero.monitorEl.querySelector('.monitor-mana-fill').style.width = '0%'; 
+                hero.monitorEl.classList.add('dead'); hero.monitorEl.querySelector('.monitor-name').innerText += " (陣亡)"; 
+                hero.monitorEl.querySelector('.monitor-hp-fill').style.width = '0%'; hero.monitorEl.querySelector('.monitor-mana-fill').style.width = '0%'; 
             }
-            if(hero.el) hero.el.remove();
-            deadHeroes.push(hero); 
-            heroEntities.splice(i, 1);
-            
-            updateBattleUI();
-            continue;
+            if(hero.el) hero.el.remove(); deadHeroes.push(hero); heroEntities.splice(i, 1); updateBattleUI(); continue;
         }
         
         if (hero.monitorEl) { 
-            const hpPercent = Math.max(0, (hero.currentHp / hero.maxHp) * 100); 
-            const manaPercent = Math.max(0, (hero.currentMana / hero.maxMana) * 100);
-
-            const fillHp = hero.monitorEl.querySelector('.monitor-hp-fill'); 
-            const fillMana = hero.monitorEl.querySelector('.monitor-mana-fill'); 
-            if (fillHp) fillHp.style.width = `${hpPercent}%`; 
-            if (fillMana) fillMana.style.width = `${manaPercent}%`; 
+            const hpPercent = Math.max(0, (hero.currentHp / hero.maxHp) * 100); const manaPercent = Math.max(0, (hero.currentMana / hero.maxMana) * 100);
+            const fillHp = hero.monitorEl.querySelector('.monitor-hp-fill'); const fillMana = hero.monitorEl.querySelector('.monitor-mana-fill'); 
+            if (fillHp) fillHp.style.width = `${hpPercent}%`; if (fillMana) fillMana.style.width = `${manaPercent}%`; 
         }
 
         if (hero.currentMana < hero.maxMana) {
-            let manaRate = isPvpMode ? 0.25 : 0.02;
-            hero.currentMana += manaRate * gameSpeed; 
-            if(hero.currentMana > hero.maxMana) hero.currentMana = hero.maxMana;
+            let manaRate = isPvpMode ? 0.25 : 0.02; hero.currentMana += manaRate * gameSpeed; if(hero.currentMana > hero.maxMana) hero.currentMana = hero.maxMana;
         }
 
         let blocked = false; let pushX = 0; let pushY = 0; let nearestEnemy = null; let minTotalDist = 9999; 
@@ -955,27 +729,16 @@ function gameLoop() {
         if (nearestEnemy && minTotalDist <= hero.range) {
             blocked = true; 
             if (now - hero.lastAttackTime > 2000 / gameSpeed) {
-                
                 if (hero.currentMana >= hero.maxMana) {
-                    const combatContext = {
-                        dealDamage,
-                        healTarget,
-                        getCombatGroups,
-                        enemies,
-                        heroEntities
-                    };
+                    const combatContext = { dealDamage, healTarget, getCombatGroups, enemies, heroEntities };
                     executeSkill(hero, nearestEnemy, combatContext);
                 } else {
                     const heroType = hero.attackType || 'melee'; const projType = heroType === 'ranged' ? 'arrow' : 'sword';
                     fireProjectile(hero.el, nearestEnemy.el, projType, () => {
-                        if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
-                            dealDamage(hero, nearestEnemy, 1.0);
-                            hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 5);
-                        }
+                        if (nearestEnemy.el && nearestEnemy.currentHp > 0) { dealDamage(hero, nearestEnemy, 1.0); hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 5); }
                     });
                     safePlaySound('dismantle'); 
                 }
-                
                 hero.lastAttackTime = now;
             }
         }
@@ -997,73 +760,49 @@ function gameLoop() {
         if (hero.el) {
             hero.el.style.left = `${hero.position}%`; hero.el.style.top = `${hero.y}%`; 
             hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
-            
             const manaPercent = (hero.currentMana / hero.maxMana) * 100;
             hero.el.querySelector('.hero-mana-bar div').style.width = `${manaPercent}%`;
-            
-            if(hero.currentMana >= hero.maxMana) hero.el.classList.add('mana-full');
-            else hero.el.classList.remove('mana-full');
+            if(hero.currentMana >= hero.maxMana) hero.el.classList.add('mana-full'); else hero.el.classList.remove('mana-full');
 
-            if (nearestEnemy && nearestEnemy.position < hero.position) { hero.el.style.transform = 'translateY(-50%) scaleX(-1)'; } else { hero.el.style.transform = 'translateY(-50%) scaleX(1)'; }
+            // 🔥 修正轉向邏輯：使用 class 控制
+            if (nearestEnemy && nearestEnemy.position < hero.position) {
+                hero.el.classList.add('unit-flipped'); // 面向左
+            } else {
+                hero.el.classList.remove('unit-flipped'); // 面向右 (預設)
+            }
         }
     }
 
     if (!isPvpMode && isBattleActive && heroEntities.length === 0 && battleState.spawned > 0) { endBattle(false); return; }
 
-    // --- 敵人邏輯 ---
     enemies.sort((a, b) => a.position - b.position);
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
-
         if (enemy.currentHp <= 0) {
             if (enemy.monitorEl) { 
-                enemy.monitorEl.classList.add('dead'); 
-                enemy.monitorEl.querySelector('.monitor-name').innerText += " (陣亡)"; 
-                enemy.monitorEl.querySelector('.monitor-hp-fill').style.width = '0%'; 
-                enemy.monitorEl.querySelector('.monitor-mana-fill').style.width = '0%'; 
+                enemy.monitorEl.classList.add('dead'); enemy.monitorEl.querySelector('.monitor-name').innerText += " (陣亡)"; 
+                enemy.monitorEl.querySelector('.monitor-hp-fill').style.width = '0%'; enemy.monitorEl.querySelector('.monitor-mana-fill').style.width = '0%'; 
             }
-
-            if(enemy.el) enemy.el.remove();
-            deadEnemies.push(enemy);
-            enemies.splice(i, 1);
-            
+            if(enemy.el) enemy.el.remove(); deadEnemies.push(enemy); enemies.splice(i, 1);
             if(!isPvpMode) { 
                 try {
-                    // 🔥 使用 DIFFICULTY_SETTINGS 中的金幣倍率
                     const diffSettings = DIFFICULTY_SETTINGS[currentDifficulty] || DIFFICULTY_SETTINGS['normal'];
                     const goldGain = Math.floor((50 + (battleState.wave * 10)) * diffSettings.goldMult);
-
-                    battleGold += goldGain;
-                    updateBattleUI(); 
-                    showDamageText(enemy.position, enemy.y, `+${goldGain}G`, 'gold-text'); 
-                    
+                    battleGold += goldGain; updateBattleUI(); showDamageText(enemy.position, enemy.y, `+${goldGain}G`, 'gold-text'); 
                     let killer = heroEntities.find(h => Math.abs(h.position - enemy.position) < 20); 
-                    if(killer && killer.currentMana < killer.maxMana) {
-                         killer.currentMana = Math.min(killer.maxMana, killer.currentMana + 15);
-                         showDamageText(killer.position, killer.y, `MP+15`, 'gold-text');
-                    }
-
-                } catch(err) { console.error("Critical Error in PVE Death Logic:", err); }
+                    if(killer && killer.currentMana < killer.maxMana) { killer.currentMana = Math.min(killer.maxMana, killer.currentMana + 15); showDamageText(killer.position, killer.y, `MP+15`, 'gold-text'); }
+                } catch(err) { console.error(err); }
             }
-            safePlaySound('dismantle'); 
-            continue; 
+            safePlaySound('dismantle'); continue; 
         }
 
         if (enemy.monitorEl) { 
-            const hpPercent = Math.max(0, (enemy.currentHp / enemy.maxHp) * 100); 
-            const manaPercent = Math.max(0, (enemy.currentMana / enemy.maxMana) * 100);
-
-            const fillHp = enemy.monitorEl.querySelector('.monitor-hp-fill'); 
-            const fillMana = enemy.monitorEl.querySelector('.monitor-mana-fill'); 
-            if (fillHp) fillHp.style.width = `${hpPercent}%`; 
-            if (fillMana) fillMana.style.width = `${manaPercent}%`; 
+            const hpPercent = Math.max(0, (enemy.currentHp / enemy.maxHp) * 100); const manaPercent = Math.max(0, (enemy.currentMana / enemy.maxMana) * 100);
+            const fillHp = enemy.monitorEl.querySelector('.monitor-hp-fill'); const fillMana = enemy.monitorEl.querySelector('.monitor-mana-fill'); 
+            if (fillHp) fillHp.style.width = `${hpPercent}%`; if (fillMana) fillMana.style.width = `${manaPercent}%`; 
         }
 
-        // Boss 攻擊
-        if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { 
-            fireBossSkill(enemy); 
-            enemy.lastAttackTime = now; 
-        }
+        if (enemy.isBoss && now - enemy.lastAttackTime > 3000 / gameSpeed) { fireBossSkill(enemy); enemy.lastAttackTime = now; }
 
         let blocked = false; let dodgeY = 0; let nearestHero = null; let minTotalDist = 9999;
         heroEntities.forEach(hero => {
@@ -1074,10 +813,7 @@ function gameLoop() {
         });
 
         if (enemy.isPvpHero) {
-            if (enemy.currentMana < enemy.maxMana) {
-                enemy.currentMana += 0.25 * gameSpeed; 
-                if(enemy.currentMana > enemy.maxMana) enemy.currentMana = enemy.maxMana;
-            }
+            if (enemy.currentMana < enemy.maxMana) { enemy.currentMana += 0.25 * gameSpeed; if(enemy.currentMana > enemy.maxMana) enemy.currentMana = enemy.maxMana; }
             if (enemy.isPvpHero && nearestHero && minTotalDist <= enemy.range) {
                 blocked = true;
                 if (now - enemy.lastAttackTime > 2000 / gameSpeed) {
@@ -1088,17 +824,9 @@ function gameLoop() {
                         const projType = enemy.attackType === 'ranged' ? 'arrow' : 'sword';
                         fireProjectile(enemy.el, nearestHero.el, projType, () => {
                             if (nearestHero.el && nearestHero.currentHp > 0) {
-                                if(nearestHero.isInvincible) {
-                                    showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
-                                } else if (nearestHero.immunityStacks > 0) {
-                                    nearestHero.immunityStacks--;
-                                    showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
-                                    safePlaySound('block');
-                                } else {
-                                    dealDamage(enemy, nearestHero, 1.0);
-                                    triggerHeroHit(nearestHero);
-                                    enemy.currentMana = Math.min(enemy.maxMana, enemy.currentMana + 5);
-                                }
+                                if(nearestHero.isInvincible) { showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text'); } 
+                                else if (nearestHero.immunityStacks > 0) { nearestHero.immunityStacks--; showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text'); safePlaySound('block'); } 
+                                else { dealDamage(enemy, nearestHero, 1.0); triggerHeroHit(nearestHero); enemy.currentMana = Math.min(enemy.maxMana, enemy.currentMana + 5); }
                             }
                         });
                     }
@@ -1111,18 +839,9 @@ function gameLoop() {
             if (now - enemy.lastAttackTime > 800 / gameSpeed) {
                 fireProjectile(enemy.el, nearestHero.el, 'fireball', () => {
                     if (nearestHero.el && nearestHero.currentHp > 0) {
-                        if(nearestHero.isInvincible) {
-                            showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text');
-                        } else if (nearestHero.immunityStacks > 0) {
-                            nearestHero.immunityStacks--;
-                            showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text');
-                            safePlaySound('block');
-                        } else {
-                            nearestHero.currentHp -= enemy.atk; 
-                            triggerHeroHit(nearestHero); 
-                            safePlaySound('poison'); 
-                            showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg');
-                        }
+                        if(nearestHero.isInvincible) { showDamageText(nearestHero.position, nearestHero.y, `免疫`, 'gold-text'); } 
+                        else if (nearestHero.immunityStacks > 0) { nearestHero.immunityStacks--; showDamageText(nearestHero.position, nearestHero.y, `格擋!`, 'gold-text'); safePlaySound('block'); } 
+                        else { nearestHero.currentHp -= enemy.atk; triggerHeroHit(nearestHero); safePlaySound('poison'); showDamageText(nearestHero.position, nearestHero.y, `-${enemy.atk}`, 'enemy-dmg'); }
                     }
                 });
                 enemy.lastAttackTime = now;
@@ -1132,10 +851,7 @@ function gameLoop() {
         for (let other of enemies) {
             if (other !== enemy && other.currentHp > 0) {
                 let dist = Math.abs(enemy.position - other.position);
-                if (dist < 2.5 && Math.abs(other.y - enemy.y) < 5) {
-                        let jitter = (Math.random() * 0.2) + 0.1;
-                        if (enemy.y <= other.y) dodgeY -= jitter; else dodgeY += jitter;
-                }
+                if (dist < 2.5 && Math.abs(other.y - enemy.y) < 5) { let jitter = (Math.random() * 0.2) + 0.1; if (enemy.y <= other.y) dodgeY -= jitter; else dodgeY += jitter; }
             }
         }
 
@@ -1149,17 +865,17 @@ function gameLoop() {
              }
         }
         
-        enemy.y += dodgeY * gameSpeed;
-        enemy.y = Math.max(10, Math.min(90, enemy.y));
-        enemy.position = Math.max(0, Math.min(100, enemy.position));
+        enemy.y += dodgeY * gameSpeed; enemy.y = Math.max(10, Math.min(90, enemy.y)); enemy.position = Math.max(0, Math.min(100, enemy.position));
 
         if (enemy.el) {
             enemy.el.style.left = `${enemy.position}%`; enemy.el.style.top = `${enemy.y}%`;
             enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
+            
+            // 🔥 修正轉向邏輯：使用 class 控制
             if (nearestHero && nearestHero.position > enemy.position) {
-                enemy.el.style.transform = 'translateY(-50%) scaleX(1)';
+                enemy.el.classList.remove('unit-flipped'); // 英雄在右邊，面向右
             } else {
-                enemy.el.style.transform = 'translateY(-50%) scaleX(-1)';
+                enemy.el.classList.add('unit-flipped'); // 英雄在左邊，面向左
             }
         }
     }
