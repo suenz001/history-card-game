@@ -272,13 +272,45 @@ export function openDetailModal(index) {
     renderDetailCard(); 
 }
 
+// js/inventory.js 中的 openEnemyDetailModal 函式
+
 export function openEnemyDetailModal(enemyCard) {
     isViewingEnemy = true;
-    currentDisplayList = [enemyCard];
+
+    // 🔥 1. 取得原始卡片設定 (為了拿到基礎攻擊力與血量)
+    const baseCard = cardDatabase.find(c => c.id == enemyCard.id);
+    
+    // 🔥 2. 合併資料並計算數值
+    let displayCard = { ...baseCard, ...enemyCard };
+
+    if (baseCard) {
+        const level = displayCard.level || 1;
+        const stars = displayCard.stars || 1;
+        
+        // 數值成長公式 (需與 main.js/calculateCardStats 保持一致)
+        const levelBonus = (level - 1) * 0.03;
+        const starBonus = (stars - 1) * 0.20;
+        
+        // 優先使用敵人資料上的 baseAtk，如果沒有則使用資料庫預設值
+        const baseAtk = displayCard.baseAtk || baseCard.atk;
+        const baseHp = displayCard.baseHp || baseCard.hp;
+
+        displayCard.atk = Math.floor(baseAtk * (1 + levelBonus) * (1 + starBonus));
+        displayCard.hp = Math.floor(baseHp * (1 + levelBonus) * (1 + starBonus));
+        
+        // 補上技能設定，確保顯示正確
+        displayCard.skillKey = baseCard.skillKey;
+        displayCard.skillParams = baseCard.skillParams;
+        displayCard.unitType = baseCard.unitType || 'INFANTRY'; // 確保兵種圖示正確
+    }
+
+    currentDisplayList = [displayCard];
     currentCardIndex = 0;
+    
     const detailModal = document.getElementById('detail-modal');
     detailModal.classList.remove('hidden'); 
     detailModal.style.zIndex = "99999"; 
+    
     renderDetailCard();
 }
 
