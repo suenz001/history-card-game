@@ -4,7 +4,7 @@ import { cardDatabase, DISMANTLE_VALUES } from './data.js';
 import { playSound } from './audio.js';
 import { getSkillDescription } from './skills.js';
 import { HERO_BIOS } from './bios.js';
-import { battleSlots, isBattleActive } from './battle.js'; // 用於判斷卡片是否在戰鬥/部署中
+import { battleSlots, isBattleActive } from './battle.js'; 
 
 // --- 內部狀態變數 ---
 let db = null;
@@ -12,16 +12,24 @@ let currentUser = null;
 let allUserCards = [];
 let currentDisplayList = [];
 let currentCardIndex = 0;
-let currentFilterType = 'ALL';
 let currentSortMethod = localStorage.getItem('userSortMethod') || 'time_desc';
+
+// 🔥 新增：複數篩選狀態 (使用 Set 來儲存多選)
+// 背包用的篩選
+let invRarityFilters = new Set(); // 存 'SSR', 'SR', 'R'
+let invTypeFilters = new Set();   // 存 'INFANTRY', 'CAVALRY', 'ARCHER'
+
+// 圖鑑用的篩選
+let galRarityFilters = new Set();
+let galTypeFilters = new Set();
 
 // 批量操作狀態
 let isBatchMode = false;
 let selectedBatchCards = new Set();
 
-// 外部回調 (用於通知 main.js 更新金幣/UI)
+// 外部回調
 let onCurrencyUpdate = null; 
-let onPvpSelectionDone = null; // PVP 選角完成後的回調
+let onPvpSelectionDone = null;
 
 // PVP 選擇模式狀態
 let pvpTargetInfo = { index: null, type: null };
@@ -37,7 +45,6 @@ export function initInventory(database, user, currencyCallback, pvpCallback) {
     onCurrencyUpdate = currencyCallback;
     onPvpSelectionDone = pvpCallback;
     
-    // 綁定 DOM 事件 (只綁定一次)
     bindInventoryEvents();
 }
 
@@ -54,6 +61,11 @@ export async function loadInventory(uid) {
     if(!uid) uid = currentUser?.uid;
     if(!uid) return;
 
+    // 重置篩選狀態 (預設顯示全部)
+    invRarityFilters.clear();
+    invTypeFilters.clear();
+    updateFilterButtonsUI('inventory');
+
     const container = document.getElementById('inventory-grid');
     if(container) container.innerHTML = "讀取中...";
 
@@ -64,14 +76,12 @@ export async function loadInventory(uid) {
         
         querySnapshot.forEach((docSnap) => { 
             let data = docSnap.data();
-            // 資料校正邏輯
             const baseCard = cardDatabase.find(c => c.id == data.id);
             if(baseCard) {
                  if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; }
                  if(data.attackType !== baseCard.attackType) data.attackType = baseCard.attackType;
                  if(data.title !== baseCard.title) data.title = baseCard.title;
                  if(data.name !== baseCard.name) data.name = baseCard.name;
-                 // 技能校正
                  const newSkillKey = baseCard.skillKey || null;
                  const newSkillParams = baseCard.skillParams || null;
                  if(data.skillKey !== newSkillKey) data.skillKey = newSkillKey; 
@@ -81,7 +91,7 @@ export async function loadInventory(uid) {
         });
         
         updateInventoryCounts();
-        filterInventory('ALL');
+        filterInventory(); // 執行篩選
     } catch (e) {
         console.error("Load Inventory Failed:", e);
         if(container) container.innerHTML = "<p>讀取失敗，請重新整理</p>";
@@ -97,7 +107,6 @@ export async function saveCardToCloud(card) {
         skillKey: card.skillKey || null, skillParams: card.skillParams || null,
         level: 1, stars: 1, obtainedAt: new Date(), owner: currentUser.uid, id: card.id 
     });
-    // 本地同步更新
     const newCard = { ...card, docId: docRef.id, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 1 };
     allUserCards.push(newCard);
     updateInventoryCounts();
@@ -114,7 +123,6 @@ export function renderCard(card, targetContainer) {
     const starString = '★'.repeat(stars); 
     const idString = String(card.id).padStart(3, '0');
     
-    // 圖示判斷
     const baseConfig = cardDatabase.find(c => c.id == card.id);
     const uType = baseConfig ? (baseConfig.unitType || 'INFANTRY') : 'INFANTRY';
     let typeIcon = '⚔️'; 
@@ -139,7 +147,6 @@ export function renderCard(card, targetContainer) {
         if (cardDiv.classList.contains('is-deployed')) return; 
         if (isBatchMode) { toggleBatchSelection(card, cardDiv); return; } 
         
-        // PVP / PVE 選擇模式
         if (pvpTargetInfo.index !== null && onPvpSelectionDone) {
             const success = onPvpSelectionDone(pvpTargetInfo.index, card, pvpTargetInfo.type);
             if(success) {
@@ -157,25 +164,79 @@ export function renderCard(card, targetContainer) {
     return cardDiv;
 }
 
-// --- 篩選與排序 ---
-export function filterInventory(filterType) {
-    currentFilterType = filterType; 
+// 🔥 新增：處理按鈕點擊邏輯 (通用)
+function handleFilterClick(mode, filterValue) {
+    const raritySet = mode === 'inventory' ? invRarityFilters : galRarityFilters;
+    const typeSet = mode === 'inventory' ? invTypeFilters : galTypeFilters;
+
+    if (filterValue === 'ALL') {
+        // 清空所有條件 = 全部顯示
+        raritySet.clear();
+        typeSet.clear();
+    } else {
+        // 判斷是 稀有度 還是 兵種
+        if (['SSR', 'SR', 'R'].includes(filterValue)) {
+            if (raritySet.has(filterValue)) raritySet.delete(filterValue);
+            else raritySet.add(filterValue);
+        } else {
+            // 兵種
+            if (typeSet.has(filterValue)) typeSet.delete(filterValue);
+            else typeSet.add(filterValue);
+        }
+    }
+
+    // 更新 UI 亮燈狀態
+    updateFilterButtonsUI(mode);
+
+    // 執行篩選
+    if (mode === 'inventory') filterInventory();
+    else filterGallery();
+}
+
+// 🔥 新增：更新按鈕 UI
+function updateFilterButtonsUI(mode) {
+    const raritySet = mode === 'inventory' ? invRarityFilters : galRarityFilters;
+    const typeSet = mode === 'inventory' ? invTypeFilters : galTypeFilters;
+    
+    // 決定使用哪個 class
+    const btnClass = mode === 'inventory' ? '.filter-btn' : '.gallery-filter-btn';
+    const buttons = document.querySelectorAll(btnClass);
+
+    const isAll = (raritySet.size === 0 && typeSet.size === 0);
+
+    buttons.forEach(btn => {
+        const val = btn.getAttribute('data-filter');
+        if (val === 'ALL') {
+            if (isAll) btn.classList.add('active'); else btn.classList.remove('active');
+        } else {
+            // 檢查該值是否在任一集合中
+            if (raritySet.has(val) || typeSet.has(val)) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        }
+    });
+}
+
+// 🔥 修改：背包篩選邏輯 (支援複選 + 混合)
+export function filterInventory(ignoreVal) {
     const container = document.getElementById('inventory-grid');
     if(!container) return; 
     container.innerHTML = "";
     
-    let filteredList = [];
-    if (filterType === 'ALL') {
-        filteredList = [...allUserCards];
-    } else if (['SSR', 'SR', 'R'].includes(filterType)) {
-        filteredList = allUserCards.filter(card => card.rarity === filterType);
-    } else {
-        filteredList = allUserCards.filter(card => {
-            const base = cardDatabase.find(db => db.id == card.id);
-            const uType = base ? (base.unitType || 'INFANTRY') : 'INFANTRY';
-            return uType === filterType;
-        });
-    }
+    // 邏輯：(稀有度集合為空 OR 命中) AND (兵種集合為空 OR 命中)
+    const filteredList = allUserCards.filter(card => {
+        // 1. 稀有度檢查
+        const passRarity = (invRarityFilters.size === 0) || invRarityFilters.has(card.rarity);
+        
+        // 2. 兵種檢查 (需查表)
+        const base = cardDatabase.find(db => db.id == card.id);
+        const uType = base ? (base.unitType || 'INFANTRY') : 'INFANTRY';
+        const passType = (invTypeFilters.size === 0) || invTypeFilters.has(uType);
+
+        return passRarity && passType;
+    });
 
     sortCards(filteredList, currentSortMethod);
     currentDisplayList = filteredList;
@@ -229,7 +290,6 @@ export function openDetailModal(index) {
     renderDetailCard(); 
 }
 
-// 支援外部直接開啟 (例如點擊 PVP 對手)
 export function openEnemyDetailModal(enemyCard) {
     isViewingEnemy = true;
     currentDisplayList = [enemyCard];
@@ -282,7 +342,6 @@ function renderDetailCard() {
 
     cardWrapper.addEventListener('click', () => { playSound('click'); cardWrapper.classList.toggle('is-flipped'); });
 
-    // 按鈕邏輯
     setupDetailButtons(card);
 }
 
@@ -301,7 +360,6 @@ function setupDetailButtons(card) {
     if(upgradeControls) upgradeControls.style.display = 'flex';
     if(dismantleBtn) dismantleBtn.style.display = 'block';
 
-    // 升級
     if (card.level >= 30) { 
         upgradeLevelBtn.innerHTML = "已達 MAX"; upgradeLevelBtn.classList.add('btn-disabled'); upgradeLevelBtn.onclick = null; 
     } else { 
@@ -311,7 +369,6 @@ function setupDetailButtons(card) {
         upgradeLevelBtn.onclick = () => upgradeCardLevel(cost); 
     }
     
-    // 升星
     if (card.stars >= 5) { 
         upgradeStarBtn.innerText = "已達 5★"; upgradeStarBtn.classList.add('btn-disabled'); upgradeStarBtn.onclick = null; 
     } else { 
@@ -322,14 +379,13 @@ function setupDetailButtons(card) {
     dismantleBtn.onclick = () => dismantleCurrentCard();
 }
 
-// --- 卡片操作 (升級/升星/分解) ---
 async function upgradeCardLevel(cost) {
     if(!onCurrencyUpdate) return;
-    const hasFunds = onCurrencyUpdate('check', cost); // 檢查錢夠不夠
+    const hasFunds = onCurrencyUpdate('check', cost); 
     if (!hasFunds) return alert("金幣不足！");
     
     const card = currentDisplayList[currentCardIndex];
-    onCurrencyUpdate('deduct', cost); // 扣錢
+    onCurrencyUpdate('deduct', cost); 
     playSound('coin'); 
     card.level++; 
     calculateCardStats(card); 
@@ -337,7 +393,7 @@ async function upgradeCardLevel(cost) {
     
     await updateDoc(doc(db, "inventory", card.docId), { level: card.level, atk: card.atk, hp: card.hp }); 
     renderDetailCard();
-    onCurrencyUpdate('refresh'); // 更新 UI
+    onCurrencyUpdate('refresh'); 
 }
 
 async function upgradeCardStar() {
@@ -347,7 +403,6 @@ async function upgradeCardStar() {
     if (!confirm(`確定要消耗一張【${duplicate.name}】來升星嗎？`)) return;
     
     await deleteDoc(doc(db, "inventory", duplicate.docId)); 
-    // 從陣列移除
     const idx = allUserCards.findIndex(c => c.docId === duplicate.docId);
     if(idx > -1) allUserCards.splice(idx, 1);
     
@@ -358,7 +413,7 @@ async function upgradeCardStar() {
     await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
     
     updateInventoryCounts();
-    filterInventory(currentFilterType);
+    filterInventory(); // 重新篩選
     renderDetailCard(); 
     alert(`升星成功！目前 ${card.stars} ★`);
 }
@@ -372,15 +427,14 @@ async function dismantleCurrentCard() {
         if (card.docId) await deleteDoc(doc(db, "inventory", card.docId)); 
         playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
         
-        onCurrencyUpdate('add', value); // 加錢
+        onCurrencyUpdate('add', value); 
         
-        // 移除本地資料
         const idx = allUserCards.findIndex(c => c.docId === card.docId);
         if(idx > -1) allUserCards.splice(idx, 1);
         
         updateInventoryCounts();
         document.getElementById('detail-modal').classList.add('hidden'); 
-        filterInventory(currentFilterType);
+        filterInventory(); // 重新篩選
         alert(`已分解！獲得 ${value} 金幣`); 
     } catch (e) { console.error("分解失敗", e); }
 }
@@ -415,7 +469,7 @@ function calculateBatchTotal() {
     }
 }
 
-// --- 自動升星 (核心邏輯) ---
+// --- 自動升星 ---
 export async function autoStarUp() {
     if (!currentUser) return alert("請先登入");
     if (isBatchMode) return alert("請先關閉批量分解模式");
@@ -498,9 +552,8 @@ export async function autoStarUp() {
         playSound('upgrade');
         allUserCards = newCardsState; 
         updateInventoryCounts();
-        filterInventory(currentFilterType);
+        filterInventory(); // 重新篩選
         
-        // 更新主介面戰力
         if(onCurrencyUpdate) onCurrencyUpdate('refresh');
         
         alert(`升星完成！\n共升級了 ${upgradedCount} 次\n消耗了 ${consumedCount} 張素材卡`);
@@ -515,22 +568,30 @@ export async function autoStarUp() {
 // --- 圖鑑系統 ---
 export function openGalleryModal() {
     isViewingGallery = true;
+    // 重置圖鑑篩選
+    galRarityFilters.clear();
+    galTypeFilters.clear();
+    updateFilterButtonsUI('gallery');
+
     document.getElementById('gallery-modal').classList.remove('hidden');
-    filterGallery('ALL'); 
+    filterGallery(); 
 }
 
-export function filterGallery(filterType) {
+// 🔥 修改：圖鑑篩選邏輯 (支援複選)
+export function filterGallery() {
     const container = document.getElementById('gallery-grid');
     if(!container) return;
     container.innerHTML = "";
 
     let fullList = [...cardDatabase].sort((a, b) => a.id - b.id);
     
-    // 篩選
-    if (filterType !== 'ALL') {
-        if (['SSR', 'SR', 'R'].includes(filterType)) fullList = fullList.filter(card => card.rarity === filterType);
-        else fullList = fullList.filter(card => (card.unitType || 'INFANTRY') === filterType);
-    }
+    // 篩選邏輯：(稀有度集合為空 OR 命中) AND (兵種集合為空 OR 命中)
+    fullList = fullList.filter(card => {
+        const passRarity = (galRarityFilters.size === 0) || galRarityFilters.has(card.rarity);
+        const uType = card.unitType || 'INFANTRY';
+        const passType = (galTypeFilters.size === 0) || galTypeFilters.has(uType);
+        return passRarity && passType;
+    });
 
     const ownedCardIds = new Set(allUserCards.map(c => c.id));
     let ownedCount = 0;
@@ -604,13 +665,12 @@ export function filterGallery(filterType) {
 
 // --- 事件綁定 ---
 function bindInventoryEvents() {
-    // 篩選按鈕
+    // 背包篩選按鈕
     document.querySelectorAll('.filter-btn').forEach(btn => { 
         btn.addEventListener('click', (e) => { 
             playSound('click'); 
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); 
-            e.target.classList.add('active'); 
-            filterInventory(e.target.getAttribute('data-filter')); 
+            const val = e.target.getAttribute('data-filter');
+            handleFilterClick('inventory', val);
         }); 
     });
     
@@ -618,9 +678,8 @@ function bindInventoryEvents() {
     document.querySelectorAll('.gallery-filter-btn').forEach(btn => { 
         btn.addEventListener('click', (e) => { 
             playSound('click'); 
-            document.querySelectorAll('.gallery-filter-btn').forEach(b => b.classList.remove('active')); 
-            e.target.classList.add('active'); 
-            filterGallery(e.target.getAttribute('data-filter')); 
+            const val = e.target.getAttribute('data-filter');
+            handleFilterClick('gallery', val);
         }); 
     });
 
@@ -658,7 +717,7 @@ function bindInventoryEvents() {
             btn.classList.remove('active'); btn.innerText = "🔧 批量分解"; bar.classList.add('hidden'); 
         }
         calculateBatchTotal();
-        filterInventory(currentFilterType);
+        filterInventory();
     });
     
     // 批量分解確認
@@ -695,7 +754,7 @@ function bindInventoryEvents() {
             toggleBtn.classList.remove('active'); toggleBtn.innerText = "🔧 批量分解"; bar.classList.add('hidden'); 
             
             updateInventoryCounts();
-            filterInventory(currentFilterType); 
+            filterInventory(); 
             
             alert(`批量分解成功！獲得 ${totalGold} 金幣`); 
         } catch (e) { 
