@@ -25,7 +25,7 @@ export const DIFFICULTY_SETTINGS = {
     }
 };
 
-// 🔥 新增：從 main.js 移過來的系統通知設定
+// 🔥 系統通知設定
 export const SYSTEM_NOTIFICATIONS = [
     { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 }, isSystem: true }
 ];
@@ -164,75 +164,259 @@ export const LEVEL_CONFIGS = {
 };
 
 export const cardDatabase = [
-    // SSR
-    { id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, title: "千古一帝", attackType: "melee", skillKey: "HEAL_AND_STRIKE", skillParams: { healRate: 0.40, dmgMult: 1.5 } },
-    { id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, title: "征服王", attackType: "melee", skillKey: "INVINCIBLE_STRIKE", skillParams: { duration: 3000, dmgMult: 1.5 } },
-    { id: 3, name: "拿破崙", rarity: "SSR", atk: 1550, hp: 2000, title: "戰爭之神", attackType: "ranged", skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.5 } },
-    { id: 13, name: "成吉思汗", rarity: "SSR", atk: 1700, hp: 1900, title: "草原霸主", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 5.0 } },
-    { id: 14, name: "凱撒大帝", rarity: "SSR", atk: 1500, hp: 2300, title: "羅馬獨裁者", attackType: "melee", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 3, dmgMult: 2.0 } },
-    { id: 15, name: "漢尼拔", rarity: "SSR", atk: 1580, hp: 2100, title: "戰略之父", attackType: "melee", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 20, buffRate: 1.10, dmgMult: 1.5 } },
-    { id: 16, name: "埃及豔后", rarity: "SSR", atk: 1400, hp: 1800, title: "尼羅河女王", attackType: "ranged", skillKey: "HEAL_ALLIES", skillParams: { range: 20, healRate: 0.20, dmgMult: 1.5 } },
-    { id: 17, name: "宮本武藏", rarity: "SSR", atk: 1800, hp: 1500, title: "二天一流", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.25, dmgMult: 2.0 } },
-    
-    // SR
-    { id: 7, name: "愛因斯坦", rarity: "SR", atk: 1300, hp: 1000, title: "物理之父", attackType: "ranged", skillKey: "AOE_CIRCLE", skillParams: { radius: 15, dmgMult: 1.8 } },
-    { id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, title: "第六天魔王", attackType: "ranged", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 2, dmgMult: 2.5 } },
-    { id: 5, name: "聖女貞德", rarity: "SR", atk: 900, hp: 1800, title: "奧爾良少女", attackType: "melee", skillKey: "HEAL_ALL_ALLIES", skillParams: { healRate: 0.20, dmgMult: 1.2 } },
-    { id: 4, name: "諸葛亮", rarity: "SR", atk: 1200, hp: 1400, title: "臥龍先生", attackType: "ranged", skillKey: "DEBUFF_GLOBAL_ATK", skillParams: { debuffRate: 0.8, dmgMult: 2.0 } },
-    { id: 23, name: "南丁格爾", rarity: "SR", atk: 500, hp: 2000, title: "提燈天使", attackType: "ranged", skillKey: "FULL_HEAL_LOWEST", skillParams: { dmgMult: 1.0 } },
-    { id: 19, name: "華盛頓", rarity: "SR", atk: 1000, hp: 1600, title: "開國元勛", attackType: "ranged", skillKey: "RESTORE_MANA_ALLIES", skillParams: { range: 20, manaAmount: 20, dmgMult: 1.2 } },
-    { id: 20, name: "薩拉丁", rarity: "SR", atk: 1150, hp: 1450, title: "沙漠之鷹", attackType: "melee", skillKey: "STRIKE_AND_RESTORE_MANA", skillParams: { manaRestore: 40, dmgMult: 2.0 } },
-    { id: 21, name: "林肯", rarity: "SR", atk: 1100, hp: 1200, title: "解放者", attackType: "ranged", skillKey: "HEAL_SELF_AND_ALLY", skillParams: { range: 15, healRate: 0.30, dmgMult: 2.0 } },
-    { id: 18, name: "關羽", rarity: "SR", atk: 1250, hp: 1500, title: "武聖", attackType: "melee", skillKey: "EXECUTE_LOW_HP", skillParams: { threshold: 0.20, dmgMult: 2.5 } },
-    { id: 22, name: "源義經", rarity: "SR", atk: 1280, hp: 1100, title: "牛若丸", attackType: "melee", skillKey: "STACKABLE_IMMUNITY", skillParams: { count: 2, dmgMult: 2.2 } },
+    // ================= SSR =================
+    { 
+        id: 1, name: "秦始皇", rarity: "SSR", atk: 1500, hp: 2500, 
+        unitType: "INFANTRY", // 步兵 (皇帝親衛)
+        title: "千古一帝", attackType: "melee", skillKey: "HEAL_AND_STRIKE", skillParams: { healRate: 0.40, dmgMult: 1.5 } 
+    },
+    { 
+        id: 2, name: "亞歷山大", rarity: "SSR", atk: 1600, hp: 2200, 
+        unitType: "CAVALRY", // 騎兵 (夥伴騎兵)
+        title: "征服王", attackType: "melee", skillKey: "INVINCIBLE_STRIKE", skillParams: { duration: 3000, dmgMult: 1.5 } 
+    },
+    { 
+        id: 3, name: "拿破崙", rarity: "SSR", atk: 1550, hp: 2000, 
+        unitType: "ARCHER", // 弓兵 (火砲戰術)
+        title: "戰爭之神", attackType: "ranged", skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.5 } 
+    },
+    { 
+        id: 13, name: "成吉思汗", rarity: "SSR", atk: 1700, hp: 1900, 
+        unitType: "CAVALRY", // 騎兵 (蒙古鐵騎)
+        title: "草原霸主", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 5.0 } 
+    },
+    { 
+        id: 14, name: "凱撒大帝", rarity: "SSR", atk: 1500, hp: 2300, 
+        unitType: "INFANTRY", // 步兵 (羅馬軍團)
+        title: "羅馬獨裁者", attackType: "melee", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 3, dmgMult: 2.0 } 
+    },
+    { 
+        id: 15, name: "漢尼拔", rarity: "SSR", atk: 1580, hp: 2100, 
+        unitType: "CAVALRY", // 騎兵 (戰象部隊)
+        title: "戰略之父", attackType: "melee", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 20, buffRate: 1.10, dmgMult: 1.5 } 
+    },
+    { 
+        id: 16, name: "埃及豔后", rarity: "SSR", atk: 1400, hp: 1800, 
+        unitType: "ARCHER", // 弓兵 (法術/權謀)
+        title: "尼羅河女王", attackType: "ranged", skillKey: "HEAL_ALLIES", skillParams: { range: 20, healRate: 0.20, dmgMult: 1.5 } 
+    },
+    { 
+        id: 17, name: "宮本武藏", rarity: "SSR", atk: 1800, hp: 1500, 
+        unitType: "INFANTRY", // 步兵 (劍聖)
+        title: "二天一流", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.25, dmgMult: 2.0 } 
+    },
+    { 
+        id: 31, name: "亞瑟王", rarity: "SSR", atk: 1650, hp: 2400, 
+        unitType: "INFANTRY", // 步兵 (聖劍騎士)
+        title: "永恆之王", attackType: "melee", skillKey: "STACKABLE_IMMUNITY", skillParams: { count: 3, dmgMult: 2.0 } 
+    },
+    { 
+        id: 32, name: "呂布", rarity: "SSR", atk: 1900, hp: 1800, 
+        unitType: "CAVALRY", // 騎兵 (赤兔馬)
+        title: "飛將", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.30, dmgMult: 2.5 } 
+    },
+    { 
+        id: 33, name: "諾貝爾", rarity: "SSR", atk: 1800, hp: 1900, 
+        unitType: "ARCHER", // 弓兵 (炸藥)
+        title: "炸藥之父", attackType: "ranged", skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.7 } 
+    },
+    { 
+        id: 34, name: "武則天", rarity: "SSR", atk: 1450, hp: 2200, 
+        unitType: "ARCHER", // 弓兵 (帝王威壓/法術)
+        title: "一代女皇", attackType: "ranged", skillKey: "DEBUFF_GLOBAL_ATK", skillParams: { debuffRate: 0.7, dmgMult: 1.8 } 
+    },
+    { 
+        id: 35, name: "斯巴達克斯", rarity: "SSR", atk: 1750, hp: 1900, 
+        unitType: "INFANTRY", // 步兵 (角鬥士)
+        title: "傳奇角鬥士", attackType: "melee", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 4, dmgMult: 2.0 } 
+    },
 
-    // R
-    { id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, title: "三百壯士", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, title: "龜甲陣列", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, title: "武士道", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 11, name: "維京海盜", rarity: "R", atk: 550, hp: 700, title: "狂戰士", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 12, name: "條頓騎士", rarity: "R", atk: 450, hp: 850, title: "鐵十字", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 24, name: "英國長弓兵", rarity: "R", atk: 600, hp: 300, title: "遠程打擊", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 25, name: "蒙古騎兵", rarity: "R", atk: 550, hp: 500, title: "騎射手", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 26, name: "忍者", rarity: "R", atk: 650, hp: 300, title: "影之軍團", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 27, name: "十字軍", rarity: "R", atk: 400, hp: 800, title: "聖殿騎士", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 28, name: "祖魯戰士", rarity: "R", atk: 500, hp: 600, title: "長矛兵", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, title: "熱兵器", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
+    // ================= SR =================
+    { 
+        id: 7, name: "愛因斯坦", rarity: "SR", atk: 1300, hp: 1000, 
+        unitType: "ARCHER", // 弓兵 (科學光束)
+        title: "物理之父", attackType: "ranged", skillKey: "AOE_CIRCLE", skillParams: { radius: 15, dmgMult: 1.8 } 
+    },
+    { 
+        id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, 
+        unitType: "ARCHER", // 弓兵 (火繩槍隊)
+        title: "第六天魔王", attackType: "ranged", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 2, dmgMult: 2.5 } 
+    },
+    { 
+        id: 5, name: "聖女貞德", rarity: "SR", atk: 900, hp: 1800, 
+        unitType: "INFANTRY", // 步兵 (掌旗官/輔助)
+        title: "奧爾良少女", attackType: "melee", skillKey: "HEAL_ALL_ALLIES", skillParams: { healRate: 0.20, dmgMult: 1.2 } 
+    },
+    { 
+        id: 4, name: "諸葛亮", rarity: "SR", atk: 1200, hp: 1400, 
+        unitType: "ARCHER", // 弓兵 (軍師/法術)
+        title: "臥龍先生", attackType: "ranged", skillKey: "DEBUFF_GLOBAL_ATK", skillParams: { debuffRate: 0.8, dmgMult: 2.0 } 
+    },
+    { 
+        id: 23, name: "南丁格爾", rarity: "SR", atk: 500, hp: 2000, 
+        unitType: "ARCHER", // 弓兵 (後排治療)
+        title: "提燈天使", attackType: "ranged", skillKey: "FULL_HEAL_LOWEST", skillParams: { dmgMult: 1.0 } 
+    },
+    { 
+        id: 19, name: "華盛頓", rarity: "SR", atk: 1000, hp: 1600, 
+        unitType: "ARCHER", // 弓兵 (滑膛槍)
+        title: "開國元勛", attackType: "ranged", skillKey: "RESTORE_MANA_ALLIES", skillParams: { range: 20, manaAmount: 20, dmgMult: 1.2 } 
+    },
+    { 
+        id: 20, name: "薩拉丁", rarity: "SR", atk: 1150, hp: 1450, 
+        unitType: "CAVALRY", // 騎兵 (阿尤布重騎兵)
+        title: "沙漠之鷹", attackType: "melee", skillKey: "STRIKE_AND_RESTORE_MANA", skillParams: { manaRestore: 40, dmgMult: 2.0 } 
+    },
+    { 
+        id: 21, name: "林肯", rarity: "SR", atk: 1100, hp: 1200, 
+        unitType: "ARCHER", // 弓兵 (演說/輔助)
+        title: "解放者", attackType: "ranged", skillKey: "HEAL_SELF_AND_ALLY", skillParams: { range: 15, healRate: 0.30, dmgMult: 2.0 } 
+    },
+    { 
+        id: 18, name: "關羽", rarity: "SR", atk: 1250, hp: 1500, 
+        unitType: "CAVALRY", // 騎兵 (赤兔馬)
+        title: "武聖", attackType: "melee", skillKey: "EXECUTE_LOW_HP", skillParams: { threshold: 0.20, dmgMult: 2.5 } 
+    },
+    { 
+        id: 22, name: "源義經", rarity: "SR", atk: 1280, hp: 1100, 
+        unitType: "CAVALRY", // 騎兵 (鵯越奇襲)
+        title: "牛若丸", attackType: "melee", skillKey: "STACKABLE_IMMUNITY", skillParams: { count: 2, dmgMult: 2.2 } 
+    },
+    { 
+        id: 36, name: "孫武", rarity: "SR", atk: 1100, hp: 1300, 
+        unitType: "ARCHER", // 弓兵 (兵法家/指揮)
+        title: "兵聖", attackType: "ranged", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 25, buffRate: 1.15, dmgMult: 1.2 } 
+    },
+    { 
+        id: 37, name: "特斯拉", rarity: "SR", atk: 1350, hp: 1100, 
+        unitType: "ARCHER", // 弓兵 (閃電塔)
+        title: "交流電之父", attackType: "ranged", skillKey: "AOE_CIRCLE", skillParams: { radius: 18, dmgMult: 1.9 } 
+    },
+    { 
+        id: 38, name: "岳飛", rarity: "SR", atk: 1250, hp: 1400, 
+        unitType: "INFANTRY", // 步兵 (岳家軍長槍)
+        title: "精忠報國", attackType: "melee", skillKey: "EXECUTE_LOW_HP", skillParams: { threshold: 0.25, dmgMult: 2.0 } 
+    },
+    { 
+        id: 39, name: "達文西", rarity: "SR", atk: 1200, hp: 1500, 
+        unitType: "ARCHER", // 弓兵 (戰爭機器)
+        title: "文藝復興", attackType: "ranged", skillKey: "AOE_CIRCLE", skillParams: { radius: 20, dmgMult: 1.8 } 
+    },
+    { 
+        id: 40, name: "伊莉莎白一世", rarity: "SR", atk: 1000, hp: 1500, 
+        unitType: "ARCHER", // 弓兵 (無敵艦隊指揮)
+        title: "童貞女王", attackType: "ranged", skillKey: "RESTORE_MANA_ALLIES", skillParams: { range: 20, manaAmount: 25, dmgMult: 1.2 } 
+    },
 
-
-// 請將以下內容複製並貼上到 data.js 的 cardDatabase 陣列中 (接在最後一張卡片後面)
-
-    // ================= SSR (新皇者與戰神) =================
-    { id: 31, name: "亞瑟王", rarity: "SSR", atk: 1650, hp: 2400, title: "永恆之王", attackType: "melee", skillKey: "STACKABLE_IMMUNITY", skillParams: { count: 3, dmgMult: 2.0 } }, // 湖中劍鞘提供高防禦
-    { id: 32, name: "呂布", rarity: "SSR", atk: 1900, hp: 1800, title: "飛將", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.30, dmgMult: 2.5 } }, // 極致的個人武力
-    { id: 33, name: "諾貝爾", rarity: "SSR", atk: 1800, hp: 1900, title: "炸藥之父", attackType: "ranged", skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.7 } }, // 諾貝爾發明的炸藥轟炸全場 (倍率微調至0.7以符合SSR強度)
-    { id: 34, name: "武則天", rarity: "SSR", atk: 1450, hp: 2200, title: "一代女皇", attackType: "ranged", skillKey: "DEBUFF_GLOBAL_ATK", skillParams: { debuffRate: 0.7, dmgMult: 1.8 } }, // 威懾全場
-    { id: 35, name: "斯巴達克斯", rarity: "SSR", atk: 1750, hp: 1900, title: "傳奇角鬥士", attackType: "melee", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 4, dmgMult: 2.0 } }, // 替換阿提拉，揮舞雙刀同時攻擊4個敵人
-
-    // ================= SR (名將與奇才) =================
-    { id: 36, name: "孫武", rarity: "SR", atk: 1100, hp: 1300, title: "兵聖", attackType: "ranged", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 25, buffRate: 1.15, dmgMult: 1.2 } }, // 兵法加成
-    { id: 37, name: "特斯拉", rarity: "SR", atk: 1350, hp: 1100, title: "交流電之父", attackType: "ranged", skillKey: "AOE_CIRCLE", skillParams: { radius: 18, dmgMult: 1.9 } }, // 電氣範圍攻擊
-    { id: 38, name: "岳飛", rarity: "SR", atk: 1250, hp: 1400, title: "精忠報國", attackType: "melee", skillKey: "EXECUTE_LOW_HP", skillParams: { threshold: 0.25, dmgMult: 2.0 } }, // 處決殘血敵人
-    { id: 39, name: "達文西", rarity: "SR", atk: 1200, hp: 1500, title: "文藝復興", attackType: "ranged", skillKey: "AOE_CIRCLE", skillParams: { radius: 20, dmgMult: 1.8 } }, // 替換李舜臣，改用範圍攻擊(丟出发明物)
-    { id: 40, name: "伊莉莎白一世", rarity: "SR", atk: 1000, hp: 1500, title: "童貞女王", attackType: "ranged", skillKey: "RESTORE_MANA_ALLIES", skillParams: { range: 20, manaAmount: 25, dmgMult: 1.2 } }, // 回氣輔助
-
-    // ================= R (歷史著名兵種) - 統一使用 HEAVY_STRIKE =================
-    // 騎兵類 (高攻、血量中等)
-    { id: 41, name: "翼騎兵", rarity: "R", atk: 600, hp: 550, title: "波蘭之翼", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 42, name: "馬穆魯克", rarity: "R", atk: 580, hp: 600, title: "奴隸騎兵", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    
-    // 步兵/衛隊類 (血量較高、攻擊中等)
-    { id: 43, name: "土耳其禁衛軍", rarity: "R", atk: 480, hp: 850, title: "蘇丹親兵", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 44, name: "瑞士衛隊", rarity: "R", atk: 450, hp: 900, title: "忠誠護衛", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 45, name: "波斯長生軍", rarity: "R", atk: 420, hp: 950, title: "不死軍團", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 46, name: "西班牙征服者", rarity: "R", atk: 550, hp: 700, title: "遠征軍", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 47, name: "亞馬遜戰士", rarity: "R", atk: 620, hp: 450, title: "叢林女傑", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-
-    // 遠程/特殊兵種 (血量低、攻擊高或距離遠)
-    { id: 48, name: "諸葛連弩兵", rarity: "R", atk: 500, hp: 350, title: "蜀漢精銳", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
-    { id: 49, name: "神機營", rarity: "R", atk: 650, hp: 250, title: "大明火器", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } }, // 火槍兵的前身
-    { id: 50, name: "大和弓箭手", rarity: "R", atk: 520, hp: 300, title: "長弓部隊", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } }
-
-
+    // ================= R =================
+    { 
+        id: 8, name: "斯巴達", rarity: "R", atk: 400, hp: 800, 
+        unitType: "INFANTRY", // 步兵 (重裝步兵)
+        title: "三百壯士", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 9, name: "羅馬軍團", rarity: "R", atk: 350, hp: 900, 
+        unitType: "INFANTRY", // 步兵 (龜甲陣)
+        title: "龜甲陣列", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 10, name: "日本武士", rarity: "R", atk: 500, hp: 600, 
+        unitType: "INFANTRY", // 步兵 (太刀)
+        title: "武士道", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 11, name: "維京海盜", rarity: "R", atk: 550, hp: 700, 
+        unitType: "INFANTRY", // 步兵 (戰斧)
+        title: "狂戰士", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 12, name: "條頓騎士", rarity: "R", atk: 450, hp: 850, 
+        unitType: "CAVALRY", // 騎兵 (重裝騎士)
+        title: "鐵十字", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 24, name: "英國長弓兵", rarity: "R", atk: 600, hp: 300, 
+        unitType: "ARCHER", // 弓兵
+        title: "遠程打擊", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 25, name: "蒙古騎兵", rarity: "R", atk: 550, hp: 500, 
+        unitType: "CAVALRY", // 騎兵 (騎射)
+        title: "騎射手", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 26, name: "忍者", rarity: "R", atk: 650, hp: 300, 
+        unitType: "ARCHER", // 弓兵 (暗器/手裡劍)
+        title: "影之軍團", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 27, name: "十字軍", rarity: "R", atk: 400, hp: 800, 
+        unitType: "INFANTRY", // 步兵 (聖殿步兵)
+        title: "聖殿騎士", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 28, name: "祖魯戰士", rarity: "R", atk: 500, hp: 600, 
+        unitType: "INFANTRY", // 步兵 (長矛)
+        title: "長矛兵", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, 
+        unitType: "ARCHER", // 弓兵 (火槍)
+        title: "熱兵器", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, 
+        unitType: "CAVALRY", // 騎兵 (戰車)
+        title: "沙漠疾風", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 41, name: "翼騎兵", rarity: "R", atk: 600, hp: 550, 
+        unitType: "CAVALRY", // 騎兵 (衝鋒)
+        title: "波蘭之翼", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 42, name: "馬穆魯克", rarity: "R", atk: 580, hp: 600, 
+        unitType: "CAVALRY", // 騎兵
+        title: "奴隸騎兵", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 43, name: "土耳其禁衛軍", rarity: "R", atk: 480, hp: 850, 
+        unitType: "INFANTRY", // 步兵 (親衛隊)
+        title: "蘇丹親兵", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 44, name: "瑞士衛隊", rarity: "R", atk: 450, hp: 900, 
+        unitType: "INFANTRY", // 步兵 (長戟)
+        title: "忠誠護衛", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 45, name: "波斯長生軍", rarity: "R", atk: 420, hp: 950, 
+        unitType: "INFANTRY", // 步兵
+        title: "不死軍團", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 46, name: "西班牙征服者", rarity: "R", atk: 550, hp: 700, 
+        unitType: "INFANTRY", // 步兵 (劍/盾)
+        title: "遠征軍", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 47, name: "亞馬遜戰士", rarity: "R", atk: 620, hp: 450, 
+        unitType: "INFANTRY", // 步兵 (女戰士)
+        title: "叢林女傑", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 48, name: "諸葛連弩兵", rarity: "R", atk: 500, hp: 350, 
+        unitType: "ARCHER", // 弓兵
+        title: "蜀漢精銳", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 49, name: "神機營", rarity: "R", atk: 650, hp: 250, 
+        unitType: "ARCHER", // 弓兵 (火器)
+        title: "大明火器", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    },
+    { 
+        id: 50, name: "大和弓箭手", rarity: "R", atk: 520, hp: 300, 
+        unitType: "ARCHER", // 弓兵
+        title: "長弓部隊", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
+    }
 ];

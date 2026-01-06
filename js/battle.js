@@ -790,6 +790,33 @@ function updateBattleUI() {
 function dealDamage(source, target, multiplier) {
     if (!target.el || target.currentHp <= 0) return;
 
+    // 🔥 --- [新增] 兵種相剋邏輯開始 --- 🔥
+    // 1. 從資料庫取得雙方原始設定 (確保能讀到 unitType)
+    const sourceConfig = cardDatabase.find(c => c.id == source.id);
+    const targetConfig = cardDatabase.find(c => c.id == target.id);
+    
+    // 2. 取得兵種 (若沒設定則預設為步兵 INFANTRY，避免報錯)
+    const sType = sourceConfig ? (sourceConfig.unitType || 'INFANTRY') : 'INFANTRY';
+    const tType = targetConfig ? (targetConfig.unitType || 'INFANTRY') : 'INFANTRY';
+
+    // 3. 計算相剋加成 (這裡設定為 1.5 倍，你可以自行調整)
+    const COUNTER_BONUS = 1.5; 
+
+    // 步兵 > 騎兵
+    if (sType === 'INFANTRY' && tType === 'CAVALRY') {
+        multiplier *= COUNTER_BONUS;
+        // (可選) 顯示特效：showDamageText(target.position, target.y, "剋制!", "critical-text");
+    } 
+    // 騎兵 > 弓兵
+    else if (sType === 'CAVALRY' && tType === 'ARCHER') {
+        multiplier *= COUNTER_BONUS;
+    } 
+    // 弓兵 > 步兵
+    else if (sType === 'ARCHER' && tType === 'INFANTRY') {
+        multiplier *= COUNTER_BONUS;
+    }
+    // 🔥 --- [新增] 兵種相剋邏輯結束 --- 🔥
+
     if (isPvpMode) multiplier *= 0.25;
 
     const dmg = Math.floor(source.atk * multiplier);
