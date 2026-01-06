@@ -628,14 +628,51 @@ function fireBossSkill(boss) {
     }, 600); 
 }
 
+// js/battle.js - 替換原本的 updateBattleUI 函式
+
 function updateBattleUI() {
     try {
-        const goldEl = document.getElementById('battle-gold'); if(goldEl) goldEl.innerText = battleGold; 
-        const goldContainer = document.getElementById('battle-gold-container'); if (goldContainer) goldContainer.style.display = isPvpMode ? 'none' : 'inline';
-        const waveContainer = document.getElementById('wave-display-container'); if (waveContainer) waveContainer.style.display = isPvpMode ? 'none' : 'inline';
-        if (!isPvpMode) { const waveEl = document.getElementById('wave-count'); if(waveEl) waveEl.innerText = battleState.wave; }
-        const countEl = document.getElementById('hero-count-display'); if(countEl) countEl.innerText = heroEntities.length;
-    } catch(e) { console.warn("UI Update Warning:", e); }
+        // 1. 更新金幣
+        const goldEl = document.getElementById('battle-gold');
+        if(goldEl) goldEl.innerText = battleGold; 
+        
+        // 2. 控制金幣與波次顯示 (PVP 模式隱藏)
+        const goldContainer = document.getElementById('battle-gold-container');
+        if (goldContainer) {
+            goldContainer.style.display = isPvpMode ? 'none' : 'inline';
+        }
+
+        const waveContainer = document.getElementById('wave-display-container');
+        if (waveContainer) {
+            waveContainer.style.display = isPvpMode ? 'none' : 'inline';
+        }
+
+        // 3. 更新波次
+        if (!isPvpMode) {
+            const waveEl = document.getElementById('wave-count');
+            if(waveEl) waveEl.innerText = battleState.wave;
+        }
+        
+        // 4. 更新存活英雄數
+        const countEl = document.getElementById('hero-count-display');
+        if(countEl) countEl.innerText = heroEntities.length;
+
+        // 🔥 5. 新增：計算並顯示目前戰力 (攻擊力 + 當前血量)
+        const powerEl = document.getElementById('current-battle-power');
+        if (powerEl) {
+            let currentTotalPower = 0;
+            heroEntities.forEach(hero => {
+                // 戰力 = 攻擊力 + 當前血量 (這樣受傷或死掉戰力會下降)
+                if (hero.currentHp > 0) {
+                    currentTotalPower += (hero.atk + hero.currentHp);
+                }
+            });
+            powerEl.innerText = Math.floor(currentTotalPower);
+        }
+        
+    } catch(e) {
+        console.warn("UI Update Warning:", e); 
+    }
 }
 
 function dealDamage(source, target, multiplier) {
