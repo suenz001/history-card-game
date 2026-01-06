@@ -1022,7 +1022,15 @@ function renderDetailCard() {
     const stars = card.stars || 1;
     const starString = '★'.repeat(stars);
     const idString = String(card.id).padStart(3, '0');
-    const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
+    
+    // 🔥 --- [修改] 圖示判斷邏輯 --- 🔥
+    const baseConfig = cardDatabase.find(c => c.id == card.id);
+    const uType = baseConfig ? (baseConfig.unitType || 'INFANTRY') : 'INFANTRY';
+    
+    let typeIcon = '⚔️';
+    if (uType === 'CAVALRY') typeIcon = '🐴';
+    else if (uType === 'ARCHER') typeIcon = '🏹';
+    // 🔥 --- [修改] 結束 --- 🔥
     
     const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
     const bioData = HERO_BIOS[card.id]; 
@@ -1223,7 +1231,15 @@ function drawSRorAbove() { const rand = Math.random(); let rarity = rand < 0.17 
 function renderCard(card, targetContainer) {
     const cardDiv = document.createElement('div'); const charPath = `assets/cards/${card.id}.webp`; const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; const level = card.level || 1; const stars = card.stars || 1; const starString = '★'.repeat(stars); const idString = String(card.id).padStart(3, '0');
     
-    const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
+    // 🔥 --- [修改] 圖示判斷邏輯開始 --- 🔥
+    // 從 cardDatabase 取得原始設定 (確保讀得到 unitType)
+    const baseConfig = cardDatabase.find(c => c.id == card.id);
+    const uType = baseConfig ? (baseConfig.unitType || 'INFANTRY') : 'INFANTRY';
+    
+    let typeIcon = '⚔️'; // 預設步兵
+    if (uType === 'CAVALRY') typeIcon = '🐴';      // 騎兵 -> 馬頭
+    else if (uType === 'ARCHER') typeIcon = '🏹'; // 弓兵 -> 弓
+    // 🔥 --- [修改] 圖示判斷邏輯結束 --- 🔥
 
     cardDiv.className = `card ${card.rarity}`; 
     
@@ -1237,6 +1253,7 @@ function renderCard(card, targetContainer) {
     
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     
+    // 注意：下方的 HTML 字串中，將 typeIcon 變數放入 span
     cardDiv.innerHTML = `<div class="card-id-badge">#${idString}</div><div class="card-rarity-badge ${card.rarity}">${card.rarity}</div><img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><div class="card-info-overlay"><div class="card-title">${card.title || ""}</div><div class="card-name">${card.name}</div><div class="card-level-star">Lv.${level} <span style="color:#f1c40f">${starString}</span></div><div class="card-stats"><span class="type-icon">${typeIcon}</span> 👊${card.atk} ❤️${card.hp}</div></div><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
     
     cardDiv.addEventListener('click', () => { 

@@ -1500,3 +1500,11 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .notification-badge.hidden {
     display: none;
 }
+
+/* style.css 最下方新增 */
+
+/* 騎兵專屬：綠色底色 */
+.hero-type-badge.cavalry {
+    background-color: #27ae60; /* 翡翠綠 */
+    box-shadow: 0 0 5px #2ecc71;
+}
