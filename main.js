@@ -495,6 +495,13 @@ if(document.getElementById('toggle-sidebar-btn')) {
     });
 }
 
+if(document.getElementById('sort-select')) document.getElementById('sort-select').addEventListener('change', (e) => { 
+    playSound('click'); 
+    localStorage.setItem('userSortMethod', e.target.value); 
+    // inventory.js 會讀取 localStorage，這裡觸發重繪即可
+    Inventory.filterInventory(document.querySelector('.filter-btn.active')?.dataset?.filter || 'ALL');
+});
+
 function playGachaAnimation(highestRarity) {
     return new Promise((resolve) => {
         const overlay = document.getElementById('gacha-overlay'); const circle = document.getElementById('summon-circle'); const text = document.getElementById('summon-text'); const burst = document.getElementById('summon-burst');
@@ -542,11 +549,14 @@ if(document.getElementById('draw-10-btn')) document.getElementById('draw-10-btn'
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
 });
 
-// 🔥 更新背包按鈕事件
+// 🔥 更新背包按鈕事件 (加入自動解除全軍)
 if(document.getElementById('inventory-btn')) document.getElementById('inventory-btn').addEventListener('click', () => { 
     playSound('inventory'); 
     if(!currentUser) return alert("請先登入"); 
     
+    // 🔥 自動解除全軍 (確保不會有灰卡)
+    clearDeployment();
+
     // 清除部署選擇狀態
     Inventory.setPvpSelectionMode(null, null);
 
