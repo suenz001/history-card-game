@@ -14,7 +14,7 @@ let currentDisplayList = [];
 let currentCardIndex = 0;
 let currentSortMethod = localStorage.getItem('userSortMethod') || 'time_desc';
 
-// 🔥 複數篩選狀態 (使用 Set 儲存多選)
+// 🔥 複數篩選狀態
 let invRarityFilters = new Set(); 
 let invTypeFilters = new Set();   
 
@@ -48,6 +48,11 @@ export function getAllCards() {
 
 export function setPvpSelectionMode(index, type) {
     pvpTargetInfo = { index, type };
+}
+
+// 🔥 新增：讓外部強制刷新背包畫面 (用於解除全軍時)
+export function refreshInventory() {
+    filterInventory();
 }
 
 // --- 資料讀取 ---
@@ -102,7 +107,6 @@ export async function saveCardToCloud(card) {
         skillKey: card.skillKey || null, skillParams: card.skillParams || null,
         level: 1, stars: 1, obtainedAt: new Date(), owner: currentUser.uid, id: card.id 
     });
-    // 儲存後立即轉為本地物件 (注意：obtainedAt 是 JS Date)
     const newCard = { ...card, docId: docRef.id, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 1, obtainedAt: new Date() };
     allUserCards.push(newCard);
     updateInventoryCounts();
@@ -127,11 +131,13 @@ export function renderCard(card, targetContainer) {
 
     cardDiv.className = `card ${card.rarity}`; 
     
-    // 判斷是否部署中
+    // 判斷是否部署中 (僅用於視覺變灰)
     const isPvpSelection = pvpTargetInfo && pvpTargetInfo.index !== null;
+    let isDeployed = false;
     if (!isPvpSelection) {
         if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { 
             cardDiv.classList.add('is-deployed'); 
+            isDeployed = true;
         }
     }
     
@@ -144,13 +150,15 @@ export function renderCard(card, targetContainer) {
         
         // 1. 批量模式：禁止操作已部署卡片
         if (isBatchMode) { 
-            if (cardDiv.classList.contains('is-deployed')) return alert("正在出戰中的英雄無法分解！");
+            if (isDeployed) return alert("正在出戰中的英雄無法分解！");
             toggleBatchSelection(card, cardDiv); 
             return; 
         } 
         
-        // 2. PVP/PVE 選擇模式
+        // 2. PVP/PVE 選擇模式 (例如點擊空位後選人)
         if (pvpTargetInfo.index !== null && onPvpSelectionDone) {
+            // 注意：這裡是「選人上陣」，所以如果已經部署，通常還是允許點擊 (視同切換/無效，由外部邏輯決定)
+            // 為了避免混淆，這裡不阻擋，交給 callback 處理
             const success = onPvpSelectionDone(pvpTargetInfo.index, card, pvpTargetInfo.type);
             if(success) {
                 pvpTargetInfo = { index: null, type: null };
@@ -159,7 +167,7 @@ export function renderCard(card, targetContainer) {
             return;
         }
 
-        // 3. 一般詳情
+        // 3. 一般詳情查看 (🔥 關鍵修正：就算已部署，只要不是上面兩種模式，就打開詳情)
         let index = currentDisplayList.indexOf(card); 
         if (index === -1) { currentDisplayList = [card]; index = 0; } 
         openDetailModal(index); 
@@ -168,7 +176,7 @@ export function renderCard(card, targetContainer) {
     return cardDiv;
 }
 
-// 🔥 處理按鈕點擊邏輯 (複選核心)
+// 處理按鈕點擊邏輯 (複選核心)
 function handleFilterClick(mode, filterValue) {
     const raritySet = mode === 'inventory' ? invRarityFilters : galRarityFilters;
     const typeSet = mode === 'inventory' ? invTypeFilters : galTypeFilters;
@@ -192,7 +200,6 @@ function handleFilterClick(mode, filterValue) {
     else filterGallery();
 }
 
-// 🔥 更新按鈕 UI (亮燈狀態)
 function updateFilterButtonsUI(mode) {
     const raritySet = mode === 'inventory' ? invRarityFilters : galRarityFilters;
     const typeSet = mode === 'inventory' ? invTypeFilters : galTypeFilters;
@@ -216,7 +223,7 @@ function updateFilterButtonsUI(mode) {
     });
 }
 
-// 🔥 背包篩選邏輯 (支援複選 + 混合 + 排序)
+// 背包篩選邏輯 (支援複選 + 混合 + 排序)
 export function filterInventory(ignoreVal) {
     const container = document.getElementById('inventory-grid');
     if(!container) return; 
@@ -243,7 +250,7 @@ export function filterInventory(ignoreVal) {
     currentDisplayList.forEach((card) => { renderCard(card, container); });
 }
 
-// 🔥 時間戳記轉換 Helper (解決 Firebase Timestamp 與 JS Date 混用問題)
+// 時間戳記轉換 Helper
 function getTime(dateObj) {
     if (!dateObj) return 0;
     if (dateObj.seconds) return dateObj.seconds * 1000; // Firebase Timestamp
@@ -293,17 +300,16 @@ export function openDetailModal(index) {
     renderDetailCard(); 
 }
 
-// 支援外部直接開啟 (例如點擊 PVP 對手)
 export function openEnemyDetailModal(enemyCard) {
     isViewingEnemy = true;
 
-    // 重新計算數值，避免顯示 undefined
     const baseCard = cardDatabase.find(c => c.id == enemyCard.id);
     let displayCard = { ...baseCard, ...enemyCard };
 
     if (baseCard) {
         const level = displayCard.level || 1;
         const stars = displayCard.stars || 1;
+        
         const levelBonus = (level - 1) * 0.03;
         const starBonus = (stars - 1) * 0.20;
         
@@ -604,7 +610,6 @@ export function openGalleryModal() {
     filterGallery(); 
 }
 
-// 🔥 圖鑑篩選邏輯 (支援複選)
 export function filterGallery() {
     const container = document.getElementById('gallery-grid');
     if(!container) return;
@@ -710,7 +715,7 @@ function bindInventoryEvents() {
         }); 
     });
 
-    // 🔥 排序下拉選單監聽
+    // 排序下拉選單監聽
     const sortSelect = document.getElementById('sort-select');
     if (sortSelect) {
         // 初始化時設定選單值
@@ -720,7 +725,6 @@ function bindInventoryEvents() {
             playSound('click');
             currentSortMethod = e.target.value;
             localStorage.setItem('userSortMethod', currentSortMethod);
-            // 重新執行篩選 (因為 filterInventory 內部會呼叫 sortCards)
             filterInventory();
         });
     }
