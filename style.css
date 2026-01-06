@@ -1451,3 +1451,44 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.1); opacity: 1; }
     100% { transform: translate(-50%, -50%) rotate(720deg) scale(1.5); opacity: 0; }
 }
+
+/* style.css 新增 */
+
+/* 🔒 鎖定的關卡按鈕 */
+.level-btn.locked {
+    opacity: 0.5;
+    filter: grayscale(1);
+    pointer-events: none; /* 禁止點擊 */
+    cursor: not-allowed;
+    position: relative;
+    border-color: #555;
+}
+
+/* 鎖頭圖示 (覆蓋在鎖定的關卡上) */
+.level-btn.locked::after {
+    content: "🔒";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2em;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 0 5px #000;
+    z-index: 10;
+}
+
+/* 🔒 鎖定的難度按鈕 */
+.difficulty-btn.locked {
+    opacity: 0.3;
+    pointer-events: none; /* 禁止點擊 */
+    filter: grayscale(1);
+    position: relative;
+}
+
+.difficulty-btn.locked::after {
+    content: "🔒";
+    position: absolute;
+    right: -5px;
+    top: -5px;
+    font-size: 0.8em;
+}
