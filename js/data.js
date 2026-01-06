@@ -208,7 +208,7 @@ export const cardDatabase = [
     { id: 32, name: "呂布", rarity: "SSR", atk: 1900, hp: 1800, title: "飛將", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.30, dmgMult: 2.5 } }, // 極致的個人武力
     { id: 33, name: "諾貝爾", rarity: "SSR", atk: 1800, hp: 1900, title: "炸藥之父", attackType: "ranged", skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.7 } }, // 諾貝爾發明的炸藥轟炸全場 (倍率微調至0.7以符合SSR強度)
     { id: 34, name: "武則天", rarity: "SSR", atk: 1450, hp: 2200, title: "一代女皇", attackType: "ranged", skillKey: "DEBUFF_GLOBAL_ATK", skillParams: { debuffRate: 0.7, dmgMult: 1.8 } }, // 威懾全場
-    { id: 35, name: "阿提拉", rarity: "SSR", atk: 1750, hp: 1900, title: "上帝之鞭", attackType: "melee", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 4, dmgMult: 2.0 } }, // 同時攻擊多個目標
+    { id: 35, name: "斯巴達克斯", rarity: "SSR", atk: 1750, hp: 1900, title: "傳奇角鬥士", attackType: "melee", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 4, dmgMult: 2.0 } }, // 替換阿提拉，揮舞雙刀同時攻擊4個敵人
 
     // ================= SR (名將與奇才) =================
     { id: 36, name: "孫武", rarity: "SR", atk: 1100, hp: 1300, title: "兵聖", attackType: "ranged", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 25, buffRate: 1.15, dmgMult: 1.2 } }, // 兵法加成
