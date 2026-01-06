@@ -1715,7 +1715,12 @@ function filterGallery(rarity) {
         const charPath = `assets/cards/${displayCard.id}.webp`;
         const framePath = `assets/frames/${displayCard.rarity.toLowerCase()}.png`;
         const idString = String(displayCard.id).padStart(3, '0');
-        const typeIcon = displayCard.attackType === 'ranged' ? '🏹' : '⚔️';
+        
+        // 🔥 --- [修改] 圖鑑圖示判斷 --- 🔥
+        let typeIcon = '⚔️';
+        if (displayCard.unitType === 'CAVALRY') typeIcon = '🐴';
+        else if (displayCard.unitType === 'ARCHER') typeIcon = '🏹';
+        // 🔥 --- [修改] 結束 --- 🔥
 
         const lockedClass = isOwned ? '' : 'locked';
         cardDiv.className = `card ${displayCard.rarity} ${lockedClass}`;
