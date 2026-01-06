@@ -239,8 +239,8 @@ export const cardDatabase = [
     },
     { 
         id: 6, name: "織田信長", rarity: "SR", atk: 1100, hp: 1300, 
-        unitType: "ARCHER", // 弓兵 (火繩槍隊)
-        title: "第六天魔王", attackType: "ranged", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 2, dmgMult: 2.5 } 
+        unitType: "CAVALRY", // 騎兵 (騎兵隊)
+        title: "第六天魔王", attackType: "melee", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 2, dmgMult: 2.5 } 
     },
     { 
         id: 5, name: "聖女貞德", rarity: "SR", atk: 900, hp: 1800, 
@@ -269,8 +269,8 @@ export const cardDatabase = [
     },
     { 
         id: 21, name: "林肯", rarity: "SR", atk: 1100, hp: 1200, 
-        unitType: "ARCHER", // 弓兵 (演說/輔助)
-        title: "解放者", attackType: "ranged", skillKey: "HEAL_SELF_AND_ALLY", skillParams: { range: 15, healRate: 0.30, dmgMult: 2.0 } 
+        unitType: "INFANTRY", // 步兵 (演說/輔助)
+        title: "解放者", attackType: "melee", skillKey: "HEAL_SELF_AND_ALLY", skillParams: { range: 15, healRate: 0.30, dmgMult: 2.0 } 
     },
     { 
         id: 18, name: "關羽", rarity: "SR", atk: 1250, hp: 1500, 
@@ -284,8 +284,8 @@ export const cardDatabase = [
     },
     { 
         id: 36, name: "孫武", rarity: "SR", atk: 1100, hp: 1300, 
-        unitType: "ARCHER", // 弓兵 (兵法家/指揮)
-        title: "兵聖", attackType: "ranged", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 25, buffRate: 1.15, dmgMult: 1.2 } 
+        unitType: "INFANTRY", // 步兵 (兵法家/指揮)
+        title: "兵聖", attackType: "melee", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 25, buffRate: 1.15, dmgMult: 1.2 } 
     },
     { 
         id: 37, name: "特斯拉", rarity: "SR", atk: 1350, hp: 1100, 
