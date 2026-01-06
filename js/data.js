@@ -200,8 +200,39 @@ export const cardDatabase = [
     { id: 29, name: "火槍手", rarity: "R", atk: 700, hp: 200, title: "熱兵器", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
     { id: 30, name: "埃及戰車", rarity: "R", atk: 450, hp: 750, title: "沙漠疾風", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } }
 
+
+// 請將以下內容複製並貼上到 data.js 的 cardDatabase 陣列中 (接在最後一張卡片後面)
+
+    // ================= SSR (新皇者與戰神) =================
+    { id: 31, name: "亞瑟王", rarity: "SSR", atk: 1650, hp: 2400, title: "永恆之王", attackType: "melee", skillKey: "STACKABLE_IMMUNITY", skillParams: { count: 3, dmgMult: 2.0 } }, // 湖中劍鞘提供高防禦
+    { id: 32, name: "呂布", rarity: "SSR", atk: 1900, hp: 1800, title: "飛將", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.30, dmgMult: 2.5 } }, // 極致的個人武力
+    { id: 33, name: "諾貝爾", rarity: "SSR", atk: 1800, hp: 1900, title: "炸藥之父", attackType: "ranged", skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.7 } }, // 諾貝爾發明的炸藥轟炸全場 (倍率微調至0.7以符合SSR強度)
+    { id: 34, name: "武則天", rarity: "SSR", atk: 1450, hp: 2200, title: "一代女皇", attackType: "ranged", skillKey: "DEBUFF_GLOBAL_ATK", skillParams: { debuffRate: 0.7, dmgMult: 1.8 } }, // 威懾全場
+    { id: 35, name: "阿提拉", rarity: "SSR", atk: 1750, hp: 1900, title: "上帝之鞭", attackType: "melee", skillKey: "MULTI_TARGET_STRIKE", skillParams: { count: 4, dmgMult: 2.0 } }, // 同時攻擊多個目標
+
+    // ================= SR (名將與奇才) =================
+    { id: 36, name: "孫武", rarity: "SR", atk: 1100, hp: 1300, title: "兵聖", attackType: "ranged", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 25, buffRate: 1.15, dmgMult: 1.2 } }, // 兵法加成
+    { id: 37, name: "特斯拉", rarity: "SR", atk: 1350, hp: 1100, title: "交流電之父", attackType: "ranged", skillKey: "AOE_CIRCLE", skillParams: { radius: 18, dmgMult: 1.9 } }, // 電氣範圍攻擊
+    { id: 38, name: "岳飛", rarity: "SR", atk: 1250, hp: 1400, title: "精忠報國", attackType: "melee", skillKey: "EXECUTE_LOW_HP", skillParams: { threshold: 0.25, dmgMult: 2.0 } }, // 處決殘血敵人
+    { id: 39, name: "達文西", rarity: "SR", atk: 1200, hp: 1500, title: "文藝復興", attackType: "ranged", skillKey: "AOE_CIRCLE", skillParams: { radius: 20, dmgMult: 1.8 } }, // 替換李舜臣，改用範圍攻擊(丟出发明物)
+    { id: 40, name: "伊莉莎白一世", rarity: "SR", atk: 1000, hp: 1500, title: "童貞女王", attackType: "ranged", skillKey: "RESTORE_MANA_ALLIES", skillParams: { range: 20, manaAmount: 25, dmgMult: 1.2 } }, // 回氣輔助
+
+    // ================= R (歷史著名兵種) - 統一使用 HEAVY_STRIKE =================
+    // 騎兵類 (高攻、血量中等)
+    { id: 41, name: "翼騎兵", rarity: "R", atk: 600, hp: 550, title: "波蘭之翼", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
+    { id: 42, name: "馬穆魯克", rarity: "R", atk: 580, hp: 600, title: "奴隸騎兵", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
+    
+    // 步兵/衛隊類 (血量較高、攻擊中等)
+    { id: 43, name: "土耳其禁衛軍", rarity: "R", atk: 480, hp: 850, title: "蘇丹親兵", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
+    { id: 44, name: "瑞士衛隊", rarity: "R", atk: 450, hp: 900, title: "忠誠護衛", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
+    { id: 45, name: "波斯長生軍", rarity: "R", atk: 420, hp: 950, title: "不死軍團", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
+    { id: 46, name: "西班牙征服者", rarity: "R", atk: 550, hp: 700, title: "遠征軍", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
+    { id: 47, name: "亞馬遜戰士", rarity: "R", atk: 620, hp: 450, title: "叢林女傑", attackType: "melee", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
+
+    // 遠程/特殊兵種 (血量低、攻擊高或距離遠)
+    { id: 48, name: "諸葛連弩兵", rarity: "R", atk: 500, hp: 350, title: "蜀漢精銳", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } },
+    { id: 49, name: "神機營", rarity: "R", atk: 650, hp: 250, title: "大明火器", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } }, // 火槍兵的前身
+    { id: 50, name: "大和弓箭手", rarity: "R", atk: 520, hp: 300, title: "長弓部隊", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } }
+
+
 ];
-
-
-
-

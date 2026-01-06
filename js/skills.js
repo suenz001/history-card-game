@@ -24,12 +24,18 @@ export const SKILL_LIBRARY = {
         });
     },
     
+    // 🔥 優化：加入 baseAtk 檢查，避免無限疊加導致數值崩壞
     SELF_BUFF_ATK: (hero, target, params, context) => {
         const { dealDamage } = context;
         const buffRate = params.buffRate || 1.25;
         const dmgMult = params.dmgMult || 2.0;
         
+        // 如果是第一次施放，記錄原始攻擊力 (防呆機制)
+        if (!hero.baseAtk) hero.baseAtk = hero.atk;
+
+        // 計算新的攻擊力
         hero.atk = Math.floor(hero.atk * buffRate);
+        
         showDamageText(hero.position, hero.y, `攻擊UP!`, 'gold-text');
         createVfx(hero.position, hero.y, 'vfx-buff-ring');
         safePlaySound('buff');
@@ -55,7 +61,7 @@ export const SKILL_LIBRARY = {
                     dealDamage(hero, enemy, dmgMult);
                 }
             });
-            shakeScreen(); // AOE 技能保留震動比較有感
+            shakeScreen(); 
         }, 200);
     },
 
@@ -73,16 +79,13 @@ export const SKILL_LIBRARY = {
         });
     },
 
-    // 🔥 修改：移除 shakeScreen()，避免畫面過度晃動
     HEAVY_STRIKE: (hero, target, params, context) => {
         const { dealDamage } = context;
         const dmgMult = params.dmgMult || 5.0;
 
-        // 雖然是重擊，但因為R卡大量使用，所以移除震動
-        // shakeScreen();  <-- 已移除
-
+        // R卡大量使用，保持移除震動
         fireProjectile(hero.el, target.el, 'skill', () => {
-            safePlaySound('boom'); // 保留音效
+            safePlaySound('boom'); 
             createVfx(target.position, target.y, 'vfx-slash'); 
             dealDamage(hero, target, dmgMult);
         });
@@ -123,7 +126,10 @@ export const SKILL_LIBRARY = {
 
         allies.forEach(ally => {
             if (ally !== hero && Math.abs(ally.position - hero.position) < range) {
+                // 同樣加上 baseAtk 檢查
+                if (!ally.baseAtk) ally.baseAtk = ally.atk;
                 ally.atk = Math.floor(ally.atk * buffRate);
+                
                 showDamageText(ally.position, ally.y, `ATK UP!`, 'gold-text');
                 createVfx(ally.position, ally.y, 'vfx-buff-ring');
             }
@@ -205,13 +211,13 @@ export const SKILL_LIBRARY = {
         const debuffRate = params.debuffRate || 0.8;
         const dmgMult = params.dmgMult || 2.0;
 
-        flashScreen('dark');
+        flashScreen('dark'); // 武則天適合這個特效
         safePlaySound('debuff');
 
         enemies.forEach(enemy => {
             enemy.atk = Math.floor(enemy.atk * debuffRate);
             showDamageText(enemy.position, enemy.y, `ATK DOWN`, 'purple-text');
-            createVfx(enemy.position, enemy.y, 'vfx-explosion'); // 暫用爆炸特效
+            createVfx(enemy.position, enemy.y, 'vfx-explosion'); 
         });
 
         fireProjectile(hero.el, target.el, 'skill', () => {
@@ -237,7 +243,7 @@ export const SKILL_LIBRARY = {
 
         if (lowestAlly) {
             safePlaySound('heal');
-            healTarget(hero, lowestAlly, lowestAlly.maxHp); // 全補
+            healTarget(hero, lowestAlly, lowestAlly.maxHp); 
             createVfx(lowestAlly.position, lowestAlly.y, 'vfx-heal-pillar');
             showDamageText(lowestAlly.position, lowestAlly.y, `FULL HEAL`, 'gold-text');
         }
@@ -294,7 +300,6 @@ export const SKILL_LIBRARY = {
         const healAmount = Math.floor(hero.maxHp * healRate);
         healTarget(hero, hero, healAmount);
 
-        // 找附近一名隊友
         const nearbyAlly = allies.find(a => a !== hero && Math.abs(a.position - hero.position) < range);
         if (nearbyAlly) {
             healTarget(hero, nearbyAlly, healAmount);
@@ -311,12 +316,12 @@ export const SKILL_LIBRARY = {
         const threshold = params.threshold || 0.20;
         const dmgMult = params.dmgMult || 2.5;
 
-        safePlaySound('slash'); // 斬殺音效
+        safePlaySound('slash'); 
 
         fireProjectile(hero.el, target.el, 'skill', () => {
             dealDamage(hero, target, dmgMult);
             
-            // 斬殺邏輯
+            // 岳飛的斬殺邏輯
             enemies.forEach(enemy => {
                 if (!enemy.isBoss && enemy.currentHp > 0 && (enemy.currentHp / enemy.maxHp) < threshold) {
                     enemy.currentHp = 0;
@@ -332,6 +337,7 @@ export const SKILL_LIBRARY = {
         const count = params.count || 2;
         const dmgMult = params.dmgMult || 2.2;
 
+        // 亞瑟王與李舜臣的邏輯
         hero.immunityStacks = (hero.immunityStacks || 0) + count;
         showDamageText(hero.position, hero.y, `免疫x${hero.immunityStacks}`, 'gold-text');
         createVfx(hero.position, hero.y, 'vfx-buff-ring');
@@ -366,12 +372,10 @@ export function executeSkill(hero, target, context) {
     if (skillFunc) {
         skillFunc(hero, target, hero.skillParams || {}, context);
     } else {
-        // 預設技能 fallback
         SKILL_LIBRARY.HEAVY_STRIKE(hero, target, { dmgMult: 1.5 }, context);
     }
 }
 
-// 🔥 新增：從 main.js 移過來的技能描述 helper
 export function getSkillDescription(skillKey, params) {
     if (!params) return "造成強力傷害。";
 
