@@ -5,10 +5,13 @@ import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, s
 
 // 🔥 引入模組
 import { HERO_BIOS } from './js/bios.js';
-import { cardDatabase, RATES, DISMANTLE_VALUES, DIFFICULTY_SETTINGS } from './js/data.js';
+// 🔥 修改：加入 SYSTEM_NOTIFICATIONS
+import { cardDatabase, RATES, DISMANTLE_VALUES, DIFFICULTY_SETTINGS, SYSTEM_NOTIFICATIONS } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
 import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive, gameSpeed } from './js/battle.js';
-import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/pvp.js'; 
+import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/pvp.js';
+// 🔥 修改：引入 getSkillDescription
+import { getSkillDescription } from './js/skills.js';
 
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
@@ -42,9 +45,9 @@ let gems = 0;
 let gold = 0;
 let totalPower = 0;
 
-// 🔥 新增：本地暫存的通關進度
+// 本地暫存的通關進度
 let completedLevels = {};
-// 🔥 新增：紀錄目前正在打的關卡 ID (用於結算)
+// 紀錄目前正在打的關卡 ID (用於結算)
 let currentPlayingLevelId = 1;
 
 let allUserCards = [];
@@ -78,9 +81,7 @@ let selectedNotifIds = new Set();
 // 暫存當前顯示的通知列表 (用於全選功能)
 let currentVisibleNotifs = [];
 
-const SYSTEM_NOTIFICATIONS = [
-    { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 }, isSystem: true }
-];
+// 🔥 移除：SYSTEM_NOTIFICATIONS 已移至 data.js
 
 // 設定戰鬥結束的回調
 setOnBattleEnd(handleBattleEnd);
@@ -189,7 +190,7 @@ if(document.getElementById('redeem-btn')) {
             gold += 50000;
             alert("💰 獲得 50000 金幣！");
         } 
-        // 🔥 新增：解鎖所有關卡 (測試用)
+        // 解鎖所有關卡 (測試用)
         else if (code === 'unlock stage') {
             const allLevels = {};
             for(let i=1; i<=8; i++) {
@@ -201,7 +202,7 @@ if(document.getElementById('redeem-btn')) {
             await updateDoc(doc(db, "users", currentUser.uid), { completedLevels: completedLevels });
             alert("🔓 全關卡已解鎖！(測試用)");
         }
-        // 🔥 新增：鎖定關卡 (重置進度)
+        // 鎖定關卡 (重置進度)
         else if (code === 'lock stage') {
             completedLevels = {}; // 清空
             await updateDoc(doc(db, "users", currentUser.uid), { completedLevels: completedLevels });
@@ -661,7 +662,7 @@ async function loadUserData(user) {
         deletedSystemNotifs = data.deletedSystemNotifs || [];
         battleLogs = data.battleLogs || [];
         
-        // 🔥 讀取通關進度
+        // 讀取通關進度
         completedLevels = data.completedLevels || {};
 
         const updateData = { lastLoginAt: serverTimestamp() };
@@ -986,48 +987,7 @@ function openDetailModal(index) {
     renderDetailCard(); 
 }
 
-function getSkillDescription(skillKey, params) {
-    if (!params) return "造成強力傷害。";
-
-    switch (skillKey) {
-        case 'HEAL_AND_STRIKE':
-            return `恢復自身 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對目標造成 ${params.dmgMult} 倍傷害。`;
-        case 'AOE_CIRCLE':
-            return `對周圍半徑 ${params.radius} 範圍內的敵人造成 ${params.dmgMult} 倍傷害。`;
-        case 'GLOBAL_BOMB':
-            return `對全場所有敵人造成 ${Math.floor((params.dmgMult || 0) * 100)}% 自身攻擊力的傷害。`;
-        case 'HEAVY_STRIKE':
-            return `對目標造成強力一擊，傷害倍率為 ${params.dmgMult} 倍。`;
-        case 'INVINCIBLE_STRIKE':
-            return `獲得無敵狀態持續 ${params.duration / 1000} 秒，並對目標造成 ${params.dmgMult} 倍傷害。`;
-        case 'BUFF_ALLIES_ATK':
-            return `提升範圍 ${params.range} 內隊友 ${Math.floor(((params.buffRate || 1) - 1) * 100)}% 攻擊力，並對敵造成 ${params.dmgMult} 倍傷害。`;
-        case 'HEAL_ALLIES':
-            return `恢復範圍 ${params.range} 內隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對敵造成 ${params.dmgMult} 倍傷害。`;
-        case 'SELF_BUFF_ATK':
-            return `每次施放增加自身攻擊力 ${Math.floor(((params.buffRate || 1) - 1) * 100)}%，並造成 ${params.dmgMult} 倍傷害。`;
-        case 'MULTI_TARGET_STRIKE':
-            return `同時攻擊最近的 ${params.count} 個敵人，造成 ${params.dmgMult} 倍傷害。`;
-        case 'HEAL_ALL_ALLIES':
-            return `恢復全體隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對目標造成 ${params.dmgMult} 倍傷害。`;
-        case 'DEBUFF_GLOBAL_ATK':
-            return `降低全場敵人 ${100 - Math.floor((params.debuffRate || 1) * 100)}% 攻擊力，並造成 ${params.dmgMult} 倍傷害。`;
-        case 'FULL_HEAL_LOWEST':
-            return `完全恢復血量最低的一名隊友，並對目標造成 ${params.dmgMult} 倍傷害。`;
-        case 'RESTORE_MANA_ALLIES':
-            return `回復範圍 ${params.range} 內其他隊友 ${params.manaAmount} 點氣力，並造成 ${params.dmgMult} 倍傷害。`;
-        case 'STRIKE_AND_RESTORE_MANA':
-            return `造成 ${params.dmgMult} 倍傷害，並回復自身 ${params.manaRestore} 點氣力。`;
-        case 'HEAL_SELF_AND_ALLY':
-            return `恢復自身與一名隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並造成 ${params.dmgMult} 倍傷害。`;
-        case 'EXECUTE_LOW_HP':
-            return `對目標造成傷害，並立即斬殺場上所有血量低於 ${Math.floor((params.threshold || 0) * 100)}% 的敵人 (Boss除外)。`;
-        case 'STACKABLE_IMMUNITY':
-            return `對目標造成傷害，並獲得 ${params.count} 層傷害免疫護盾 (可疊加)。`;
-        default:
-            return "造成強力傷害。";
-    }
-}
+// 🔥 移除：getSkillDescription 已移至 skills.js
 
 function renderDetailCard() {
     const container = document.getElementById('large-card-view');
@@ -1044,6 +1004,7 @@ function renderDetailCard() {
     const idString = String(card.id).padStart(3, '0');
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
     
+    // 🔥 修改：使用 import 進來的 getSkillDescription
     const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
     const bioData = HERO_BIOS[card.id]; 
     let bioHtml = bioData ? `
@@ -1123,7 +1084,7 @@ function renderDetailCard() {
     const upgradeControls = document.querySelector('.upgrade-controls');
     const dismantleBtn = document.getElementById('dismantle-btn');
     
-    // 🔥 修改：如果是「敵方卡片」或「圖鑑模式」，隱藏所有升級按鈕
+    // 修改：如果是「敵方卡片」或「圖鑑模式」，隱藏所有升級按鈕
     if(isViewingEnemy || isViewingGallery) {
         if(upgradeControls) upgradeControls.style.display = 'none';
         if(dismantleBtn) dismantleBtn.style.display = 'none';
@@ -1206,7 +1167,7 @@ if(document.getElementById('close-detail-btn')) document.getElementById('close-d
     playSound('click'); 
     document.getElementById('detail-modal').classList.add('hidden'); 
     isViewingEnemy = false; 
-    isViewingGallery = false; // 🔥 關閉視窗時，重置圖鑑狀態
+    isViewingGallery = false; // 關閉視窗時，重置圖鑑狀態
     
     const upgradeControls = document.querySelector('.upgrade-controls');
     const dismantleBtn = document.getElementById('dismantle-btn');
@@ -1312,7 +1273,7 @@ if(document.getElementById('draw-10-btn')) document.getElementById('draw-10-btn'
      await playGachaAnimation(highestRarity); showRevealModal(drawnCards);
 });
 
-// 🔥 監聽背包按鈕，開啟時自動解除全軍 + 帶入上次排序
+// 監聽背包按鈕，開啟時自動解除全軍 + 帶入上次排序
 if(document.getElementById('inventory-btn')) document.getElementById('inventory-btn').addEventListener('click', () => { 
     playSound('inventory'); 
     if(!currentUser) return alert("請先登入"); 
@@ -1368,13 +1329,13 @@ if(document.getElementById('enter-battle-mode-btn')) document.getElementById('en
     if(!currentUser) return alert("請先登入");
     if(allUserCards.length === 0) await loadInventory(currentUser.uid);
     
-    // 🔥 開啟關卡選單時，更新按鈕鎖定狀態
+    // 開啟關卡選單時，更新按鈕鎖定狀態
     updateLevelButtonsLockState();
     
     document.getElementById('level-selection-modal').classList.remove('hidden');
 });
 
-// 🔥 新增：更新關卡按鈕鎖定狀態
+// 新增：更新關卡按鈕鎖定狀態
 function updateLevelButtonsLockState() {
     document.querySelectorAll('.level-btn').forEach(btn => {
         const levelId = parseInt(btn.dataset.level);
@@ -1398,7 +1359,7 @@ function updateLevelButtonsLockState() {
 
 document.querySelectorAll('.level-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-        // 🔥 鎖定時不給點
+        // 鎖定時不給點
         if(btn.classList.contains('locked')) return; 
         
         playSound('click');
@@ -1407,7 +1368,7 @@ document.querySelectorAll('.level-btn').forEach(btn => {
 
         document.getElementById('level-selection-modal').classList.add('hidden');
         
-        // 🔥 傳遞 completedLevels 進度給 battle 模組
+        // 傳遞 completedLevels 進度給 battle 模組
         initBattle(levelId, completedLevels);
     });
 });
@@ -1512,7 +1473,7 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
     updateStartButton();
 });
 
-// 🔥 修改：handleBattleEnd 更新通關進度
+// 修改：handleBattleEnd 更新通關進度
 async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     // 讀取目前的難度設定
     const diffSettings = DIFFICULTY_SETTINGS[currentDifficulty] || DIFFICULTY_SETTINGS['normal'];
@@ -1540,7 +1501,7 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
         gemText.style.display = 'block';
         gemText.innerText = `💎 +${gemReward}`;
 
-        // 🔥 更新通關進度邏輯
+        // 更新通關進度邏輯
         if (currentUser) {
             // 標記當前關卡+難度已通關
             const progressKey = `${currentPlayingLevelId}_${currentDifficulty}`;
