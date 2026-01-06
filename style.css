@@ -1508,3 +1508,25 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     background-color: #27ae60; /* 翡翠綠 */
     box-shadow: 0 0 5px #2ecc71;
 }
+
+/* style.css 最下方新增 */
+
+/* 確保所有戰鬥單位預設垂直置中且面向右 */
+.hero-unit, .enemy-unit {
+    transform: translateY(-50%) scaleX(1);
+    transform-origin: center center; /* 確保翻轉時以中心為軸 */
+    transition: transform 0.1s linear; /* 增加一點轉向的平滑感 */
+}
+
+/* 當單位需要面向左時，套用此 class */
+.unit-flipped {
+    transform: translateY(-50%) scaleX(-1) !important;
+}
+
+/* 🔥 關鍵修正：當父層被翻轉時，把內部的血條、氣力條、兵種圖示「翻回來」(負負得正) */
+.unit-flipped .hero-hp-bar,
+.unit-flipped .enemy-hp-bar,
+.unit-flipped .hero-mana-bar,
+.unit-flipped .hero-type-badge {
+    transform: scaleX(-1);
+}
