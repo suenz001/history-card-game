@@ -66,7 +66,6 @@ setOnBattleEnd(handleBattleEnd);
 // 初始化 PVP
 setTimeout(() => {
     if(document.getElementById('pvp-menu-btn')) {
-        // 🔥 修改：改用 Inventory.getAllCards()
         initPvp(db, currentUser, Inventory.getAllCards(), (slotIndex, type) => {
             // PVP 選擇回調
             Inventory.setPvpSelectionMode(slotIndex, type);
@@ -77,7 +76,7 @@ setTimeout(() => {
             // 如果背包沒資料則讀取
             if(Inventory.getAllCards().length === 0 && currentUser) Inventory.loadInventory(currentUser.uid); 
             else Inventory.filterInventory('ALL');
-        }, Inventory.openEnemyDetailModal); // 改用 Inventory 的詳細頁面
+        }, Inventory.openEnemyDetailModal); 
     }
 }, 500);
 
@@ -493,13 +492,6 @@ if(document.getElementById('toggle-sidebar-btn')) {
         btn.innerText = sidebar.classList.contains('collapsed') ? "◀" : "▶";
     });
 }
-
-if(document.getElementById('sort-select')) document.getElementById('sort-select').addEventListener('change', (e) => { 
-    playSound('click'); 
-    localStorage.setItem('userSortMethod', e.target.value); 
-    // inventory.js 會讀取 localStorage，這裡觸發重繪即可
-    Inventory.filterInventory(document.querySelector('.filter-btn.active')?.dataset?.filter || 'ALL');
-});
 
 function playGachaAnimation(highestRarity) {
     return new Promise((resolve) => {
