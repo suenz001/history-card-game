@@ -370,3 +370,47 @@ export function executeSkill(hero, target, context) {
         SKILL_LIBRARY.HEAVY_STRIKE(hero, target, { dmgMult: 1.5 }, context);
     }
 }
+
+// 🔥 新增：從 main.js 移過來的技能描述 helper
+export function getSkillDescription(skillKey, params) {
+    if (!params) return "造成強力傷害。";
+
+    switch (skillKey) {
+        case 'HEAL_AND_STRIKE':
+            return `恢復自身 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對目標造成 ${params.dmgMult} 倍傷害。`;
+        case 'AOE_CIRCLE':
+            return `對周圍半徑 ${params.radius} 範圍內的敵人造成 ${params.dmgMult} 倍傷害。`;
+        case 'GLOBAL_BOMB':
+            return `對全場所有敵人造成 ${Math.floor((params.dmgMult || 0) * 100)}% 自身攻擊力的傷害。`;
+        case 'HEAVY_STRIKE':
+            return `對目標造成強力一擊，傷害倍率為 ${params.dmgMult} 倍。`;
+        case 'INVINCIBLE_STRIKE':
+            return `獲得無敵狀態持續 ${params.duration / 1000} 秒，並對目標造成 ${params.dmgMult} 倍傷害。`;
+        case 'BUFF_ALLIES_ATK':
+            return `提升範圍 ${params.range} 內隊友 ${Math.floor(((params.buffRate || 1) - 1) * 100)}% 攻擊力，並對敵造成 ${params.dmgMult} 倍傷害。`;
+        case 'HEAL_ALLIES':
+            return `恢復範圍 ${params.range} 內隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對敵造成 ${params.dmgMult} 倍傷害。`;
+        case 'SELF_BUFF_ATK':
+            return `每次施放增加自身攻擊力 ${Math.floor(((params.buffRate || 1) - 1) * 100)}%，並造成 ${params.dmgMult} 倍傷害。`;
+        case 'MULTI_TARGET_STRIKE':
+            return `同時攻擊最近的 ${params.count} 個敵人，造成 ${params.dmgMult} 倍傷害。`;
+        case 'HEAL_ALL_ALLIES':
+            return `恢復全體隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並對目標造成 ${params.dmgMult} 倍傷害。`;
+        case 'DEBUFF_GLOBAL_ATK':
+            return `降低全場敵人 ${100 - Math.floor((params.debuffRate || 1) * 100)}% 攻擊力，並造成 ${params.dmgMult} 倍傷害。`;
+        case 'FULL_HEAL_LOWEST':
+            return `完全恢復血量最低的一名隊友，並對目標造成 ${params.dmgMult} 倍傷害。`;
+        case 'RESTORE_MANA_ALLIES':
+            return `回復範圍 ${params.range} 內其他隊友 ${params.manaAmount} 點氣力，並造成 ${params.dmgMult} 倍傷害。`;
+        case 'STRIKE_AND_RESTORE_MANA':
+            return `造成 ${params.dmgMult} 倍傷害，並回復自身 ${params.manaRestore} 點氣力。`;
+        case 'HEAL_SELF_AND_ALLY':
+            return `恢復自身與一名隊友 ${Math.floor((params.healRate || 0) * 100)}% 血量，並造成 ${params.dmgMult} 倍傷害。`;
+        case 'EXECUTE_LOW_HP':
+            return `對目標造成傷害，並立即斬殺場上所有血量低於 ${Math.floor((params.threshold || 0) * 100)}% 的敵人 (Boss除外)。`;
+        case 'STACKABLE_IMMUNITY':
+            return `對目標造成傷害，並獲得 ${params.count} 層傷害免疫護盾 (可疊加)。`;
+        default:
+            return "造成強力傷害。";
+    }
+}
