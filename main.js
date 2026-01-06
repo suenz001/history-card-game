@@ -3,14 +3,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// 🔥 引入模組
+// 引入模組
 import { HERO_BIOS } from './js/bios.js';
-// 🔥 修改：加入 SYSTEM_NOTIFICATIONS
 import { cardDatabase, RATES, DISMANTLE_VALUES, DIFFICULTY_SETTINGS, SYSTEM_NOTIFICATIONS } from './js/data.js';
 import { playSound, audioBgm, audioBattle, audioCtx, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
 import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive, gameSpeed } from './js/battle.js';
 import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/pvp.js';
-// 🔥 修改：引入 getSkillDescription
 import { getSkillDescription } from './js/skills.js';
 
 window.onerror = function(msg, url, line) {
@@ -80,8 +78,6 @@ let isNotifBatchMode = false;
 let selectedNotifIds = new Set();
 // 暫存當前顯示的通知列表 (用於全選功能)
 let currentVisibleNotifs = [];
-
-// 🔥 移除：SYSTEM_NOTIFICATIONS 已移至 data.js
 
 // 設定戰鬥結束的回調
 setOnBattleEnd(handleBattleEnd);
@@ -235,6 +231,13 @@ if(document.getElementById('close-notification-btn')) {
         
         isNotifBatchMode = false;
         selectedNotifIds.clear();
+
+        // 🔥 新增：關閉視窗時，紀錄「現在時間」為「已讀時間」
+        if (currentUser) {
+            localStorage.setItem(`lastReadNotifTime_${currentUser.uid}`, Date.now().toString());
+            // 立即重新計算 (戰報紅點會消失，但未領獎勵的紅點會保留)
+            checkUnreadNotifications();
+        }
     });
 }
 
@@ -243,6 +246,14 @@ async function openNotificationModal() {
         await loadUserData(currentUser);
     }
     
+    // 開啟時再抓一次最新公告
+    await fetchGlobalAnnouncements();
+
+    notificationModal.classList.remove('hidden');
+    renderNotifications();
+}
+
+async function fetchGlobalAnnouncements() {
     try {
         const q = query(collection(db, "announcements"), orderBy("timestamp", "desc"), limit(20));
         const snap = await getDocs(q);
@@ -261,9 +272,6 @@ async function openNotificationModal() {
     } catch(e) {
         console.warn("讀取公告失敗", e);
     }
-
-    notificationModal.classList.remove('hidden');
-    renderNotifications();
 }
 
 function toggleNotifBatchMode() {
@@ -335,6 +343,9 @@ async function executeBatchDelete() {
         
         playSound('dismantle');
         renderNotifications();
+        
+        // 🔥 刪除後重新計算紅點
+        checkUnreadNotifications();
         
     } catch (e) {
         console.error("批量刪除失敗", e);
@@ -562,6 +573,10 @@ async function deleteBattleLog(logToRemove) {
         battleLogs = newLogs;
         renderNotifications();
         playSound('dismantle');
+        
+        // 🔥 刪除後重新計算紅點
+        checkUnreadNotifications();
+        
     } catch (e) {
         console.error("刪除戰報失敗", e);
         alert("刪除失敗，請檢查網路");
@@ -590,6 +605,9 @@ async function claimReward(notif) {
         alert(`領取成功！獲得 ${notif.reward.amount} ${notif.reward.type === 'gems' ? '鑽石' : '金幣'}`);
         updateUIDisplay();
         renderNotifications(); 
+        
+        // 🔥 領取後重新計算紅點
+        checkUnreadNotifications();
         
     } catch (e) {
         console.error("領取失敗", e);
@@ -693,6 +711,10 @@ async function loadUserData(user) {
         }); 
     }
     updateUIDisplay();
+    
+    // 🔥 登入後立即抓取公告並檢查紅點
+    await fetchGlobalAnnouncements();
+    checkUnreadNotifications();
 }
 
 async function updateCurrencyCloud() { if (!currentUser) return; await updateDoc(doc(db, "users", currentUser.uid), { gems, gold, combatPower: totalPower, claimedNotifs: claimedNotifs }); }
@@ -987,8 +1009,6 @@ function openDetailModal(index) {
     renderDetailCard(); 
 }
 
-// 🔥 移除：getSkillDescription 已移至 skills.js
-
 function renderDetailCard() {
     const container = document.getElementById('large-card-view');
     container.innerHTML = "";
@@ -1004,7 +1024,6 @@ function renderDetailCard() {
     const idString = String(card.id).padStart(3, '0');
     const typeIcon = card.attackType === 'ranged' ? '🏹' : '⚔️';
     
-    // 🔥 修改：使用 import 進來的 getSkillDescription
     const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
     const bioData = HERO_BIOS[card.id]; 
     let bioHtml = bioData ? `
@@ -1725,8 +1744,7 @@ function filterGallery(rarity) {
     }
 }
 
-// main.js 新增函式
-
+// 🔥 檢查紅點邏輯 (已經整合到 loadUserData 和 claimReward 中)
 function checkUnreadNotifications() {
     if (!currentUser) return;
 
