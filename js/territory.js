@@ -1,22 +1,25 @@
 // js/territory.js
-import { doc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, updateDoc, increment, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { playSound } from './audio.js';
 
-// --- 建築設定檔 (平衡性調整版) ---
+// ==========================================
+// 🔥 平衡性調整：建築設定
+// 1. baseTime (秒) 大幅增加，增加黏著度 (下線等待)
+// 2. timeFactor 提高，後期升級時間會顯著拉長
+// ==========================================
 const BUILDING_CONFIG = {
     castle: { 
         name: "🏰 主堡", 
         desc: "領地的核心，限制其他建築的最高等級。",
         baseCost: 1000, costFactor: 1.5, 
-        baseTime: 60, timeFactor: 1.2, // 秒
-        maxLevel: 10 
+        baseTime: 600, timeFactor: 1.5, // 初始 10分鐘，成長係數 1.5 (Lv5 約需 50分鐘, Lv10 約需 25小時)
+        maxLevel: 20 
     },
     farm: { 
         name: "🌾 農田", 
         desc: "生產糧食，軍隊補給的基礎。",
         baseCost: 500, costFactor: 1.4, 
-        baseTime: 30, timeFactor: 1.2, 
-        // 🔥 調整：基礎產量 200 -> 300，成長 1.3 -> 1.35 (應對戰鬥消耗)
+        baseTime: 300, timeFactor: 1.4, // 初始 5分鐘
         baseProd: 300, prodFactor: 1.35, 
         resource: 'food' 
     },
@@ -24,50 +27,64 @@ const BUILDING_CONFIG = {
         name: "🪓 伐木場", 
         desc: "生產木頭，建設建築的基礎資源。",
         baseCost: 600, costFactor: 1.4, 
-        baseTime: 40, timeFactor: 1.2, 
-        // 🔥 調整：基礎產量 150 -> 300，成長 1.25 -> 1.35 (加速建設節奏)
-        baseProd: 300, prodFactor: 1.35, 
+        baseTime: 300, timeFactor: 1.4, // 初始 5分鐘
+        baseProd: 200, prodFactor: 1.35, 
         resource: 'wood' 
     },
     mine: { 
-        name: "⛏️ 礦場", 
-        desc: "生產鐵礦，這是強化英雄裝備的關鍵資源。",
-        baseCost: 800, costFactor: 1.4, 
-        baseTime: 45, timeFactor: 1.2, 
-        baseProd: 50, prodFactor: 1.2, // 鐵礦維持稀有
-        resource: 'iron'
+        name: "⛏️ 鐵礦場", 
+        desc: "生產鐵礦，打造裝備的必要資源。",
+        baseCost: 800, costFactor: 1.5, 
+        baseTime: 450, timeFactor: 1.45, // 初始 7.5分鐘
+        baseProd: 100, prodFactor: 1.3, 
+        resource: 'iron' 
     },
-    warehouse: { 
-        name: "📦 倉庫", 
-        desc: "決定資源的儲存上限 (時間限制)。",
-        baseCost: 400, costFactor: 1.3, 
-        baseTime: 20, timeFactor: 1.1, 
-        baseCapHours: 4, capFactor: 1.15 
+    barracks: { 
+        name: "⚔️ 兵營", 
+        desc: "提升所有英雄的攻擊力 (+2%)。",
+        baseCost: 1500, costFactor: 1.6, 
+        baseTime: 600, timeFactor: 1.5, // 初始 10分鐘
+        effect: "atk_boost", effectVal: 0.02 
+    },
+    bank: { 
+        name: "🏦 銀行", 
+        desc: "生產金幣，並提升資源儲存上限。",
+        baseCost: 2000, costFactor: 1.7, 
+        baseTime: 900, timeFactor: 1.6, // 初始 15分鐘
+        baseProd: 50, prodFactor: 1.25, 
+        resource: 'gold' 
     }
 };
 
-let db = null;
-let currentUser = null;
+let db;
+let currentUser;
 let territoryData = null;
-let onCurrencyUpdate = null; // callback to main.js
-let uiUpdateInterval = null;
+let currencyCallback = null;
+let timerInterval = null;
 
-// --- 初始化 ---
-export function initTerritory(database, user, data, currencyCallback) {
+export function initTerritory(database, user, data, onCurrencyUpdate) {
     db = database;
     currentUser = user;
     territoryData = data || createDefaultTerritory();
-    onCurrencyUpdate = currencyCallback;
+    currencyCallback = onCurrencyUpdate;
 
-    // 初始化時立即檢查離線升級狀態
-    checkOfflineUpgrades();
+    // 啟動定時器檢查建築倒數
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(updateTimers, 1000);
 
-    // 綁定 UI 事件
-    document.getElementById('territory-btn')?.addEventListener('click', openTerritoryModal);
-    document.getElementById('close-territory-btn')?.addEventListener('click', closeTerritoryModal);
+    renderTerritory();
     
-    // 綁定建築點擊 (事件委派)
-    document.querySelector('.territory-grid')?.addEventListener('click', handleBuildingClick);
+    // 綁定關閉按鈕
+    const closeBtn = document.getElementById('close-territory-btn');
+    if(closeBtn) {
+        // 移除舊的 event listener 避免重複綁定 (雖然通常 init 只跑一次，但保險起見)
+        const newBtn = closeBtn.cloneNode(true);
+        closeBtn.parentNode.replaceChild(newBtn, closeBtn);
+        newBtn.addEventListener('click', () => {
+            playSound('click');
+            document.getElementById('territory-modal').classList.add('hidden');
+        });
+    }
 }
 
 export function getTerritoryData() {
@@ -75,289 +92,290 @@ export function getTerritoryData() {
 }
 
 function createDefaultTerritory() {
-    return {
-        castle: { level: 1, upgradeEndTime: 0 },
-        farm: { level: 1, upgradeEndTime: 0, lastClaimTime: Date.now() },
-        lumber: { level: 1, upgradeEndTime: 0, lastClaimTime: Date.now() }, 
-        mine: { level: 1, upgradeEndTime: 0, lastClaimTime: Date.now() },
-        warehouse: { level: 1, upgradeEndTime: 0 }
-    };
-}
-
-// --- 核心邏輯：離線升級檢查 ---
-async function checkOfflineUpgrades() {
-    const now = Date.now();
-    let hasUpdates = false;
-
-    for (const type in territoryData) {
-        const buildData = territoryData[type];
-        if (buildData.upgradeEndTime > 0 && buildData.upgradeEndTime <= now) {
-            console.log(`[離線升級] ${type} 升級完成！`);
-            buildData.level++;
-            buildData.upgradeEndTime = 0;
-            hasUpdates = true;
-        }
-    }
-
-    if (hasUpdates && currentUser && onCurrencyUpdate) {
-        // 通知主程式刷新並存檔
-        onCurrencyUpdate('refresh');
-    }
-}
-
-// --- UI 邏輯 ---
-
-function openTerritoryModal() {
-    playSound('click');
-    
-    checkOfflineUpgrades().then(() => {
-        document.getElementById('territory-modal').classList.remove('hidden');
-        renderTerritory();
-        
-        if (uiUpdateInterval) clearInterval(uiUpdateInterval);
-        uiUpdateInterval = setInterval(updateTerritoryUI, 1000);
-        updateTerritoryUI();
+    const defaultData = {};
+    Object.keys(BUILDING_CONFIG).forEach(key => {
+        defaultData[key] = { level: 0, upgradeEndTime: 0, lastClaimTime: Date.now() };
     });
+    // 預設主堡 Lv1
+    defaultData.castle.level = 1;
+    return defaultData;
 }
 
-function closeTerritoryModal() {
-    playSound('click');
-    document.getElementById('territory-modal').classList.add('hidden');
-    if (uiUpdateInterval) clearInterval(uiUpdateInterval);
+// ==========================================
+// 🔥 平衡性調整：資源消耗計算
+// ==========================================
+function getBuildingCost(type, currentLevel) {
+    const config = BUILDING_CONFIG[type];
+    const nextLevel = currentLevel + 1;
+    
+    // 金幣計算 (指數成長)
+    const goldCost = Math.floor(config.baseCost * Math.pow(config.costFactor, nextLevel - 1));
+    
+    // 🔥 修改：木頭消耗固定為金幣的 10%
+    const woodCost = Math.floor(goldCost * 0.1); 
+
+    // 鐵礦 (僅兵營與銀行需要，設為金幣 15%)
+    let ironCost = 0;
+    if (type === 'barracks' || type === 'bank') {
+        ironCost = Math.floor(goldCost * 0.15);
+    }
+
+    return { gold: goldCost, wood: woodCost, iron: ironCost };
+}
+
+function getUpgradeTime(type, currentLevel) {
+    const config = BUILDING_CONFIG[type];
+    // 時間計算 (指數成長)
+    return Math.floor(config.baseTime * Math.pow(config.timeFactor, currentLevel));
 }
 
 function renderTerritory() {
-    const grid = document.querySelector('.territory-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
+    const container = document.getElementById('territory-grid');
+    if (!container) return;
+    container.innerHTML = "";
 
-    const order = ['castle', 'farm', 'lumber', 'mine', 'warehouse'];
-    const resourceMap = { gold: '金幣', iron: '鐵礦', food: '糧食', wood: '木頭' };
+    const castleLevel = territoryData['castle'].level;
 
-    order.forEach(type => {
-        if (!territoryData[type]) {
-            territoryData[type] = { level: 1, upgradeEndTime: 0, lastClaimTime: Date.now() };
-        }
-
-        const buildData = territoryData[type];
-        const config = BUILDING_CONFIG[type];
+    Object.keys(BUILDING_CONFIG).forEach(key => {
+        const config = BUILDING_CONFIG[key];
+        const data = territoryData[key] || { level: 0, upgradeEndTime: 0 };
+        const isUpgrading = data.upgradeEndTime > Date.now();
         
-        let statsInfo = "";
-        let claimBtn = "";
-        
-        if (config.resource) {
-            const prodPerHour = Math.floor(config.baseProd * Math.pow(config.prodFactor, buildData.level - 1));
-            const capacityHours = getWarehouseCapacity();
-            const maxStorage = Math.floor(prodPerHour * capacityHours);
-            const pending = calculatePendingResource(type);
-            const isFull = pending >= maxStorage;
-            const resourceName = resourceMap[config.resource];
-            
-            statsInfo = `<div class="build-stat">產量: ${prodPerHour}/小時<br>容量: ${maxStorage} (${capacityHours.toFixed(1)}h)</div>`;
-            
-            claimBtn = `<button class="btn-mini claim-btn ${pending <= 0 ? 'disabled' : ''}" data-type="${type}">
-                收穫 ${Math.floor(pending)} ${resourceName} ${isFull ? '(滿)' : ''}
-            </button>`;
-        } else if (type === 'warehouse') {
-            const capacity = getWarehouseCapacity();
-            statsInfo = `<div class="build-stat">資源保存時限: ${capacity.toFixed(1)} 小時</div>`;
-        } else {
-            statsInfo = `<div class="build-stat">最高建築等級限制: Lv.${buildData.level}</div>`;
-        }
+        const card = document.createElement('div');
+        card.className = 'building-card';
+        if (data.level === 0) card.classList.add('locked');
 
-        const el = document.createElement('div');
-        el.className = `building-card ${type}`;
-        el.innerHTML = `
-            <div class="build-icon"></div>
-            <div class="build-info">
-                <div class="build-name">${config.name} <span class="build-lv">Lv.${buildData.level}</span></div>
-                <div class="build-desc">${config.desc}</div>
-                ${statsInfo}
-                
-                <div class="build-actions">
-                    ${claimBtn}
-                    ${renderUpgradeButton(type, buildData, config)}
+        // 標題與等級
+        let html = `
+            <div class="building-header">
+                <div class="building-icon">🏠</div>
+                <div class="building-info">
+                    <div class="building-name">${config.name} <span style="color:#f1c40f">Lv.${data.level}</span></div>
+                    <div class="building-desc">${config.desc}</div>
                 </div>
-                ${renderProgressBar(type, buildData, config)}
             </div>
+            <div class="building-body">
         `;
-        grid.appendChild(el);
+
+        // 生產/效果 資訊
+        if (config.resource) {
+            const currentProd = data.level > 0 ? Math.floor(config.baseProd * Math.pow(config.prodFactor, data.level - 1)) : 0;
+            const nextProd = Math.floor(config.baseProd * Math.pow(config.prodFactor, data.level));
+            const resName = getResourceName(config.resource);
+            html += `<div class="prod-info">產量: ${currentProd}/小時 ➝ <span style="color:#2ecc71">${nextProd}/小時</span> (${resName})</div>`;
+        } else if (config.effect) {
+            const currentEff = Math.floor((data.level * config.effectVal) * 100);
+            const nextEff = Math.floor(((data.level + 1) * config.effectVal) * 100);
+            html += `<div class="prod-info">效果: +${currentEff}% ➝ <span style="color:#2ecc71">+${nextEff}%</span></div>`;
+        }
+
+        // 升級按鈕或進度條
+        if (isUpgrading) {
+            const remaining = Math.max(0, Math.floor((data.upgradeEndTime - Date.now()) / 1000));
+            // 初始渲染進度條，之後由 updateTimers 更新
+            html += `
+                <div class="build-progress-bar" id="prog-${key}" data-end="${data.upgradeEndTime}" data-type="${key}">
+                    <div class="fill" style="width:0%"></div>
+                    <div class="timer-text">${formatTime(remaining)}</div>
+                </div>
+                <button class="btn-secondary" style="width:100%; margin-top:5px; font-size:0.8em;" onclick="alert('加速功能開發中...')">💎 立即完成</button>
+            `;
+        } else {
+            // 顯示升級需求
+            const cost = getBuildingCost(key, data.level);
+            const timeSec = getUpgradeTime(key, data.level);
+            
+            // 檢查前置條件 (主堡限制)
+            const isCastleCap = (key !== 'castle' && data.level >= castleLevel);
+            const isMaxLevel = (data.level >= (config.maxLevel || 999));
+
+            if (isMaxLevel) {
+                html += `<button class="btn-disabled upgrade-btn">已達最高等級</button>`;
+            } else if (isCastleCap) {
+                html += `<button class="btn-disabled upgrade-btn">需升級主堡 Lv.${castleLevel+1}</button>`;
+            } else {
+                let costStr = `💰 ${cost.gold}`;
+                if (cost.wood > 0) costStr += ` | 🪵 ${cost.wood}`;
+                if (cost.iron > 0) costStr += ` | ⛏️ ${cost.iron}`;
+                
+                html += `
+                    <div class="cost-row">${costStr}</div>
+                    <div class="time-row">⏳ ${formatTime(timeSec)}</div>
+                    <button class="btn-primary upgrade-btn" id="btn-up-${key}">升級</button>
+                `;
+            }
+        }
+
+        // 收穫按鈕 (僅資源建築)
+        if (config.resource && data.level > 0 && !isUpgrading) {
+            html += `<button class="btn-success claim-btn" id="btn-claim-${key}" data-type="${key}" style="margin-top:5px; width:100%;">收穫</button>`;
+        }
+
+        html += `</div>`; // end body
+        card.innerHTML = html;
+        container.appendChild(card);
+
+        // 綁定升級事件
+        const upBtn = card.querySelector(`#btn-up-${key}`);
+        if (upBtn) {
+            upBtn.addEventListener('click', () => startUpgrade(key));
+        }
+
+        // 綁定收穫事件
+        const claimBtn = card.querySelector(`#btn-claim-${key}`);
+        if (claimBtn) {
+            claimBtn.addEventListener('click', () => claimResource(key));
+        }
     });
 }
 
-// 修改：顯示金幣與木頭費用
-function renderUpgradeButton(type, data, config) {
-    if (data.upgradeEndTime > Date.now()) {
-        return `<button class="btn-secondary btn-disabled" id="btn-upgrade-${type}" disabled>🚧 建造中...</button>`;
-    }
-    if (type !== 'castle' && data.level >= territoryData.castle.level) {
-        return `<button class="btn-secondary btn-disabled">需升級主堡</button>`;
-    }
-    if (data.level >= config.maxLevel && config.maxLevel) {
-        return `<button class="btn-secondary btn-disabled">已達最大等級</button>`;
-    }
+async function startUpgrade(type) {
+    if (!currentUser) return alert("請先登入");
+    const data = territoryData[type];
+    const cost = getBuildingCost(type, data.level);
 
-    const goldCost = Math.floor(config.baseCost * Math.pow(config.costFactor, data.level));
-    const woodCost = Math.floor(goldCost * 0.5); // 木頭消耗為金幣的 50%
+    // 檢查資源
+    if (!currencyCallback('check', cost.gold, 'gold')) return alert("金幣不足！");
+    if (cost.wood > 0 && !currencyCallback('check', cost.wood, 'wood')) return alert("木頭不足！");
+    if (cost.iron > 0 && !currencyCallback('check', cost.iron, 'iron')) return alert("鐵礦不足！");
+
+    // 扣除資源
+    if (!confirm(`確定要升級 ${BUILDING_CONFIG[type].name} 嗎？\n(需要等待 ${formatTime(getUpgradeTime(type, data.level))})`)) return;
+
+    currencyCallback('deduct', cost.gold, 'gold');
+    if (cost.wood > 0) currencyCallback('deduct', cost.wood, 'wood');
+    if (cost.iron > 0) currencyCallback('deduct', cost.iron, 'iron');
     
-    const timeSec = Math.floor(config.baseTime * Math.pow(config.timeFactor, data.level));
-    const timeStr = formatTime(timeSec);
+    currencyCallback('refresh');
+    playSound('build');
 
-    return `<button class="btn-upgrade-build" data-type="${type}" data-cost="${goldCost}" data-wood-cost="${woodCost}" data-time="${timeSec}">
-        ⬆️ 升級 (${goldCost}G + ${woodCost}木 / ${timeStr})
-    </button>`;
+    // 設定時間
+    const durationSec = getUpgradeTime(type, data.level);
+    territoryData[type].upgradeEndTime = Date.now() + (durationSec * 1000);
+    
+    // 立即存檔
+    try {
+        const userRef = doc(db, "users", currentUser.uid);
+        await updateDoc(userRef, { territory: territoryData });
+        renderTerritory();
+    } catch (e) {
+        console.error("Upgrade save failed", e);
+        alert("升級失敗，請檢查網路");
+    }
 }
 
-function renderProgressBar(type, data, config) {
-    if (data.upgradeEndTime <= Date.now()) return '';
+async function claimResource(type) {
+    if (!currentUser) return;
+    const config = BUILDING_CONFIG[type];
+    const data = territoryData[type];
     
-    const totalTimeSec = Math.floor(config.baseTime * Math.pow(config.timeFactor, data.level));
-    const totalMs = totalTimeSec * 1000;
-    const remainingMs = data.upgradeEndTime - Date.now();
-    const percent = Math.max(0, Math.min(100, ((totalMs - remainingMs) / totalMs) * 100));
+    const pending = calculatePendingResource(type);
+    if (pending <= 0) return alert("目前沒有資源可收穫");
 
-    return `
-        <div class="build-progress-bar" id="progress-box-${type}">
-            <div class="fill" id="progress-fill-${type}" style="width:${percent}%"></div>
-            <span class="timer-text" id="timer-${type}" data-type="${type}" data-end="${data.upgradeEndTime}">計算中...</span>
-        </div>
-    `;
-}
+    const amount = Math.floor(pending);
+    
+    // 增加資源
+    currencyCallback('add_resource', { type: config.resource, amount: amount });
+    currencyCallback('refresh');
+    playSound('coin');
 
-function getWarehouseCapacity() {
-    const lv = territoryData.warehouse.level;
-    const conf = BUILDING_CONFIG.warehouse;
-    return conf.baseCapHours * Math.pow(conf.capFactor, lv - 1);
+    // 重置時間
+    territoryData[type].lastClaimTime = Date.now();
+    
+    // 存檔
+    try {
+        const userRef = doc(db, "users", currentUser.uid);
+        await updateDoc(userRef, { territory: territoryData });
+        renderTerritory();
+    } catch (e) {
+        console.error("Claim failed", e);
+    }
 }
 
 function calculatePendingResource(type) {
     const data = territoryData[type];
-    const config = BUILDING_CONFIG[type];
-    if (!config.baseProd) return 0;
-
-    const now = Date.now();
-    const lastClaim = data.lastClaimTime || now;
-    const diffHours = (now - lastClaim) / (1000 * 60 * 60);
+    if (!data || data.level === 0) return 0;
     
+    const config = BUILDING_CONFIG[type];
     const prodPerHour = Math.floor(config.baseProd * Math.pow(config.prodFactor, data.level - 1));
-    const maxHours = getWarehouseCapacity();
-    const effectiveHours = Math.min(diffHours, maxHours);
+    const hoursPassed = (Date.now() - data.lastClaimTime) / (1000 * 60 * 60);
     
-    return Math.floor(prodPerHour * effectiveHours);
+    // 倉庫上限：根據銀行等級決定，預設 8 小時產量，每級銀行 +1 小時
+    const capacityHours = getWarehouseCapacity();
+    const actualHours = Math.min(hoursPassed, capacityHours);
+    
+    return Math.floor(prodPerHour * actualHours);
 }
 
-// --- 事件處理 ---
-
-async function handleBuildingClick(e) {
-    const btn = e.target.closest('button');
-    if (!btn) return;
-    
-    const type = btn.dataset.type;
-    
-    if (btn.classList.contains('claim-btn')) {
-        handleClaim(type); 
-    } else if (btn.classList.contains('btn-upgrade-build')) {
-        await handleUpgrade(type, btn);
-    }
+function getWarehouseCapacity() {
+    const bankLv = (territoryData['bank'] && territoryData['bank'].level) || 0;
+    return 8 + bankLv; // 基礎 8 小時，每級銀行 +1
 }
 
-function handleClaim(type) {
-    const amount = calculatePendingResource(type);
-    if (amount <= 0) return;
-
-    const config = BUILDING_CONFIG[type];
-    const resourceType = config.resource;
-
-    playSound('coin');
-    
-    territoryData[type].lastClaimTime = Date.now();
-    
-    if (onCurrencyUpdate) {
-        console.log(`[Territory] Claiming ${amount} ${resourceType}`);
-        onCurrencyUpdate('add_resource', { type: resourceType, amount: amount });
-        onCurrencyUpdate('refresh');
-    }
-    
-    renderTerritory(); 
+function getResourceName(key) {
+    const map = { gold: '金幣', food: '糧食', wood: '木頭', iron: '鐵礦' };
+    return map[key] || key;
 }
 
-async function handleUpgrade(type, btn) {
-    if (territoryData[type].upgradeEndTime > Date.now()) return;
-
-    const goldCost = parseInt(btn.dataset.cost);
-    const woodCost = parseInt(btn.dataset.woodCost) || 0; 
-    const timeSec = parseInt(btn.dataset.time);
-
-    // 1. 檢查資源
-    const hasGold = onCurrencyUpdate('check', goldCost, 'gold');
-    const hasWood = onCurrencyUpdate('check', woodCost, 'wood');
-
-    if (!hasGold) {
-        alert(`金幣不足！(需要 ${goldCost} G)`);
-        return;
-    }
-    if (!hasWood) {
-        alert(`木頭不足！(需要 ${woodCost} 木)`);
-        return;
-    }
-
-    if (!confirm(`確定要升級 ${BUILDING_CONFIG[type].name} 嗎？\n費用: ${goldCost}G + ${woodCost}木\n需耗時: ${formatTime(timeSec)}`)) return;
-
-    // 2. 扣除資源
-    onCurrencyUpdate('deduct', goldCost, 'gold');
-    onCurrencyUpdate('deduct', woodCost, 'wood');
-    
-    playSound('upgrade');
-
-    const endTime = Date.now() + (timeSec * 1000);
-    territoryData[type].upgradeEndTime = endTime;
-
-    if (onCurrencyUpdate) onCurrencyUpdate('refresh');
-    
-    renderTerritory(); 
-}
-
-function updateTerritoryUI() {
-    let needRender = false;
+// 定時更新 UI (進度條與收穫按鈕)
+function updateTimers() {
     const now = Date.now();
-    const resourceMap = { gold: '金幣', iron: '鐵礦', food: '糧食', wood: '木頭' };
+    let needRender = false;
 
-    document.querySelectorAll('.timer-text').forEach(span => {
-        const end = parseInt(span.dataset.end);
-        const type = span.dataset.type;
-        const data = territoryData[type];
-
-        if (end <= now && data.upgradeEndTime > 0) {
-            console.log(`${type} 升級完成！`);
-            data.level++;
-            data.upgradeEndTime = 0;
-            playSound('upgrade');
-            needRender = true;
-            if (onCurrencyUpdate) onCurrencyUpdate('refresh'); 
-        } else if (end > now) {
-            span.innerText = `剩餘: ${formatTime((end - now) / 1000)}`;
-            const fill = document.getElementById(`progress-fill-${type}`);
+    // 更新進度條
+    document.querySelectorAll('.build-progress-bar').forEach(bar => {
+        const end = parseInt(bar.dataset.end);
+        const type = bar.dataset.type;
+        const remaining = Math.max(0, (end - now) / 1000);
+        
+        const timerText = bar.querySelector('.timer-text');
+        const fill = bar.querySelector('.fill');
+        
+        if (remaining <= 0) {
+            // 升級完成！
+            if (territoryData[type].upgradeEndTime > 0) {
+                territoryData[type].level += 1;
+                territoryData[type].upgradeEndTime = 0;
+                territoryData[type].lastClaimTime = Date.now(); // 升級後重置產出
+                
+                // 存檔 (背景執行)
+                if (currentUser) {
+                    updateDoc(doc(db, "users", currentUser.uid), { territory: territoryData });
+                }
+                
+                playSound('upgrade');
+                needRender = true; // 需要重繪變成普通狀態
+            }
+        } else {
+            if (timerText) timerText.innerText = formatTime(remaining);
             if (fill) {
+                // 計算總時間來顯示百分比
+                const data = territoryData[type];
                 const config = BUILDING_CONFIG[type];
+                // 這裡稍微 tricky，因為沒有存 startTime，我們倒推總時間
+                // 只要顯示相對準確即可，用 config 計算
                 const totalTimeSec = Math.floor(config.baseTime * Math.pow(config.timeFactor, data.level));
                 const totalMs = totalTimeSec * 1000;
-                const remainingMs = end - now;
-                const percent = Math.max(0, Math.min(100, ((totalMs - remainingMs) / totalMs) * 100));
+                // 為了避免誤差導致進度條亂跳，我們假設剩餘時間不會超過總時間
+                const percent = Math.max(0, Math.min(100, ((totalMs - (end - now)) / totalMs) * 100));
                 fill.style.width = `${percent}%`;
             }
         }
     });
 
+    // 更新收穫按鈕狀態 (每秒檢查)
     document.querySelectorAll('.claim-btn').forEach(btn => {
         const type = btn.dataset.type;
         const pending = calculatePendingResource(type);
         const config = BUILDING_CONFIG[type];
-        const resourceName = resourceMap[config.resource];
+        const resourceName = getResourceName(config.resource);
+        
         const capacityHours = getWarehouseCapacity();
         const prodPerHour = Math.floor(config.baseProd * Math.pow(config.prodFactor, territoryData[type].level - 1));
         const maxStorage = Math.floor(prodPerHour * capacityHours);
         
         btn.innerText = `收穫 ${Math.floor(pending)} ${resourceName} ${pending >= maxStorage ? '(滿)' : ''}`;
+        
         if (pending > 0) btn.classList.remove('disabled');
         else btn.classList.add('disabled');
     });
@@ -365,8 +383,20 @@ function updateTerritoryUI() {
     if (needRender) renderTerritory();
 }
 
+// 🔥 優化：支援顯示天、小時、分鐘
 function formatTime(seconds) {
     if (seconds < 60) return `${Math.floor(seconds)}秒`;
-    if (seconds < 3600) return `${Math.floor(seconds/60)}分 ${Math.floor(seconds%60)}秒`;
-    return `${Math.floor(seconds/3600)}時 ${Math.floor((seconds%3600)/60)}分`;
+    if (seconds < 3600) {
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}分 ${s}秒`;
+    }
+    if (seconds < 86400) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return `${h}小時 ${m}分`;
+    }
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    return `${d}天 ${h}小時`;
 }
