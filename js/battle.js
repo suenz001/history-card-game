@@ -715,12 +715,13 @@ function spawnEnemy() {
 function fireBossSkill(boss) {
     const container = document.querySelector('.battle-field-container');
     if(!container) return;
-    const aoe = boss.aoeConfig || { radius: 15, damageMult: 1.0, effect: 'shockwave', color: '#e74c3c' };
-    showDamageText(boss.position, boss.y - 15, "蓄力中...", "skill-title"); safePlaySound('magic');
-    const projectile = document.createElement('div'); projectile.className = 'boss-projectile';
-    projectile.style.left = `${boss.position}%`; projectile.style.top = `${boss.y}%`;
-    container.appendChild(projectile);
     
+    // 1. 原本的 AOE 設定
+    const aoe = boss.aoeConfig || { radius: 15, damageMult: 1.0, effect: 'shockwave', color: '#e74c3c' };
+    showDamageText(boss.position, boss.y - 15, "蓄力中...", "skill-title"); 
+    safePlaySound('magic');
+
+    // 2. 尋找目標
     let target = null; let minDist = 9999;
     heroEntities.forEach(h => {
         const dx = h.position - boss.position; const dy = h.y - boss.y; const dist = Math.sqrt(dx*dx + dy*dy);
@@ -728,18 +729,52 @@ function fireBossSkill(boss) {
     });
     if (!target && heroEntities.length > 0) target = heroEntities[Math.floor(Math.random() * heroEntities.length)];
     if (!target) target = { position: 20, y: 50 }; 
-    void projectile.offsetWidth; projectile.style.left = `${target.position}%`; projectile.style.top = `${target.y}%`;
+
+    // 🔥 3. 強制執行卡片技能 (如無敵、補血、Buff)
+    const combatContext = { 
+        dealDamage, 
+        healTarget, 
+        getCombatGroups, 
+        enemies,      // 對 Boss 來說，enemies 是他的隊友
+        heroEntities  // heroEntities 是他的敵人
+    };
+    executeSkill(boss, target, combatContext);
+
+    // 4. 發射 AOE 投射物
+    const projectile = document.createElement('div'); projectile.className = 'boss-projectile';
+    projectile.style.left = `${boss.position}%`; projectile.style.top = `${boss.y}%`;
+    container.appendChild(projectile);
+    
+    void projectile.offsetWidth; 
+    projectile.style.left = `${target.position}%`; 
+    projectile.style.top = `${target.y}%`;
     
     setTimeout(() => {
-        projectile.remove(); createBossVfx(target.position, target.y, aoe.effect, aoe.color); safePlaySound('explosion');
+        projectile.remove(); 
+        createBossVfx(target.position, target.y, aoe.effect, aoe.color); 
+        safePlaySound('explosion');
+        
+        // AOE 傷害結算
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position; const dy = hero.y - target.y; const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < aoe.radius) { 
-                if (hero.isInvincible) { showDamageText(hero.position, hero.y, `免疫`, 'gold-text'); safePlaySound('block'); } 
-                else if (hero.immunityStacks > 0) { hero.immunityStacks--; showDamageText(hero.position, hero.y, `格擋!`, 'gold-text'); safePlaySound('block'); } 
+                if (hero.isInvincible) { 
+                    showDamageText(hero.position, hero.y, `免疫`, 'gold-text'); 
+                    safePlaySound('block'); 
+                } 
+                else if (hero.immunityStacks > 0) { 
+                    hero.immunityStacks--; 
+                    showDamageText(hero.position, hero.y, `格擋!`, 'gold-text'); 
+                    safePlaySound('block'); 
+                } 
                 else {
-                    const dmg = Math.floor(boss.atk * aoe.damageMult); hero.currentHp -= dmg; triggerHeroHit(hero); showDamageText(hero.position, hero.y, `-${dmg}`, 'hero-dmg');
+                    const dmg = Math.floor(boss.atk * aoe.damageMult); 
+                    hero.currentHp -= dmg; 
+                    triggerHeroHit(hero); 
+                    showDamageText(hero.position, hero.y, `-${dmg}`, 'hero-dmg');
                 }
+                
+                // 擊退效果
                 if(hero.position < boss.position) hero.position -= 1; else hero.position += 1;
             }
         });
@@ -885,8 +920,24 @@ function gameLoop() {
                     executeSkill(hero, nearestEnemy, combatContext);
                 } else {
                     const heroType = hero.attackType || 'melee'; const projType = heroType === 'ranged' ? 'arrow' : 'sword';
+                    
                     fireProjectile(hero.el, nearestEnemy.el, projType, () => {
-                        if (nearestEnemy.el && nearestEnemy.currentHp > 0) { dealDamage(hero, nearestEnemy, 1.0); hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 5); }
+                        if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
+                            // 🔥 無敵與格擋檢查 (新增)
+                            if (nearestEnemy.isInvincible) {
+                                showDamageText(nearestEnemy.position, nearestEnemy.y, `免疫`, 'gold-text');
+                                safePlaySound('block');
+                            } 
+                            else if (nearestEnemy.immunityStacks > 0) {
+                                nearestEnemy.immunityStacks--;
+                                showDamageText(nearestEnemy.position, nearestEnemy.y, `格擋!`, 'gold-text');
+                                safePlaySound('block');
+                            }
+                            else {
+                                dealDamage(hero, nearestEnemy, 1.0); 
+                                hero.currentMana = Math.min(hero.maxMana, hero.currentMana + 5); 
+                            }
+                        }
                     });
                     safePlaySound('dismantle'); 
                 }
