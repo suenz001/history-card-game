@@ -42,7 +42,9 @@ try {
 let currentUser = null;
 let gems = 0;
 let gold = 0;
-let iron = 0; // 🔥 新增鐵礦
+let iron = 0; 
+let food = 0; // 🔥 新增糧食
+let wood = 0; // 🔥 新增木頭
 let totalPower = 0;
 
 // 本地暫存的通關進度
@@ -133,7 +135,9 @@ if(document.getElementById('redeem-btn')) {
 
         if (code === 'make diamond') { gems += 5000; alert("💎 獲得 5000 鑽石！"); } 
         else if (code === 'make gold') { gold += 50000; alert("💰 獲得 50000 金幣！"); } 
-        else if (code === 'make iron') { iron += 5000; alert("⛏️ 獲得 5000 鐵礦！"); } // 🔥 作弊碼
+        else if (code === 'make iron') { iron += 5000; alert(⛏️ 獲得 5000 鐵礦！"); }
+        else if (code === 'make food') { food += 5000; alert("🌾 獲得 5000 糧食！"); } // 🔥 新增作弊碼
+        else if (code === 'make wood') { wood += 5000; alert("🪵 獲得 5000 木頭！"); } // 🔥 新增作弊碼
         else if (code === 'unlock stage') {
             const allLevels = {}; for(let i=1; i<=8; i++) { allLevels[`${i}_easy`] = true; allLevels[`${i}_normal`] = true; allLevels[`${i}_hard`] = true; }
             completedLevels = allLevels; await updateDoc(doc(db, "users", currentUser.uid), { completedLevels: completedLevels }); alert("🔓 全關卡已解鎖！");
@@ -413,6 +417,8 @@ const currencyHandler = (action, amount, type = 'gold') => {
         if (amount.type === 'gold') gold += amount.amount;
         if (amount.type === 'iron') iron += amount.amount;
         if (amount.type === 'gems') gems += amount.amount;
+        if (amount.type === 'food') food += amount.amount; // 🔥 修正：處理糧食
+        if (amount.type === 'wood') wood += amount.amount; // 🔥 修正：處理木頭
     }
     
     // 5. 刷新 UI 與雲端 (refresh)
@@ -434,8 +440,10 @@ async function loadUserData(user) {
         const data = userSnap.data(); 
         gems = data.gems || 0; 
         gold = data.gold || 0;
-        iron = data.iron || 0; // 🔥 讀取鐵礦
-        territoryData = data.territory || null; // 讀取領地資料
+        iron = data.iron || 0; 
+        food = data.food || 0; // 🔥 讀取糧食
+        wood = data.wood || 0; // 🔥 讀取木頭
+        territoryData = data.territory || null; 
 
         claimedNotifs = data.claimedNotifs || [];
         deletedSystemNotifs = data.deletedSystemNotifs || [];
@@ -446,11 +454,11 @@ async function loadUserData(user) {
         if(!data.email && user.email) updateData.email = user.email;
         updateDoc(userRef, updateData);
     } else { 
-        gems = 1000; gold = 5000; iron = 500;
+        gems = 1000; gold = 5000; iron = 500; food = 0; wood = 0; // 🔥 初始化新資源
         claimedNotifs = []; deletedSystemNotifs = []; battleLogs = []; completedLevels = {};
         await setDoc(userRef, { 
             name: user.displayName || "未命名", email: user.email || null, 
-            gems, gold, iron, combatPower: 0, 
+            gems, gold, iron, food, wood, combatPower: 0, 
             claimedNotifs: [], deletedSystemNotifs: [], battleLogs: [], completedLevels: {}, 
             createdAt: new Date(), lastLoginAt: serverTimestamp() 
         }); 
@@ -459,7 +467,7 @@ async function loadUserData(user) {
     await fetchGlobalAnnouncements();
     checkUnreadNotifications();
 
-    // 🔥 初始化 Inventory 模組 (傳入統一的 Handler)
+    // 🔥 初始化 Inventory 模組
     Inventory.initInventory(db, user, currencyHandler, (index, card, type) => {
         if (type === 'pve_deploy') { return deployHeroToSlot(index, card); } 
         else { return setPvpHero(index, card, type); }
@@ -474,8 +482,8 @@ async function loadUserData(user) {
 
 async function updateCurrencyCloud() { 
     if (!currentUser) return; 
-    // 🔥 儲存 iron 和 territory 狀態
-    const updates = { gems, gold, iron, combatPower: totalPower, claimedNotifs: claimedNotifs };
+    // 🔥 儲存 iron, food, wood 和 territory 狀態
+    const updates = { gems, gold, iron, food, wood, combatPower: totalPower, claimedNotifs: claimedNotifs };
     const currentTData = Territory.getTerritoryData();
     if(currentTData) updates.territory = currentTData;
     
@@ -485,9 +493,16 @@ async function updateCurrencyCloud() {
 function updateUIDisplay() { 
     document.getElementById('gem-count').innerText = gems; 
     document.getElementById('gold-count').innerText = gold; 
-    // 🔥 更新鐵礦顯示 (如果有的話)
+    
+    // 🔥 更新資源顯示
     const ironEl = document.getElementById('iron-count');
     if(ironEl) ironEl.innerText = iron; 
+
+    const foodEl = document.getElementById('food-count');
+    if(foodEl) foodEl.innerText = food;
+
+    const woodEl = document.getElementById('wood-count');
+    if(woodEl) woodEl.innerText = wood;
     
     document.getElementById('power-display').innerText = `🔥 戰力: ${totalPower}`; 
 }
