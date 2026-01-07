@@ -12,6 +12,61 @@ import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/p
 import * as Inventory from './js/inventory.js';
 import * as Territory from './js/territory.js';
 
+// ==========================================
+// 🔥 新增：更新主畫面「最新獲得」卡片
+// ==========================================
+function updateLatestCardsUI() {
+    const container = document.getElementById('card-display-area');
+    if (!container) return;
+    
+    // 取得所有卡片並依獲得時間排序 (最新的在前面)
+    const allCards = Inventory.getAllCards();
+    
+    // 如果沒有卡片，顯示提示
+    if (allCards.length === 0) {
+        container.innerHTML = '<p style="color:#7f8c8d; width:100%; text-align:center;">尚無卡片，快去召喚吧！</p>';
+        return;
+    }
+
+    // 排序：處理 Firebase Timestamp 或一般 Date 物件
+    const sortedCards = [...allCards].sort((a, b) => {
+        const getTime = (t) => {
+            if (!t) return 0;
+            if (t.seconds) return t.seconds; // Firestore Timestamp
+            if (typeof t.getTime === 'function') return t.getTime() / 1000; // JS Date
+            return 0;
+        };
+        return getTime(b.obtainedAt) - getTime(a.obtainedAt);
+    });
+    
+    const latestCards = sortedCards.slice(0, 5);
+
+    container.innerHTML = "";
+    latestCards.forEach(card => {
+        const cardDiv = document.createElement('div');
+        const charPath = `assets/cards/${card.id}.webp`;
+        const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
+        
+        cardDiv.className = `card ${card.rarity}`;
+        cardDiv.style.cursor = "pointer";
+        // 點擊可以開啟詳情
+        cardDiv.onclick = () => {
+            const originalIndex = allCards.findIndex(c => c.docId === card.docId);
+            if(originalIndex !== -1) Inventory.openDetailModal(originalIndex);
+        };
+
+        cardDiv.innerHTML = `
+            <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
+            <img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+            <div class="card-info-overlay">
+                <div class="card-name">${card.name}</div>
+            </div>
+            <img src="${framePath}" class="card-frame-img">
+        `;
+        container.appendChild(cardDiv);
+    });
+}
+
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
 };
@@ -77,7 +132,7 @@ setTimeout(() => {
         }, Inventory.openEnemyDetailModal, currencyHandler); 
     }
     
-    // --- 綁定主畫面按鈕事件 (修復點擊無反應問題) ---
+    // --- 綁定主畫面按鈕事件 ---
     
     // 1. 背包按鈕
     const invBtn = document.getElementById('inventory-btn');
@@ -99,7 +154,6 @@ setTimeout(() => {
             playSound('click');
             if (!currentUser) return alert("請先登入");
             document.getElementById('territory-modal').classList.remove('hidden');
-            // 如果 Territory 模組有刷新函式可以在此呼叫，目前假設 init 時已自動處理
         });
     }
 
@@ -130,20 +184,23 @@ setTimeout(() => {
         });
     }
     
-    // 6. Gacha Skip 按鈕
+    // 6. Gacha Skip 按鈕 (更新邏輯)
     const skipBtn = document.getElementById('gacha-skip-btn');
     if (skipBtn) {
         skipBtn.addEventListener('click', () => {
              playSound('click');
              const container = document.getElementById('gacha-reveal-container');
-             // 顯示所有卡片
+             // 清空並顯示所有剩餘卡片
+             container.innerHTML = "";
              gachaQueue.forEach(card => createGachaCardElement(card, container));
              gachaQueue = []; // 清空佇列
+             
              document.getElementById('gacha-next-hint').innerText = "點擊任意處關閉";
              document.getElementById('gacha-reveal-modal').onclick = () => {
                  document.getElementById('gacha-reveal-modal').classList.add('hidden');
                  document.getElementById('gacha-reveal-modal').onclick = null;
                  Inventory.filterInventory('ALL'); // 刷新背包
+                 updateLatestCardsUI(); // 刷新主畫面
              };
         });
     }
@@ -460,14 +517,14 @@ const currencyHandler = (action, data, extraType = 'gold') => {
         if (extraType === 'iron') return iron >= data;
         if (extraType === 'wood') return wood >= data;
         if (extraType === 'food') return food >= data;
-        if (extraType === 'gems') return gems >= data; // 加入鑽石檢查
+        if (extraType === 'gems') return gems >= data; 
         return gold >= data;
     }
     if (action === 'deduct') {
         if (extraType === 'iron') iron -= data;
         else if (extraType === 'wood') wood -= data;
         else if (extraType === 'food') food -= data;
-        else if (extraType === 'gems') gems -= data; // 加入鑽石扣除
+        else if (extraType === 'gems') gems -= data; 
         else gold -= data;
     }
     if (action === 'add') {
@@ -535,6 +592,9 @@ async function loadUserData(user) {
 
     await Inventory.loadInventory(user.uid);
     updatePvpContext(currentUser, Inventory.getAllCards());
+    
+    // 🔥 載入完成後，更新主畫面最新卡片
+    updateLatestCardsUI();
 }
 
 async function updateCurrencyCloud() { 
@@ -615,7 +675,9 @@ if(document.getElementById('sort-select')) document.getElementById('sort-select'
     Inventory.filterInventory(document.querySelector('.filter-btn.active')?.dataset?.filter || 'ALL');
 });
 
-// --- 抽卡系統實作 (Gacha Logic) ---
+// ==========================================
+// 🔥 修改：抽卡系統實作 (Gacha Logic)
+// ==========================================
 
 async function performGacha(times) {
     if (!currentUser) return alert("請先登入！");
@@ -624,63 +686,96 @@ async function performGacha(times) {
     const cost = times * 100;
     if (gems < cost) return alert(`鑽石不足！需要 ${cost} 鑽石`);
     
-    // 扣除資源
+    // 1. 先扣除資源
     gems -= cost;
     updateUIDisplay();
     
     // 播放音效
     playSound('draw');
 
-    // 準備抽卡
+    // 2. 🔥 預先計算結果 (為了決定特效顏色)
     const results = [];
-    const promises = [];
-    const animationDelay = 100;
+    let maxRarityValue = 0; // 1=R, 2=SR, 3=SSR
 
-    // 顯示召喚動畫
+    for (let i = 0; i < times; i++) {
+        let rarity = 'R';
+        let rarityVal = 1;
+        const rand = Math.random();
+        
+        // 十連抽保底機制
+        if (times === 10 && i === 9) {
+            const totalSRSSR = RATES.SSR + RATES.SR;
+            const normalizedSSR = RATES.SSR / totalSRSSR;
+            if (Math.random() < normalizedSSR) { rarity = 'SSR'; rarityVal = 3; }
+            else { rarity = 'SR'; rarityVal = 2; }
+        } else {
+            if (rand < RATES.SSR) { rarity = 'SSR'; rarityVal = 3; }
+            else if (rand < RATES.SSR + RATES.SR) { rarity = 'SR'; rarityVal = 2; }
+            else { rarity = 'R'; rarityVal = 1; }
+        }
+        
+        if (rarityVal > maxRarityValue) maxRarityValue = rarityVal;
+
+        const pool = cardDatabase.filter(c => c.rarity === rarity);
+        const card = pool[Math.floor(Math.random() * pool.length)];
+        results.push(card);
+    }
+
+    // 3. 🔥 設定動畫特效 (根據最高稀有度)
     const overlay = document.getElementById('gacha-overlay');
-    if(overlay) overlay.classList.remove('hidden');
-    
-    // 模擬網路延遲與動畫時間
-    setTimeout(async () => {
-        for (let i = 0; i < times; i++) {
-            let rarity = 'R';
-            const rand = Math.random();
-            
-            // 十連抽保底機制：第10張必為 SR 或 SSR
-            if (times === 10 && i === 9) {
-                // 在 SR 和 SSR 之間骰 (正規化機率)
-                const totalSRSSR = RATES.SSR + RATES.SR;
-                const normalizedSSR = RATES.SSR / totalSRSSR;
-                if (Math.random() < normalizedSSR) rarity = 'SSR';
-                else rarity = 'SR';
-            } else {
-                if (rand < RATES.SSR) rarity = 'SSR';
-                else if (rand < RATES.SSR + RATES.SR) rarity = 'SR';
-                else rarity = 'R';
-            }
-            
-            // 從資料庫撈取該稀有度的卡片池
-            const pool = cardDatabase.filter(c => c.rarity === rarity);
-            const card = pool[Math.floor(Math.random() * pool.length)];
-            
-            // 存入雲端
-            promises.push(Inventory.saveCardToCloud(card));
-            results.push(card);
+    const summonCircle = document.getElementById('summon-circle');
+    const summonBurst = document.getElementById('summon-burst');
+    const summonText = document.getElementById('summon-text');
+
+    if(overlay && summonCircle) {
+        // 重置樣式
+        summonCircle.className = ''; 
+        summonBurst.className = '';
+        summonText.style.color = 'white';
+        summonText.innerText = "召喚中...";
+
+        // 根據稀有度添加光圈樣式
+        if (maxRarityValue === 3) {
+            // SSR
+            summonCircle.classList.add('glow-ssr');
+            summonBurst.classList.add('burst-active'); 
+            summonText.style.color = '#f1c40f';
+            summonText.innerText = "✨ 傳說降臨 ✨";
+            playSound('ssr'); 
+        } else if (maxRarityValue === 2) {
+            // SR
+            summonCircle.classList.add('glow-sr');
+            summonText.style.color = '#9b59b6';
+        } else {
+            // R
+            summonCircle.classList.add('glow-r');
         }
 
+        overlay.classList.remove('hidden');
+    }
+
+    // 4. 背景執行儲存
+    const promises = results.map(card => Inventory.saveCardToCloud(card));
+    
+    // 動畫等待時間
+    setTimeout(async () => {
         try {
-            await Promise.all(promises);
-            await updateCurrencyCloud(); // 儲存扣款結果
+            const savedCards = await Promise.all(promises);
+            await updateCurrencyCloud(); 
             
             // 隱藏召喚動畫，顯示結果
             if(overlay) overlay.classList.add('hidden');
-            showGachaReveal(results);
+            
+            showGachaReveal(savedCards);
+            
+            // 🔥 抽完後立即更新主畫面的最新卡片
+            updateLatestCardsUI();
         } catch (e) {
             console.error("抽卡錯誤", e);
             alert("抽卡過程發生錯誤，請聯繫管理員");
             if(overlay) overlay.classList.add('hidden');
         }
-    }, 2000); // 2秒動畫
+    }, 2500);
 }
 
 function showGachaReveal(cards) {
@@ -708,6 +803,7 @@ function showGachaReveal(cards) {
             modal.classList.add('hidden');
             modal.onclick = null;
             Inventory.filterInventory('ALL'); // 刷新背包
+            updateLatestCardsUI(); // 再次確保刷新主畫面
         }
     };
 }
@@ -717,9 +813,6 @@ function showNextGachaCard() {
     if (!card) return;
     
     const container = document.getElementById('gacha-reveal-container');
-    
-    // 如果是 10 連抽，我們一次顯示一張大的，或者如果是單抽就顯示一張
-    // 這裡採用覆蓋式顯示：清空容器顯示當前這張
     container.innerHTML = ""; 
     
     createGachaCardElement(card, container);
@@ -740,7 +833,7 @@ function createGachaCardElement(card, container) {
     const charPath = `assets/cards/${card.id}.webp`;
     const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
     
-    cardDiv.className = `large-card ${card.rarity} reveal-anim`; // 加上動畫 class
+    cardDiv.className = `large-card ${card.rarity} reveal-anim`; 
     cardDiv.innerHTML = `
         <div class="large-card-inner">
             <div class="large-card-front ${card.rarity === 'SSR' ? 'ssr-effect' : ''}">
@@ -829,30 +922,24 @@ function deployHeroToSlot(slotIndex, card) {
     return true;
 }
 
-// 🔥🔥 大幅優化：使用 index.html 定義的 CSS 類別來渲染布陣格子
 function renderBattleSlots() {
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
     battleSlotsEl.forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); 
         
-        // 清空舊內容
         const existingInfo = slotDiv.querySelector('.deploy-card-info'); 
         const existingImgs = slotDiv.querySelectorAll('img');
         if (existingInfo) existingInfo.remove();
         existingImgs.forEach(img => img.remove());
 
-        // 重置樣式以防殘留
         slotDiv.style.background = ''; 
 
         if (hero) {
             placeholder.style.display = 'none'; 
             slotDiv.classList.add('active');
-            
-            // 🔥 移除半透明背景，確保卡片清晰
             slotDiv.style.background = 'none';
 
-            // 準備數據
             const charPath = `assets/cards/${hero.id}.webp`; 
             const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
             const level = hero.level || 1;
@@ -860,28 +947,23 @@ function renderBattleSlots() {
             const starStr = stars > 0 ? '★'.repeat(stars) : '';
             const power = hero.atk + hero.hp;
 
-            // 判斷兵種
             const baseConfig = cardDatabase.find(c => c.id == hero.id);
             const uType = baseConfig ? (baseConfig.unitType || 'INFANTRY') : 'INFANTRY';
             let typeIcon = '⚔️'; 
             if(uType === 'CAVALRY') typeIcon = '🐴';
             else if(uType === 'ARCHER') typeIcon = '🏹';
 
-            // 建立 HTML 結構
-            // 1. 底圖 (確保不透明)
             const img = document.createElement('img');
             img.src = charPath;
             img.onerror = () => { this.src='https://placehold.co/120x180?text=No+Image'; };
             img.style.cssText = "width:100%; height:100%; object-fit:cover; border-radius:6px; display:block; opacity: 1;";
             slotDiv.appendChild(img);
 
-            // 2. 框
             const frame = document.createElement('img');
             frame.src = framePath;
             frame.style.cssText = "position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; border-radius:6px;";
             slotDiv.appendChild(frame);
 
-            // 3. 資訊覆蓋層 (使用 index.html 定義的 class)
             const infoDiv = document.createElement('div');
             infoDiv.className = 'deploy-card-info';
             infoDiv.innerHTML = `
@@ -895,7 +977,6 @@ function renderBattleSlots() {
         } else { 
             placeholder.style.display = 'block'; 
             slotDiv.classList.remove('active'); 
-            // 恢復半透明黑底給空格子
             slotDiv.style.background = 'rgba(0, 0, 0, 0.3)';
         }
     });
@@ -903,7 +984,6 @@ function renderBattleSlots() {
     updateStartButton(); 
 }
 
-// 修正：加入戰力計算與糧食消耗顯示
 function updateStartButton() {
     const btn = document.getElementById('start-battle-btn');
     const foodCostEl = document.getElementById('battle-food-cost');
@@ -956,14 +1036,12 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
     updateStartButton();
 });
 
-// 🔥 新增：戰鬥結算掉落木頭
 async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     const diffSettings = DIFFICULTY_SETTINGS[currentDifficulty] || DIFFICULTY_SETTINGS['normal'];
     let goldMultiplier = currentDifficulty === 'easy' ? 0.5 : (currentDifficulty === 'hard' ? 2.0 : 1.0);
     let finalGold = Math.floor(earnedGold * goldMultiplier);
     let gemReward = isWin ? (diffSettings.gemReward || 0) : 0;
     
-    // 🔥 木頭掉落：金幣的 20%
     let ironReward = isWin ? Math.floor(finalGold * 0.1) : 0; 
     let woodReward = isWin ? Math.floor(finalGold * 0.2) : 0; 
 
@@ -982,7 +1060,6 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
         title.innerText = "DEFEAT"; title.className = "result-title lose-text"; gemText.style.display = 'none'; playSound('dismantle'); 
     }
     
-    // 更新 UI 顯示 (加入木頭)
     goldText.innerHTML = `💰 +${finalGold}<br>⛏️ +${ironReward} | 🪵 +${woodReward}`;
     
     gold += finalGold; gems += gemReward; iron += ironReward; wood += woodReward;
@@ -1038,7 +1115,6 @@ function checkUnreadNotifications() {
     }
 }
 
-// 載入排行榜 (簡單實作)
 async function loadLeaderboard() {
     const list = document.getElementById('leaderboard-list');
     if (!list) return;

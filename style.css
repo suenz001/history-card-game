@@ -1582,3 +1582,86 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 }
 `
 }
+
+/* style.css */
+
+/* Gacha Overlay */
+#gacha-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 2000; /* 提高層級，確保蓋住所有介面 */
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+}
+
+/* 召喚陣基礎 */
+#summon-circle {
+    width: 150px; height: 150px;
+    border-radius: 50%;
+    background: transparent;
+    border: 5px solid rgba(255,255,255,0.5);
+    transition: all 0.5s;
+    z-index: 2002;
+    position: relative;
+}
+
+/* R 卡特效 (藍光) */
+.glow-r {
+    box-shadow: 0 0 30px #3498db, inset 0 0 20px #3498db;
+    border-color: #3498db !important;
+    animation: pulse 1s infinite alternate;
+}
+
+/* SR 卡特效 (紫光) */
+.glow-sr {
+    box-shadow: 0 0 50px #9b59b6, inset 0 0 30px #8e44ad;
+    border-color: #9b59b6 !important;
+    animation: spin-pulse 2s infinite linear; /* 旋轉加閃爍 */
+}
+
+/* SSR 卡特效 (金光 + 爆閃) */
+.glow-ssr {
+    box-shadow: 
+        0 0 60px #f1c40f, 
+        0 0 100px #f39c12, 
+        inset 0 0 40px #f1c40f;
+    border-color: #f1c40f !important;
+    background: radial-gradient(circle, rgba(255,215,0,0.2) 0%, transparent 70%);
+    animation: super-shake 0.2s infinite, pulse-gold 0.5s infinite alternate;
+}
+
+/* SSR 爆發光束 (背景) */
+#summon-burst {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 0; height: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 10%, #f1c40f 40%, transparent 70%);
+    opacity: 0;
+    z-index: 2001;
+}
+
+.burst-active {
+    animation: holyBurst 2.5s forwards ease-out;
+}
+
+/* 動畫定義 */
+@keyframes pulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.1); opacity: 1; } }
+@keyframes pulse-gold { from { opacity: 0.8; filter: brightness(1); } to { opacity: 1; filter: brightness(1.5); } }
+@keyframes spin-pulse { 
+    0% { transform: rotate(0deg) scale(1); box-shadow: 0 0 30px #9b59b6; } 
+    50% { transform: rotate(180deg) scale(1.1); box-shadow: 0 0 60px #9b59b6; } 
+    100% { transform: rotate(360deg) scale(1); box-shadow: 0 0 30px #9b59b6; } 
+}
+@keyframes super-shake { 
+    0% { transform: translate(1px, 1px) rotate(0deg); } 
+    25% { transform: translate(-1px, -2px) rotate(-1deg); } 
+    50% { transform: translate(-2px, 0px) rotate(1deg); } 
+    75% { transform: translate(2px, 1px) rotate(-1deg); } 
+    100% { transform: translate(1px, -1px) rotate(0deg); } 
+}
+@keyframes holyBurst { 
+    0% { width: 0; height: 0; opacity: 1; } 
+    20% { width: 150vw; height: 150vw; opacity: 0.8; } 
+    100% { width: 200vw; height: 200vw; opacity: 0; } 
+}
