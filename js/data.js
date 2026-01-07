@@ -7,19 +7,19 @@ export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 // 數值已針對新版低攻擊力環境進行微調
 export const DIFFICULTY_SETTINGS = {
     easy:   { 
-        hpMult: 0.8,    // 簡單模式敵人血量略降
+        hpMult: 1.8,    // 簡單模式敵人血量略降
         atkMult: 0.7,   // 簡單模式敵人攻擊降低
         goldMult: 0.6,  
         gemReward: 150  
     },
     normal: { 
-        hpMult: 1.0, 
+        hpMult: 2.0, 
         atkMult: 1.0, 
         goldMult: 1.0, 
         gemReward: 250 
     },
     hard:   { 
-        hpMult: 1.5,    // 困難模式血量倍率適度下修，避免戰鬥過長
+        hpMult: 2.5,    // 困難模式血量倍率適度下修，避免戰鬥過長
         atkMult: 1.5,   
         goldMult: 2.0, 
         gemReward: 350 
@@ -28,7 +28,7 @@ export const DIFFICULTY_SETTINGS = {
 
 // 🔥 系統通知設定
 export const SYSTEM_NOTIFICATIONS = [
-    { id: 'open_beta_gift', title: '🎉 開服測試，送5000鑽', reward: { type: 'gems', amount: 5000 }, isSystem: true }
+    { id: 'open_beta_gift', title: '🎉 開服大禮包，送5000鑽', reward: { type: 'gems', amount: 5000 }, isSystem: true }
 ];
 
 // ==========================================
@@ -37,7 +37,7 @@ export const SYSTEM_NOTIFICATIONS = [
 // 針對新版數值調整了 Boss 的固定數值
 const DEFAULT_WAVES = {
     1: { 
-        count: 8, 
+        count: 6, 
         hpMult: 0.8,   
         atkMult: 0.8,  
         enemyPool: [8, 9] 
@@ -49,7 +49,7 @@ const DEFAULT_WAVES = {
         enemyPool: [8, 9, 28] 
     },
     3: { 
-        count: 20, 
+        count: 24, 
         hpMult: 1.2, 
         atkMult: 1.1, 
         enemyPool: [10, 11, 24] 
@@ -76,7 +76,7 @@ wavesLevel1[1].enemyPool = [8, 9];
 wavesLevel1[2].enemyPool = [8, 9, 28]; 
 wavesLevel1[3].enemyPool = [24, 8, 9]; 
 wavesLevel1[4] = { 
-    count: 1, hp: 5000, atk: 120, bossId: 1, 
+    count: 1, hp: 15000, atk: 1120, bossId: 1, 
     aoeConfig: { radius: 18, damageMult: 1.2, effect: 'shockwave', color: '#f1c40f' } 
 };
 
@@ -89,7 +89,7 @@ wavesLevel2[1].enemyPool = [8, 28];
 wavesLevel2[2].enemyPool = [8, 28, 30]; 
 wavesLevel2[3].enemyPool = [8, 24, 30]; 
 wavesLevel2[4] = { 
-    count: 1, hp: 7500, atk: 140, bossId: 2, 
+    count: 1, hp: 17500, atk: 140, bossId: 2, 
     aoeConfig: { radius: 20, damageMult: 1.3, effect: 'shockwave', color: '#e67e22' } 
 };
 
@@ -99,7 +99,7 @@ wavesLevel3[1].enemyPool = [29, 24];
 wavesLevel3[2].enemyPool = [29, 12, 24]; 
 wavesLevel3[3].enemyPool = [29, 30, 25]; 
 wavesLevel3[4] = { 
-    count: 1, hp: 10000, atk: 160, bossId: 3, 
+    count: 1, hp: 20000, atk: 1160, bossId: 3, 
     aoeConfig: { radius: 25, damageMult: 1.5, effect: 'explosion', color: '#c0392b' } 
 };
 
@@ -109,7 +109,7 @@ wavesLevel4[1].enemyPool = [25, 30];
 wavesLevel4[2].enemyPool = [25, 29, 24]; 
 wavesLevel4[3].enemyPool = [25, 12, 10]; 
 wavesLevel4[4] = { 
-    count: 1, hp: 13000, atk: 180, bossId: 13, 
+    count: 1, hp: 23000, atk: 1180, bossId: 13, 
     aoeConfig: { radius: 22, damageMult: 1.4, effect: 'storm', color: '#27ae60' } 
 };
 
@@ -119,7 +119,7 @@ wavesLevel5[1].enemyPool = [9, 8];
 wavesLevel5[2].enemyPool = [9, 12, 28]; 
 wavesLevel5[3].enemyPool = [9, 24, 30]; 
 wavesLevel5[4] = { 
-    count: 1, hp: 16000, atk: 200, bossId: 14, 
+    count: 1, hp: 26000, atk: 1200, bossId: 14, 
     aoeConfig: { radius: 20, damageMult: 1.6, effect: 'shockwave', color: '#8e44ad' } 
 };
 
@@ -129,7 +129,7 @@ wavesLevel6[1].enemyPool = [28, 30];
 wavesLevel6[2].enemyPool = [28, 9, 25]; 
 wavesLevel6[3].enemyPool = [12, 30, 29]; 
 wavesLevel6[4] = { 
-    count: 1, hp: 20000, atk: 220, bossId: 15, 
+    count: 1, hp: 30000, atk: 1220, bossId: 15, 
     aoeConfig: { radius: 25, damageMult: 1.8, effect: 'shockwave', color: '#7f8c8d' } 
 };
 
@@ -139,7 +139,7 @@ wavesLevel7[1].enemyPool = [30, 28];
 wavesLevel7[2].enemyPool = [30, 24, 26]; 
 wavesLevel7[3].enemyPool = [26, 25, 29]; 
 wavesLevel7[4] = { 
-    count: 1, hp: 25000, atk: 240, bossId: 16, 
+    count: 1, hp: 35000, atk: 1240, bossId: 16, 
     aoeConfig: { radius: 28, damageMult: 1.5, effect: 'storm', color: '#9b59b6' } 
 };
 
@@ -149,7 +149,7 @@ wavesLevel8[1].enemyPool = [10, 26];
 wavesLevel8[2].enemyPool = [10, 26, 25]; 
 wavesLevel8[3].enemyPool = [10, 26, 29]; 
 wavesLevel8[4] = { 
-    count: 1, hp: 32000, atk: 280, bossId: 17, 
+    count: 1, hp: 42000, atk: 1280, bossId: 17, 
     aoeConfig: { radius: 20, damageMult: 2.5, effect: 'slash_spin', color: '#3498db' } 
 };
 
