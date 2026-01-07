@@ -135,7 +135,7 @@ if(document.getElementById('redeem-btn')) {
 
         if (code === 'make diamond') { gems += 5000; alert("💎 獲得 5000 鑽石！"); } 
         else if (code === 'make gold') { gold += 50000; alert("💰 獲得 50000 金幣！"); } 
-        else if (code === 'make iron') { iron += 5000; alert(⛏️ 獲得 5000 鐵礦！"); }
+        else if (code === 'make iron') { iron += 5000; alert("⛏️ 獲得 5000 鐵礦！"); }
         else if (code === 'make food') { food += 5000; alert("🌾 獲得 5000 糧食！"); } // 🔥 新增作弊碼
         else if (code === 'make wood') { wood += 5000; alert("🪵 獲得 5000 木頭！"); } // 🔥 新增作弊碼
         else if (code === 'unlock stage') {
