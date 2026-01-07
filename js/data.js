@@ -420,3 +420,51 @@ export const cardDatabase = [
         title: "長弓部隊", attackType: "ranged", skillKey: "HEAVY_STRIKE", skillParams: { dmgMult: 1.5 } 
     }
 ];
+
+// js/data.js (請加在最下方)
+
+// 🔥 領地建築設定
+export const BUILDING_CONFIG = {
+    town_center: {
+        id: 'town_center',
+        name: "城鎮中心",
+        description: "領地的核心，限制其他建築的等級上限。",
+        baseCost: 1000,      // 升級基礎金幣
+        costFactor: 1.5,     // 升級倍率 (等級^1.5)
+        type: 'core',        // 類型
+        maxLevel: 20
+    },
+    farm: {
+        id: 'farm',
+        name: "農田",
+        description: "種植作物，隨時間產出糧食。",
+        baseCost: 500,
+        costFactor: 1.4,
+        type: 'resource',
+        resourceType: 'food',
+        baseProd: 60,        // 基礎產量 (每小時)
+        prodFactor: 1.2      // 升級產量倍率
+    },
+    mine: {
+        id: 'mine',
+        name: "鐵礦場",
+        description: "開採礦脈，隨時間產出鐵礦。",
+        baseCost: 800,
+        costFactor: 1.4,
+        type: 'resource',
+        resourceType: 'iron',
+        baseProd: 30,        // 基礎產量 (每小時)
+        prodFactor: 1.2
+    },
+    lumber_mill: {
+        id: 'lumber_mill',
+        name: "伐木場",
+        description: "砍伐林木，隨時間產出木材。",
+        baseCost: 600,
+        costFactor: 1.4,
+        type: 'resource',
+        resourceType: 'wood',
+        baseProd: 40,        // 基礎產量 (每小時)
+        prodFactor: 1.2
+    }
+};
