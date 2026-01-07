@@ -18,8 +18,10 @@ export let gameSpeed = 1;
 let currentLevelId = 1; 
 
 let pvpPlayerTeamData = [];
-// 🔥 新增：儲存使用者通關進度
 let userProgress = {}; 
+
+// 🔥 新增：用來檢查和扣除資源的回調函式
+let currencyHandlerRef = null;
 
 let battleState = {
     wave: 1, 
@@ -43,6 +45,11 @@ export function setDifficulty(diff) { currentDifficulty = diff; }
 export function setGameSpeed(speed) { gameSpeed = speed; } 
 export function setOnBattleEnd(callback) { onBattleEndCallback = callback; }
 
+// 🔥 新增：設定資源管理器
+export function setCurrencyValidator(handler) {
+    currencyHandlerRef = handler;
+}
+
 function ensureBattleListeners() {
     const startBtn = document.getElementById('start-battle-btn');
     if (startBtn && !startBtn.dataset.initialized) {
@@ -51,10 +58,9 @@ function ensureBattleListeners() {
     }
 }
 
-// 🔥 修改：initBattle 接收 progress 參數
 export function initBattle(levelId = 1, progress = {}) {
     currentLevelId = levelId;
-    userProgress = progress; // 存下進度
+    userProgress = progress; 
     ensureBattleListeners(); 
     prepareLevel();
 }
@@ -77,7 +83,6 @@ function setupBattleListeners() {
         });
     }
     
-    // 綁定難度按鈕
     document.querySelectorAll('.difficulty-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             if(isBattleActive) return; 
@@ -170,16 +175,57 @@ function renderBattleSlots() {
             placeholder.style.display = 'block'; slotDiv.classList.remove('active'); 
         }
     });
+    
+    // 每次渲染插槽時也更新按鈕狀態 (因為陣容變了，費用也會變)
+    updateStartButton();
 }
 
+// 🔥 修改：更新按鈕顯示，包含糧食費用
 function updateStartButton() {
-    const btn = document.getElementById('start-battle-btn'); const deployedCount = battleSlots.filter(s => s !== null).length;
-    if (deployedCount > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `⚔️ 開始戰鬥 (${deployedCount}/9)`; } 
-    else { btn.classList.add('btn-disabled'); btn.innerText = `請先部署英雄`; }
+    const btn = document.getElementById('start-battle-btn'); 
+    const deployedHeroes = battleSlots.filter(s => s !== null);
+    const deployedCount = deployedHeroes.length;
+    
+    if (deployedCount > 0) { 
+        let totalPower = 0;
+        deployedHeroes.forEach(h => totalPower += (h.atk + h.hp));
+        
+        // 🔥 計算糧食消耗 (總戰力的 1%)
+        const foodCost = Math.ceil(totalPower * 0.01);
+
+        btn.classList.remove('btn-disabled'); 
+        // 支援 HTML 換行顯示費用
+        btn.innerHTML = `⚔️ 開始戰鬥 <span style="font-size:0.8em">(${deployedCount}/9)</span><br><span style="font-size:0.7em; color:#f1c40f;">🌾 -${foodCost} 糧食</span>`; 
+        
+        // 將費用存入 dataset 供點擊時讀取
+        btn.dataset.cost = foodCost;
+    } 
+    else { 
+        btn.classList.add('btn-disabled'); 
+        btn.innerText = `請先部署英雄`; 
+        btn.dataset.cost = 0;
+    }
 }
 
+// 🔥 修改：開始戰鬥邏輯，加入扣糧判斷
 function startBattle() {
     if (isBattleActive) return;
+    
+    // 1. 檢查糧食
+    const btn = document.getElementById('start-battle-btn');
+    const cost = parseInt(btn.dataset.cost || 0);
+    
+    if (currencyHandlerRef) {
+        // 檢查是否足夠
+        if (!currencyHandlerRef('check', cost, 'food')) {
+            alert(`糧食不足！\n本次出戰需要 ${cost} 糧食\n(依據部隊戰力計算)`);
+            return;
+        }
+        // 扣除糧食
+        currencyHandlerRef('deduct', cost, 'food');
+        currencyHandlerRef('refresh'); // 更新 UI
+    }
+
     isPvpMode = false; 
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'flex'; 
@@ -332,7 +378,6 @@ function spawnHeroes() {
         el.style.backgroundImage = `url(assets/cards/${card.id}.webp)`;
         el.style.left = `${startPos}%`;
         el.style.top = `${startY}%`;
-        // 🔥 移除行內 transform，改由 CSS 控制
         
         el.innerHTML = `
             <div class="hero-hp-bar"><div style="width:100%"></div></div>
@@ -442,8 +487,6 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     el.style.backgroundSize = 'cover';
     el.style.left = `${startPos}%`;
     el.style.top = `${startY}%`;
-    
-    // 🔥 修正：敵人預設面向左，這裡加上 unit-flipped class
     el.classList.add('unit-flipped');
 
     if(!enemyCard.isBoss) { el.style.border = '2px solid #e74c3c'; }
@@ -628,15 +671,11 @@ function fireBossSkill(boss) {
     }, 600); 
 }
 
-// js/battle.js - 替換原本的 updateBattleUI 函式
-
 function updateBattleUI() {
     try {
-        // 1. 更新金幣
         const goldEl = document.getElementById('battle-gold');
         if(goldEl) goldEl.innerText = battleGold; 
         
-        // 2. 控制金幣與波次顯示 (PVP 模式隱藏)
         const goldContainer = document.getElementById('battle-gold-container');
         if (goldContainer) {
             goldContainer.style.display = isPvpMode ? 'none' : 'inline';
@@ -647,29 +686,24 @@ function updateBattleUI() {
             waveContainer.style.display = isPvpMode ? 'none' : 'inline';
         }
 
-        // 3. 更新波次
         if (!isPvpMode) {
             const waveEl = document.getElementById('wave-count');
             if(waveEl) waveEl.innerText = battleState.wave;
         }
         
-        // 4. 更新存活英雄數
         const countEl = document.getElementById('hero-count-display');
         if(countEl) countEl.innerText = heroEntities.length;
 
-        // 🔥 5. 新增：計算並顯示目前戰力 (攻擊力 + 當前血量)
         const powerEl = document.getElementById('current-battle-power');
         if (powerEl) {
             let currentTotalPower = 0;
             heroEntities.forEach(hero => {
-                // 戰力 = 攻擊力 + 當前血量 (這樣受傷或死掉戰力會下降)
                 if (hero.currentHp > 0) {
                     currentTotalPower += (hero.atk + hero.currentHp);
                 }
             });
             powerEl.innerText = Math.floor(currentTotalPower);
         }
-        
     } catch(e) {
         console.warn("UI Update Warning:", e); 
     }
@@ -801,11 +835,10 @@ function gameLoop() {
             hero.el.querySelector('.hero-mana-bar div').style.width = `${manaPercent}%`;
             if(hero.currentMana >= hero.maxMana) hero.el.classList.add('mana-full'); else hero.el.classList.remove('mana-full');
 
-            // 🔥 修正轉向邏輯：使用 class 控制
             if (nearestEnemy && nearestEnemy.position < hero.position) {
-                hero.el.classList.add('unit-flipped'); // 面向左
+                hero.el.classList.add('unit-flipped'); 
             } else {
-                hero.el.classList.remove('unit-flipped'); // 面向右 (預設)
+                hero.el.classList.remove('unit-flipped'); 
             }
         }
     }
@@ -908,11 +941,10 @@ function gameLoop() {
             enemy.el.style.left = `${enemy.position}%`; enemy.el.style.top = `${enemy.y}%`;
             enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
             
-            // 🔥 修正轉向邏輯：使用 class 控制
             if (nearestHero && nearestHero.position > enemy.position) {
-                enemy.el.classList.remove('unit-flipped'); // 英雄在右邊，面向右
+                enemy.el.classList.remove('unit-flipped'); 
             } else {
-                enemy.el.classList.add('unit-flipped'); // 英雄在左邊，面向左
+                enemy.el.classList.add('unit-flipped'); 
             }
         }
     }

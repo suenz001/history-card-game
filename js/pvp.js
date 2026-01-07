@@ -15,13 +15,16 @@ export let currentEnemyData = null;
 
 let requestOpenInventory = null;
 let showEnemyCardCallback = null;
+let onCurrencyUpdate = null; // 🔥 新增：資源扣除回調
 
-export function initPvp(database, user, inventory, openInventoryCallback, onCardClick) {
+// 🔥 修改：接收 currencyCallback
+export function initPvp(database, user, inventory, openInventoryCallback, onCardClick, currencyCallback) {
     db = database;
     currentUser = user;
     allUserCards = inventory;
     requestOpenInventory = openInventoryCallback; 
     showEnemyCardCallback = onCardClick; 
+    onCurrencyUpdate = currencyCallback; // 存下來
 
     const pvpBtn = document.getElementById('pvp-menu-btn');
     if (pvpBtn) {
@@ -94,25 +97,19 @@ export function updatePvpContext(user, inventory) {
 
 function getCardPower(card) {
     if (!card) return 0;
-    
     if (card.atk !== undefined && card.hp !== undefined) {
         return card.atk + card.hp;
     }
-
     const baseConfig = cardDatabase.find(c => String(c.id) === String(card.id));
     if (baseConfig) {
         const level = card.level || 1;
         const stars = card.stars || 1;
-        
         const levelBonus = (level - 1) * 0.03;
         const starBonus = (stars - 1) * 0.20;
-        
         const finalAtk = Math.floor(baseConfig.atk * (1 + levelBonus) * (1 + starBonus));
         const finalHp = Math.floor(baseConfig.hp * (1 + levelBonus) * (1 + starBonus));
-        
         return finalAtk + finalHp;
     }
-    
     return 0;
 }
 
@@ -126,6 +123,14 @@ function updateMyArenaPowerDisplay() {
     });
     
     powerEl.innerText = currentTeamPower;
+    
+    // 🔥 同步更新開戰按鈕上的糧食消耗提示
+    const btn = document.getElementById('start-pvp-battle-btn');
+    if(btn) {
+        const foodCost = Math.ceil(currentTeamPower * 0.01);
+        btn.innerHTML = `⚔️ 開戰 (奪取 5% 金幣)<br><span style="font-size:0.7em; color:#f1c40f;">🌾 -${foodCost} 糧食</span>`;
+        btn.dataset.cost = foodCost;
+    }
 }
 
 async function openPvpModal() {
@@ -228,7 +233,6 @@ function renderPvpSlots(type) {
 
 function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !== null).length; const btn = document.getElementById('save-pvp-team-btn'); if (count > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `💾 儲存防守陣容 (${count}/6)`; } else { btn.classList.add('btn-disabled'); btn.innerText = "請至少配置 1 名英雄"; } }
 
-// 🔥 修正：確保所有欄位都有預設值，防止 undefined 錯誤
 async function saveDefenseTeam() {
     if (!currentUser) return;
     const count = pvpDefenseSlots.filter(x => x !== null).length; 
@@ -244,8 +248,6 @@ async function saveDefenseTeam() {
         pvpDefenseSlots.forEach((hero, index) => { 
             if (hero) { 
                 const baseConfig = cardDatabase.find(c => String(c.id) === String(hero.id));
-                
-                // 嚴格檢查：如果 data.js 裡沒有設定，則使用預設值
                 const safeTitle = (baseConfig && baseConfig.title) || hero.title || "";
                 const safeSkillKey = (baseConfig && baseConfig.skillKey) || "HEAVY_STRIKE";
                 const safeSkillParams = (baseConfig && baseConfig.skillParams) || { dmgMult: 2.0 };
@@ -557,6 +559,7 @@ function renderMatchup() {
     }
 }
 
+// 🔥 修改：啟動 PVP 戰鬥，增加糧食檢查
 async function startActualPvp() {
     if (!currentEnemyData) return;
 
@@ -564,6 +567,25 @@ async function startActualPvp() {
     if (myCount === 0) return alert("請至少配置 1 名進攻英雄！");
     if (myCount > 6) return alert("進攻英雄不能超過 6 名！");
     
+    // 1. 計算糧食費用
+    let totalPower = 0;
+    pvpAttackSlots.forEach(h => { if(h) totalPower += (h.atk + h.hp); });
+    const foodCost = Math.ceil(totalPower * 0.01);
+
+    // 2. 檢查與扣除
+    if (onCurrencyUpdate) {
+        if (!onCurrencyUpdate('check', foodCost, 'food')) {
+            alert(`糧食不足！無法開戰\n需要 ${foodCost} 糧食 (依據戰力)`);
+            return;
+        }
+        
+        // 再次確認
+        if(!confirm(`確定要消耗 ${foodCost} 糧食開始進攻嗎？`)) return;
+
+        onCurrencyUpdate('deduct', foodCost, 'food');
+        onCurrencyUpdate('refresh');
+    }
+
     saveAttackTeam(); 
 
     document.getElementById('pvp-arena-modal').classList.add('hidden');
