@@ -765,7 +765,7 @@ async function performGacha(times) {
             summonCircle.classList.add('glow-ssr');
             summonBurst.classList.add('burst-active'); 
             summonText.style.color = '#f1c40f';
-            summonText.innerText = "✨ 傳說降臨 ✨";
+            summonText.innerText = "✨ SSR降臨 ✨";
             playSound('ssr'); 
         } else if (maxRarityValue === 2) {
             // SR
@@ -1085,7 +1085,7 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
         title.innerText = "DEFEAT"; title.className = "result-title lose-text"; gemText.style.display = 'none'; playSound('dismantle'); 
     }
     
-    goldText.innerHTML = `💰 +${finalGold}<br>⛏️ +${ironReward} | 🪵 +${woodReward}`;
+    goldText.innerHTML = `💰 +${finalGold}<br>🔩 +${ironReward} | 🌲 +${woodReward}`;
     
     gold += finalGold; gems += gemReward; iron += ironReward; wood += woodReward;
     
