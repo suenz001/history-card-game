@@ -206,6 +206,7 @@ function renderUpgradeButton(type, data, config) {
     </button>`;
 }
 
+// 修改：將文字放到 div 內部，以便進行絕對定位
 function renderProgressBar(type, data, config) {
     if (data.upgradeEndTime <= Date.now()) return '';
     
@@ -216,12 +217,12 @@ function renderProgressBar(type, data, config) {
     const elapsedMs = totalMs - remainingMs;
     const percent = Math.max(0, Math.min(100, (elapsedMs / totalMs) * 100));
 
-    // 修改：將 span 移到 div 外面，避免被 overflow:hidden 遮擋
+    // 修改：將 span 移到 div 裡面
     return `
         <div class="build-progress-bar" id="progress-box-${type}">
             <div class="fill" id="progress-fill-${type}" style="width:${percent}%"></div>
+            <span class="timer-text" id="timer-${type}" data-type="${type}" data-end="${data.upgradeEndTime}">計算中...</span>
         </div>
-        <span class="timer-text" id="timer-${type}" data-type="${type}" data-end="${data.upgradeEndTime}">計算中...</span>
     `;
 }
 
