@@ -50,10 +50,9 @@ function updateLatestCardsUI() {
         
         cardDiv.className = `card ${card.rarity}`;
         cardDiv.style.cursor = "pointer";
-        // 點擊可以開啟詳情
+        // 🔥 修改：直接使用物件呼叫，解決 Index 錯亂問題
         cardDiv.onclick = () => {
-            const originalIndex = allCards.findIndex(c => c.docId === card.docId);
-            if(originalIndex !== -1) Inventory.openDetailModal(originalIndex);
+            Inventory.openCardModal(card);
         };
 
         cardDiv.innerHTML = `
