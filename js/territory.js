@@ -7,7 +7,7 @@ const BUILDING_CONFIG = {
     castle: { 
         name: "🏰 主堡", 
         desc: "領地的核心，限制其他建築的最高等級。",
-        baseCost: 1000, costFactor: 1.5, // 升級消耗金幣
+        baseCost: 1000, costFactor: 1.5, 
         baseTime: 60, timeFactor: 1.2, // 秒
         maxLevel: 10 
     },
@@ -32,7 +32,7 @@ const BUILDING_CONFIG = {
         desc: "決定資源的儲存上限 (時間限制)。",
         baseCost: 400, costFactor: 1.3, 
         baseTime: 20, timeFactor: 1.1, 
-        baseCapHours: 4, capFactor: 1.15 // 初始 4 小時，每級增加
+        baseCapHours: 4, capFactor: 1.15 
     }
 };
 
@@ -48,6 +48,9 @@ export function initTerritory(database, user, data, currencyCallback) {
     currentUser = user;
     territoryData = data || createDefaultTerritory();
     onCurrencyUpdate = currencyCallback;
+
+    // 初始化時立即檢查離線升級狀態
+    checkOfflineUpgrades();
 
     // 綁定 UI 事件
     document.getElementById('territory-btn')?.addEventListener('click', openTerritoryModal);
@@ -70,16 +73,52 @@ function createDefaultTerritory() {
     };
 }
 
+// --- 核心邏輯：離線升級檢查 ---
+async function checkOfflineUpgrades() {
+    const now = Date.now();
+    let hasUpdates = false;
+    const updates = {};
+
+    for (const type in territoryData) {
+        const buildData = territoryData[type];
+        // 如果有設定結束時間，且時間已過
+        if (buildData.upgradeEndTime > 0 && buildData.upgradeEndTime <= now) {
+            console.log(`[離線升級] ${type} 升級完成！`);
+            buildData.level++;
+            buildData.upgradeEndTime = 0;
+            
+            updates[`territory.${type}.level`] = buildData.level;
+            updates[`territory.${type}.upgradeEndTime`] = 0;
+            hasUpdates = true;
+        }
+    }
+
+    if (hasUpdates && currentUser) {
+        try {
+            await updateDoc(doc(db, "users", currentUser.uid), updates);
+            console.log("離線升級資料已同步至雲端");
+        } catch (e) {
+            console.error("同步離線升級失敗", e);
+        }
+    }
+}
+
 // --- UI 邏輯 ---
 
 function openTerritoryModal() {
     playSound('click');
-    document.getElementById('territory-modal').classList.remove('hidden');
-    renderTerritory();
     
-    // 啟動計時器更新 UI (倒數計時、產量更新)
-    if (uiUpdateInterval) clearInterval(uiUpdateInterval);
-    uiUpdateInterval = setInterval(updateTerritoryUI, 1000);
+    // 開啟前再檢查一次狀態，避免掛機時時間到了沒更新
+    checkOfflineUpgrades().then(() => {
+        document.getElementById('territory-modal').classList.remove('hidden');
+        renderTerritory();
+        
+        // 啟動計時器更新 UI (倒數計時、產量更新)
+        if (uiUpdateInterval) clearInterval(uiUpdateInterval);
+        uiUpdateInterval = setInterval(updateTerritoryUI, 1000);
+        // 立即執行一次，避免畫面延遲
+        updateTerritoryUI();
+    });
 }
 
 function closeTerritoryModal() {
@@ -137,7 +176,7 @@ function renderTerritory() {
                     ${claimBtn}
                     ${renderUpgradeButton(type, buildData, config)}
                 </div>
-                ${renderProgressBar(buildData)}
+                ${renderProgressBar(type, buildData, config)}
             </div>
         `;
         grid.appendChild(el);
@@ -146,7 +185,7 @@ function renderTerritory() {
 
 function renderUpgradeButton(type, data, config) {
     if (data.upgradeEndTime > Date.now()) {
-        return `<button class="btn-secondary btn-disabled">🚧 建造中...</button>`;
+        return `<button class="btn-secondary btn-disabled" id="btn-upgrade-${type}" disabled>🚧 建造中...</button>`;
     }
     
     // 檢查主堡限制
@@ -167,9 +206,22 @@ function renderUpgradeButton(type, data, config) {
     </button>`;
 }
 
-function renderProgressBar(data) {
+function renderProgressBar(type, data, config) {
     if (data.upgradeEndTime <= Date.now()) return '';
-    return `<div class="build-progress-bar"><div class="fill" style="width:100%"></div><span class="timer-text" data-end="${data.upgradeEndTime}">計算中...</span></div>`;
+    
+    // 計算初始寬度 (避免重新開啟視窗時進度條歸零)
+    // 這裡我們需要重新計算總時間來推算進度，這比儲存開始時間節省資料庫空間
+    const totalTimeSec = Math.floor(config.baseTime * Math.pow(config.timeFactor, data.level));
+    const totalMs = totalTimeSec * 1000;
+    const remainingMs = data.upgradeEndTime - Date.now();
+    const elapsedMs = totalMs - remainingMs;
+    const percent = Math.max(0, Math.min(100, (elapsedMs / totalMs) * 100));
+
+    return `
+        <div class="build-progress-bar" id="progress-box-${type}">
+            <div class="fill" id="progress-fill-${type}" style="width:${percent}%"></div>
+            <span class="timer-text" id="timer-${type}" data-type="${type}" data-end="${data.upgradeEndTime}">計算中...</span>
+        </div>`;
 }
 
 // 倉庫容量 (小時)
@@ -179,7 +231,7 @@ function getWarehouseCapacity() {
     return conf.baseCapHours * Math.pow(conf.capFactor, lv - 1);
 }
 
-// 計算累積資源 (離線收益核心)
+// 計算累積資源
 function calculatePendingResource(type) {
     const data = territoryData[type];
     const config = BUILDING_CONFIG[type];
@@ -218,19 +270,18 @@ async function handleClaim(type) {
     if (amount <= 0) return;
 
     const config = BUILDING_CONFIG[type];
-    const resourceType = config.resource; // 'gold' or 'iron'
+    const resourceType = config.resource;
 
     playSound('coin');
     
     // 更新本地數據
     territoryData[type].lastClaimTime = Date.now();
     
-    // 呼叫 main.js 的更新函式 (同時更新 Firebase)
+    // 呼叫 main.js 的更新函式
     if (onCurrencyUpdate) {
         onCurrencyUpdate('add_resource', { type: resourceType, amount: amount });
     }
     
-    // 強制儲存一次 territory 狀態
     const updates = {};
     updates[`territory.${type}.lastClaimTime`] = territoryData[type].lastClaimTime;
     try {
@@ -270,40 +321,52 @@ async function handleUpgrade(type, btn) {
     await updateDoc(doc(db, "users", currentUser.uid), updates);
     onCurrencyUpdate('refresh'); // 刷新金幣 UI
     
-    renderTerritory();
+    renderTerritory(); // 重新渲染以顯示進度條
 }
 
+// 每秒更新 UI
 function updateTerritoryUI() {
     let needRender = false;
     const now = Date.now();
 
-    // 更新計時器文字
+    // 更新升級進度條與倒數
     document.querySelectorAll('.timer-text').forEach(span => {
         const end = parseInt(span.dataset.end);
+        const type = span.dataset.type; // 取得建築類型
+        const config = BUILDING_CONFIG[type];
+        const data = territoryData[type];
+
         if (end <= now) {
             // 時間到，升級完成！
-            const buildingCard = span.closest('.building-card');
-            if (buildingCard) {
-                // 找出是哪個建築
-                for (const type in territoryData) {
-                    if (buildingCard.classList.contains(type)) {
-                        if (territoryData[type].upgradeEndTime > 0) {
-                            territoryData[type].level++; // 邏輯上升級
-                            territoryData[type].upgradeEndTime = 0;
-                            // 寫入 DB
-                            const updates = {};
-                            updates[`territory.${type}.level`] = territoryData[type].level;
-                            updates[`territory.${type}.upgradeEndTime`] = 0;
-                            updateDoc(doc(db, "users", currentUser.uid), updates);
-                            
-                            needRender = true;
-                            playSound('upgrade');
-                        }
-                    }
-                }
+            if (data.upgradeEndTime > 0) {
+                console.log(`${type} 升級完成！`);
+                data.level++;
+                data.upgradeEndTime = 0;
+                
+                const updates = {};
+                updates[`territory.${type}.level`] = data.level;
+                updates[`territory.${type}.upgradeEndTime`] = 0;
+                updateDoc(doc(db, "users", currentUser.uid), updates);
+                
+                playSound('upgrade');
+                needRender = true; // 標記需要重繪
             }
         } else {
+            // 更新倒數文字
             span.innerText = formatTime((end - now) / 1000);
+
+            // 更新進度條寬度
+            const fill = document.getElementById(`progress-fill-${type}`);
+            if (fill) {
+                // 重新計算總時間 (根據當前等級)
+                // 注意：這裡假設還沒升級完成，所以用 data.level 算是「升級前」的等級，對應的升級時間是正確的
+                const totalTimeSec = Math.floor(config.baseTime * Math.pow(config.timeFactor, data.level));
+                const totalMs = totalTimeSec * 1000;
+                const remainingMs = end - now;
+                const percent = Math.max(0, Math.min(100, ((totalMs - remainingMs) / totalMs) * 100));
+                
+                fill.style.width = `${percent}%`;
+            }
         }
     });
 
@@ -319,6 +382,7 @@ function updateTerritoryUI() {
         
         btn.innerText = `收穫 ${Math.floor(pending)} ${resourceName} ${pending >= maxStorage ? '(滿)' : ''}`;
         if (pending > 0) btn.classList.remove('disabled');
+        else btn.classList.add('disabled');
     });
 
     if (needRender) renderTerritory();
