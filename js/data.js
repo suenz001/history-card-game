@@ -7,8 +7,8 @@ export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 // 數值已針對新版低攻擊力環境進行微調
 export const DIFFICULTY_SETTINGS = {
     easy:   { 
-        hpMult: 0.3,    // 簡單模式敵人血量略降
-        atkMult: 0.3,   // 簡單模式敵人攻擊降低
+        hpMult: 0.2,    // 簡單模式敵人血量略降
+        atkMult: 0.2,   // 簡單模式敵人攻擊降低
         goldMult: 0.3,  
         gemReward: 100  
     },
@@ -76,7 +76,7 @@ wavesLevel1[1].enemyPool = [8, 9];
 wavesLevel1[2].enemyPool = [8, 9, 28]; 
 wavesLevel1[3].enemyPool = [24, 8, 9]; 
 wavesLevel1[4] = { 
-    count: 1, hp: 15000, atk: 1120, bossId: 1, 
+    count: 1, hp: 15000, atk: 700, bossId: 1, 
     aoeConfig: { radius: 18, damageMult: 1.2, effect: 'shockwave', color: '#f1c40f' } 
 };
 
@@ -89,7 +89,7 @@ wavesLevel2[1].enemyPool = [8, 28];
 wavesLevel2[2].enemyPool = [8, 28, 30]; 
 wavesLevel2[3].enemyPool = [8, 24, 30]; 
 wavesLevel2[4] = { 
-    count: 1, hp: 17500, atk: 140, bossId: 2, 
+    count: 1, hp: 17500, atk: 900, bossId: 2, 
     aoeConfig: { radius: 20, damageMult: 1.3, effect: 'shockwave', color: '#e67e22' } 
 };
 
