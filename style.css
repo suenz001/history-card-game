@@ -223,10 +223,13 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 敵人出生區 */
 .enemy-spawn-zone { width: 50px; height: 100%; background: rgba(0,0,0,0.3); border-left: 4px dashed #c0392b; display: flex; justify-content: center; align-items: center; color: #e74c3c; font-weight: bold; writing-mode: vertical-lr; z-index: 10; }
 
-/* 🔥 英雄單位 (跑動中) */
+/* 🔥 英雄單位 (跑動中) - 2倍化修正 🔥 */
 .hero-unit { 
-    position: absolute; width: 45px; height: 45px; 
-    border-radius: 50%; border: 3px solid #fff; 
+    position: absolute; 
+    width: 90px; /* 45px * 2 */
+    height: 90px; /* 45px * 2 */
+    border-radius: 50%; 
+    border: 4px solid #fff; /* 邊框加粗 */
     display: flex; justify-content: center; align-items: center; 
     font-size: 1.2em; z-index: 20; 
     transition: left 0.1s linear; 
@@ -239,19 +242,26 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .hero-unit.SR { border-color: #9b59b6; }
 .hero-unit.R { border-color: #3498db; }
 
-/* 英雄與敵人的血條 */
-.hero-hp-bar, .enemy-hp-bar { position: absolute; top: -10px; width: 35px; height: 4px; background: #555; border-radius: 2px; }
-.hero-hp-bar > div { height: 100%; background: #2ecc71; }
-.enemy-hp-bar > div { height: 100%; background: #e74c3c; }
+/* 英雄與敵人的血條 - 2倍化修正 */
+.hero-hp-bar, .enemy-hp-bar { 
+    position: absolute; 
+    top: -24px; /* 往上移，留空間給氣力條 */
+    width: 70px; /* 35px * 2 */
+    height: 8px; /* 4px * 2 */
+    background: #555; 
+    border-radius: 4px; 
+}
+.hero-hp-bar > div { height: 100%; background: #2ecc71; border-radius: 4px; }
+.enemy-hp-bar > div { height: 100%; background: #e74c3c; border-radius: 4px; }
 
-/* 🔷 英雄氣力條 (藍條) */
+/* 🔷 英雄氣力條 (藍條) - 2倍化修正 */
 .hero-mana-bar {
     position: absolute;
-    top: -5px; /* 位於血條下方一點點 */
-    width: 35px;
-    height: 4px;
+    top: -12px; /* 位於血條下方 */
+    width: 70px; /* 35px * 2 */
+    height: 8px; /* 4px * 2 */
     background: #333;
-    border-radius: 2px;
+    border-radius: 4px;
     overflow: hidden;
     z-index: 25;
 }
@@ -268,11 +278,11 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .hero-unit.mana-full::after {
     content: '';
     position: absolute;
-    /* 設定比原本大一圈 (原本是 45x45) */
-    top: -10px; 
-    left: -10px; 
-    right: -10px; 
-    bottom: -10px;
+    /* 設定比原本大一圈 */
+    top: -15px; 
+    left: -15px; 
+    right: -15px; 
+    bottom: -15px;
     border-radius: 50%;
     
     /* 橘色光圈 */
@@ -311,25 +321,33 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: translateY(-50px) scale(0.8); opacity: 0; }
 }
 
-/* 調整原本血條位置，避免重疊 */
-.hero-hp-bar {
-    top: -12px; /* 往上移一點，讓出空間給藍條 */
+/* 敵人實體 - 2倍化修正 */
+.enemy-unit { 
+    position: absolute; 
+    width: 90px; /* 40px * 2 + 調整 */
+    height: 90px; 
+    background: #e74c3c; 
+    border-radius: 50%; 
+    border: 4px solid #fff; 
+    display: flex; justify-content: center; align-items: center; 
+    font-size: 1.2em; z-index: 5; 
+    transition: left 0.1s linear; 
+    box-shadow: 0 0 10px rgba(0,0,0,0.5); 
+    transform: translateY(-50%); 
 }
 
-/* 敵人實體 */
-.enemy-unit { position: absolute; width: 40px; height: 40px; background: #e74c3c; border-radius: 50%; border: 2px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.2em; z-index: 5; transition: left 0.1s linear; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: translateY(-50%); }
-
-/* 🔥 魔王樣式 */
+/* 🔥 魔王樣式 - 巨大化修正 */
 .enemy-unit.boss { 
-    width: 80px; height: 80px; 
+    width: 200px !important;  /* 原本 110px -> 200px */
+    height: 200px !important;
     background: rgba(0,0,0,0.6);
     border-radius: 5px; /* 微微圓角的正方形 */
-    z-index: 10;
-    font-size: 3em;
+    z-index: 50;
+    font-size: 5em; /* Emoji 變大 */
     
     /* 移除舊邊框，改用偽元素 */
     border: none; 
-    box-shadow: none; 
+    box-shadow: 0 0 30px #c0392b; 
 
     /* 保持 flex 讓 Emoji 居中 */
     display: flex;
@@ -341,7 +359,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .enemy-unit.boss::before {
     content: '';
     position: absolute;
-    top: -10px; left: -10px; right: -10px; bottom: -10px;
+    top: -15px; left: -15px; right: -15px; bottom: -15px;
     border: 4px dashed #8e44ad; /* 紫色虛線 */
     border-radius: 5px;
     box-shadow: 0 0 20px #8e44ad;
@@ -353,20 +371,20 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .enemy-unit.boss::after {
     content: '';
     position: absolute;
-    top: -15px; left: -15px; right: -15px; bottom: -15px;
-    border: 2px solid #f1c40f; /* 金色外框 */
+    top: -25px; left: -25px; right: -25px; bottom: -25px;
+    border: 3px solid #f1c40f; /* 金色外框 */
     border-radius: 5px;
     box-shadow: 0 0 30px #f1c40f;
     animation: bossSpin 6s linear infinite reverse; /* 反向旋轉 */
     z-index: -2;
 }
 
-/* 血條位置調整 */
+/* 魔王血條位置調整 - 2倍化修正 */
 .enemy-unit.boss .enemy-hp-bar { 
-    top: -30px; 
-    width: 100px; 
-    height: 8px; 
-    border: 1px solid rgba(255,255,255,0.5);
+    top: -40px; 
+    width: 180px; 
+    height: 14px; 
+    border: 2px solid rgba(255,255,255,0.8);
 }
 
 /* 旋轉動畫定義 */
@@ -528,16 +546,18 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     height: 100%; background: #f1c40f; transition: width 0.5s ease-out;
 }
 
-/* 🔥 修正 1：兵種圖示改到右下角，避免擋住人物 */
+/* 🔥 修正 1：兵種圖示改到右下角，避免擋住人物 - 2倍化修正 */
 .hero-type-badge {
     position: absolute; 
-    bottom: -5px; /* 改為 bottom */
+    bottom: -5px; 
     right: -5px; 
-    top: auto;    /* 取消 top */
-    width: 20px; height: 20px;
-    background: #3498db; border-radius: 50%; font-size: 12px;
+    top: auto;
+    width: 32px; height: 32px; /* 變大 */
+    background: #3498db; border-radius: 50%; 
+    font-size: 18px; /* 字體變大 */
     display: flex; justify-content: center; align-items: center; color: white;
     z-index: 25;
+    border: 2px solid white; /* 增加白邊 */
 }
 
 /* 🔥 新增：遠程兵種圖示改為紅色 */
@@ -1110,7 +1130,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     
     /* 🔥 iOS 修正關鍵 3：確保背面在翻轉後能接收觸控 */
     z-index: 10; 
-}}
+}
 
 /* 優化捲軸樣式 (讓它好看一點) */
 .card-bio-section::-webkit-scrollbar {
@@ -1253,124 +1273,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     background: #fff;
     color: #2c3e50 !important;
     border-color: #fff !important;
-}
-
-/* =========================================
-   👹 BOSS 專屬特效樣式
-   ========================================= */
-
-/* 1. Boss 本體樣式 (巨大化 + 霸氣外框) */
-.enemy-unit.boss {
-    width: 110px !important;  /* 變大：原本是 40px */
-    height: 110px !important;
-    
-    /* 邊框設計：雙層發光邊框 */
-    border: 3px solid #fff;
-    box-shadow: 
-        0 0 15px #e74c3c,      /* 紅色外發光 */
-        0 0 30px #c0392b,      /* 深紅擴散 */
-        inset 0 0 20px #000;   /* 內陰影增加立體感 */
-        
-    background-color: #2c3e50; /* 底色 */
-    background-size: cover;
-    z-index: 50; /* 確保 Boss 在最上層 */
-    
-    /* 出場動畫 */
-    animation: bossEnter 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, bossPulse 3s infinite;
-}
-
-/* 2. Boss 背後的旋轉光環 (增加神聖/邪惡感) */
-.enemy-unit.boss::before {
-    content: '';
-    position: absolute;
-    top: -20%; left: -20%;
-    width: 140%; height: 140%;
-    border: 2px dashed rgba(241, 196, 15, 0.6); /* 金色虛線 */
-    border-radius: 50%;
-    z-index: -1;
-    animation: rotateAura 10s linear infinite;
-}
-
-.enemy-unit.boss::after {
-    content: '';
-    position: absolute;
-    top: -10%; left: -10%;
-    width: 120%; height: 120%;
-    border: 2px solid rgba(231, 76, 60, 0.5); /* 紅色實線 */
-    border-radius: 50%;
-    z-index: -1;
-    animation: rotateAura 5s linear infinite reverse;
-}
-
-/* 3. Boss 的血條調整 (因為本體變大了，血條也要寬一點) */
-.enemy-unit.boss .enemy-hp-bar {
-    width: 100px;
-    height: 8px;
-    top: -15px;
-    border: 1px solid white;
-    box-shadow: 0 0 5px black;
-}
-
-/* --- 動畫定義 --- */
-
-/* 出場動畫：從天而降並彈跳 */
-@keyframes bossEnter {
-    0% {
-        transform: translateY(-200%) scale(0.5);
-        opacity: 0;
-    }
-    60% {
-        transform: translateY(-40%) scale(1.2); /* 稍微過頭一點製造衝擊感 */
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(-50%) scale(1);
-    }
-}
-
-/* 待機動畫：像心跳一樣緩慢縮放 */
-@keyframes bossPulse {
-    0% { transform: translateY(-50%) scale(1); box-shadow: 0 0 15px #e74c3c; }
-    50% { transform: translateY(-50%) scale(1.05); box-shadow: 0 0 40px #ff0000; }
-    100% { transform: translateY(-50%) scale(1); box-shadow: 0 0 15px #e74c3c; }
-}
-
-/* 光環旋轉 */
-@keyframes rotateAura {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-/* ⚠️ BOSS WARNING 警告文字特效 */
-#boss-warning-overlay {
-    position: fixed;
-    top: 50%; left: 0; width: 100%;
-    transform: translateY(-50%);
-    text-align: center;
-    pointer-events: none;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.warning-text {
-    font-family: 'Impact', sans-serif;
-    font-size: 5em;
-    color: #e74c3c;
-    text-transform: uppercase;
-    letter-spacing: 10px;
-    text-shadow: 0 0 20px #000, 0 0 10px red;
-    animation: warningFlash 0.2s infinite alternate;
-    background: rgba(0,0,0,0.7);
-    width: 100%;
-    padding: 20px 0;
-}
-
-@keyframes warningFlash {
-    from { opacity: 1; text-shadow: 0 0 20px red; color: #fff; }
-    to { opacity: 0.5; text-shadow: 0 0 5px darkred; color: #e74c3c; }
 }
 
 /* =========================================
