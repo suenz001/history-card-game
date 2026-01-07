@@ -386,6 +386,7 @@ function renderDetailCard() {
     setupDetailButtons(card);
 }
 
+// 🔥 修改：卡片升級按鈕顯示金幣+鐵礦
 function setupDetailButtons(card) {
     const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); 
     const upgradeStarBtn = document.getElementById('upgrade-star-btn');
@@ -404,10 +405,12 @@ function setupDetailButtons(card) {
     if (card.level >= 30) { 
         upgradeLevelBtn.innerHTML = "已達 MAX"; upgradeLevelBtn.classList.add('btn-disabled'); upgradeLevelBtn.onclick = null; 
     } else { 
-        const cost = card.level * 100; 
-        upgradeLevelBtn.innerHTML = `⬆️ 升級 <span style="font-size:0.8em;">(${cost}G)</span>`; 
+        const goldCost = card.level * 100; 
+        const ironCost = Math.floor(goldCost * 0.2); // 🔥 鐵礦消耗為金幣的 20%
+        
+        upgradeLevelBtn.innerHTML = `⬆️ 升級 <span style="font-size:0.8em;">(${goldCost}G / ${ironCost}鐵)</span>`; 
         upgradeLevelBtn.classList.remove('btn-disabled'); 
-        upgradeLevelBtn.onclick = () => upgradeCardLevel(cost); 
+        upgradeLevelBtn.onclick = () => upgradeCardLevel(goldCost, ironCost); 
     }
     
     if (card.stars >= 5) { 
@@ -420,13 +423,20 @@ function setupDetailButtons(card) {
     dismantleBtn.onclick = () => dismantleCurrentCard();
 }
 
-async function upgradeCardLevel(cost) {
+// 🔥 修改：升級消耗邏輯 (扣除金幣與鐵礦)
+async function upgradeCardLevel(goldCost, ironCost) {
     if(!onCurrencyUpdate) return;
-    const hasFunds = onCurrencyUpdate('check', cost); 
-    if (!hasFunds) return alert("金幣不足！");
+    
+    const hasGold = onCurrencyUpdate('check', goldCost, 'gold'); 
+    const hasIron = onCurrencyUpdate('check', ironCost, 'iron');
+    
+    if (!hasGold) return alert(`金幣不足！(需要 ${goldCost} G)`);
+    if (!hasIron) return alert(`鐵礦不足！(需要 ${ironCost} 鐵)`);
     
     const card = currentDisplayList[currentCardIndex];
-    onCurrencyUpdate('deduct', cost); 
+    onCurrencyUpdate('deduct', goldCost, 'gold'); 
+    onCurrencyUpdate('deduct', ironCost, 'iron'); 
+    
     playSound('coin'); 
     card.level++; 
     calculateCardStats(card); 
@@ -459,11 +469,6 @@ async function upgradeCardStar() {
     alert(`升星成功！目前 ${card.stars} ★`);
 }
 
-// 🔥 修改：單張分解價值計算
-// 公式：基礎價值 * (星數 + 1)
-// 0星 = Base * 1 = 100
-// 1星 = Base * 2 = 200 (2張卡)
-// 5星 = Base * 6 = 600 (6張卡)
 async function dismantleCurrentCard() {
     const card = currentDisplayList[currentCardIndex]; 
     const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
@@ -480,7 +485,6 @@ async function dismantleCurrentCard() {
         
         onCurrencyUpdate('add', totalValue);
         
-        // 🔥 這裡一定要呼叫 refresh，否則 main.js 不會更新到資料庫
         onCurrencyUpdate('refresh'); 
         
         const idx = allUserCards.findIndex(c => c.docId === card.docId);
@@ -495,7 +499,7 @@ async function dismantleCurrentCard() {
 
 function calculateCardStats(card) { 
     const levelBonus = (card.level - 1) * 0.03; 
-    const starBonus = card.stars * 0.20; // 0星=0%, 1星=20%
+    const starBonus = card.stars * 0.20; 
     card.atk = Math.floor(card.baseAtk * (1 + levelBonus) * (1 + starBonus)); 
     card.hp = Math.floor(card.baseHp * (1 + levelBonus) * (1 + starBonus)); 
 }
@@ -510,15 +514,12 @@ function toggleBatchSelection(card, cardDiv) {
     calculateBatchTotal(); 
 }
 
-// 🔥 修改：批量分解價值計算 (公式修正)
 function calculateBatchTotal() { 
     let totalGold = 0; let count = 0; 
     allUserCards.forEach(card => { 
         if (selectedBatchCards.has(card.docId)) { 
             const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
-            // 計算公式修正：Base * (Stars + 1)
             const cardValue = baseValue * (card.stars + 1);
-            
             totalGold += cardValue; 
             count++; 
         } 
@@ -746,9 +747,7 @@ function bindInventoryEvents() {
     // 排序下拉選單監聽
     const sortSelect = document.getElementById('sort-select');
     if (sortSelect) {
-        // 初始化時設定選單值
         sortSelect.value = currentSortMethod;
-        
         sortSelect.addEventListener('change', (e) => {
             playSound('click');
             currentSortMethod = e.target.value;
@@ -757,7 +756,6 @@ function bindInventoryEvents() {
         });
     }
 
-    // 關閉 Modal
     document.getElementById('close-inventory-btn')?.addEventListener('click', () => {
         playSound('click');
         document.getElementById('inventory-modal').classList.add('hidden');
@@ -776,7 +774,6 @@ function bindInventoryEvents() {
         isViewingGallery = false;
     });
 
-    // 批量模式切換
     document.getElementById('batch-toggle-btn')?.addEventListener('click', () => {
         playSound('click');
         isBatchMode = !isBatchMode;
@@ -794,7 +791,6 @@ function bindInventoryEvents() {
         filterInventory();
     });
     
-    // 🔥 修改：批量分解確認 (公式修正 + 記得 refresh)
     document.getElementById('batch-confirm-btn')?.addEventListener('click', async () => {
         playSound('click'); 
         if (selectedBatchCards.size === 0) return; 
@@ -806,7 +802,6 @@ function bindInventoryEvents() {
         
         cardsToRemove.forEach(card => { 
             const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
-            // 修正公式：Base * (Stars + 1)
             const cardValue = baseValue * (card.stars + 1);
             totalGold += cardValue; 
             
@@ -821,15 +816,12 @@ function bindInventoryEvents() {
             playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
             
             if(onCurrencyUpdate) onCurrencyUpdate('add', totalGold);
-            
-            // 🔥 這裡一定要呼叫 refresh
             onCurrencyUpdate('refresh'); 
             
             allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); 
             selectedBatchCards.clear(); 
             isBatchMode = false; 
             
-            // 更新 UI
             const toggleBtn = document.getElementById('batch-toggle-btn');
             const bar = document.getElementById('batch-action-bar');
             toggleBtn.classList.remove('active'); toggleBtn.innerText = "🔧 批量分解"; bar.classList.add('hidden'); 
@@ -846,10 +838,8 @@ function bindInventoryEvents() {
         }
     });
     
-    // 一鍵升星
     document.getElementById('auto-star-btn')?.addEventListener('click', () => { playSound('click'); autoStarUp(); });
 
-    // 左右切換卡片
     document.getElementById('prev-card-btn')?.addEventListener('click', () => { 
         currentCardIndex--; 
         if(currentCardIndex < 0) currentCardIndex = currentDisplayList.length -1; 

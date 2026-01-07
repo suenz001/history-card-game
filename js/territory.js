@@ -86,8 +86,6 @@ function createDefaultTerritory() {
 async function checkOfflineUpgrades() {
     const now = Date.now();
     let hasUpdates = false;
-    // 這裡我們只更新本地數據，存檔交給 main.js 統一處理
-    // 或是如果這裡必須存檔，也只存必要的
 
     for (const type in territoryData) {
         const buildData = territoryData[type];
@@ -185,6 +183,7 @@ function renderTerritory() {
     });
 }
 
+// 🔥 修改：顯示金幣與木頭費用
 function renderUpgradeButton(type, data, config) {
     if (data.upgradeEndTime > Date.now()) {
         return `<button class="btn-secondary btn-disabled" id="btn-upgrade-${type}" disabled>🚧 建造中...</button>`;
@@ -196,12 +195,14 @@ function renderUpgradeButton(type, data, config) {
         return `<button class="btn-secondary btn-disabled">已達最大等級</button>`;
     }
 
-    const cost = Math.floor(config.baseCost * Math.pow(config.costFactor, data.level));
+    const goldCost = Math.floor(config.baseCost * Math.pow(config.costFactor, data.level));
+    const woodCost = Math.floor(goldCost * 0.5); // 🔥 木頭消耗為金幣的 50%
+    
     const timeSec = Math.floor(config.baseTime * Math.pow(config.timeFactor, data.level));
     const timeStr = formatTime(timeSec);
 
-    return `<button class="btn-upgrade-build" data-type="${type}" data-cost="${cost}" data-time="${timeSec}">
-        ⬆️ 升級 (${cost}G / ${timeStr})
+    return `<button class="btn-upgrade-build" data-type="${type}" data-cost="${goldCost}" data-wood-cost="${woodCost}" data-time="${timeSec}">
+        ⬆️ 升級 (${goldCost}G + ${woodCost}木 / ${timeStr})
     </button>`;
 }
 
@@ -252,7 +253,7 @@ async function handleBuildingClick(e) {
     const type = btn.dataset.type;
     
     if (btn.classList.contains('claim-btn')) {
-        handleClaim(type); // 🔥 移除 await，讓 UI 立即反應
+        handleClaim(type); 
     } else if (btn.classList.contains('btn-upgrade-build')) {
         await handleUpgrade(type, btn);
     }
@@ -267,41 +268,49 @@ function handleClaim(type) {
 
     playSound('coin');
     
-    // 1. 更新本地數據 (重置時間)
     territoryData[type].lastClaimTime = Date.now();
     
-    // 2. 🔥 關鍵：只通知主程式，不要在這裡寫入 Firebase
-    // 這會觸發 main.js 裡的 add_resource (加錢) 和 refresh (更新 UI + 存檔)
     if (onCurrencyUpdate) {
         console.log(`[Territory] Claiming ${amount} ${resourceType}`);
         onCurrencyUpdate('add_resource', { type: resourceType, amount: amount });
         onCurrencyUpdate('refresh');
     }
     
-    // 3. 立即刷新領地 UI (按鈕變灰)
     renderTerritory(); 
 }
 
+// 🔥 修改：升級消耗邏輯 (扣除金幣與木頭)
 async function handleUpgrade(type, btn) {
     if (territoryData[type].upgradeEndTime > Date.now()) return;
 
-    const cost = parseInt(btn.dataset.cost);
+    const goldCost = parseInt(btn.dataset.cost);
+    const woodCost = parseInt(btn.dataset.woodCost) || 0; // 讀取木頭費用
     const timeSec = parseInt(btn.dataset.time);
 
-    if (!onCurrencyUpdate('check', cost)) {
-        alert("金幣不足！");
+    // 1. 檢查資源
+    const hasGold = onCurrencyUpdate('check', goldCost, 'gold');
+    const hasWood = onCurrencyUpdate('check', woodCost, 'wood');
+
+    if (!hasGold) {
+        alert(`金幣不足！(需要 ${goldCost} G)`);
+        return;
+    }
+    if (!hasWood) {
+        alert(`木頭不足！(需要 ${woodCost} 木)`);
         return;
     }
 
-    if (!confirm(`確定要花費 ${cost}G 升級 ${BUILDING_CONFIG[type].name} 嗎？\n需耗時: ${formatTime(timeSec)}`)) return;
+    if (!confirm(`確定要升級 ${BUILDING_CONFIG[type].name} 嗎？\n費用: ${goldCost}G + ${woodCost}木\n需耗時: ${formatTime(timeSec)}`)) return;
 
-    onCurrencyUpdate('deduct', cost);
+    // 2. 扣除資源
+    onCurrencyUpdate('deduct', goldCost, 'gold');
+    onCurrencyUpdate('deduct', woodCost, 'wood');
+    
     playSound('upgrade');
 
     const endTime = Date.now() + (timeSec * 1000);
     territoryData[type].upgradeEndTime = endTime;
 
-    // 升級比較重要，這裡保留一個同步操作，但主要還是靠 main.js
     if (onCurrencyUpdate) onCurrencyUpdate('refresh');
     
     renderTerritory(); 
@@ -323,7 +332,7 @@ function updateTerritoryUI() {
             data.upgradeEndTime = 0;
             playSound('upgrade');
             needRender = true;
-            if (onCurrencyUpdate) onCurrencyUpdate('refresh'); // 升級完成也要存檔
+            if (onCurrencyUpdate) onCurrencyUpdate('refresh'); 
         } else if (end > now) {
             span.innerText = `剩餘: ${formatTime((end - now) / 1000)}`;
             const fill = document.getElementById(`progress-fill-${type}`);
