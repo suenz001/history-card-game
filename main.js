@@ -434,7 +434,16 @@ function renderNotifications() {
             const isWin = item.result === 'win';
             const colorClass = isWin ? 'log-def-win' : 'log-def-lose';
             const resultText = isWin ? '🛡️ 防守成功' : '💔 防守失敗';
-            const moneyText = isWin ? '無損失' : `<span style="color:#e74c3c">損失 ${item.goldLost} G</span>`;
+            
+            // 🔥 修改：顯示所有資源損失
+            const moneyText = isWin ? '無損失' : 
+                `<div style="font-size:0.8em; color:#e74c3c; line-height:1.2; margin-top:3px;">
+                    -${item.goldLost || 0} G<br>
+                    -${item.foodLost || 0} 🌾<br>
+                    -${item.woodLost || 0} 🪵<br>
+                    -${item.ironLost || 0} ⛏️
+                </div>`;
+                
             const revengeHint = (!isNotifBatchMode && item.attackerUid) ? '<div class="revenge-tag" style="background:#e74c3c; padding:2px 5px; border-radius:3px; font-size:0.8em;">復仇 ⚔️</div>' : '';
             
             div.className = `notification-item notif-battle-log ${colorClass}`;
