@@ -10,7 +10,7 @@ import { playSound, audioBgm, audioBattle, setBgmState, setSfxState, setBgmVolum
 import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive } from './js/battle.js';
 import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/pvp.js';
 import * as Inventory from './js/inventory.js';
-import * as Territory from './js/territory.js'; // 🔥 引入領地模組
+import * as Territory from './js/territory.js';
 
 window.onerror = function(msg, url, line) {
     console.error("Global Error:", msg);
@@ -43,15 +43,13 @@ let currentUser = null;
 let gems = 0;
 let gold = 0;
 let iron = 0; 
-let food = 0; // 🔥 新增糧食
-let wood = 0; // 🔥 新增木頭
+let food = 0; 
+let wood = 0; 
 let totalPower = 0;
 
-// 本地暫存的通關進度
 let completedLevels = {};
 let currentPlayingLevelId = 1;
 
-// 通知系統變數
 let claimedNotifs = []; 
 let battleLogs = []; 
 let deletedSystemNotifs = []; 
@@ -60,31 +58,24 @@ let isNotifBatchMode = false;
 let selectedNotifIds = new Set();
 let currentVisibleNotifs = [];
 
-// 抽卡佇列
 let gachaQueue = [];
 let gachaIndex = 0;
 
-// 設定戰鬥結束的回調
 setOnBattleEnd(handleBattleEnd);
 
-// 初始化 PVP
 setTimeout(() => {
     if(document.getElementById('pvp-menu-btn')) {
         initPvp(db, currentUser, Inventory.getAllCards(), (slotIndex, type) => {
-            // PVP 選擇回調
             Inventory.setPvpSelectionMode(slotIndex, type);
             const title = type === 'defense' ? "👇 選擇 PVP 防守英雄" : "👇 選擇 PVP 進攻英雄";
             document.getElementById('inventory-title').innerText = title; 
             document.getElementById('inventory-modal').classList.remove('hidden');
-            
-            // 如果背包沒資料則讀取
             if(Inventory.getAllCards().length === 0 && currentUser) Inventory.loadInventory(currentUser.uid); 
             else Inventory.filterInventory('ALL');
         }, Inventory.openEnemyDetailModal); 
     }
 }, 500);
 
-// 設定介面相關
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
 const sfxToggle = document.getElementById('sfx-toggle');
@@ -136,8 +127,8 @@ if(document.getElementById('redeem-btn')) {
         if (code === 'make diamond') { gems += 5000; alert("💎 獲得 5000 鑽石！"); } 
         else if (code === 'make gold') { gold += 50000; alert("💰 獲得 50000 金幣！"); } 
         else if (code === 'make iron') { iron += 5000; alert("⛏️ 獲得 5000 鐵礦！"); }
-        else if (code === 'make food') { food += 5000; alert("🌾 獲得 5000 糧食！"); } // 🔥 新增作弊碼
-        else if (code === 'make wood') { wood += 5000; alert("🪵 獲得 5000 木頭！"); } // 🔥 新增作弊碼
+        else if (code === 'make food') { food += 5000; alert("🌾 獲得 5000 糧食！"); }
+        else if (code === 'make wood') { wood += 5000; alert("🪵 獲得 5000 木頭！"); }
         else if (code === 'unlock stage') {
             const allLevels = {}; for(let i=1; i<=8; i++) { allLevels[`${i}_easy`] = true; allLevels[`${i}_normal`] = true; allLevels[`${i}_hard`] = true; }
             completedLevels = allLevels; await updateDoc(doc(db, "users", currentUser.uid), { completedLevels: completedLevels }); alert("🔓 全關卡已解鎖！");
@@ -151,9 +142,6 @@ if(document.getElementById('redeem-btn')) {
     });
 }
 
-// ===================================
-// 🔥 通知系統
-// ===================================
 const notificationModal = document.getElementById('notification-modal');
 const notificationList = document.getElementById('notification-list');
 
@@ -392,39 +380,43 @@ if (isFirebaseReady && auth) {
     });
 }
 
-// 統一的資源管理與更新邏輯
-const currencyHandler = (action, amount, type = 'gold') => {
-    // 1. 處理檢查 (check)
+// 🔥 統一資源管理與更新邏輯
+// action: 'check', 'deduct', 'add', 'add_resource', 'refresh'
+const currencyHandler = (action, data, extraType = 'gold') => {
+    // 1. 處理檢查
     if (action === 'check') {
-        if (type === 'iron') return iron >= amount;
-        return gold >= amount;
+        if (extraType === 'iron') return iron >= data;
+        return gold >= data;
     }
     
-    // 2. 處理扣款 (deduct)
+    // 2. 處理扣款
     if (action === 'deduct') {
-        if (type === 'iron') iron -= amount;
-        else gold -= amount;
+        if (extraType === 'iron') iron -= data;
+        else gold -= data;
     }
     
-    // 3. 處理增加 (add) - 來自背包分解或一般獲取
+    // 3. 處理一般增加
     if (action === 'add') {
-        if (type === 'iron') iron += amount;
-        else gold += amount;
+        if (extraType === 'iron') iron += data;
+        else gold += data;
     }
     
-    // 4. 處理資源產出 (add_resource) - 來自領地系統
+    // 4. 🔥 處理資源產出 (add_resource)
     if (action === 'add_resource') {
-        if (amount.type === 'gold') gold += amount.amount;
-        if (amount.type === 'iron') iron += amount.amount;
-        if (amount.type === 'gems') gems += amount.amount;
-        if (amount.type === 'food') food += amount.amount; // 🔥 修正：處理糧食
-        if (amount.type === 'wood') wood += amount.amount; // 🔥 修正：處理木頭
+        const val = Number(data.amount) || 0;
+        console.log(`[Main] Adding ${val} to ${data.type}`); // Log 供確認
+        
+        if (data.type === 'gold') gold += val;
+        if (data.type === 'iron') iron += val;
+        if (data.type === 'gems') gems += val;
+        if (data.type === 'food') food += val; 
+        if (data.type === 'wood') wood += val; 
     }
     
-    // 5. 刷新 UI 與雲端 (refresh)
+    // 5. 🔥 刷新 UI 與雲端 (重點修正：UI 優先)
     if (action === 'refresh') { 
-        updateCurrencyCloud(); 
-        updateUIDisplay(); 
+        updateUIDisplay(); // 先更新 UI，讓玩家感覺不延遲
+        updateCurrencyCloud(); // 再慢慢存雲端
     }
     
     return true;
@@ -438,11 +430,11 @@ async function loadUserData(user) {
 
     if (userSnap.exists()) { 
         const data = userSnap.data(); 
-        gems = data.gems || 0; 
-        gold = data.gold || 0;
-        iron = data.iron || 0; 
-        food = data.food || 0; // 🔥 讀取糧食
-        wood = data.wood || 0; // 🔥 讀取木頭
+        gems = Number(data.gems) || 0; 
+        gold = Number(data.gold) || 0;
+        iron = Number(data.iron) || 0; 
+        food = Number(data.food) || 0; 
+        wood = Number(data.wood) || 0; 
         territoryData = data.territory || null; 
 
         claimedNotifs = data.claimedNotifs || [];
@@ -454,7 +446,7 @@ async function loadUserData(user) {
         if(!data.email && user.email) updateData.email = user.email;
         updateDoc(userRef, updateData);
     } else { 
-        gems = 1000; gold = 5000; iron = 500; food = 0; wood = 0; // 🔥 初始化新資源
+        gems = 1000; gold = 5000; iron = 500; food = 0; wood = 0; 
         claimedNotifs = []; deletedSystemNotifs = []; battleLogs = []; completedLevels = {};
         await setDoc(userRef, { 
             name: user.displayName || "未命名", email: user.email || null, 
@@ -467,13 +459,11 @@ async function loadUserData(user) {
     await fetchGlobalAnnouncements();
     checkUnreadNotifications();
 
-    // 🔥 初始化 Inventory 模組
     Inventory.initInventory(db, user, currencyHandler, (index, card, type) => {
         if (type === 'pve_deploy') { return deployHeroToSlot(index, card); } 
         else { return setPvpHero(index, card, type); }
     });
 
-    // 🔥 初始化 Territory 模組
     Territory.initTerritory(db, user, territoryData, currencyHandler);
 
     await Inventory.loadInventory(user.uid);
@@ -482,29 +472,23 @@ async function loadUserData(user) {
 
 async function updateCurrencyCloud() { 
     if (!currentUser) return; 
-    // 🔥 儲存 iron, food, wood 和 territory 狀態
+    // 🔥 儲存所有資源與領地狀態
     const updates = { gems, gold, iron, food, wood, combatPower: totalPower, claimedNotifs: claimedNotifs };
     const currentTData = Territory.getTerritoryData();
     if(currentTData) updates.territory = currentTData;
     
-    await updateDoc(doc(db, "users", currentUser.uid), updates); 
+    // 背景靜默存檔，不影響 UI
+    await updateDoc(doc(db, "users", currentUser.uid), updates).catch(e => console.error("Cloud save failed", e));
 }
 
 function updateUIDisplay() { 
-    document.getElementById('gem-count').innerText = gems; 
-    document.getElementById('gold-count').innerText = gold; 
-    
-    // 🔥 更新資源顯示
-    const ironEl = document.getElementById('iron-count');
-    if(ironEl) ironEl.innerText = iron; 
-
-    const foodEl = document.getElementById('food-count');
-    if(foodEl) foodEl.innerText = food;
-
-    const woodEl = document.getElementById('wood-count');
-    if(woodEl) woodEl.innerText = wood;
-    
-    document.getElementById('power-display').innerText = `🔥 戰力: ${totalPower}`; 
+    // 強制更新所有資源顯示
+    const gemEl = document.getElementById('gem-count'); if(gemEl) gemEl.innerText = gems;
+    const goldEl = document.getElementById('gold-count'); if(goldEl) goldEl.innerText = gold;
+    const ironEl = document.getElementById('iron-count'); if(ironEl) ironEl.innerText = iron; 
+    const foodEl = document.getElementById('food-count'); if(foodEl) foodEl.innerText = food;
+    const woodEl = document.getElementById('wood-count'); if(woodEl) woodEl.innerText = wood;
+    const powerEl = document.getElementById('power-display'); if(powerEl) powerEl.innerText = `🔥 戰力: ${totalPower}`; 
 }
 
 async function calculateTotalPowerOnly(uid) {
@@ -745,7 +729,7 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     let finalGold = Math.floor(earnedGold * goldMultiplier);
     let gemReward = isWin ? (diffSettings.gemReward || 0) : 0;
     
-    // 🔥 勝利掉落少量鐵礦 (難度越高掉越多)
+    // 🔥 勝利掉落少量鐵礦
     let ironReward = isWin ? Math.floor(finalGold * 0.1) : 0; 
 
     const modal = document.getElementById('battle-result-modal'); const title = document.getElementById('result-title'); const goldText = document.getElementById('result-gold'); const gemText = document.getElementById('result-gems');
