@@ -796,7 +796,9 @@ function dealDamage(source, target, multiplier) {
     else if (sType === 'CAVALRY' && tType === 'ARCHER') multiplier *= COUNTER_BONUS;
     else if (sType === 'ARCHER' && tType === 'INFANTRY') multiplier *= COUNTER_BONUS;
 
-    if (isPvpMode) multiplier *= 0.25;
+    // 🔥 修正：PVP 傷害倍率改為 1.0 (正常傷害)
+    if (isPvpMode) multiplier *= 1.0; 
+
     const dmg = Math.floor(source.atk * multiplier);
     target.currentHp -= dmg;
     
@@ -861,7 +863,10 @@ function gameLoop() {
         }
 
         if (hero.currentMana < hero.maxMana) {
-            let manaRate = isPvpMode ? 0.25 : 0.02; hero.currentMana += manaRate * gameSpeed; if(hero.currentMana > hero.maxMana) hero.currentMana = hero.maxMana;
+            // 🔥 修正：PVP 回魔速度下修至 0.12
+            let manaRate = isPvpMode ? 0.12 : 0.02; 
+            hero.currentMana += manaRate * gameSpeed; 
+            if(hero.currentMana > hero.maxMana) hero.currentMana = hero.maxMana;
         }
 
         let blocked = false; let pushX = 0; let pushY = 0; let nearestEnemy = null; let minTotalDist = 9999; 
@@ -958,7 +963,12 @@ function gameLoop() {
         });
 
         if (enemy.isPvpHero) {
-            if (enemy.currentMana < enemy.maxMana) { enemy.currentMana += 0.25 * gameSpeed; if(enemy.currentMana > enemy.maxMana) enemy.currentMana = enemy.maxMana; }
+            // 🔥 修正：PVP 敵方回魔速度同步下修至 0.12
+            if (enemy.currentMana < enemy.maxMana) { 
+                enemy.currentMana += 0.12 * gameSpeed; 
+                if(enemy.currentMana > enemy.maxMana) enemy.currentMana = enemy.maxMana; 
+            }
+            
             if (enemy.isPvpHero && nearestHero && minTotalDist <= enemy.range) {
                 blocked = true;
                 if (now - enemy.lastAttackTime > 2000 / gameSpeed) {
