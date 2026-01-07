@@ -159,25 +159,74 @@ function updateDifficultyButtons() {
     }
 }
 
+// 🔥🔥 同步 main.js 的新樣式渲染邏輯 + 強力清理
 function renderBattleSlots() {
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
     battleSlotsEl.forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); 
-        const existingCard = slotDiv.querySelector('.card'); if (existingCard) existingCard.remove();
         
+        // 🔥 強力清空：移除除了 placeholder 以外的所有子元素
+        Array.from(slotDiv.children).forEach(child => {
+            if (!child.classList.contains('slot-placeholder')) {
+                child.remove();
+            }
+        });
+        
+        // 重置樣式
+        slotDiv.style.background = '';
+        slotDiv.classList.remove('active');
+
         if (hero) {
-            placeholder.style.display = 'none'; slotDiv.classList.add('active');
-            const cardDiv = document.createElement('div'); const charPath = `assets/cards/${hero.id}.webp`; const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
-            cardDiv.className = `card ${hero.rarity}`; cardDiv.innerHTML = `<img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'"><img src="${framePath}" class="card-frame-img" onerror="this.remove()">`;
-            slotDiv.appendChild(cardDiv); 
+            placeholder.style.display = 'none'; 
+            slotDiv.classList.add('active');
+            
+            // 🔥 移除半透明背景
+            slotDiv.style.background = 'none';
+
+            // 準備數據
+            const charPath = `assets/cards/${hero.id}.webp`; 
+            const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
+            const level = hero.level || 1;
+            const stars = hero.stars || 0;
+            const starStr = stars > 0 ? '★'.repeat(stars) : '';
+            const power = hero.atk + hero.hp;
+
+            const baseConfig = cardDatabase.find(c => c.id == hero.id);
+            const uType = baseConfig ? (baseConfig.unitType || 'INFANTRY') : 'INFANTRY';
+            let typeIcon = '⚔️'; 
+            if(uType === 'CAVALRY') typeIcon = '🐴';
+            else if(uType === 'ARCHER') typeIcon = '🏹';
+
+            // 建立 HTML 結構
+            const img = document.createElement('img');
+            img.src = charPath;
+            img.onerror = () => { this.src='https://placehold.co/120x180?text=No+Image'; };
+            img.style.cssText = "width:100%; height:100%; object-fit:cover; border-radius:6px; display:block; opacity: 1;";
+            slotDiv.appendChild(img);
+
+            const frame = document.createElement('img');
+            frame.src = framePath;
+            frame.style.cssText = "position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; border-radius:6px;";
+            slotDiv.appendChild(frame);
+
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'deploy-card-info';
+            infoDiv.innerHTML = `
+                <div class="deploy-info-top-left">Lv.${level}</div>
+                <div class="deploy-info-top-right">${typeIcon}</div>
+                <div class="deploy-power-tag">${power}</div>
+                <div class="deploy-info-bottom">${starStr}</div>
+            `;
+            slotDiv.appendChild(infoDiv);
+
         } else { 
-            placeholder.style.display = 'block'; slotDiv.classList.remove('active'); 
+            placeholder.style.display = 'block'; 
+            slotDiv.style.background = 'rgba(0, 0, 0, 0.3)'; // 恢復空格背景
         }
     });
     
-    // 每次渲染插槽時也更新按鈕狀態與糧食顯示
-    updateStartButton();
+    updateStartButton(); 
 }
 
 function updateStartButton() {
@@ -298,11 +347,11 @@ function setupBattleEnvironment() {
     if(heroMonitorList) heroMonitorList.innerHTML = '';
     if(enemyMonitorList) enemyMonitorList.innerHTML = '';
 
-    // 🔥 核心修改：戰鬥開始時，直接隱藏布陣格子 (display: none)
+    // 🔥 核心修改：戰鬥開始時，直接隱藏布陣格子
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) {
         lanesWrapper.style.display = 'none';
-        lanesWrapper.style.opacity = '1'; // 重置透明度以防萬一
+        lanesWrapper.style.opacity = '1';
     }
     
     updateBattleUI();
@@ -348,7 +397,7 @@ export function resetBattleState() {
     const battleScreen = document.getElementById('battle-screen');
     const waveNotif = document.getElementById('wave-notification');
     
-    // 🔥 核心修改：戰鬥結束重置時，恢復顯示布陣格子
+    // 🔥 核心修改：戰鬥重置時，恢復顯示布陣格子
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) {
         lanesWrapper.style.display = 'flex';
@@ -365,7 +414,6 @@ export function resetBattleState() {
     if(warning) warning.remove();
 }
 
-// ... (後面的 spawnHeroes 等函式保持不變) ...
 function spawnHeroes() {
     const container = document.getElementById('hero-container');
     const monitorList = document.getElementById('hero-monitor-list');
