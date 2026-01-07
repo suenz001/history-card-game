@@ -5,6 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
     <link rel="stylesheet" href="style.css?v=125">
+    <style>
+        /* 新增：建築升級進度條樣式 */
+        .build-progress-bar {
+            width: 100%;
+            height: 12px;
+            background-color: #333;
+            border-radius: 6px;
+            margin-top: 8px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid #555;
+        }
+        .build-progress-bar .fill {
+            height: 100%;
+            background-color: #f1c40f; /* 黃色進度條 */
+            width: 0%;
+            transition: width 0.2s linear; /* 平滑過渡 */
+            box-shadow: 0 0 5px rgba(241, 196, 15, 0.5);
+        }
+        .timer-text {
+            font-size: 0.8em;
+            color: #ddd;
+            display: block;
+            text-align: center;
+            margin-top: 4px;
+            font-family: monospace;
+        }
+    </style>
 </head>
 <body>
 
