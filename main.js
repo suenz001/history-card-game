@@ -380,18 +380,22 @@ if (isFirebaseReady && auth) {
     });
 }
 
-// 🔥 統一資源管理與更新邏輯
+// 🔥 統一資源管理與更新邏輯 (修正版：支援木頭與鐵礦)
 // action: 'check', 'deduct', 'add', 'add_resource', 'refresh'
 const currencyHandler = (action, data, extraType = 'gold') => {
     // 1. 處理檢查
     if (action === 'check') {
         if (extraType === 'iron') return iron >= data;
+        if (extraType === 'wood') return wood >= data; // 🔥 新增
+        if (extraType === 'food') return food >= data;
         return gold >= data;
     }
     
     // 2. 處理扣款
     if (action === 'deduct') {
         if (extraType === 'iron') iron -= data;
+        else if (extraType === 'wood') wood -= data; // 🔥 新增
+        else if (extraType === 'food') food -= data;
         else gold -= data;
     }
     
@@ -401,10 +405,10 @@ const currencyHandler = (action, data, extraType = 'gold') => {
         else gold += data;
     }
     
-    // 4. 🔥 處理資源產出 (add_resource)
+    // 4. 處理資源產出 (add_resource)
     if (action === 'add_resource') {
         const val = Number(data.amount) || 0;
-        console.log(`[Main] Adding ${val} to ${data.type}`); // Log 供確認
+        console.log(`[Main] Adding ${val} to ${data.type}`);
         
         if (data.type === 'gold') gold += val;
         if (data.type === 'iron') iron += val;
@@ -413,10 +417,10 @@ const currencyHandler = (action, data, extraType = 'gold') => {
         if (data.type === 'wood') wood += val; 
     }
     
-    // 5. 🔥 刷新 UI 與雲端 (重點修正：UI 優先)
+    // 5. 刷新 UI 與雲端 (UI 優先)
     if (action === 'refresh') { 
-        updateUIDisplay(); // 先更新 UI，讓玩家感覺不延遲
-        updateCurrencyCloud(); // 再慢慢存雲端
+        updateUIDisplay(); 
+        updateCurrencyCloud(); 
     }
     
     return true;
@@ -472,17 +476,15 @@ async function loadUserData(user) {
 
 async function updateCurrencyCloud() { 
     if (!currentUser) return; 
-    // 🔥 儲存所有資源與領地狀態
+    // 儲存所有資源與領地狀態
     const updates = { gems, gold, iron, food, wood, combatPower: totalPower, claimedNotifs: claimedNotifs };
     const currentTData = Territory.getTerritoryData();
     if(currentTData) updates.territory = currentTData;
     
-    // 背景靜默存檔，不影響 UI
     await updateDoc(doc(db, "users", currentUser.uid), updates).catch(e => console.error("Cloud save failed", e));
 }
 
 function updateUIDisplay() { 
-    // 強制更新所有資源顯示
     const gemEl = document.getElementById('gem-count'); if(gemEl) gemEl.innerText = gems;
     const goldEl = document.getElementById('gold-count'); if(goldEl) goldEl.innerText = gold;
     const ironEl = document.getElementById('iron-count'); if(ironEl) ironEl.innerText = iron; 
