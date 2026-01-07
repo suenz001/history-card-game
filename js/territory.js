@@ -209,19 +209,20 @@ function renderUpgradeButton(type, data, config) {
 function renderProgressBar(type, data, config) {
     if (data.upgradeEndTime <= Date.now()) return '';
     
-    // 計算初始寬度 (避免重新開啟視窗時進度條歸零)
-    // 這裡我們需要重新計算總時間來推算進度，這比儲存開始時間節省資料庫空間
+    // 計算初始寬度
     const totalTimeSec = Math.floor(config.baseTime * Math.pow(config.timeFactor, data.level));
     const totalMs = totalTimeSec * 1000;
     const remainingMs = data.upgradeEndTime - Date.now();
     const elapsedMs = totalMs - remainingMs;
     const percent = Math.max(0, Math.min(100, (elapsedMs / totalMs) * 100));
 
+    // 修改：將 span 移到 div 外面，避免被 overflow:hidden 遮擋
     return `
         <div class="build-progress-bar" id="progress-box-${type}">
             <div class="fill" id="progress-fill-${type}" style="width:${percent}%"></div>
-            <span class="timer-text" id="timer-${type}" data-type="${type}" data-end="${data.upgradeEndTime}">計算中...</span>
-        </div>`;
+        </div>
+        <span class="timer-text" id="timer-${type}" data-type="${type}" data-end="${data.upgradeEndTime}">計算中...</span>
+    `;
 }
 
 // 倉庫容量 (小時)
@@ -353,13 +354,12 @@ function updateTerritoryUI() {
             }
         } else {
             // 更新倒數文字
-            span.innerText = formatTime((end - now) / 1000);
+            span.innerText = `剩餘: ${formatTime((end - now) / 1000)}`;
 
             // 更新進度條寬度
             const fill = document.getElementById(`progress-fill-${type}`);
             if (fill) {
-                // 重新計算總時間 (根據當前等級)
-                // 注意：這裡假設還沒升級完成，所以用 data.level 算是「升級前」的等級，對應的升級時間是正確的
+                // 重新計算總時間
                 const totalTimeSec = Math.floor(config.baseTime * Math.pow(config.timeFactor, data.level));
                 const totalMs = totalTimeSec * 1000;
                 const remainingMs = end - now;
