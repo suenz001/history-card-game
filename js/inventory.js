@@ -95,7 +95,6 @@ export async function loadInventory(uid) {
                 if (!data.stars) data.stars = 0;
 
                 // 🔥 根據新的 baseAtk/baseHp 重新計算當前的 atk/hp
-                // 這樣舊卡片就會立刻套用新的平衡數值
                 const levelBonus = (data.level - 1) * 0.03; 
                 const starBonus = data.stars * 0.20; 
                 data.atk = Math.floor(data.baseAtk * (1 + levelBonus) * (1 + starBonus)); 
@@ -152,12 +151,17 @@ export function renderCard(card, targetContainer) {
 
     cardDiv.className = `card ${card.rarity}`; 
     
-    const isPvpSelection = pvpTargetInfo && pvpTargetInfo.index !== null;
+    // 🔥 修正：僅邏輯判斷是否部署，但不添加視覺樣式
+    // 這樣背包看起來就是「乾淨」的，不論卡片是否在隊伍中
     let isDeployed = false;
+    const isPvpSelection = pvpTargetInfo && pvpTargetInfo.index !== null;
+    
     if (!isPvpSelection) {
         if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { 
-            cardDiv.classList.add('is-deployed'); 
+            // isDeployed 變數保留給點擊時的邏輯判斷 (例如防止分解)
             isDeployed = true;
+            // ❌ 不添加 'is-deployed' class，保持乾淨
+            // cardDiv.classList.add('is-deployed'); 
         }
     }
     
@@ -180,7 +184,8 @@ export function renderCard(card, targetContainer) {
         playSound('click'); 
         
         if (isBatchMode) { 
-            if (isDeployed) return alert("正在出戰中的英雄無法分解！");
+            // 🔥 邏輯保護：雖然外觀看不出來，但實際批量分解時仍禁止分解出戰卡
+            if (isDeployed) return alert("這位英雄正在出戰隊伍中，無法選取分解！\n(請先解除隊伍部署)");
             toggleBatchSelection(card, cardDiv); 
             return; 
         } 
@@ -194,6 +199,7 @@ export function renderCard(card, targetContainer) {
             return;
         }
 
+        // 開啟詳情
         let index = currentDisplayList.indexOf(card); 
         if (index === -1) { currentDisplayList = [card]; index = 0; } 
         openDetailModal(index); 
@@ -323,9 +329,7 @@ export function openDetailModal(index) {
     renderDetailCard(); 
 }
 
-// 🔥 新增：供外部使用的開啟指定卡片函式 (修復主畫面顯示問題)
 export function openCardModal(card) {
-    // 強制設定顯示列表為該張卡片，避免因排序或篩選造成的 index 錯亂
     currentDisplayList = [card];
     currentCardIndex = 0;
     
@@ -417,7 +421,7 @@ function renderDetailCard() {
     setupDetailButtons(card);
 }
 
-// 🔥 修改：卡片升級按鈕顯示金幣+鐵礦
+// 🔥 修改：卡片升級按鈕
 function setupDetailButtons(card) {
     const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); 
     const upgradeStarBtn = document.getElementById('upgrade-star-btn');
@@ -437,7 +441,7 @@ function setupDetailButtons(card) {
         upgradeLevelBtn.innerHTML = "已達 MAX"; upgradeLevelBtn.classList.add('btn-disabled'); upgradeLevelBtn.onclick = null; 
     } else { 
         const goldCost = card.level * 100; 
-        const ironCost = Math.floor(goldCost * 0.2); // 🔥 鐵礦消耗為金幣的 20%
+        const ironCost = Math.floor(goldCost * 0.2); 
         
         upgradeLevelBtn.innerHTML = `⬆️ 升級 <span style="font-size:0.8em;">(${goldCost}G / ${ironCost}鐵)</span>`; 
         upgradeLevelBtn.classList.remove('btn-disabled'); 
@@ -451,7 +455,21 @@ function setupDetailButtons(card) {
         upgradeStarBtn.onclick = () => upgradeCardStar(); 
     }
     
-    dismantleBtn.onclick = () => dismantleCurrentCard();
+    // 🔥 邏輯檢查：僅在要分解時才阻擋，且顯示提示，但不改變按鈕外觀
+    const isDeployedPVE = battleSlots.some(s => s && s.docId === card.docId);
+    
+    if (isDeployedPVE) {
+        // 你可以選擇是否要讓按鈕變灰，或只是點擊時跳警告
+        // 為了維持「乾淨」，我們這裡讓按鈕看起來正常，但點擊會阻擋
+        // 或是明確一點：按鈕改文字但保持可互動
+        dismantleBtn.classList.add('btn-disabled');
+        dismantleBtn.innerHTML = "⚔️ 出戰中 (不可分解)";
+        dismantleBtn.onclick = null; // 禁止點擊
+    } else {
+        dismantleBtn.classList.remove('btn-disabled');
+        dismantleBtn.innerHTML = "💰 分解此卡";
+        dismantleBtn.onclick = () => dismantleCurrentCard();
+    }
 }
 
 // 🔥 修改：升級消耗邏輯 (扣除金幣與鐵礦)
@@ -484,6 +502,10 @@ async function upgradeCardStar() {
     if (!duplicate) return alert("沒有重複的卡片可以用來升星！");
     if (!confirm(`確定要消耗一張【${duplicate.name}】來升星嗎？`)) return;
     
+    // 檢查素材卡是否出戰
+    const isFodderDeployed = battleSlots.some(s => s && s.docId === duplicate.docId);
+    if (isFodderDeployed) return alert("作為素材的卡片正在出戰中，無法消耗！\n請先解除該卡片的部署。");
+
     await deleteDoc(doc(db, "inventory", duplicate.docId)); 
     const idx = allUserCards.findIndex(c => c.docId === duplicate.docId);
     if(idx > -1) allUserCards.splice(idx, 1);
@@ -614,6 +636,10 @@ export async function autoStarUp() {
                 
                 if (deletedDocIds.has(fodder.docId)) continue;
                 if (mainCard.stars >= 5) break;
+                
+                // 🔥 安全檢查：素材卡不能正在出戰
+                const isFodderDeployed = battleSlots.some(s => s && s.docId === fodder.docId);
+                if (isFodderDeployed) continue;
 
                 deletedDocIds.add(fodder.docId);
                 deletePromises.push(deleteDoc(doc(db, "inventory", fodder.docId)));
@@ -636,7 +662,7 @@ export async function autoStarUp() {
     }
 
     if (upgradedCount === 0 && consumedCount === 0) {
-        return alert("目前沒有可升星的卡片組合");
+        return alert("目前沒有可升星的卡片組合 (或素材卡正在出戰中)");
     }
 
     try {
