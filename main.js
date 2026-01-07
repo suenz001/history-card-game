@@ -39,7 +39,8 @@ function updateLatestCardsUI() {
         return getTime(b.obtainedAt) - getTime(a.obtainedAt);
     });
     
-    const latestCards = sortedCards.slice(0, 5);
+    // 🔥 修改：顯示最新的 10 張卡片
+    const latestCards = sortedCards.slice(0, 10);
 
     container.innerHTML = "";
     latestCards.forEach(card => {
@@ -184,24 +185,40 @@ setTimeout(() => {
         });
     }
     
-    // 6. Gacha Skip 按鈕 (更新邏輯)
+    // 6. Gacha Skip 按鈕 (🔥 更新邏輯：跳轉至 SSR)
     const skipBtn = document.getElementById('gacha-skip-btn');
     if (skipBtn) {
         skipBtn.addEventListener('click', () => {
              playSound('click');
-             const container = document.getElementById('gacha-reveal-container');
-             // 清空並顯示所有剩餘卡片
-             container.innerHTML = "";
-             gachaQueue.forEach(card => createGachaCardElement(card, container));
-             gachaQueue = []; // 清空佇列
              
-             document.getElementById('gacha-next-hint').innerText = "點擊任意處關閉";
-             document.getElementById('gacha-reveal-modal').onclick = () => {
-                 document.getElementById('gacha-reveal-modal').classList.add('hidden');
-                 document.getElementById('gacha-reveal-modal').onclick = null;
-                 Inventory.filterInventory('ALL'); // 刷新背包
-                 updateLatestCardsUI(); // 刷新主畫面
-             };
+             // 檢查剩下的隊列中是否有 SSR
+             const nextSSRIndex = gachaQueue.findIndex(c => c.rarity === 'SSR');
+             
+             if (nextSSRIndex !== -1) {
+                 // 🔥 策略更新：如果有 SSR，移除 SSR 之前的所有卡片
+                 // 這樣下一次呼叫 showNextGachaCard() 就會直接顯示這張 SSR
+                 gachaQueue.splice(0, nextSSRIndex);
+                 
+                 // 立即顯示這張 SSR (這會觸發 SSR 特效動畫)
+                 showNextGachaCard(); 
+             } else {
+                 // 如果沒有 SSR 了，就依照原本邏輯：一次顯示全部剩餘
+                 const container = document.getElementById('gacha-reveal-container');
+                 // 清空容器
+                 container.innerHTML = "";
+                 // 將剩餘卡片全部顯示
+                 gachaQueue.forEach(card => createGachaCardElement(card, container));
+                 gachaQueue = []; // 清空佇列
+                 
+                 // 更新狀態為結束
+                 document.getElementById('gacha-next-hint').innerText = "點擊任意處關閉";
+                 document.getElementById('gacha-reveal-modal').onclick = () => {
+                     document.getElementById('gacha-reveal-modal').classList.add('hidden');
+                     document.getElementById('gacha-reveal-modal').onclick = null;
+                     Inventory.filterInventory('ALL'); // 刷新背包
+                     updateLatestCardsUI(); // 刷新主畫面
+                 };
+             }
         });
     }
 
