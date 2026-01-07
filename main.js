@@ -619,16 +619,22 @@ function renderBattleSlots() {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); 
         
-        // 清空舊內容 (保留 placeholder)
+        // 清空舊內容
         const existingInfo = slotDiv.querySelector('.deploy-card-info'); 
         const existingImgs = slotDiv.querySelectorAll('img');
         if (existingInfo) existingInfo.remove();
         existingImgs.forEach(img => img.remove());
 
+        // 重置樣式以防殘留
+        slotDiv.style.background = ''; 
+
         if (hero) {
             placeholder.style.display = 'none'; 
             slotDiv.classList.add('active');
             
+            // 🔥 移除半透明背景，確保卡片清晰
+            slotDiv.style.background = 'none';
+
             // 準備數據
             const charPath = `assets/cards/${hero.id}.webp`; 
             const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
@@ -645,11 +651,11 @@ function renderBattleSlots() {
             else if(uType === 'ARCHER') typeIcon = '🏹';
 
             // 建立 HTML 結構
-            // 1. 底圖
+            // 1. 底圖 (確保不透明)
             const img = document.createElement('img');
             img.src = charPath;
             img.onerror = () => { this.src='https://placehold.co/120x180?text=No+Image'; };
-            img.style.cssText = "width:100%; height:100%; object-fit:cover; border-radius:6px; display:block;";
+            img.style.cssText = "width:100%; height:100%; object-fit:cover; border-radius:6px; display:block; opacity: 1;";
             slotDiv.appendChild(img);
 
             // 2. 框
@@ -658,7 +664,7 @@ function renderBattleSlots() {
             frame.style.cssText = "position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; border-radius:6px;";
             slotDiv.appendChild(frame);
 
-            // 3. 資訊覆蓋層 (使用 index.html 定義的 class)
+            // 3. 資訊覆蓋層
             const infoDiv = document.createElement('div');
             infoDiv.className = 'deploy-card-info';
             infoDiv.innerHTML = `
@@ -672,10 +678,12 @@ function renderBattleSlots() {
         } else { 
             placeholder.style.display = 'block'; 
             slotDiv.classList.remove('active'); 
+            // 恢復半透明黑底給空格子
+            slotDiv.style.background = 'rgba(0, 0, 0, 0.3)';
         }
     });
     
-    updateStartButton(); // 確保數值同步
+    updateStartButton(); 
 }
 
 // 修正：加入戰力計算與糧食消耗顯示
@@ -707,7 +715,7 @@ function updateStartButton() {
     }
 
     if (foodCostContainer) {
-        if (!isBattleActive) { // 只在非戰鬥中顯示
+        if (!isPvpMode && !isBattleActive) {
             foodCostContainer.style.display = 'inline';
         } else {
             foodCostContainer.style.display = 'none';
