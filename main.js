@@ -7,7 +7,7 @@ import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, s
 import { HERO_BIOS } from './js/bios.js';
 import { cardDatabase, RATES, DIFFICULTY_SETTINGS, SYSTEM_NOTIFICATIONS } from './js/data.js';
 import { playSound, audioBgm, audioBattle, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
-// 🔥 修改：引入 setCurrencyValidator
+// 🔥 引入 setCurrencyValidator
 import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive, setCurrencyValidator } from './js/battle.js';
 import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/pvp.js';
 import * as Inventory from './js/inventory.js';
@@ -73,7 +73,7 @@ setTimeout(() => {
             document.getElementById('inventory-modal').classList.remove('hidden');
             if(Inventory.getAllCards().length === 0 && currentUser) Inventory.loadInventory(currentUser.uid); 
             else Inventory.filterInventory('ALL');
-        }, Inventory.openEnemyDetailModal, currencyHandler); // 🔥 修改：傳入 currencyHandler
+        }, Inventory.openEnemyDetailModal, currencyHandler); 
     }
 }, 500);
 
@@ -707,10 +707,34 @@ function renderBattleSlots() {
     });
 }
 
+// 🔥 修正：加入戰力計算與糧食消耗顯示
 function updateStartButton() {
-    const btn = document.getElementById('start-battle-btn'); const deployedCount = battleSlots.filter(s => s !== null).length;
-    if (deployedCount > 0) { btn.classList.remove('btn-disabled'); btn.innerText = `⚔️ 開始戰鬥 (${deployedCount}/9)`; } 
-    else { btn.classList.add('btn-disabled'); btn.innerText = `請先部署英雄`; }
+    const btn = document.getElementById('start-battle-btn');
+    const foodCostEl = document.getElementById('battle-food-cost');
+    const powerEl = document.getElementById('current-battle-power');
+    
+    const deployedHeroes = battleSlots.filter(s => s !== null);
+    const deployedCount = deployedHeroes.length;
+    
+    let totalPower = 0;
+    deployedHeroes.forEach(h => totalPower += (h.atk + h.hp));
+    const foodCost = Math.ceil(totalPower * 0.01); // 1% 糧食消耗
+
+    // 更新上方的戰力與糧食顯示
+    if (powerEl) powerEl.innerText = totalPower;
+    if (foodCostEl) foodCostEl.innerText = foodCost;
+
+    // 更新按鈕
+    if (deployedCount > 0) { 
+        btn.classList.remove('btn-disabled'); 
+        btn.innerHTML = `⚔️ 開始戰鬥 <span style="font-size:0.8em">(${deployedCount}/9)</span>`; 
+        btn.dataset.cost = foodCost;
+    } 
+    else { 
+        btn.classList.add('btn-disabled'); 
+        btn.innerText = `請先部署英雄`; 
+        btn.dataset.cost = 0;
+    }
 }
 
 if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-deploy-btn').addEventListener('click', () => {
