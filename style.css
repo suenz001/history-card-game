@@ -242,7 +242,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .hero-unit.SR { border-color: #9b59b6; }
 .hero-unit.R { border-color: #3498db; }
 
-/* 英雄與敵人的血條 - 2倍化修正 */
+/* 🔥 修正：血條加入置中設定，防止轉向時亂跑 🔥 */
 .hero-hp-bar, .enemy-hp-bar { 
     position: absolute; 
     top: -24px; /* 往上移，留空間給氣力條 */
@@ -250,11 +250,14 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     height: 8px; /* 4px * 2 */
     background: #555; 
     border-radius: 4px; 
+    /* 強制置中 */
+    left: 50%;
+    transform: translateX(-50%);
 }
 .hero-hp-bar > div { height: 100%; background: #2ecc71; border-radius: 4px; }
 .enemy-hp-bar > div { height: 100%; background: #e74c3c; border-radius: 4px; }
 
-/* 🔷 英雄氣力條 (藍條) - 2倍化修正 */
+/* 🔥 修正：氣力條加入置中設定 🔥 */
 .hero-mana-bar {
     position: absolute;
     top: -12px; /* 位於血條下方 */
@@ -264,6 +267,9 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     border-radius: 4px;
     overflow: hidden;
     z-index: 25;
+    /* 強制置中 */
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .hero-mana-bar > div {
@@ -379,12 +385,15 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     z-index: -2;
 }
 
-/* 魔王血條位置調整 - 2倍化修正 */
+/* 🔥 魔王血條位置調整 - 2倍化修正 & 加入置中 */
 .enemy-unit.boss .enemy-hp-bar { 
     top: -40px; 
     width: 180px; 
     height: 14px; 
     border: 2px solid rgba(255,255,255,0.8);
+    /* 強制置中 */
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 /* 旋轉動畫定義 */
@@ -1426,9 +1435,17 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 }
 
 /* 🔥 關鍵修正：當父層被翻轉時，把內部的血條、氣力條、兵種圖示「翻回來」(負負得正) */
+/* 修正重點：
+   1. transform: translateX(-50%) -> 維持置中
+   2. scaleX(-1) -> 抵銷父層鏡像，確保血條方向正確
+*/
 .unit-flipped .hero-hp-bar,
 .unit-flipped .enemy-hp-bar,
-.unit-flipped .hero-mana-bar,
+.unit-flipped .hero-mana-bar {
+    transform: translateX(-50%) scaleX(-1) !important;
+}
+
+/* 兵種圖示不需要置中修正 (因為它是定位在角落的)，只需抵銷翻轉 */
 .unit-flipped .hero-type-badge {
     transform: scaleX(-1);
 }
@@ -1579,89 +1596,4 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 @keyframes progressStripes {
     from { background-position: 20px 0; }
     to { background-position: 0 0; }
-}
-`
-}
-
-/* style.css */
-
-/* Gacha Overlay */
-#gacha-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.9);
-    z-index: 2000; /* 提高層級，確保蓋住所有介面 */
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-}
-
-/* 召喚陣基礎 */
-#summon-circle {
-    width: 150px; height: 150px;
-    border-radius: 50%;
-    background: transparent;
-    border: 5px solid rgba(255,255,255,0.5);
-    transition: all 0.5s;
-    z-index: 2002;
-    position: relative;
-}
-
-/* R 卡特效 (藍光) */
-.glow-r {
-    box-shadow: 0 0 30px #3498db, inset 0 0 20px #3498db;
-    border-color: #3498db !important;
-    animation: pulse 1s infinite alternate;
-}
-
-/* SR 卡特效 (紫光) */
-.glow-sr {
-    box-shadow: 0 0 50px #9b59b6, inset 0 0 30px #8e44ad;
-    border-color: #9b59b6 !important;
-    animation: spin-pulse 2s infinite linear; /* 旋轉加閃爍 */
-}
-
-/* SSR 卡特效 (金光 + 爆閃) */
-.glow-ssr {
-    box-shadow: 
-        0 0 60px #f1c40f, 
-        0 0 100px #f39c12, 
-        inset 0 0 40px #f1c40f;
-    border-color: #f1c40f !important;
-    background: radial-gradient(circle, rgba(255,215,0,0.2) 0%, transparent 70%);
-    animation: super-shake 0.2s infinite, pulse-gold 0.5s infinite alternate;
-}
-
-/* SSR 爆發光束 (背景) */
-#summon-burst {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 0; height: 0;
-    border-radius: 50%;
-    background: radial-gradient(circle, #fff 10%, #f1c40f 40%, transparent 70%);
-    opacity: 0;
-    z-index: 2001;
-}
-
-.burst-active {
-    animation: holyBurst 2.5s forwards ease-out;
-}
-
-/* 動畫定義 */
-@keyframes pulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.1); opacity: 1; } }
-@keyframes pulse-gold { from { opacity: 0.8; filter: brightness(1); } to { opacity: 1; filter: brightness(1.5); } }
-@keyframes spin-pulse { 
-    0% { transform: rotate(0deg) scale(1); box-shadow: 0 0 30px #9b59b6; } 
-    50% { transform: rotate(180deg) scale(1.1); box-shadow: 0 0 60px #9b59b6; } 
-    100% { transform: rotate(360deg) scale(1); box-shadow: 0 0 30px #9b59b6; } 
-}
-@keyframes super-shake { 
-    0% { transform: translate(1px, 1px) rotate(0deg); } 
-    25% { transform: translate(-1px, -2px) rotate(-1deg); } 
-    50% { transform: translate(-2px, 0px) rotate(1deg); } 
-    75% { transform: translate(2px, 1px) rotate(-1deg); } 
-    100% { transform: translate(1px, -1px) rotate(0deg); } 
-}
-@keyframes holyBurst { 
-    0% { width: 0; height: 0; opacity: 1; } 
-    20% { width: 150vw; height: 150vw; opacity: 0.8; } 
-    100% { width: 200vw; height: 200vw; opacity: 0; } 
 }
