@@ -20,7 +20,7 @@ let currentLevelId = 1;
 let pvpPlayerTeamData = [];
 let userProgress = {}; 
 
-// 🔥 新增：用來檢查和扣除資源的回調函式
+// 用來檢查和扣除資源的回調函式
 let currencyHandlerRef = null;
 
 let battleState = {
@@ -45,7 +45,7 @@ export function setDifficulty(diff) { currentDifficulty = diff; }
 export function setGameSpeed(speed) { gameSpeed = speed; } 
 export function setOnBattleEnd(callback) { onBattleEndCallback = callback; }
 
-// 🔥 新增：設定資源管理器
+// 設定資源管理器
 export function setCurrencyValidator(handler) {
     currencyHandlerRef = handler;
 }
@@ -176,34 +176,48 @@ function renderBattleSlots() {
         }
     });
     
-    // 每次渲染插槽時也更新按鈕狀態 (因為陣容變了，費用也會變)
+    // 每次渲染插槽時也更新按鈕狀態與糧食顯示
     updateStartButton();
 }
 
-// 🔥 修改：更新按鈕顯示，包含糧食費用
+// 🔥 修改：更新按鈕與上方的糧食顯示
 function updateStartButton() {
     const btn = document.getElementById('start-battle-btn'); 
+    const foodCostEl = document.getElementById('battle-food-cost');
+    const foodCostContainer = document.getElementById('battle-food-cost-container');
+
     const deployedHeroes = battleSlots.filter(s => s !== null);
     const deployedCount = deployedHeroes.length;
     
+    let foodCost = 0;
+
     if (deployedCount > 0) { 
         let totalPower = 0;
         deployedHeroes.forEach(h => totalPower += (h.atk + h.hp));
         
-        // 🔥 計算糧食消耗 (總戰力的 1%)
-        const foodCost = Math.ceil(totalPower * 0.01);
+        // 計算糧食消耗 (總戰力的 1%)
+        foodCost = Math.ceil(totalPower * 0.01);
 
         btn.classList.remove('btn-disabled'); 
-        // 支援 HTML 換行顯示費用
-        btn.innerHTML = `⚔️ 開始戰鬥 <span style="font-size:0.8em">(${deployedCount}/9)</span><br><span style="font-size:0.7em; color:#f1c40f;">🌾 -${foodCost} 糧食</span>`; 
-        
-        // 將費用存入 dataset 供點擊時讀取
+        btn.innerHTML = `⚔️ 開始戰鬥 <span style="font-size:0.8em">(${deployedCount}/9)</span>`; 
         btn.dataset.cost = foodCost;
     } 
     else { 
         btn.classList.add('btn-disabled'); 
         btn.innerText = `請先部署英雄`; 
         btn.dataset.cost = 0;
+    }
+
+    // 更新上方顯示
+    if (foodCostEl) foodCostEl.innerText = foodCost;
+    
+    // 如果是 PVE 模式，且未開戰，顯示糧食消耗
+    if (foodCostContainer) {
+        if (!isPvpMode && !isBattleActive) {
+            foodCostContainer.style.display = 'inline';
+        } else {
+            foodCostContainer.style.display = 'none';
+        }
     }
 }
 
@@ -229,6 +243,10 @@ function startBattle() {
     isPvpMode = false; 
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'flex'; 
+    
+    // 隱藏糧食顯示 (因為戰鬥開始了)
+    const foodCostContainer = document.getElementById('battle-food-cost-container');
+    if(foodCostContainer) foodCostContainer.style.display = 'none';
 
     setupBattleEnvironment();
     spawnHeroes();
@@ -245,6 +263,10 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
 
     const diffControls = document.getElementById('difficulty-controls');
     if(diffControls) diffControls.style.display = 'none';
+    
+    // PVP 模式下隱藏糧食顯示
+    const foodCostContainer = document.getElementById('battle-food-cost-container');
+    if(foodCostContainer) foodCostContainer.style.display = 'none';
 
     setupBattleEnvironment();
     
@@ -941,10 +963,11 @@ function gameLoop() {
             enemy.el.style.left = `${enemy.position}%`; enemy.el.style.top = `${enemy.y}%`;
             enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
             
+            // 修正轉向邏輯：使用 class 控制
             if (nearestHero && nearestHero.position > enemy.position) {
-                enemy.el.classList.remove('unit-flipped'); 
+                enemy.el.classList.remove('unit-flipped'); // 英雄在右邊，面向右
             } else {
-                enemy.el.classList.add('unit-flipped'); 
+                enemy.el.classList.add('unit-flipped'); // 英雄在左邊，面向左
             }
         }
     }
