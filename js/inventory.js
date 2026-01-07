@@ -50,7 +50,7 @@ export function setPvpSelectionMode(index, type) {
     pvpTargetInfo = { index, type };
 }
 
-// 🔥 新增：讓外部強制刷新背包畫面 (用於解除全軍時)
+// 強制刷新背包畫面
 export function refreshInventory() {
     filterInventory();
 }
@@ -87,6 +87,8 @@ export async function loadInventory(uid) {
                  if(data.skillKey !== newSkillKey) data.skillKey = newSkillKey; 
                  if(JSON.stringify(data.skillParams) !== JSON.stringify(newSkillParams)) data.skillParams = newSkillParams; 
             }
+            // 🔥 修正：如果沒有 stars 屬性，預設為 0 星 (初始狀態)
+            if (data.stars === undefined) data.stars = 0;
             allUserCards.push({ ...data, docId: docSnap.id }); 
         });
         
@@ -105,9 +107,10 @@ export async function saveCardToCloud(card) {
         name: card.name, rarity: card.rarity, atk: card.atk, hp: card.hp, title: card.title, 
         baseAtk: card.atk, baseHp: card.hp, attackType: card.attackType || 'melee',
         skillKey: card.skillKey || null, skillParams: card.skillParams || null,
-        level: 1, stars: 1, obtainedAt: new Date(), owner: currentUser.uid, id: card.id 
+        // 🔥 修正：新抽到的卡片為 0 星
+        level: 1, stars: 0, obtainedAt: new Date(), owner: currentUser.uid, id: card.id 
     });
-    const newCard = { ...card, docId: docRef.id, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 1, obtainedAt: new Date() };
+    const newCard = { ...card, docId: docRef.id, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 0, obtainedAt: new Date() };
     allUserCards.push(newCard);
     updateInventoryCounts();
     return newCard;
@@ -119,19 +122,21 @@ export function renderCard(card, targetContainer) {
     const charPath = `assets/cards/${card.id}.webp`; 
     const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; 
     const level = card.level || 1; 
-    const stars = card.stars || 1; 
+    
+    // 🔥 修正：0 星時不顯示星星，1 星顯示 ★
+    const stars = card.stars !== undefined ? card.stars : 0; 
     const starString = '★'.repeat(stars); 
+    
     const idString = String(card.id).padStart(3, '0');
     
     const baseConfig = cardDatabase.find(c => c.id == card.id);
     const uType = baseConfig ? (baseConfig.unitType || 'INFANTRY') : 'INFANTRY';
-    let typeIcon = '⚔️'; 
+    let typeIcon = ⚔️'; 
     if (uType === 'CAVALRY') typeIcon = '🐴';
     else if (uType === 'ARCHER') typeIcon = '🏹';
 
     cardDiv.className = `card ${card.rarity}`; 
     
-    // 判斷是否部署中 (僅用於視覺變灰)
     const isPvpSelection = pvpTargetInfo && pvpTargetInfo.index !== null;
     let isDeployed = false;
     if (!isPvpSelection) {
@@ -148,17 +153,13 @@ export function renderCard(card, targetContainer) {
     cardDiv.addEventListener('click', () => { 
         playSound('click'); 
         
-        // 1. 批量模式：禁止操作已部署卡片
         if (isBatchMode) { 
             if (isDeployed) return alert("正在出戰中的英雄無法分解！");
             toggleBatchSelection(card, cardDiv); 
             return; 
         } 
         
-        // 2. PVP/PVE 選擇模式 (例如點擊空位後選人)
         if (pvpTargetInfo.index !== null && onPvpSelectionDone) {
-            // 注意：這裡是「選人上陣」，所以如果已經部署，通常還是允許點擊 (視同切換/無效，由外部邏輯決定)
-            // 為了避免混淆，這裡不阻擋，交給 callback 處理
             const success = onPvpSelectionDone(pvpTargetInfo.index, card, pvpTargetInfo.type);
             if(success) {
                 pvpTargetInfo = { index: null, type: null };
@@ -167,7 +168,6 @@ export function renderCard(card, targetContainer) {
             return;
         }
 
-        // 3. 一般詳情查看 (🔥 關鍵修正：就算已部署，只要不是上面兩種模式，就打開詳情)
         let index = currentDisplayList.indexOf(card); 
         if (index === -1) { currentDisplayList = [card]; index = 0; } 
         openDetailModal(index); 
@@ -176,7 +176,7 @@ export function renderCard(card, targetContainer) {
     return cardDiv;
 }
 
-// 處理按鈕點擊邏輯 (複選核心)
+// 處理按鈕點擊邏輯
 function handleFilterClick(mode, filterValue) {
     const raritySet = mode === 'inventory' ? invRarityFilters : galRarityFilters;
     const typeSet = mode === 'inventory' ? invTypeFilters : galTypeFilters;
@@ -223,20 +223,17 @@ function updateFilterButtonsUI(mode) {
     });
 }
 
-// 背包篩選邏輯 (支援複選 + 混合 + 排序)
+// 背包篩選邏輯
 export function filterInventory(ignoreVal) {
     const container = document.getElementById('inventory-grid');
     if(!container) return; 
     container.innerHTML = "";
     
     const filteredList = allUserCards.filter(card => {
-        // 邏輯：(稀有度集合為空 OR 命中) AND (兵種集合為空 OR 命中)
         const passRarity = (invRarityFilters.size === 0) || invRarityFilters.has(card.rarity);
-        
         const base = cardDatabase.find(db => db.id == card.id);
         const uType = base ? (base.unitType || 'INFANTRY') : 'INFANTRY';
         const passType = (invTypeFilters.size === 0) || invTypeFilters.has(uType);
-
         return passRarity && passType;
     });
 
@@ -250,11 +247,11 @@ export function filterInventory(ignoreVal) {
     currentDisplayList.forEach((card) => { renderCard(card, container); });
 }
 
-// 時間戳記轉換 Helper
+// 時間戳記轉換
 function getTime(dateObj) {
     if (!dateObj) return 0;
-    if (dateObj.seconds) return dateObj.seconds * 1000; // Firebase Timestamp
-    if (dateObj.getTime) return dateObj.getTime(); // JS Date
+    if (dateObj.seconds) return dateObj.seconds * 1000; 
+    if (dateObj.getTime) return dateObj.getTime(); 
     return 0;
 }
 
@@ -308,10 +305,11 @@ export function openEnemyDetailModal(enemyCard) {
 
     if (baseCard) {
         const level = displayCard.level || 1;
-        const stars = displayCard.stars || 1;
+        const stars = displayCard.stars !== undefined ? displayCard.stars : 0; // 🔥 修正：預設 0 星
         
         const levelBonus = (level - 1) * 0.03;
-        const starBonus = (stars - 1) * 0.20;
+        // 🔥 修正：星級加成改為 stars * 20% (0星無加成)
+        const starBonus = stars * 0.20;
         
         const baseAtk = displayCard.baseAtk || baseCard.atk;
         const baseHp = displayCard.baseHp || baseCard.hp;
@@ -343,8 +341,10 @@ function renderDetailCard() {
     const charPath = `assets/cards/${card.id}.webp`;
     const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
     const level = card.level || 1;
-    const stars = card.stars || 1;
-    const starString = '★'.repeat(stars);
+    // 🔥 修正：星星顯示字串
+    const stars = card.stars !== undefined ? card.stars : 0;
+    const starString = '★'.repeat(stars); 
+    
     const idString = String(card.id).padStart(3, '0');
     
     const baseConfig = cardDatabase.find(c => c.id == card.id);
@@ -452,16 +452,27 @@ async function upgradeCardStar() {
     alert(`升星成功！目前 ${card.stars} ★`);
 }
 
+// 🔥 修改：分解價值計算邏輯 (修正版)
+// 邏輯：基礎價值 * (星數 + 1)
+// 0星 = Base * 1 = 100
+// 1星 = Base * 2 = 200 (2張卡)
+// 5星 = Base * 6 = 600 (6張卡)
 async function dismantleCurrentCard() {
     const card = currentDisplayList[currentCardIndex]; 
-    const value = DISMANTLE_VALUES[card.rarity];
-    if (card.rarity !== 'R') { if (!confirm(`確定要分解【${card.name}】嗎？\n獲得 ${value} 金幣。`)) return; }
+    const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
+    
+    // 計算公式修正：
+    const totalValue = baseValue * (card.stars + 1);
+
+    if (card.rarity !== 'R') { 
+        if (!confirm(`確定要分解【${card.name}】嗎？\n獲得 ${totalValue} 金幣。`)) return; 
+    }
     
     try { 
         if (card.docId) await deleteDoc(doc(db, "inventory", card.docId)); 
         playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
         
-        onCurrencyUpdate('add', value); 
+        onCurrencyUpdate('add', totalValue); 
         
         const idx = allUserCards.findIndex(c => c.docId === card.docId);
         if(idx > -1) allUserCards.splice(idx, 1);
@@ -469,13 +480,17 @@ async function dismantleCurrentCard() {
         updateInventoryCounts();
         document.getElementById('detail-modal').classList.add('hidden'); 
         filterInventory(); 
-        alert(`已分解！獲得 ${value} 金幣`); 
+        alert(`已分解！獲得 ${totalValue} 金幣`); 
     } catch (e) { console.error("分解失敗", e); }
 }
 
+// 🔥 修改：數值計算公式 (修正版)
+// 星級加成從 0 星開始計算
 function calculateCardStats(card) { 
     const levelBonus = (card.level - 1) * 0.03; 
-    const starBonus = (card.stars - 1) * 0.20; 
+    // 🔥 修正：星級加成改為 stars * 0.20 (0星無加成)
+    const starBonus = card.stars * 0.20; 
+    
     card.atk = Math.floor(card.baseAtk * (1 + levelBonus) * (1 + starBonus)); 
     card.hp = Math.floor(card.baseHp * (1 + levelBonus) * (1 + starBonus)); 
 }
@@ -490,10 +505,18 @@ function toggleBatchSelection(card, cardDiv) {
     calculateBatchTotal(); 
 }
 
+// 🔥 修改：批量分解價值計算 (修正版)
 function calculateBatchTotal() { 
     let totalGold = 0; let count = 0; 
     allUserCards.forEach(card => { 
-        if (selectedBatchCards.has(card.docId)) { totalGold += DISMANTLE_VALUES[card.rarity] || 0; count++; } 
+        if (selectedBatchCards.has(card.docId)) { 
+            const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
+            // 計算公式修正：Base * (Stars + 1)
+            const cardValue = baseValue * (card.stars + 1);
+            
+            totalGold += cardValue; 
+            count++; 
+        } 
     }); 
     const batchInfo = document.getElementById('batch-info');
     const btn = document.getElementById('batch-confirm-btn');
@@ -766,7 +789,7 @@ function bindInventoryEvents() {
         filterInventory();
     });
     
-    // 批量分解確認
+    // 🔥 修改：批量分解確認 (數值公式修正)
     document.getElementById('batch-confirm-btn')?.addEventListener('click', async () => {
         playSound('click'); 
         if (selectedBatchCards.size === 0) return; 
@@ -777,7 +800,11 @@ function bindInventoryEvents() {
         const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); 
         
         cardsToRemove.forEach(card => { 
-            totalGold += DISMANTLE_VALUES[card.rarity]; 
+            const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
+            // 修正公式：Base * (Stars + 1)
+            const cardValue = baseValue * (card.stars + 1);
+            totalGold += cardValue; 
+            
             if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); 
         }); 
         
