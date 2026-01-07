@@ -7,20 +7,20 @@ export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 // 數值已針對新版低攻擊力環境進行微調
 export const DIFFICULTY_SETTINGS = {
     easy:   { 
-        hpMult: 1.8,    // 簡單模式敵人血量略降
-        atkMult: 0.7,   // 簡單模式敵人攻擊降低
+        hpMult: 2.0,    // 簡單模式敵人血量略降
+        atkMult: 1.5,   // 簡單模式敵人攻擊降低
         goldMult: 0.6,  
         gemReward: 150  
     },
     normal: { 
-        hpMult: 2.0, 
-        atkMult: 1.0, 
+        hpMult: 2.5, 
+        atkMult: 2.0, 
         goldMult: 1.0, 
         gemReward: 250 
     },
     hard:   { 
-        hpMult: 2.5,    // 困難模式血量倍率適度下修，避免戰鬥過長
-        atkMult: 1.5,   
+        hpMult: 3.5,    // 困難模式血量倍率適度下修，避免戰鬥過長
+        atkMult: 2.5,   
         goldMult: 2.0, 
         gemReward: 350 
     }
@@ -57,7 +57,7 @@ const DEFAULT_WAVES = {
     4: { 
         // 修正：配合玩家 ATK 下修 (約300)，將 Boss 血量從 30000 下修至 6000，ATK 從 500 下修至 150
         // 這樣戰鬥時間會變長，但不會打不死
-        count: 1, hp: 6000, atk: 150, bossId: 1,
+        count: 1, hp: 15000, atk: 1120, bossId: 1,
         aoeConfig: { radius: 15, damageMult: 1.0, effect: 'shockwave', color: '#e74c3c' }
     } 
 };
