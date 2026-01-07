@@ -305,6 +305,19 @@ export function openDetailModal(index) {
     renderDetailCard(); 
 }
 
+// 🔥 新增：供外部使用的開啟指定卡片函式 (修復主畫面顯示問題)
+export function openCardModal(card) {
+    // 強制設定顯示列表為該張卡片，避免因排序或篩選造成的 index 錯亂
+    currentDisplayList = [card];
+    currentCardIndex = 0;
+    
+    playSound('click'); 
+    const detailModal = document.getElementById('detail-modal');
+    detailModal.classList.remove('hidden'); 
+    detailModal.style.zIndex = "99999"; 
+    renderDetailCard(); 
+}
+
 export function openEnemyDetailModal(enemyCard) {
     isViewingEnemy = true;
 
