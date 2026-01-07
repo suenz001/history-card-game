@@ -126,6 +126,14 @@ function prepareLevel() {
     if(retreatBtn) retreatBtn.innerText = "🏳️ 撤退";
     
     document.getElementById('battle-screen').classList.remove('hidden');
+
+    // 🔥 修正：強制設定布陣區為不透明且顯示，解決第一次進入時透明的問題
+    const lanesWrapper = document.querySelector('.lanes-wrapper');
+    if(lanesWrapper) {
+        lanesWrapper.style.display = 'flex';
+        lanesWrapper.style.opacity = '1';
+    }
+
     renderBattleSlots();
     updateStartButton();
     updateBattleUI(); 
@@ -159,14 +167,14 @@ function updateDifficultyButtons() {
     }
 }
 
-// 🔥🔥 同步 main.js 的新樣式渲染邏輯 + 強力清理
+// 🔥 強力清理 + 新樣式渲染
 function renderBattleSlots() {
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
     battleSlotsEl.forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); 
         
-        // 🔥 強力清空：移除除了 placeholder 以外的所有子元素
+        // 強力清空：只保留 placeholder
         Array.from(slotDiv.children).forEach(child => {
             if (!child.classList.contains('slot-placeholder')) {
                 child.remove();
@@ -180,9 +188,7 @@ function renderBattleSlots() {
         if (hero) {
             placeholder.style.display = 'none'; 
             slotDiv.classList.add('active');
-            
-            // 🔥 移除半透明背景
-            slotDiv.style.background = 'none';
+            slotDiv.style.background = 'none'; // 確保不透明
 
             // 準備數據
             const charPath = `assets/cards/${hero.id}.webp`; 
@@ -198,7 +204,7 @@ function renderBattleSlots() {
             if(uType === 'CAVALRY') typeIcon = '🐴';
             else if(uType === 'ARCHER') typeIcon = '🏹';
 
-            // 建立 HTML 結構
+            // 建立 HTML
             const img = document.createElement('img');
             img.src = charPath;
             img.onerror = () => { this.src='https://placehold.co/120x180?text=No+Image'; };
@@ -222,7 +228,7 @@ function renderBattleSlots() {
 
         } else { 
             placeholder.style.display = 'block'; 
-            slotDiv.style.background = 'rgba(0, 0, 0, 0.3)'; // 恢復空格背景
+            slotDiv.style.background = 'rgba(0, 0, 0, 0.3)'; // 空格保持半透明
         }
     });
     
@@ -347,7 +353,7 @@ function setupBattleEnvironment() {
     if(heroMonitorList) heroMonitorList.innerHTML = '';
     if(enemyMonitorList) enemyMonitorList.innerHTML = '';
 
-    // 🔥 核心修改：戰鬥開始時，直接隱藏布陣格子
+    // 🔥 隱藏布陣區
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) {
         lanesWrapper.style.display = 'none';
@@ -397,7 +403,7 @@ export function resetBattleState() {
     const battleScreen = document.getElementById('battle-screen');
     const waveNotif = document.getElementById('wave-notification');
     
-    // 🔥 核心修改：戰鬥重置時，恢復顯示布陣格子
+    // 🔥 恢復布陣區顯示
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) {
         lanesWrapper.style.display = 'flex';
