@@ -2,7 +2,7 @@
 import { doc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { playSound } from './audio.js';
 
-// --- 建築設定檔 ---
+// --- 建築設定檔 (平衡性調整版) ---
 const BUILDING_CONFIG = {
     castle: { 
         name: "🏰 主堡", 
@@ -16,7 +16,8 @@ const BUILDING_CONFIG = {
         desc: "生產糧食，軍隊補給的基礎。",
         baseCost: 500, costFactor: 1.4, 
         baseTime: 30, timeFactor: 1.2, 
-        baseProd: 200, prodFactor: 1.3, // 每小時產量
+        // 🔥 調整：基礎產量 200 -> 300，成長 1.3 -> 1.35 (應對戰鬥消耗)
+        baseProd: 300, prodFactor: 1.35, 
         resource: 'food' 
     },
     lumber: { 
@@ -24,7 +25,8 @@ const BUILDING_CONFIG = {
         desc: "生產木頭，建設建築的基礎資源。",
         baseCost: 600, costFactor: 1.4, 
         baseTime: 40, timeFactor: 1.2, 
-        baseProd: 150, prodFactor: 1.25, // 每小時產量
+        // 🔥 調整：基礎產量 150 -> 300，成長 1.25 -> 1.35 (加速建設節奏)
+        baseProd: 300, prodFactor: 1.35, 
         resource: 'wood' 
     },
     mine: { 
@@ -32,7 +34,7 @@ const BUILDING_CONFIG = {
         desc: "生產鐵礦，這是強化英雄裝備的關鍵資源。",
         baseCost: 800, costFactor: 1.4, 
         baseTime: 45, timeFactor: 1.2, 
-        baseProd: 50, prodFactor: 1.2, // 每小時產量
+        baseProd: 50, prodFactor: 1.2, // 鐵礦維持稀有
         resource: 'iron'
     },
     warehouse: { 
@@ -183,7 +185,7 @@ function renderTerritory() {
     });
 }
 
-// 🔥 修改：顯示金幣與木頭費用
+// 修改：顯示金幣與木頭費用
 function renderUpgradeButton(type, data, config) {
     if (data.upgradeEndTime > Date.now()) {
         return `<button class="btn-secondary btn-disabled" id="btn-upgrade-${type}" disabled>🚧 建造中...</button>`;
@@ -196,7 +198,7 @@ function renderUpgradeButton(type, data, config) {
     }
 
     const goldCost = Math.floor(config.baseCost * Math.pow(config.costFactor, data.level));
-    const woodCost = Math.floor(goldCost * 0.5); // 🔥 木頭消耗為金幣的 50%
+    const woodCost = Math.floor(goldCost * 0.5); // 木頭消耗為金幣的 50%
     
     const timeSec = Math.floor(config.baseTime * Math.pow(config.timeFactor, data.level));
     const timeStr = formatTime(timeSec);
@@ -279,12 +281,11 @@ function handleClaim(type) {
     renderTerritory(); 
 }
 
-// 🔥 修改：升級消耗邏輯 (扣除金幣與木頭)
 async function handleUpgrade(type, btn) {
     if (territoryData[type].upgradeEndTime > Date.now()) return;
 
     const goldCost = parseInt(btn.dataset.cost);
-    const woodCost = parseInt(btn.dataset.woodCost) || 0; // 讀取木頭費用
+    const woodCost = parseInt(btn.dataset.woodCost) || 0; 
     const timeSec = parseInt(btn.dataset.time);
 
     // 1. 檢查資源
