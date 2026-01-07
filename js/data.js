@@ -7,19 +7,19 @@ export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 // 數值已針對新版低攻擊力環境進行微調
 export const DIFFICULTY_SETTINGS = {
     easy:   { 
-        hpMult: 2.0,    // 簡單模式敵人血量略降
-        atkMult: 1.5,   // 簡單模式敵人攻擊降低
+        hpMult: 1.0,    // 簡單模式敵人血量略降
+        atkMult: 1.0,   // 簡單模式敵人攻擊降低
         goldMult: 0.6,  
         gemReward: 150  
     },
     normal: { 
-        hpMult: 2.5, 
-        atkMult: 2.0, 
+        hpMult: 1.5, 
+        atkMult: 1.5, 
         goldMult: 1.0, 
         gemReward: 250 
     },
     hard:   { 
-        hpMult: 3.5,    // 困難模式血量倍率適度下修，避免戰鬥過長
+        hpMult: 2.5,    // 困難模式血量倍率適度下修，避免戰鬥過長
         atkMult: 2.5,   
         goldMult: 2.0, 
         gemReward: 350 
