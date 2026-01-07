@@ -7,7 +7,8 @@ import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, s
 import { HERO_BIOS } from './js/bios.js';
 import { cardDatabase, RATES, DIFFICULTY_SETTINGS, SYSTEM_NOTIFICATIONS } from './js/data.js';
 import { playSound, audioBgm, audioBattle, setBgmState, setSfxState, setBgmVolume, setSfxVolume, isBgmOn, isSfxOn, bgmVolume, sfxVolume } from './js/audio.js';
-import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive } from './js/battle.js';
+// 🔥 修改：引入 setCurrencyValidator
+import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattleEnd, currentDifficulty, battleSlots, isBattleActive, setCurrencyValidator } from './js/battle.js';
 import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/pvp.js';
 import * as Inventory from './js/inventory.js';
 import * as Territory from './js/territory.js';
@@ -72,7 +73,7 @@ setTimeout(() => {
             document.getElementById('inventory-modal').classList.remove('hidden');
             if(Inventory.getAllCards().length === 0 && currentUser) Inventory.loadInventory(currentUser.uid); 
             else Inventory.filterInventory('ALL');
-        }, Inventory.openEnemyDetailModal); 
+        }, Inventory.openEnemyDetailModal, currencyHandler); // 🔥 修改：傳入 currencyHandler
     }
 }, 500);
 
@@ -469,6 +470,9 @@ async function loadUserData(user) {
     });
 
     Territory.initTerritory(db, user, territoryData, currencyHandler);
+
+    // 🔥 確保 battle.js 也能使用資源管理器
+    setCurrencyValidator(currencyHandler);
 
     await Inventory.loadInventory(user.uid);
     updatePvpContext(currentUser, Inventory.getAllCards());
