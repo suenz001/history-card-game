@@ -18,7 +18,7 @@ const BUILDING_CONFIG = {
         baseCost: 500, costFactor: 1.4, 
         // 🔥 時間調整：基礎 5 分鐘，成長係數 1.35 (Lv10 約需 1.2 小時)
         baseTime: 300, timeFactor: 1.35, 
-        baseProd: 300, prodFactor: 1.35, 
+        baseProd: 900, prodFactor: 1.35, 
         resource: 'food' 
     },
     lumber: { 
