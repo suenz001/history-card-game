@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=121">
+    <link rel="stylesheet" href="style.css?v=125">
 </head>
 <body>
 
@@ -22,7 +22,6 @@
 
         <div id="login-section">
             <h3>請選擇登入方式：</h3>
-            
             <div style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
                 <input type="email" id="email-input" placeholder="電子信箱">
                 <input type="password" id="pass-input" placeholder="密碼 (6位以上)">
@@ -39,9 +38,9 @@
             <div style="display:flex; justify-content:space-between; width:100%; align-items:center; flex-wrap: wrap; gap: 10px;">
                 <span id="user-name" style="font-size:1.2em; font-weight:bold;">玩家：載入中...</span>
                 <div style="display: flex; gap: 5px;">
-<button id="notification-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #e67e22;">
-    🔔 通知 <span id="notif-badge" class="notification-badge hidden">0</span>
-</button>
+                    <button id="notification-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #e67e22;">
+                        🔔 通知 <span id="notif-badge" class="notification-badge hidden">0</span>
+                    </button>
                     <button id="gallery-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #1abc9c;">📖 圖鑑</button>
                     <button id="settings-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">⚙️ 設定</button>
                     <button id="logout-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">登出</button>
@@ -58,8 +57,12 @@
                             <div style="display:flex; justify-content:space-between;">
                                 <span>💎 <span id="gem-count">0</span></span>
                                 <span>💰 <span id="gold-count">0</span></span>
+                                <span style="color:#bdc3c7;">⛏️ <span id="iron-count">0</span></span>
                             </div>
-                            <button id="inventory-btn" class="btn-secondary" style="background:#8e44ad; width:100%; margin:0;">🎒 打開我的背包 (查看所有卡片)</button>
+                            <div style="display: flex; gap: 5px;">
+                                <button id="territory-btn" class="btn-secondary" style="background:#27ae60; flex:1; margin:0;">🏰 經營領地</button>
+                                <button id="inventory-btn" class="btn-secondary" style="background:#8e44ad; flex:1; margin:0;">🎒 我的背包</button>
+                            </div>
                         </div>
                     </div>
 
@@ -95,6 +98,19 @@
         </div>
     </div>
 
+    <div id="territory-modal" class="modal hidden">
+        <div class="modal-content" style="background: #2c3e50; border: 3px solid #27ae60;">
+            <div class="modal-header">
+                <h2>🏰 我的領地</h2>
+                <button id="close-territory-btn" class="btn-primary" style="background:#c0392b;">離開</button>
+            </div>
+            <div class="territory-grid-container" style="flex: 1; overflow-y: auto; padding: 10px;">
+                <div class="territory-grid">
+                    </div>
+            </div>
+        </div>
+    </div>
+
     <div id="level-selection-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 600px; max-height: 80vh;">
             <div class="modal-header">
@@ -121,7 +137,7 @@
                 <span>⚔️ 存活: <span id="hero-count-display">0</span></span>
                 <span id="wave-display-container">💀 波次: <span id="wave-count">1</span>/4</span>
                 <span id="battle-gold-container">💰 <span id="battle-gold">0</span> G</span>
- <span style="margin-left: 10px; color: #f39c12;">🔥 <span id="current-battle-power">0</span></span>
+                <span style="margin-left: 10px; color: #f39c12;">🔥 <span id="current-battle-power">0</span></span>
             </div>
             <button id="retreat-btn" class="btn-danger" style="padding: 5px 15px; font-size: 0.9em;">🏳️ 撤退</button>
         </div>
@@ -202,15 +218,15 @@
                 </div>
                 <button id="close-inventory-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
             </div>
-<div class="filter-bar">
-    <button class="filter-btn active" data-filter="ALL">全部</button>
-    <button class="filter-btn" data-filter="SSR">SSR</button>
-    <button class="filter-btn" data-filter="SR">SR</button>
-    <button class="filter-btn" data-filter="R">R</button>
-    <button class="filter-btn" data-filter="INFANTRY">⚔️ 步兵</button>
-    <button class="filter-btn" data-filter="CAVALRY">🐴 騎兵</button>
-    <button class="filter-btn" data-filter="ARCHER">🏹 弓兵</button>
-</div>
+            <div class="filter-bar">
+                <button class="filter-btn active" data-filter="ALL">全部</button>
+                <button class="filter-btn" data-filter="SSR">SSR</button>
+                <button class="filter-btn" data-filter="SR">SR</button>
+                <button class="filter-btn" data-filter="R">R</button>
+                <button class="filter-btn" data-filter="INFANTRY">⚔️ 步兵</button>
+                <button class="filter-btn" data-filter="CAVALRY">🐴 騎兵</button>
+                <button class="filter-btn" data-filter="ARCHER">🏹 弓兵</button>
+            </div>
             <div id="inventory-grid" class="card-container" style="justify-content: flex-start;"></div>
             
             <div id="batch-action-bar" class="hidden">
@@ -230,15 +246,15 @@
                 <button id="close-gallery-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
             </div>
             
-<div class="filter-bar" style="justify-content: center; gap: 5px; flex-wrap: wrap;">
-    <button class="gallery-filter-btn active" data-filter="ALL">全部</button>
-    <button class="gallery-filter-btn" data-filter="SSR">SSR</button>
-    <button class="gallery-filter-btn" data-filter="SR">SR</button>
-    <button class="gallery-filter-btn" data-filter="R">R</button>
-    <button class="gallery-filter-btn" data-filter="INFANTRY">⚔️ 步兵</button>
-    <button class="gallery-filter-btn" data-filter="CAVALRY">🐴 騎兵</button>
-    <button class="gallery-filter-btn" data-filter="ARCHER">🏹 弓兵</button>
-</div>
+            <div class="filter-bar" style="justify-content: center; gap: 5px; flex-wrap: wrap;">
+                <button class="gallery-filter-btn active" data-filter="ALL">全部</button>
+                <button class="gallery-filter-btn" data-filter="SSR">SSR</button>
+                <button class="gallery-filter-btn" data-filter="SR">SR</button>
+                <button class="gallery-filter-btn" data-filter="R">R</button>
+                <button class="gallery-filter-btn" data-filter="INFANTRY">⚔️ 步兵</button>
+                <button class="gallery-filter-btn" data-filter="CAVALRY">🐴 騎兵</button>
+                <button class="gallery-filter-btn" data-filter="ARCHER">🏹 弓兵</button>
+            </div>
 
             <div id="gallery-grid" class="card-container" style="justify-content: flex-start;"></div>
         </div>
@@ -262,7 +278,7 @@
         <div class="upgrade-controls">
             <div class="upgrade-box">
                 <div class="upgrade-title">提升等級 (Lv.30 Max)</div>
-                <button id="upgrade-level-btn" class="btn-upgrade">⬆️ 升級 <span id="upgrade-cost" style="font-size:0.8em;">(500G)</span></button>
+                <button id="upgrade-level-btn" class="btn-upgrade">⬆️ 升級</button>
             </div>
             <div class="upgrade-box">
                 <div class="upgrade-title">提升星級 (5★ Max)</div>
@@ -421,7 +437,8 @@
             </div>
         </div>
     </div>
-<script type="module" src="js/inventory.js"></script>
-    <script type="module" src="main.js"></script>
+
+    <script type="module" src="js/inventory.js"></script>
+    <script type="module" src="js/territory.js"></script> <script type="module" src="main.js"></script>
 </body>
 </html>

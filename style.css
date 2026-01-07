@@ -1432,3 +1432,153 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .unit-flipped .hero-type-badge {
     transform: scaleX(-1);
 }
+
+/* =========================================
+   🏰 領地系統樣式 (新增)
+   ========================================= */
+
+.territory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 15px;
+    padding: 10px;
+}
+
+.building-card {
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid #7f8c8d;
+    border-radius: 10px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    transition: transform 0.2s;
+}
+
+.building-card:hover {
+    border-color: #27ae60;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(39, 174, 96, 0.2);
+}
+
+.building-card.castle { border-color: #f1c40f; }
+.building-card.farm { border-color: #f39c12; }
+.building-card.mine { border-color: #95a5a6; }
+.building-card.warehouse { border-color: #3498db; }
+
+.build-info {
+    flex: 1;
+}
+
+.build-name {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #ecf0f1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.build-lv {
+    font-size: 0.8em;
+    background: #27ae60;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.build-desc {
+    font-size: 0.85em;
+    color: #bdc3c7;
+    margin: 5px 0 10px 0;
+    min-height: 2.5em; /* 保持高度一致 */
+}
+
+.build-stat {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #f1c40f;
+    margin-bottom: 10px;
+}
+
+.build-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: auto;
+}
+
+.btn-upgrade-build {
+    background: #e67e22;
+    color: white;
+    border: none;
+    padding: 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.9em;
+    transition: 0.2s;
+}
+
+.btn-upgrade-build:hover {
+    background: #d35400;
+}
+
+.claim-btn {
+    background: #27ae60;
+    width: 100%;
+    margin: 0 0 5px 0;
+    padding: 8px;
+    font-size: 0.9em;
+}
+
+.claim-btn.disabled {
+    background: #7f8c8d;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* 建造進度條 */
+.build-progress-bar {
+    height: 6px;
+    background: #333;
+    border-radius: 3px;
+    margin-top: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.build-progress-bar .fill {
+    height: 100%;
+    background: #3498db;
+    animation: progressStripes 1s linear infinite;
+    background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.15) 75%,
+        transparent 75%,
+        transparent
+    );
+    background-size: 20px 20px;
+}
+
+.timer-text {
+    position: absolute;
+    top: -20px;
+    right: 0;
+    font-size: 0.8em;
+    color: #3498db;
+    font-weight: bold;
+}
+
+@keyframes progressStripes {
+    from { background-position: 20px 0; }
+    to { background-position: 0 0; }
+}
+`
+}
