@@ -1063,12 +1063,14 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
 
 async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     const diffSettings = DIFFICULTY_SETTINGS[currentDifficulty] || DIFFICULTY_SETTINGS['normal'];
+// 🔻 1. 調整黃金倍率 (原本: Easy 0.5, Hard 2.0, Normal 1.0)
     let goldMultiplier = currentDifficulty === 'easy' ? 0.5 : (currentDifficulty === 'hard' ? 2.0 : 1.0);
-    let finalGold = Math.floor(earnedGold * goldMultiplier);
+// 您也可以直接在這裡額外乘上一個係數來全體下修，例如 * 0.5 (變為一半)
+    let finalGold = Math.floor(earnedGold * goldMultiplier * 0.5);
     let gemReward = isWin ? (diffSettings.gemReward || 0) : 0;
-    
-    let ironReward = isWin ? Math.floor(finalGold * 0.1) : 0; 
-    let woodReward = isWin ? Math.floor(finalGold * 0.2) : 0; 
+// 🔻 2. 調整鐵礦與木頭的獲取比例    
+    let ironReward = isWin ? Math.floor(finalGold * 0.01) : 0; 
+    let woodReward = isWin ? Math.floor(finalGold * 0.05) : 0; 
 
     const modal = document.getElementById('battle-result-modal'); const title = document.getElementById('result-title'); const goldText = document.getElementById('result-gold'); const gemText = document.getElementById('result-gems');
     const btn = document.getElementById('close-result-btn');
