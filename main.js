@@ -116,6 +116,7 @@ let currentVisibleNotifs = [];
 let gachaQueue = [];
 let gachaIndex = 0;
 
+// 設定 PVE 戰鬥結束的回調函式
 setOnBattleEnd(handleBattleEnd);
 
 // 初始化 PVP 與 綁定 UI 事件
@@ -1063,69 +1064,176 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
 
 async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     const diffSettings = DIFFICULTY_SETTINGS[currentDifficulty] || DIFFICULTY_SETTINGS['normal'];
-// 🔻 1. 調整黃金倍率 (原本: Easy 0.5, Hard 2.0, Normal 1.0)
+    
+    // --- 資源獎勵計算 ---
     let goldMultiplier = currentDifficulty === 'easy' ? 0.5 : (currentDifficulty === 'hard' ? 2.0 : 1.0);
-// 您也可以直接在這裡額外乘上一個係數來全體下修，例如 * 0.5 (變為一半)
-    let finalGold = Math.floor(earnedGold * goldMultiplier * 0.5);
+    let finalGold = Math.floor(earnedGold * goldMultiplier * 0.5); 
     let gemReward = isWin ? (diffSettings.gemReward || 0) : 0;
-// 🔻 2. 調整鐵礦與木頭的獲取比例    
     let ironReward = isWin ? Math.floor(finalGold * 0.01) : 0; 
     let woodReward = isWin ? Math.floor(finalGold * 0.05) : 0; 
 
-    const modal = document.getElementById('battle-result-modal'); const title = document.getElementById('result-title'); const goldText = document.getElementById('result-gold'); const gemText = document.getElementById('result-gems');
+    // --- 設定 UI ---
+    const modal = document.getElementById('battle-result-modal'); 
+    const title = document.getElementById('result-title'); 
+    const goldText = document.getElementById('result-gold'); 
+    const gemText = document.getElementById('result-gems');
     const btn = document.getElementById('close-result-btn');
     
     modal.classList.remove('hidden');
     if (isWin) { 
-        title.innerText = "VICTORY"; title.className = "result-title win-text"; playSound('reveal'); 
-        gemText.style.display = 'block'; gemText.innerText = `💎 +${gemReward}`;
+        title.innerText = "VICTORY"; 
+        title.className = "result-title win-text"; 
+        playSound('reveal'); 
+        gemText.style.display = 'block'; 
+        gemText.innerText = `💎 +${gemReward}`;
+        
+        // 紀錄關卡進度
         if (currentUser) {
             const progressKey = `${currentPlayingLevelId}_${currentDifficulty}`;
-            if (!completedLevels[progressKey]) { completedLevels[progressKey] = true; await updateDoc(doc(db, "users", currentUser.uid), { completedLevels: completedLevels }); }
+            if (!completedLevels[progressKey]) { 
+                completedLevels[progressKey] = true; 
+                await updateDoc(doc(db, "users", currentUser.uid), { completedLevels: completedLevels }); 
+            }
         }
     } else { 
-        title.innerText = "DEFEAT"; title.className = "result-title lose-text"; gemText.style.display = 'none'; playSound('dismantle'); 
+        title.innerText = "DEFEAT"; 
+        title.className = "result-title lose-text"; 
+        gemText.style.display = 'none'; 
+        playSound('dismantle'); 
     }
     
     goldText.innerHTML = `💰 +${finalGold}<br>🔩 +${ironReward} | 🌲 +${woodReward}`;
     
+    // 更新資源
     gold += finalGold; gems += gemReward; iron += ironReward; wood += woodReward;
-    
-    await updateCurrencyCloud(); updateUIDisplay();
+    await updateCurrencyCloud(); 
+    updateUIDisplay();
+
+    // 🔥🔥🔥 關鍵呼叫：渲染 DPS 圖表 (只傳入 heroStats，不傳入 enemyStats) 🔥🔥🔥
     renderDpsChart(heroStats);
-    btn.onclick = () => { playSound('click'); modal.classList.add('hidden'); resetBattleState(); };
+
+    btn.onclick = () => { 
+        playSound('click'); 
+        modal.classList.add('hidden'); 
+        resetBattleState(); 
+    };
 }
 
+// 🔥 新增：PVE 專用的傷害/治療統計圖表 (只顯示我方)
 function renderDpsChart(heroStats) {
-    const dpsContainer = document.getElementById('dps-chart'); dpsContainer.innerHTML = "";
-    const tabs = document.createElement('div');
-    tabs.style.display = "flex"; tabs.style.justifyContent = "center"; tabs.style.gap = "10px"; tabs.style.marginBottom = "10px";
-    tabs.innerHTML = `<button id="show-dmg-btn" class="btn-secondary active" style="padding:5px 15px; background:#e74c3c;">⚔️ 傷害</button><button id="show-heal-btn" class="btn-secondary" style="padding:5px 15px; opacity: 0.6;">💚 治療</button>`;
-    dpsContainer.appendChild(tabs);
-    const listContainer = document.createElement('div'); dpsContainer.appendChild(listContainer);
-    let currentMode = 'damage'; 
+    const dpsContainer = document.getElementById('dps-chart'); 
+    dpsContainer.innerHTML = ""; // 清空舊資料
 
+    // --- 建立切換按鈕 (傷害 / 治療) ---
+    const tabs = document.createElement('div');
+    tabs.style.display = "flex"; 
+    tabs.style.justifyContent = "center"; 
+    tabs.style.gap = "10px"; 
+    tabs.style.marginBottom = "10px";
+    
+    tabs.innerHTML = `
+        <button id="show-dmg-btn" class="btn-secondary active" style="padding:5px 15px; background:#e74c3c; border:1px solid #fff;">⚔️ 傷害</button>
+        <button id="show-heal-btn" class="btn-secondary" style="padding:5px 15px; opacity: 0.6; background:#95a5a6; border:1px solid #777;">💚 治療</button>
+    `;
+    dpsContainer.appendChild(tabs);
+
+    // --- 建立列表捲動容器 ---
+    const listContainer = document.createElement('div');
+    listContainer.style.maxHeight = "200px"; // 設定最大高度
+    listContainer.style.overflowY = "auto";  // 超出時捲動
+    dpsContainer.appendChild(listContainer);
+
+    let currentMode = 'damage'; // 預設模式
+
+    // --- 內部函式：渲染列表 ---
     const renderList = () => {
         listContainer.innerHTML = "";
+        
+        // 根據模式決定讀取的欄位 (totalDamage / totalHealing) 與顏色
         const statKey = currentMode === 'damage' ? 'totalDamage' : 'totalHealing';
-        const color = currentMode === 'damage' ? '#e74c3c' : '#2ecc71';
+        const barColor = currentMode === 'damage' ? '#e74c3c' : '#2ecc71';
+
         if (heroStats && heroStats.length > 0) {
+            // 1. 排序 (由大到小)
             const sortedHeroes = [...heroStats].sort((a, b) => (b[statKey] || 0) - (a[statKey] || 0));
-            const maxVal = sortedHeroes[0][statKey] || 1; 
+            
+            // 2. 找出最大值 (用來計算長度百分比)
+            const maxVal = Math.max(sortedHeroes[0][statKey] || 1, 1); 
+
             sortedHeroes.forEach(h => {
-                if(!h[statKey]) h[statKey] = 0;
-                if(h[statKey] === 0 && currentMode === 'healing') return; 
-                const percent = (h[statKey] / maxVal) * 100;
-                const row = document.createElement('div'); row.className = 'dps-row';
-                row.innerHTML = `<div class="dps-icon" style="background-image: url('assets/cards/${h.id}.webp');"></div><div class="dps-bar-container"><div class="dps-info"><span>${h.name}</span><span>${h[statKey]}</span></div><div class="dps-bar-bg"><div class="dps-bar-fill" style="width: ${percent}%; background-color: ${color};"></div></div></div>`;
+                const val = h[statKey] || 0;
+                
+                // 如果是治療模式且數值為0，可以略過不顯示
+                if (currentMode === 'healing' && val === 0) return;
+
+                const percent = (val / maxVal) * 100;
+                
+                const row = document.createElement('div');
+                row.className = 'dps-row'; // 使用 CSS 定義的樣式
+                
+                // 3. 建立 HTML (頭像 + 資訊 + 進度條)
+                row.innerHTML = `
+                    <div class="dps-icon" style="background-image: url('assets/cards/${h.id}.webp');"></div>
+                    <div class="dps-bar-container">
+                        <div class="dps-info">
+                            <span>${h.name}</span>
+                            <span style="font-weight:bold; color:#fff;">${val}</span>
+                        </div>
+                        <div class="dps-bar-bg">
+                            <div class="dps-bar-fill" style="width: ${percent}%; background-color: ${barColor};"></div>
+                        </div>
+                    </div>
+                `;
                 listContainer.appendChild(row);
             });
-        } else { listContainer.innerHTML = "<div style='text-align:center; color:#777;'>無數據</div>"; }
+
+            // 如果列表為空 (例如治療模式下沒人補血)
+            if (listContainer.children.length === 0) {
+                listContainer.innerHTML = "<div style='text-align:center; color:#777; padding:10px;'>無數據</div>";
+            }
+        } else {
+            listContainer.innerHTML = "<div style='text-align:center; color:#777; padding:10px;'>無數據</div>";
+        }
     };
+
+    // 初次渲染
     renderList();
-    const dmgBtn = tabs.querySelector('#show-dmg-btn'); const healBtn = tabs.querySelector('#show-heal-btn');
-    dmgBtn.onclick = () => { currentMode = 'damage'; dmgBtn.style.opacity = "1"; dmgBtn.style.background = "#e74c3c"; healBtn.style.opacity = "0.6"; healBtn.style.background = "#95a5a6"; renderList(); };
-    healBtn.onclick = () => { currentMode = 'healing'; healBtn.style.opacity = "1"; healBtn.style.background = "#2ecc71"; dmgBtn.style.opacity = "0.6"; dmgBtn.style.background = "#95a5a6"; renderList(); };
+
+    // --- 按鈕事件綁定 ---
+    const dmgBtn = tabs.querySelector('#show-dmg-btn'); 
+    const healBtn = tabs.querySelector('#show-heal-btn');
+
+    dmgBtn.onclick = () => { 
+        if (currentMode === 'damage') return;
+        currentMode = 'damage'; 
+        
+        // 更新按鈕樣式
+        dmgBtn.style.opacity = "1"; 
+        dmgBtn.style.background = "#e74c3c"; 
+        dmgBtn.style.borderColor = "#fff";
+        
+        healBtn.style.opacity = "0.6"; 
+        healBtn.style.background = "#95a5a6"; 
+        healBtn.style.borderColor = "#777";
+        
+        renderList(); 
+    };
+
+    healBtn.onclick = () => { 
+        if (currentMode === 'healing') return;
+        currentMode = 'healing'; 
+        
+        // 更新按鈕樣式
+        healBtn.style.opacity = "1"; 
+        healBtn.style.background = "#2ecc71"; 
+        healBtn.style.borderColor = "#fff";
+        
+        dmgBtn.style.opacity = "0.6"; 
+        dmgBtn.style.background = "#95a5a6"; 
+        dmgBtn.style.borderColor = "#777";
+        
+        renderList(); 
+    };
 }
 
 function checkUnreadNotifications() {
