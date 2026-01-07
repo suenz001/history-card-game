@@ -87,8 +87,7 @@ export async function loadInventory(uid) {
                  if(data.skillKey !== newSkillKey) data.skillKey = newSkillKey; 
                  if(JSON.stringify(data.skillParams) !== JSON.stringify(newSkillParams)) data.skillParams = newSkillParams; 
             }
-            // 修正：預設 0 星
-            if (data.stars === undefined) data.stars = 0;
+            if (!data.stars) data.stars = 0;
             allUserCards.push({ ...data, docId: docSnap.id }); 
         });
         
@@ -122,9 +121,8 @@ export function renderCard(card, targetContainer) {
     const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`; 
     const level = card.level || 1; 
     
-    // 0 星不顯示星星，1 星以上才顯示
     const stars = card.stars !== undefined ? card.stars : 0;
-    const starString = stars > 0 ? '★'.repeat(stars) : ''; 
+    const starString = stars > 0 ? '★'.repeat(stars) : '';
     
     const idString = String(card.id).padStart(3, '0');
     
@@ -136,7 +134,6 @@ export function renderCard(card, targetContainer) {
 
     cardDiv.className = `card ${card.rarity}`; 
     
-    // 判斷是否部署中 (僅用於視覺變灰)
     const isPvpSelection = pvpTargetInfo && pvpTargetInfo.index !== null;
     let isDeployed = false;
     if (!isPvpSelection) {
@@ -148,7 +145,6 @@ export function renderCard(card, targetContainer) {
     
     if (isBatchMode && selectedBatchCards.has(card.docId)) { cardDiv.classList.add('is-selected'); }
     
-    // 🔥 修復 SyntaxError：將 HTML 拆成多行，避免字串過長出錯
     cardDiv.innerHTML = `
         <div class="card-id-badge">#${idString}</div>
         <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
@@ -320,7 +316,6 @@ export function openEnemyDetailModal(enemyCard) {
         const stars = displayCard.stars !== undefined ? displayCard.stars : 0; 
         
         const levelBonus = (level - 1) * 0.03;
-        // 星級加成: 0星無, 1星20%...
         const starBonus = stars * 0.20;
         
         const baseAtk = displayCard.baseAtk || baseCard.atk;
@@ -466,6 +461,9 @@ async function upgradeCardStar() {
 
 // 🔥 修改：單張分解價值計算
 // 公式：基礎價值 * (星數 + 1)
+// 0星 = Base * 1 = 100
+// 1星 = Base * 2 = 200 (2張卡)
+// 5星 = Base * 6 = 600 (6張卡)
 async function dismantleCurrentCard() {
     const card = currentDisplayList[currentCardIndex]; 
     const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
@@ -480,7 +478,10 @@ async function dismantleCurrentCard() {
         if (card.docId) await deleteDoc(doc(db, "inventory", card.docId)); 
         playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
         
-        onCurrencyUpdate('add', totalValue); 
+        onCurrencyUpdate('add', totalValue);
+        
+        // 🔥 這裡一定要呼叫 refresh，否則 main.js 不會更新到資料庫
+        onCurrencyUpdate('refresh'); 
         
         const idx = allUserCards.findIndex(c => c.docId === card.docId);
         if(idx > -1) allUserCards.splice(idx, 1);
@@ -515,7 +516,9 @@ function calculateBatchTotal() {
     allUserCards.forEach(card => { 
         if (selectedBatchCards.has(card.docId)) { 
             const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
+            // 計算公式修正：Base * (Stars + 1)
             const cardValue = baseValue * (card.stars + 1);
+            
             totalGold += cardValue; 
             count++; 
         } 
@@ -743,7 +746,9 @@ function bindInventoryEvents() {
     // 排序下拉選單監聽
     const sortSelect = document.getElementById('sort-select');
     if (sortSelect) {
+        // 初始化時設定選單值
         sortSelect.value = currentSortMethod;
+        
         sortSelect.addEventListener('change', (e) => {
             playSound('click');
             currentSortMethod = e.target.value;
@@ -789,7 +794,7 @@ function bindInventoryEvents() {
         filterInventory();
     });
     
-    // 🔥 批量分解確認
+    // 🔥 修改：批量分解確認 (公式修正 + 記得 refresh)
     document.getElementById('batch-confirm-btn')?.addEventListener('click', async () => {
         playSound('click'); 
         if (selectedBatchCards.size === 0) return; 
@@ -801,7 +806,7 @@ function bindInventoryEvents() {
         
         cardsToRemove.forEach(card => { 
             const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
-            // 公式：Base * (Stars + 1)
+            // 修正公式：Base * (Stars + 1)
             const cardValue = baseValue * (card.stars + 1);
             totalGold += cardValue; 
             
@@ -816,6 +821,9 @@ function bindInventoryEvents() {
             playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
             
             if(onCurrencyUpdate) onCurrencyUpdate('add', totalGold);
+            
+            // 🔥 這裡一定要呼叫 refresh
+            onCurrencyUpdate('refresh'); 
             
             allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); 
             selectedBatchCards.clear(); 
