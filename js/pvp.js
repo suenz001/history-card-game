@@ -128,7 +128,8 @@ function updateMyArenaPowerDisplay() {
     const btn = document.getElementById('start-pvp-battle-btn');
     if(btn) {
         const foodCost = Math.ceil(currentTeamPower * 0.01);
-        btn.innerHTML = `⚔️ 開戰 (奪取 5% 金幣)<br><span style="font-size:0.7em; color:#f1c40f;">🌾 -${foodCost} 糧食</span>`;
+        // 🔥 修改提示：奪取 5% 資源
+        btn.innerHTML = `⚔️ 開戰 (奪取 5% 資源)<br><span style="font-size:0.7em; color:#f1c40f;">🌾 -${foodCost} 糧食</span>`;
         btn.dataset.cost = foodCost;
     }
 }
@@ -713,8 +714,20 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
         goldText.innerText = "計算戰利品中...";
         
         try {
-            const stolenGold = await executeStealTransaction(currentUser.uid, currentEnemyData.uid);
-            goldText.innerText = `💰 搶奪 +${stolenGold} G`;
+            // 🔥 修改：改為接收物件
+            const stolenRes = await executeStealTransaction(currentUser.uid, currentEnemyData.uid);
+            
+            // 🔥 修改：顯示所有資源
+            let stealMsg = "";
+            if (stolenRes.gold > 0) stealMsg += `💰 +${stolenRes.gold} G\n`;
+            if (stolenRes.food > 0) stealMsg += `🌾 +${stolenRes.food} 糧食\n`;
+            if (stolenRes.wood > 0) stealMsg += `🪵 +${stolenRes.wood} 木頭\n`;
+            if (stolenRes.iron > 0) stealMsg += `⛏️ +${stolenRes.iron} 鐵礦`;
+
+            if (stealMsg === "") stealMsg = "沒有搶到任何資源";
+            
+            goldText.innerText = stealMsg;
+            goldText.style.lineHeight = "1.5";
         } catch (e) {
             console.error("結算交易失敗", e);
             goldText.innerText = "💰 結算異常";
@@ -724,7 +737,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
         title.innerText = "DEFEAT";
         title.className = "result-title lose-text";
         playSound('dismantle');
-        goldText.innerText = "💰 搶奪失敗 (0 G)";
+        goldText.innerText = "搶奪失敗 (0 資源)";
         
         recordDefenseWinLog(currentEnemyData.uid, currentUser.displayName || "神秘客", currentUser.uid);
     }
@@ -737,49 +750,75 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
     };
 }
 
+// 🔥 修改：搶奪金幣、食物、木頭、鐵礦
 async function executeStealTransaction(myUid, enemyUid) {
     const myRef = doc(db, "users", myUid);
     const enemyRef = doc(db, "users", enemyUid);
 
     try {
-        const stolenAmount = await runTransaction(db, async (transaction) => {
+        const stolenResult = await runTransaction(db, async (transaction) => {
             const enemyDoc = await transaction.get(enemyRef);
             const myDoc = await transaction.get(myRef);
 
             if (!enemyDoc.exists()) throw new Error("Enemy does not exist!");
             if (!myDoc.exists()) throw new Error("User does not exist!");
 
-            const enemyGold = enemyDoc.data().gold || 0;
-            const myGold = myDoc.data().gold || 0;
+            const enemyData = enemyDoc.data();
+            const myData = myDoc.data();
             
-            let amount = Math.floor(enemyGold * 0.05);
-            if(amount < 0) amount = 0;
+            // 資源列表
+            const targetResources = [
+                { key: 'gold', name: 'gold' },
+                { key: 'food', name: 'food' },
+                { key: 'wood', name: 'wood' },
+                { key: 'iron', name: 'iron' }
+            ];
 
-            const newEnemyGold = Math.max(0, enemyGold - amount);
-            const newMyGold = myGold + amount;
+            const stolen = {};
+            const enemyUpdates = {};
+            const myUpdates = {};
 
-            transaction.update(enemyRef, { 
-                gold: newEnemyGold,
-                battleLogs: arrayUnion({
-                    type: "defense",
-                    result: "lose",
-                    attackerName: currentUser.displayName || "無名氏",
-                    attackerUid: myUid, 
-                    goldLost: amount,
-                    timestamp: Timestamp.now()
-                })
+            targetResources.forEach(res => {
+                const eVal = Number(enemyData[res.key]) || 0;
+                const mVal = Number(myData[res.key]) || 0;
+                
+                // 計算 5%
+                let amount = Math.floor(eVal * 0.05);
+                if (amount < 0) amount = 0;
+                
+                stolen[res.key] = amount;
+
+                // 更新數值
+                enemyUpdates[res.key] = Math.max(0, eVal - amount);
+                myUpdates[res.key] = mVal + amount;
             });
-            transaction.update(myRef, { gold: newMyGold });
 
-            return amount; 
+            // 加入戰報
+            enemyUpdates.battleLogs = arrayUnion({
+                type: "defense",
+                result: "lose",
+                attackerName: currentUser.displayName || "無名氏",
+                attackerUid: myUid, 
+                goldLost: stolen.gold,
+                foodLost: stolen.food,
+                woodLost: stolen.wood,
+                ironLost: stolen.iron,
+                timestamp: Timestamp.now()
+            });
+
+            transaction.update(enemyRef, enemyUpdates);
+            transaction.update(myRef, myUpdates);
+
+            return stolen; 
         });
-        return stolenAmount;
+        return stolenResult;
     } catch (e) {
         console.error("Transaction failed: ", e);
         throw e;
     }
 }
 
+// 🔥 修改：防守勝利時記錄所有損失為 0
 async function recordDefenseWinLog(enemyUid, attackerName, attackerUid) {
     try {
         const enemyRef = doc(db, "users", enemyUid);
@@ -790,6 +829,9 @@ async function recordDefenseWinLog(enemyUid, attackerName, attackerUid) {
                 attackerName: attackerName,
                 attackerUid: attackerUid,
                 goldLost: 0,
+                foodLost: 0,
+                woodLost: 0,
+                ironLost: 0,
                 timestamp: Timestamp.now()
             })
         });
