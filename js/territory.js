@@ -13,11 +13,19 @@ const BUILDING_CONFIG = {
     },
     farm: { 
         name: "🌾 農田", 
-        desc: "生產糧食，可轉換為金幣 (離線收益)。",
+        desc: "生產糧食，軍隊補給的基礎。",
         baseCost: 500, costFactor: 1.4, 
         baseTime: 30, timeFactor: 1.2, 
         baseProd: 200, prodFactor: 1.3, // 每小時產量
-        resource: 'gold' 
+        resource: 'food' 
+    },
+    lumber: { 
+        name: "🪓 伐木場", 
+        desc: "生產木頭，建設建築的基礎資源。",
+        baseCost: 600, costFactor: 1.4, 
+        baseTime: 40, timeFactor: 1.2, 
+        baseProd: 150, prodFactor: 1.25, // 每小時產量
+        resource: 'wood' 
     },
     mine: { 
         name: "⛏️ 礦場", 
@@ -68,6 +76,7 @@ function createDefaultTerritory() {
     return {
         castle: { level: 1, upgradeEndTime: 0 },
         farm: { level: 1, upgradeEndTime: 0, lastClaimTime: Date.now() },
+        lumber: { level: 1, upgradeEndTime: 0, lastClaimTime: Date.now() }, // 新增伐木場
         mine: { level: 1, upgradeEndTime: 0, lastClaimTime: Date.now() },
         warehouse: { level: 1, upgradeEndTime: 0 }
     };
@@ -132,9 +141,23 @@ function renderTerritory() {
     if (!grid) return;
     grid.innerHTML = '';
 
-    const order = ['castle', 'farm', 'mine', 'warehouse'];
+    // 修改：將 'lumber' 加入渲染順序
+    const order = ['castle', 'farm', 'lumber', 'mine', 'warehouse'];
+
+    // 資源名稱對照表
+    const resourceMap = {
+        gold: '金幣',
+        iron: '鐵礦',
+        food: '糧食',
+        wood: '木頭'
+    };
 
     order.forEach(type => {
+        // 防止舊資料沒有 lumber 導致錯誤
+        if (!territoryData[type]) {
+            territoryData[type] = { level: 1, upgradeEndTime: 0, lastClaimTime: Date.now() };
+        }
+
         const buildData = territoryData[type];
         const config = BUILDING_CONFIG[type];
         
@@ -142,13 +165,14 @@ function renderTerritory() {
         let statsInfo = "";
         let claimBtn = "";
         
-        if (type === 'farm' || type === 'mine') {
+        // 修改：使用 config.resource 判斷是否為生產類建築
+        if (config.resource) {
             const prodPerHour = Math.floor(config.baseProd * Math.pow(config.prodFactor, buildData.level - 1));
             const capacityHours = getWarehouseCapacity();
             const maxStorage = Math.floor(prodPerHour * capacityHours);
             const pending = calculatePendingResource(type);
             const isFull = pending >= maxStorage;
-            const resourceName = config.resource === 'gold' ? '金幣' : '鐵礦';
+            const resourceName = resourceMap[config.resource];
             
             statsInfo = `<div class="build-stat">產量: ${prodPerHour}/小時<br>容量: ${maxStorage} (${capacityHours.toFixed(1)}h)</div>`;
             
@@ -279,7 +303,7 @@ async function handleClaim(type) {
     // 更新本地數據
     territoryData[type].lastClaimTime = Date.now();
     
-    // 呼叫 main.js 的更新函式
+    // 呼叫 main.js 的更新函式 (傳入正確的 resourceType: food, wood, iron...)
     if (onCurrencyUpdate) {
         onCurrencyUpdate('add_resource', { type: resourceType, amount: amount });
     }
@@ -330,6 +354,14 @@ async function handleUpgrade(type, btn) {
 function updateTerritoryUI() {
     let needRender = false;
     const now = Date.now();
+    
+    // 資源名稱對照表 (用於按鈕更新)
+    const resourceMap = {
+        gold: '金幣',
+        iron: '鐵礦',
+        food: '糧食',
+        wood: '木頭'
+    };
 
     // 更新升級進度條與倒數
     document.querySelectorAll('.timer-text').forEach(span => {
@@ -376,7 +408,7 @@ function updateTerritoryUI() {
         const type = btn.dataset.type;
         const pending = calculatePendingResource(type);
         const config = BUILDING_CONFIG[type];
-        const resourceName = config.resource === 'gold' ? '金幣' : '鐵礦';
+        const resourceName = resourceMap[config.resource];
         const capacityHours = getWarehouseCapacity();
         const prodPerHour = Math.floor(config.baseProd * Math.pow(config.prodFactor, territoryData[type].level - 1));
         const maxStorage = Math.floor(prodPerHour * capacityHours);
