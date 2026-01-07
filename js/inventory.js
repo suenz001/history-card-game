@@ -76,18 +76,36 @@ export async function loadInventory(uid) {
         querySnapshot.forEach((docSnap) => { 
             let data = docSnap.data();
             const baseCard = cardDatabase.find(c => c.id == data.id);
+            
+            // 🔥 平衡性強制同步修正區 🔥
             if(baseCard) {
-                 if(!data.baseAtk) { data.baseAtk = baseCard.atk; data.baseHp = baseCard.hp; }
-                 if(data.attackType !== baseCard.attackType) data.attackType = baseCard.attackType;
-                 if(data.title !== baseCard.title) data.title = baseCard.title;
-                 if(data.name !== baseCard.name) data.name = baseCard.name;
-                 
-                 const newSkillKey = baseCard.skillKey || null;
-                 const newSkillParams = baseCard.skillParams || null;
-                 if(data.skillKey !== newSkillKey) data.skillKey = newSkillKey; 
-                 if(JSON.stringify(data.skillParams) !== JSON.stringify(newSkillParams)) data.skillParams = newSkillParams; 
+                // 強制將「基礎數值」更新為 data.js 的最新設定
+                data.baseAtk = baseCard.atk;
+                data.baseHp = baseCard.hp;
+
+                // 強制同步技能、標題、類型 (以防您在 data.js 修改了技能)
+                data.attackType = baseCard.attackType;
+                data.title = baseCard.title;
+                data.name = baseCard.name;
+                data.skillKey = baseCard.skillKey;
+                data.skillParams = baseCard.skillParams;
+
+                // 確保等級與星級存在
+                if (!data.level) data.level = 1;
+                if (!data.stars) data.stars = 0;
+
+                // 🔥 根據新的 baseAtk/baseHp 重新計算當前的 atk/hp
+                // 這樣舊卡片就會立刻套用新的平衡數值
+                const levelBonus = (data.level - 1) * 0.03; 
+                const starBonus = data.stars * 0.20; 
+                data.atk = Math.floor(data.baseAtk * (1 + levelBonus) * (1 + starBonus)); 
+                data.hp = Math.floor(data.baseHp * (1 + levelBonus) * (1 + starBonus));
+            } else {
+                // 若找不到對應 ID (可能是已被刪除的舊卡)，給予預設值防止報錯
+                if (!data.baseAtk) { data.baseAtk = data.atk || 100; data.baseHp = data.hp || 500; }
+                if (!data.stars) data.stars = 0;
             }
-            if (!data.stars) data.stars = 0;
+
             allUserCards.push({ ...data, docId: docSnap.id }); 
         });
         
