@@ -721,8 +721,8 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
             let stealMsg = "";
             if (stolenRes.gold > 0) stealMsg += `💰 +${stolenRes.gold} G\n`;
             if (stolenRes.food > 0) stealMsg += `🌾 +${stolenRes.food} 糧食\n`;
-            if (stolenRes.wood > 0) stealMsg += `🪵 +${stolenRes.wood} 木頭\n`;
-            if (stolenRes.iron > 0) stealMsg += `⛏️ +${stolenRes.iron} 鐵礦`;
+            if (stolenRes.wood > 0) stealMsg += `🌲 +${stolenRes.wood} 木頭\n`;
+            if (stolenRes.iron > 0) stealMsg += `🔩 +${stolenRes.iron} 鐵礦`;
 
             if (stealMsg === "") stealMsg = "沒有搶到任何資源";
             
