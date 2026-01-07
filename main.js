@@ -63,7 +63,9 @@ let gachaIndex = 0;
 
 setOnBattleEnd(handleBattleEnd);
 
+// 初始化 PVP 與 綁定 UI 事件
 setTimeout(() => {
+    // PVP 初始化
     if(document.getElementById('pvp-menu-btn')) {
         initPvp(db, currentUser, Inventory.getAllCards(), (slotIndex, type) => {
             Inventory.setPvpSelectionMode(slotIndex, type);
@@ -74,6 +76,78 @@ setTimeout(() => {
             else Inventory.filterInventory('ALL');
         }, Inventory.openEnemyDetailModal, currencyHandler); 
     }
+    
+    // --- 綁定主畫面按鈕事件 (修復點擊無反應問題) ---
+    
+    // 1. 背包按鈕
+    const invBtn = document.getElementById('inventory-btn');
+    if (invBtn) {
+        invBtn.addEventListener('click', () => {
+            playSound('click');
+            if (!currentUser) return alert("請先登入");
+            document.getElementById('inventory-title').innerText = "🎒 背包";
+            Inventory.setPvpSelectionMode(null, null); // 清除 PVP 選擇模式
+            document.getElementById('inventory-modal').classList.remove('hidden');
+            Inventory.filterInventory('ALL');
+        });
+    }
+
+    // 2. 領地按鈕
+    const terBtn = document.getElementById('territory-btn');
+    if (terBtn) {
+        terBtn.addEventListener('click', () => {
+            playSound('click');
+            if (!currentUser) return alert("請先登入");
+            document.getElementById('territory-modal').classList.remove('hidden');
+            // 如果 Territory 模組有刷新函式可以在此呼叫，目前假設 init 時已自動處理
+        });
+    }
+
+    // 3. 圖鑑按鈕
+    const galBtn = document.getElementById('gallery-btn');
+    if (galBtn) {
+        galBtn.addEventListener('click', () => {
+            playSound('click');
+            Inventory.openGalleryModal();
+        });
+    }
+
+    // 4. 單抽按鈕
+    const drawBtn = document.getElementById('draw-btn');
+    if (drawBtn) {
+        drawBtn.addEventListener('click', () => {
+            playSound('click');
+            performGacha(1);
+        });
+    }
+
+    // 5. 十連抽按鈕
+    const draw10Btn = document.getElementById('draw-10-btn');
+    if (draw10Btn) {
+        draw10Btn.addEventListener('click', () => {
+            playSound('click');
+            performGacha(10);
+        });
+    }
+    
+    // 6. Gacha Skip 按鈕
+    const skipBtn = document.getElementById('gacha-skip-btn');
+    if (skipBtn) {
+        skipBtn.addEventListener('click', () => {
+             playSound('click');
+             const container = document.getElementById('gacha-reveal-container');
+             // 顯示所有卡片
+             gachaQueue.forEach(card => createGachaCardElement(card, container));
+             gachaQueue = []; // 清空佇列
+             document.getElementById('gacha-next-hint').innerText = "點擊任意處關閉";
+             document.getElementById('gacha-reveal-modal').onclick = () => {
+                 document.getElementById('gacha-reveal-modal').classList.add('hidden');
+                 document.getElementById('gacha-reveal-modal').onclick = null;
+                 Inventory.filterInventory('ALL'); // 刷新背包
+             };
+        });
+    }
+
 }, 500);
 
 const settingsModal = document.getElementById('settings-modal');
@@ -386,12 +460,14 @@ const currencyHandler = (action, data, extraType = 'gold') => {
         if (extraType === 'iron') return iron >= data;
         if (extraType === 'wood') return wood >= data;
         if (extraType === 'food') return food >= data;
+        if (extraType === 'gems') return gems >= data; // 加入鑽石檢查
         return gold >= data;
     }
     if (action === 'deduct') {
         if (extraType === 'iron') iron -= data;
         else if (extraType === 'wood') wood -= data;
         else if (extraType === 'food') food -= data;
+        else if (extraType === 'gems') gems -= data; // 加入鑽石扣除
         else gold -= data;
     }
     if (action === 'add') {
@@ -539,8 +615,149 @@ if(document.getElementById('sort-select')) document.getElementById('sort-select'
     Inventory.filterInventory(document.querySelector('.filter-btn.active')?.dataset?.filter || 'ALL');
 });
 
-// ... Gacha and other UI logic omitted for brevity, keeping it unchanged ...
-// (Assume standard gacha/modal code here)
+// --- 抽卡系統實作 (Gacha Logic) ---
+
+async function performGacha(times) {
+    if (!currentUser) return alert("請先登入！");
+    
+    // 檢查資源
+    const cost = times * 100;
+    if (gems < cost) return alert(`鑽石不足！需要 ${cost} 鑽石`);
+    
+    // 扣除資源
+    gems -= cost;
+    updateUIDisplay();
+    
+    // 播放音效
+    playSound('draw');
+
+    // 準備抽卡
+    const results = [];
+    const promises = [];
+    const animationDelay = 100;
+
+    // 顯示召喚動畫
+    const overlay = document.getElementById('gacha-overlay');
+    if(overlay) overlay.classList.remove('hidden');
+    
+    // 模擬網路延遲與動畫時間
+    setTimeout(async () => {
+        for (let i = 0; i < times; i++) {
+            let rarity = 'R';
+            const rand = Math.random();
+            
+            // 十連抽保底機制：第10張必為 SR 或 SSR
+            if (times === 10 && i === 9) {
+                // 在 SR 和 SSR 之間骰 (正規化機率)
+                const totalSRSSR = RATES.SSR + RATES.SR;
+                const normalizedSSR = RATES.SSR / totalSRSSR;
+                if (Math.random() < normalizedSSR) rarity = 'SSR';
+                else rarity = 'SR';
+            } else {
+                if (rand < RATES.SSR) rarity = 'SSR';
+                else if (rand < RATES.SSR + RATES.SR) rarity = 'SR';
+                else rarity = 'R';
+            }
+            
+            // 從資料庫撈取該稀有度的卡片池
+            const pool = cardDatabase.filter(c => c.rarity === rarity);
+            const card = pool[Math.floor(Math.random() * pool.length)];
+            
+            // 存入雲端
+            promises.push(Inventory.saveCardToCloud(card));
+            results.push(card);
+        }
+
+        try {
+            await Promise.all(promises);
+            await updateCurrencyCloud(); // 儲存扣款結果
+            
+            // 隱藏召喚動畫，顯示結果
+            if(overlay) overlay.classList.add('hidden');
+            showGachaReveal(results);
+        } catch (e) {
+            console.error("抽卡錯誤", e);
+            alert("抽卡過程發生錯誤，請聯繫管理員");
+            if(overlay) overlay.classList.add('hidden');
+        }
+    }, 2000); // 2秒動畫
+}
+
+function showGachaReveal(cards) {
+    const modal = document.getElementById('gacha-reveal-modal');
+    const container = document.getElementById('gacha-reveal-container');
+    const nextHint = document.getElementById('gacha-next-hint');
+    
+    modal.classList.remove('hidden');
+    container.innerHTML = "";
+    gachaQueue = [...cards];
+    gachaIndex = 0;
+    
+    // 顯示第一張
+    showNextGachaCard();
+    
+    // 綁定點擊顯示下一張
+    modal.onclick = (e) => {
+        // 避免點擊 Skip 按鈕觸發
+        if (e.target.id === 'gacha-skip-btn') return;
+        
+        if (gachaQueue.length > 0) {
+            playSound('reveal');
+            showNextGachaCard();
+        } else {
+            modal.classList.add('hidden');
+            modal.onclick = null;
+            Inventory.filterInventory('ALL'); // 刷新背包
+        }
+    };
+}
+
+function showNextGachaCard() {
+    const card = gachaQueue.shift();
+    if (!card) return;
+    
+    const container = document.getElementById('gacha-reveal-container');
+    
+    // 如果是 10 連抽，我們一次顯示一張大的，或者如果是單抽就顯示一張
+    // 這裡採用覆蓋式顯示：清空容器顯示當前這張
+    container.innerHTML = ""; 
+    
+    createGachaCardElement(card, container);
+    
+    if (card.rarity === 'SSR') playSound('ssr');
+    else if (card.rarity === 'SR') playSound('reveal');
+    else playSound('draw');
+    
+    if (gachaQueue.length === 0) {
+        document.getElementById('gacha-next-hint').innerText = "點擊任意處關閉";
+    } else {
+        document.getElementById('gacha-next-hint').innerText = "點擊螢幕顯示下一張";
+    }
+}
+
+function createGachaCardElement(card, container) {
+    const cardDiv = document.createElement('div');
+    const charPath = `assets/cards/${card.id}.webp`;
+    const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
+    
+    cardDiv.className = `large-card ${card.rarity} reveal-anim`; // 加上動畫 class
+    cardDiv.innerHTML = `
+        <div class="large-card-inner">
+            <div class="large-card-front ${card.rarity === 'SSR' ? 'ssr-effect' : ''}">
+                <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
+                <img src="${charPath}" class="card-img">
+                <div class="card-info-overlay">
+                    <div class="card-title">${card.title || ""}</div>
+                    <div class="card-name">${card.name}</div>
+                </div>
+                <img src="${framePath}" class="card-frame-img">
+            </div>
+        </div>
+    `;
+    container.appendChild(cardDiv);
+}
+
+// ------------------------------------
 
 if(document.getElementById('enter-battle-mode-btn')) document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
@@ -818,5 +1035,28 @@ function checkUnreadNotifications() {
     if (badge) {
         if (unreadCount > 0) { badge.innerText = unreadCount > 99 ? '99+' : unreadCount; badge.classList.remove('hidden'); } 
         else { badge.classList.add('hidden'); }
+    }
+}
+
+// 載入排行榜 (簡單實作)
+async function loadLeaderboard() {
+    const list = document.getElementById('leaderboard-list');
+    if (!list) return;
+    try {
+        const q = query(collection(db, "users"), orderBy("combatPower", "desc"), limit(5));
+        const snap = await getDocs(q);
+        let html = "";
+        let rank = 1;
+        snap.forEach(doc => {
+            const d = doc.data();
+            html += `<div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #444;">
+                <span>#${rank++} ${d.name || "未命名"}</span>
+                <span style="color:#f1c40f;">${d.combatPower || 0}</span>
+            </div>`;
+        });
+        list.innerHTML = html || "暫無資料";
+    } catch(e) {
+        console.warn("排行榜讀取失敗", e);
+        list.innerHTML = "讀取失敗";
     }
 }
