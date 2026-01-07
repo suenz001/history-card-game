@@ -1,7 +1,3 @@
-{
-type: "file",
-fileName: "js/territory.js",
-fullContent: `
 // js/territory.js
 import { doc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { playSound } from './audio.js';
