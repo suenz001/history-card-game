@@ -4,44 +4,112 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-    <link rel="stylesheet" href="style.css?v=126">
+    <link rel="stylesheet" href="style.css?v=127">
     <style>
-        /* --- 修改：建築升級進度條樣式 (Overlay 風格) --- */
+        /* --- 建築升級進度條 --- */
         .build-progress-bar {
             width: 100%;
-            height: 20px; /* 加高高度以容納文字 */
-            background-color: #444; /* 深灰底色 */
+            height: 20px; 
+            background-color: #444; 
             border-radius: 10px;
             margin-top: 8px;
             overflow: hidden;
-            position: relative; /* 關鍵：讓內部的文字可以絕對定位 */
+            position: relative; 
             border: 1px solid #222;
             box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
         }
         .build-progress-bar .fill {
             height: 100%;
-            background-color: #f1c40f; /* 黃色進度 */
+            background-color: #f1c40f; 
             width: 0%;
             transition: width 0.2s linear;
             box-shadow: 0 0 5px rgba(241, 196, 15, 0.5);
         }
-        /* 修改：倒數文字樣式 (置中懸浮) */
         .timer-text {
-            position: absolute; /* 絕對定位，浮在進度條上 */
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex; /* 使用 Flexbox 讓文字垂直水平置中 */
-            align-items: center;
-            justify-content: center;
-            font-size: 0.85em;
-            color: #fff; /* 白色文字 */
+            position: absolute; 
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.85em; color: #fff; font-weight: bold;
+            text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
+            z-index: 5; font-family: monospace; pointer-events: none;
+        }
+
+        /* --- 🔥 新增：PVE 布陣畫面優化 --- */
+        /* 1. 給布陣區域一個深色底板，避免被地圖干擾 */
+        .lanes-wrapper {
+            background: rgba(0, 0, 0, 0.7); /* 深黑半透明背景 */
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px); /* 輕微模糊背景 */
+            transition: opacity 0.3s;
+        }
+
+        /* 2. 優化格子的樣式 */
+        .defense-slot {
+            background: rgba(255, 255, 255, 0.05); /* 格子本身微亮 */
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: visible; /* 允許邊框特效溢出 */
+        }
+        .defense-slot.active {
+            background: rgba(255, 255, 255, 0.1);
+            border-style: solid;
+            border-color: rgba(255, 215, 0, 0.5);
+        }
+
+        /* 3. 上陣卡片的資訊層 (覆蓋在圖片上) */
+        .deploy-card-info {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* 讓點擊能穿透到 div */
+            z-index: 5;
+        }
+        
+        .deploy-info-top-left {
+            position: absolute;
+            top: 2px; left: 2px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            font-size: 0.7em;
+            padding: 1px 4px;
+            border-radius: 3px;
             font-weight: bold;
-            text-shadow: 1px 1px 2px #000, -1px -1px 2px #000; /* 黑色外框陰影，確保清晰 */
-            z-index: 5; /* 確保文字在進度條圖層之上 */
-            font-family: monospace;
-            pointer-events: none; /* 讓滑鼠點擊穿透文字 */
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .deploy-info-top-right {
+            position: absolute;
+            top: 2px; right: 2px;
+            font-size: 0.9em;
+            filter: drop-shadow(0 1px 2px black);
+        }
+
+        .deploy-info-bottom {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            color: #f1c40f;
+            font-size: 0.8em;
+            text-align: center;
+            padding-bottom: 2px;
+            text-shadow: 0 1px 2px #000;
+            font-weight: bold;
+        }
+
+        /* 戰力顯示 (選用) */
+        .deploy-power-tag {
+            position: absolute;
+            bottom: 16px; /* 在星數上方 */
+            width: 100%;
+            text-align: center;
+            font-size: 0.65em;
+            color: #bdc3c7;
+            text-shadow: 0 1px 2px #000;
         }
     </style>
 </head>
@@ -189,7 +257,8 @@
                 <div id="wave-notification" class="hidden">第 1 波</div>
                 <div class="spawn-line left"></div>
                 <div id="hero-container"></div>
-                <div class="lanes-wrapper" style="opacity: 0.3;">
+                
+                <div class="lanes-wrapper" style="opacity: 1;">
                     <div class="lane-row" id="lane-0">
                         <div class="defense-slot" data-slot="0"><div class="slot-placeholder">+</div></div>
                         <div class="defense-slot" data-slot="1"><div class="slot-placeholder">+</div></div>
@@ -206,6 +275,7 @@
                         <div class="defense-slot" data-slot="8"><div class="slot-placeholder">+</div></div>
                     </div>
                 </div>
+                
                 <div id="enemy-container"></div>
             </div>
             <button id="toggle-sidebar-btn">▶</button>
