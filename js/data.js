@@ -265,8 +265,8 @@ export const cardDatabase = [
     },
     { 
         id: 19, name: "華盛頓", rarity: "SR", atk: 215, hp: 2100, 
-        unitType: "ARCHER", // 弓兵 (滑膛槍)
-        title: "開國元勛", attackType: "ranged", skillKey: "RESTORE_MANA_ALLIES", skillParams: { range: 20, manaAmount: 20, dmgMult: 1.2 } 
+        unitType: ""CAVALRY", // 騎兵 (滑膛槍)
+        title: "開國元勛", attackType: "melee", skillKey: "RESTORE_MANA_ALLIES", skillParams: { range: 20, manaAmount: 20, dmgMult: 1.2 } 
     },
     { 
         id: 20, name: "薩拉丁", rarity: "SR", atk: 220, hp: 2150, 
@@ -305,8 +305,8 @@ export const cardDatabase = [
     },
     { 
         id: 39, name: "達文西", rarity: "SR", atk: 205, hp: 2000, 
-        unitType: "ARCHER", // 弓兵 (戰爭機器)
-        title: "文藝復興", attackType: "ranged", skillKey: "AOE_CIRCLE", skillParams: { radius: 20, dmgMult: 1.8 } 
+        unitType: "INFANTRY", // 步兵 (戰爭機器)
+        title: "文藝復興", attackType: "melee", skillKey: "AOE_CIRCLE", skillParams: { radius: 20, dmgMult: 1.8 } 
     },
     { 
         id: 40, name: "伊莉莎白一世", rarity: "SR", atk: 185, hp: 2150, 
