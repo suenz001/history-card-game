@@ -39,6 +39,8 @@ export function initInventory(database, user, currencyCallback, pvpCallback) {
     onCurrencyUpdate = currencyCallback;
     onPvpSelectionDone = pvpCallback;
     
+    // 🔥 初始化時，自動將「強制刷新」按鈕插入到介面中
+    injectRefreshButton();
     bindInventoryEvents();
 }
 
@@ -55,29 +57,51 @@ export function refreshInventory() {
     filterInventory();
 }
 
-// 🔥🔥 核心優化 1：儲存背包到瀏覽器本地 (localStorage)
+// 🔥 新增：動態插入「強制刷新」按鈕 (免改 HTML)
+function injectRefreshButton() {
+    // 避免重複插入
+    if (document.getElementById('force-refresh-btn')) return;
+
+    // 找到背包 Modal 的標題容器 (.modal-header 裡面的那個 div)
+    const headerGroup = document.querySelector('#inventory-modal .modal-header > div');
+    
+    if (headerGroup) {
+        const btn = document.createElement('button');
+        btn.id = 'force-refresh-btn';
+        btn.className = 'btn-secondary';
+        // 設定樣式：橘色背景，大小適中
+        btn.style.cssText = "background:#e67e22; font-size: 0.8em; padding: 5px 10px; border: 1px solid #fff;"; 
+        btn.innerText = "🔄 強制刷新";
+        
+        btn.onclick = () => {
+            playSound('click');
+            if (confirm("確定要從伺服器重新下載最新資料嗎？\n(這會消耗少量讀取配額)")) {
+                // 🔥 呼叫讀取函式，並傳入 true (代表強制刷新)
+                loadInventory(currentUser.uid, true);
+            }
+        };
+        
+        // 插在下拉選單之前，或是容器的最後面
+        headerGroup.appendChild(btn);
+    }
+}
+
+// 🔥 新增：儲存背包到本地快取 (減少 Read 消耗)
 function saveToLocalStorage() {
     if (currentUser && allUserCards.length > 0) {
         try {
             const cacheKey = `inv_cache_${currentUser.uid}`;
+            // 只存數據文字，不存圖片，所以 300kb 圖片不影響這裡
             localStorage.setItem(cacheKey, JSON.stringify(allUserCards));
-            console.log("💾 背包已快取至本地 (下次讀取不扣配額)");
+            console.log("💾 背包已快取至本地");
         } catch (e) {
             console.warn("Local Storage Error:", e);
         }
     }
 }
 
-// 🔥🔥 核心優化 2：清除快取 (除錯用)
-export function clearLocalCache() {
-    if (currentUser) {
-        localStorage.removeItem(`inv_cache_${currentUser.uid}`);
-        console.log("🗑️ 本地背包快取已清除");
-    }
-}
-
-// --- 資料讀取 (已優化 Read 用量) ---
-export async function loadInventory(uid) {
+// --- 資料讀取 (已優化 Read 用量 + 支援強制刷新) ---
+export async function loadInventory(uid, forceRefresh = false) {
     if(!uid) uid = currentUser?.uid;
     if(!uid) return;
 
@@ -89,30 +113,29 @@ export async function loadInventory(uid) {
     const container = document.getElementById('inventory-grid');
     if(container) container.innerHTML = "讀取中...";
 
-    // 🔥🔥 核心優化 3：先檢查本地有沒有資料
     const cacheKey = `inv_cache_${uid}`;
-    const cachedData = localStorage.getItem(cacheKey);
 
-    if (cachedData) {
-        try {
-            console.log("⚡ 使用本地快取讀取背包 (消耗 0 Read)");
-            allUserCards = JSON.parse(cachedData);
-            
-            // 簡單驗證資料完整性
-            if (allUserCards.length > 0 && !allUserCards[0].docId) {
-                throw new Error("快取資料損毀");
+    // 🔥 步驟 1：如果不是強制刷新，先檢查快取
+    if (!forceRefresh) {
+        const cachedData = localStorage.getItem(cacheKey);
+        if (cachedData) {
+            try {
+                console.log("⚡ 使用本地快取讀取背包 (節省流量)");
+                allUserCards = JSON.parse(cachedData);
+                
+                if (allUserCards.length > 0 && !allUserCards[0].docId) throw new Error("快取資料損毀");
+
+                updateInventoryCounts();
+                filterInventory();
+                return; // 成功讀取快取，直接結束
+            } catch (e) {
+                console.warn("快取讀取失敗，轉為下載", e);
+                localStorage.removeItem(cacheKey);
             }
-
-            updateInventoryCounts();
-            filterInventory();
-            return; // 成功讀取快取，直接結束，完全不連線 Firebase！
-        } catch (e) {
-            console.warn("快取讀取失敗，將從資料庫重新下載", e);
-            localStorage.removeItem(cacheKey);
         }
     }
 
-    // 🔥🔥 核心優化 4：只有沒快取時，才去連線 Firebase
+    // 🔥 步驟 2：從 Firebase 下載 (強制刷新 或 無快取時)
     try {
         console.log("🌐 從 Firebase 下載背包資料 (消耗 Read)...");
         const q = query(collection(db, "inventory"), where("owner", "==", uid));
@@ -123,7 +146,7 @@ export async function loadInventory(uid) {
             let data = docSnap.data();
             const baseCard = cardDatabase.find(c => c.id == data.id);
             
-            // 數值補正邏輯
+            // 數值同步與防呆
             if(baseCard) {
                 data.baseAtk = baseCard.atk;
                 data.baseHp = baseCard.hp;
@@ -148,17 +171,19 @@ export async function loadInventory(uid) {
             allUserCards.push({ ...data, docId: docSnap.id }); 
         });
         
-        // 下載成功後，馬上存入快取
+        // 下載後更新快取
         saveToLocalStorage();
 
         updateInventoryCounts();
         filterInventory(); 
+        
+        if(forceRefresh) alert("背包資料已更新！");
+
     } catch (e) {
         console.error("Load Inventory Failed:", e);
         if(container) {
-            // 如果是因为配额满了，提示用户
             if (e.code === 'resource-exhausted') {
-                container.innerHTML = "<p style='color:red'>⚠️ 每日讀取配額已滿，無法讀取背包。<br>請明天再來，或升級 Firebase。</p>";
+                container.innerHTML = "<p style='color:#e74c3c'>⚠️ 每日配額已滿，無法刷新。<br>請等待重置或升級方案。</p>";
             } else {
                 container.innerHTML = "<p>讀取失敗，請稍後再試</p>";
             }
@@ -178,7 +203,7 @@ export async function saveCardToCloud(card) {
     const newCard = { ...card, docId: docRef.id, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 0, obtainedAt: new Date() };
     allUserCards.push(newCard);
     
-    // 更新快取 (這樣就不用重新讀取資料庫)
+    // 更新快取
     saveToLocalStorage();
     
     updateInventoryCounts();
