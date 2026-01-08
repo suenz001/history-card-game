@@ -55,7 +55,28 @@ export function refreshInventory() {
     filterInventory();
 }
 
-// --- 資料讀取 ---
+// 🔥🔥 核心優化 1：儲存背包到瀏覽器本地 (localStorage)
+function saveToLocalStorage() {
+    if (currentUser && allUserCards.length > 0) {
+        try {
+            const cacheKey = `inv_cache_${currentUser.uid}`;
+            localStorage.setItem(cacheKey, JSON.stringify(allUserCards));
+            console.log("💾 背包已快取至本地 (下次讀取不扣配額)");
+        } catch (e) {
+            console.warn("Local Storage Error:", e);
+        }
+    }
+}
+
+// 🔥🔥 核心優化 2：清除快取 (除錯用)
+export function clearLocalCache() {
+    if (currentUser) {
+        localStorage.removeItem(`inv_cache_${currentUser.uid}`);
+        console.log("🗑️ 本地背包快取已清除");
+    }
+}
+
+// --- 資料讀取 (已優化 Read 用量) ---
 export async function loadInventory(uid) {
     if(!uid) uid = currentUser?.uid;
     if(!uid) return;
@@ -68,7 +89,32 @@ export async function loadInventory(uid) {
     const container = document.getElementById('inventory-grid');
     if(container) container.innerHTML = "讀取中...";
 
+    // 🔥🔥 核心優化 3：先檢查本地有沒有資料
+    const cacheKey = `inv_cache_${uid}`;
+    const cachedData = localStorage.getItem(cacheKey);
+
+    if (cachedData) {
+        try {
+            console.log("⚡ 使用本地快取讀取背包 (消耗 0 Read)");
+            allUserCards = JSON.parse(cachedData);
+            
+            // 簡單驗證資料完整性
+            if (allUserCards.length > 0 && !allUserCards[0].docId) {
+                throw new Error("快取資料損毀");
+            }
+
+            updateInventoryCounts();
+            filterInventory();
+            return; // 成功讀取快取，直接結束，完全不連線 Firebase！
+        } catch (e) {
+            console.warn("快取讀取失敗，將從資料庫重新下載", e);
+            localStorage.removeItem(cacheKey);
+        }
+    }
+
+    // 🔥🔥 核心優化 4：只有沒快取時，才去連線 Firebase
     try {
+        console.log("🌐 從 Firebase 下載背包資料 (消耗 Read)...");
         const q = query(collection(db, "inventory"), where("owner", "==", uid));
         const querySnapshot = await getDocs(q);
         allUserCards = [];
@@ -77,30 +123,24 @@ export async function loadInventory(uid) {
             let data = docSnap.data();
             const baseCard = cardDatabase.find(c => c.id == data.id);
             
-            // 🔥 平衡性強制同步修正區 🔥
+            // 數值補正邏輯
             if(baseCard) {
-                // 強制將「基礎數值」更新為 data.js 的最新設定
                 data.baseAtk = baseCard.atk;
                 data.baseHp = baseCard.hp;
-
-                // 強制同步技能、標題、類型 (以防您在 data.js 修改了技能)
                 data.attackType = baseCard.attackType;
                 data.title = baseCard.title;
                 data.name = baseCard.name;
                 data.skillKey = baseCard.skillKey;
                 data.skillParams = baseCard.skillParams;
 
-                // 確保等級與星級存在
                 if (!data.level) data.level = 1;
                 if (!data.stars) data.stars = 0;
 
-                // 🔥 根據新的 baseAtk/baseHp 重新計算當前的 atk/hp
                 const levelBonus = (data.level - 1) * 0.03; 
                 const starBonus = data.stars * 0.20; 
                 data.atk = Math.floor(data.baseAtk * (1 + levelBonus) * (1 + starBonus)); 
                 data.hp = Math.floor(data.baseHp * (1 + levelBonus) * (1 + starBonus));
             } else {
-                // 若找不到對應 ID (可能是已被刪除的舊卡)，給予預設值防止報錯
                 if (!data.baseAtk) { data.baseAtk = data.atk || 100; data.baseHp = data.hp || 500; }
                 if (!data.stars) data.stars = 0;
             }
@@ -108,11 +148,21 @@ export async function loadInventory(uid) {
             allUserCards.push({ ...data, docId: docSnap.id }); 
         });
         
+        // 下載成功後，馬上存入快取
+        saveToLocalStorage();
+
         updateInventoryCounts();
         filterInventory(); 
     } catch (e) {
         console.error("Load Inventory Failed:", e);
-        if(container) container.innerHTML = "<p>讀取失敗，請重新整理</p>";
+        if(container) {
+            // 如果是因为配额满了，提示用户
+            if (e.code === 'resource-exhausted') {
+                container.innerHTML = "<p style='color:red'>⚠️ 每日讀取配額已滿，無法讀取背包。<br>請明天再來，或升級 Firebase。</p>";
+            } else {
+                container.innerHTML = "<p>讀取失敗，請稍後再試</p>";
+            }
+        }
     }
 }
 
@@ -127,6 +177,10 @@ export async function saveCardToCloud(card) {
     });
     const newCard = { ...card, docId: docRef.id, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 0, obtainedAt: new Date() };
     allUserCards.push(newCard);
+    
+    // 更新快取 (這樣就不用重新讀取資料庫)
+    saveToLocalStorage();
+    
     updateInventoryCounts();
     return newCard;
 }
@@ -151,17 +205,12 @@ export function renderCard(card, targetContainer) {
 
     cardDiv.className = `card ${card.rarity}`; 
     
-    // 🔥 修正：僅邏輯判斷是否部署，但不添加視覺樣式
-    // 這樣背包看起來就是「乾淨」的，不論卡片是否在隊伍中
     let isDeployed = false;
     const isPvpSelection = pvpTargetInfo && pvpTargetInfo.index !== null;
     
     if (!isPvpSelection) {
         if (isBattleActive || battleSlots.some(s => s && s.docId === card.docId)) { 
-            // isDeployed 變數保留給點擊時的邏輯判斷 (例如防止分解)
             isDeployed = true;
-            // ❌ 不添加 'is-deployed' class，保持乾淨
-            // cardDiv.classList.add('is-deployed'); 
         }
     }
     
@@ -184,7 +233,6 @@ export function renderCard(card, targetContainer) {
         playSound('click'); 
         
         if (isBatchMode) { 
-            // 🔥 邏輯保護：雖然外觀看不出來，但實際批量分解時仍禁止分解出戰卡
             if (isDeployed) return alert("這位英雄正在出戰隊伍中，無法選取分解！\n(請先解除隊伍部署)");
             toggleBatchSelection(card, cardDiv); 
             return; 
@@ -199,7 +247,6 @@ export function renderCard(card, targetContainer) {
             return;
         }
 
-        // 開啟詳情
         let index = currentDisplayList.indexOf(card); 
         if (index === -1) { currentDisplayList = [card]; index = 0; } 
         openDetailModal(index); 
@@ -455,16 +502,12 @@ function setupDetailButtons(card) {
         upgradeStarBtn.onclick = () => upgradeCardStar(); 
     }
     
-    // 🔥 邏輯檢查：僅在要分解時才阻擋，且顯示提示，但不改變按鈕外觀
     const isDeployedPVE = battleSlots.some(s => s && s.docId === card.docId);
     
     if (isDeployedPVE) {
-        // 你可以選擇是否要讓按鈕變灰，或只是點擊時跳警告
-        // 為了維持「乾淨」，我們這裡讓按鈕看起來正常，但點擊會阻擋
-        // 或是明確一點：按鈕改文字但保持可互動
         dismantleBtn.classList.add('btn-disabled');
         dismantleBtn.innerHTML = "⚔️ 出戰中 (不可分解)";
-        dismantleBtn.onclick = null; // 禁止點擊
+        dismantleBtn.onclick = null; 
     } else {
         dismantleBtn.classList.remove('btn-disabled');
         dismantleBtn.innerHTML = "💰 分解此卡";
@@ -492,6 +535,10 @@ async function upgradeCardLevel(goldCost, ironCost) {
     playSound('upgrade'); 
     
     await updateDoc(doc(db, "inventory", card.docId), { level: card.level, atk: card.atk, hp: card.hp }); 
+    
+    // 🔥 同步更新快取
+    saveToLocalStorage();
+
     renderDetailCard();
     onCurrencyUpdate('refresh'); 
 }
@@ -502,7 +549,6 @@ async function upgradeCardStar() {
     if (!duplicate) return alert("沒有重複的卡片可以用來升星！");
     if (!confirm(`確定要消耗一張【${duplicate.name}】來升星嗎？`)) return;
     
-    // 檢查素材卡是否出戰
     const isFodderDeployed = battleSlots.some(s => s && s.docId === duplicate.docId);
     if (isFodderDeployed) return alert("作為素材的卡片正在出戰中，無法消耗！\n請先解除該卡片的部署。");
 
@@ -516,6 +562,9 @@ async function upgradeCardStar() {
     
     await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
     
+    // 🔥 同步更新快取
+    saveToLocalStorage();
+
     updateInventoryCounts();
     filterInventory(); 
     renderDetailCard(); 
@@ -543,6 +592,9 @@ async function dismantleCurrentCard() {
         const idx = allUserCards.findIndex(c => c.docId === card.docId);
         if(idx > -1) allUserCards.splice(idx, 1);
         
+        // 🔥 同步更新快取
+        saveToLocalStorage();
+
         updateInventoryCounts();
         document.getElementById('detail-modal').classList.add('hidden'); 
         filterInventory(); 
@@ -637,7 +689,6 @@ export async function autoStarUp() {
                 if (deletedDocIds.has(fodder.docId)) continue;
                 if (mainCard.stars >= 5) break;
                 
-                // 🔥 安全檢查：素材卡不能正在出戰
                 const isFodderDeployed = battleSlots.some(s => s && s.docId === fodder.docId);
                 if (isFodderDeployed) continue;
 
@@ -671,6 +722,10 @@ export async function autoStarUp() {
         
         playSound('upgrade');
         allUserCards = newCardsState; 
+        
+        // 🔥 同步更新快取
+        saveToLocalStorage();
+
         updateInventoryCounts();
         filterInventory(); 
         
@@ -703,7 +758,6 @@ export function filterGallery() {
 
     let fullList = [...cardDatabase].sort((a, b) => a.id - b.id);
     
-    // 篩選邏輯
     fullList = fullList.filter(card => {
         const passRarity = (galRarityFilters.size === 0) || galRarityFilters.has(card.rarity);
         const uType = card.unitType || 'INFANTRY';
@@ -783,7 +837,6 @@ export function filterGallery() {
 
 // --- 事件綁定 ---
 function bindInventoryEvents() {
-    // 背包篩選按鈕
     document.querySelectorAll('.filter-btn').forEach(btn => { 
         btn.addEventListener('click', (e) => { 
             playSound('click'); 
@@ -792,7 +845,6 @@ function bindInventoryEvents() {
         }); 
     });
     
-    // 圖鑑篩選按鈕
     document.querySelectorAll('.gallery-filter-btn').forEach(btn => { 
         btn.addEventListener('click', (e) => { 
             playSound('click'); 
@@ -801,7 +853,6 @@ function bindInventoryEvents() {
         }); 
     });
 
-    // 排序下拉選單監聽
     const sortSelect = document.getElementById('sort-select');
     if (sortSelect) {
         sortSelect.value = currentSortMethod;
@@ -879,6 +930,9 @@ function bindInventoryEvents() {
             selectedBatchCards.clear(); 
             isBatchMode = false; 
             
+            // 🔥 同步更新快取
+            saveToLocalStorage();
+
             const toggleBtn = document.getElementById('batch-toggle-btn');
             const bar = document.getElementById('batch-action-bar');
             toggleBtn.classList.remove('active'); toggleBtn.innerText = "🔧 批量分解"; bar.classList.add('hidden'); 
