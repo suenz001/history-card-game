@@ -467,7 +467,11 @@ function renderDetailCard() {
     
     const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
     const bioData = HERO_BIOS[card.id]; 
-    let bioHtml = bioData ? `<div style="font-size: 0.9em; color: #f39c12; margin-bottom: 8px; font-weight: bold; text-align: center;">【${bioData.era}】</div><div style="font-size: 0.95em; line-height: 1.6; text-align: justify; color: #ddd;">${bioData.text}</div>` : `<div class="card-back-text" style="color:#bdc3c7; text-align:center;">(資料查詢中...)</div>`;
+    // 🔥 修改：全部靠左對齊 (text-align: left)
+    let bioHtml = bioData ? 
+        `<div style="font-size: 0.9em; color: #f39c12; margin-bottom: 8px; font-weight: bold; text-align: left;">【${bioData.era}】</div>
+         <div style="font-size: 0.95em; line-height: 1.6; text-align: left; color: #ddd;">${bioData.text}</div>` 
+        : `<div class="card-back-text" style="color:#bdc3c7; text-align:center;">(資料查詢中...)</div>`;
 
     const cardWrapper = document.createElement('div');
     cardWrapper.className = `large-card ${card.rarity}`;
@@ -481,7 +485,16 @@ function renderDetailCard() {
 
     const backFace = document.createElement('div');
     backFace.className = `large-card-back ${card.rarity}`;
-    backFace.innerHTML = `<div class="card-skill-section"><div class="card-back-title">✨ 技能效果</div><div class="card-back-text" style="text-align: center;">${skillDesc}</div></div><div class="card-bio-section"><div class="card-back-title">📜 人物生平</div>${bioHtml}</div><div class="flip-hint">(再次點擊翻回正面)</div>`;
+    // 🔥 修改：技能說明改為靠左 (text-align: left)
+    backFace.innerHTML = `
+        <div class="card-skill-section">
+            <div class="card-back-title">✨ 技能效果</div>
+            <div class="card-back-text" style="text-align: left;">${skillDesc}</div>
+        </div>
+        <div class="card-bio-section">
+            <div class="card-back-title">📜 人物生平</div>${bioHtml}
+        </div>
+        <div class="flip-hint">(再次點擊翻回正面)</div>`;
 
     cardInner.appendChild(frontFace);
     cardInner.appendChild(backFace);
