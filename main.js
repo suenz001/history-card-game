@@ -1,7 +1,8 @@
 // main.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+// 🔥 新增：linkWithCredential, EmailAuthProvider
+import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile, linkWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // 引入模組
 import { HERO_BIOS } from './js/bios.js';
@@ -12,64 +13,44 @@ import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/p
 import * as Inventory from './js/inventory.js';
 import * as Territory from './js/territory.js';
 
-// ==========================================
-// 🔥 新增：更新主畫面「最新獲得」卡片
-// ==========================================
+// ... (updateLatestCardsUI 函式保持不變) ...
 function updateLatestCardsUI() {
     const container = document.getElementById('card-display-area');
     if (!container) return;
-    
-    // 取得所有卡片並依獲得時間排序 (最新的在前面)
     const allCards = Inventory.getAllCards();
-    
-    // 如果沒有卡片，顯示提示
     if (allCards.length === 0) {
         container.innerHTML = '<p style="color:#7f8c8d; width:100%; text-align:center;">尚無卡片，快去召喚吧！</p>';
         return;
     }
-
-    // 排序：處理 Firebase Timestamp 或一般 Date 物件
     const sortedCards = [...allCards].sort((a, b) => {
         const getTime = (t) => {
             if (!t) return 0;
-            if (t.seconds) return t.seconds; // Firestore Timestamp
-            if (typeof t.getTime === 'function') return t.getTime() / 1000; // JS Date
+            if (t.seconds) return t.seconds; 
+            if (typeof t.getTime === 'function') return t.getTime() / 1000;
             return 0;
         };
         return getTime(b.obtainedAt) - getTime(a.obtainedAt);
     });
-    
-    // 🔥 修改：顯示最新的 10 張卡片
     const latestCards = sortedCards.slice(0, 10);
-
     container.innerHTML = "";
     latestCards.forEach(card => {
         const cardDiv = document.createElement('div');
         const charPath = `assets/cards/${card.id}.webp`;
         const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
-        
         cardDiv.className = `card ${card.rarity}`;
         cardDiv.style.cursor = "pointer";
-        // 🔥 修改：直接使用物件呼叫，解決 Index 錯亂問題
-        cardDiv.onclick = () => {
-            Inventory.openCardModal(card);
-        };
-
+        cardDiv.onclick = () => { Inventory.openCardModal(card); };
         cardDiv.innerHTML = `
             <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
             <img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
-            <div class="card-info-overlay">
-                <div class="card-name">${card.name}</div>
-            </div>
+            <div class="card-info-overlay"><div class="card-name">${card.name}</div></div>
             <img src="${framePath}" class="card-frame-img">
         `;
         container.appendChild(cardDiv);
     });
 }
 
-window.onerror = function(msg, url, line) {
-    console.error("Global Error:", msg);
-};
+window.onerror = function(msg, url, line) { console.error("Global Error:", msg); };
 
 const firebaseConfig = {
   apiKey: "AIzaSyCaLWMEi7wNxeCjUQC86axbRsxLMDWQrq8",
@@ -116,12 +97,9 @@ let currentVisibleNotifs = [];
 let gachaQueue = [];
 let gachaIndex = 0;
 
-// 設定 PVE 戰鬥結束的回調函式
 setOnBattleEnd(handleBattleEnd);
 
-// 初始化 PVP 與 綁定 UI 事件
 setTimeout(() => {
-    // PVP 初始化
     if(document.getElementById('pvp-menu-btn')) {
         initPvp(db, currentUser, Inventory.getAllCards(), (slotIndex, type) => {
             Inventory.setPvpSelectionMode(slotIndex, type);
@@ -133,97 +111,48 @@ setTimeout(() => {
         }, Inventory.openEnemyDetailModal, currencyHandler); 
     }
     
-    // --- 綁定主畫面按鈕事件 ---
-    
-    // 1. 背包按鈕
+    // 按鈕綁定...
     const invBtn = document.getElementById('inventory-btn');
-    if (invBtn) {
-        invBtn.addEventListener('click', () => {
-            playSound('click');
-            if (!currentUser) return alert("請先登入");
-            document.getElementById('inventory-title').innerText = "🎒 背包";
-            Inventory.setPvpSelectionMode(null, null); // 清除 PVP 選擇模式
-            document.getElementById('inventory-modal').classList.remove('hidden');
-            Inventory.filterInventory('ALL');
-        });
-    }
+    if (invBtn) invBtn.addEventListener('click', () => { playSound('click'); if (!currentUser) return alert("請先登入"); document.getElementById('inventory-title').innerText = "🎒 背包"; Inventory.setPvpSelectionMode(null, null); document.getElementById('inventory-modal').classList.remove('hidden'); Inventory.filterInventory('ALL'); });
 
-    // 2. 領地按鈕
     const terBtn = document.getElementById('territory-btn');
-    if (terBtn) {
-        terBtn.addEventListener('click', () => {
-            playSound('click');
-            if (!currentUser) return alert("請先登入");
-            document.getElementById('territory-modal').classList.remove('hidden');
-        });
-    }
+    if (terBtn) terBtn.addEventListener('click', () => { playSound('click'); if (!currentUser) return alert("請先登入"); document.getElementById('territory-modal').classList.remove('hidden'); });
 
-    // 3. 圖鑑按鈕
     const galBtn = document.getElementById('gallery-btn');
-    if (galBtn) {
-        galBtn.addEventListener('click', () => {
-            playSound('click');
-            Inventory.openGalleryModal();
-        });
-    }
+    if (galBtn) galBtn.addEventListener('click', () => { playSound('click'); Inventory.openGalleryModal(); });
 
-    // 4. 單抽按鈕
     const drawBtn = document.getElementById('draw-btn');
-    if (drawBtn) {
-        drawBtn.addEventListener('click', () => {
-            playSound('click');
-            performGacha(1);
-        });
-    }
+    if (drawBtn) drawBtn.addEventListener('click', () => { playSound('click'); performGacha(1); });
 
-    // 5. 十連抽按鈕
     const draw10Btn = document.getElementById('draw-10-btn');
-    if (draw10Btn) {
-        draw10Btn.addEventListener('click', () => {
-            playSound('click');
-            performGacha(10);
-        });
-    }
+    if (draw10Btn) draw10Btn.addEventListener('click', () => { playSound('click'); performGacha(10); });
     
-    // 6. Gacha Skip 按鈕 (🔥 更新邏輯：跳轉至 SSR)
     const skipBtn = document.getElementById('gacha-skip-btn');
     if (skipBtn) {
         skipBtn.addEventListener('click', () => {
              playSound('click');
-             
-             // 檢查剩下的隊列中是否有 SSR
              const nextSSRIndex = gachaQueue.findIndex(c => c.rarity === 'SSR');
-             
              if (nextSSRIndex !== -1) {
-                 // 🔥 策略更新：如果有 SSR，移除 SSR 之前的所有卡片
-                 // 這樣下一次呼叫 showNextGachaCard() 就會直接顯示這張 SSR
                  gachaQueue.splice(0, nextSSRIndex);
-                 
-                 // 立即顯示這張 SSR (這會觸發 SSR 特效動畫)
                  showNextGachaCard(); 
              } else {
-                 // 如果沒有 SSR 了，就依照原本邏輯：一次顯示全部剩餘
                  const container = document.getElementById('gacha-reveal-container');
-                 // 清空容器
                  container.innerHTML = "";
-                 // 將剩餘卡片全部顯示
                  gachaQueue.forEach(card => createGachaCardElement(card, container));
-                 gachaQueue = []; // 清空佇列
-                 
-                 // 更新狀態為結束
+                 gachaQueue = []; 
                  document.getElementById('gacha-next-hint').innerText = "點擊任意處關閉";
                  document.getElementById('gacha-reveal-modal').onclick = () => {
                      document.getElementById('gacha-reveal-modal').classList.add('hidden');
                      document.getElementById('gacha-reveal-modal').onclick = null;
-                     Inventory.filterInventory('ALL'); // 刷新背包
-                     updateLatestCardsUI(); // 刷新主畫面
+                     Inventory.filterInventory('ALL'); 
+                     updateLatestCardsUI(); 
                  };
              }
         });
     }
-
 }, 500);
 
+// --- 設定相關 ---
 const settingsModal = document.getElementById('settings-modal');
 const bgmToggle = document.getElementById('bgm-toggle');
 const sfxToggle = document.getElementById('sfx-toggle');
@@ -239,7 +168,10 @@ if(document.getElementById('settings-btn')) {
             bgmToggle.checked = isBgmOn; 
             sfxToggle.checked = isSfxOn; 
             bgmSlider.value = bgmVolume; 
-            sfxSlider.value = sfxVolume; 
+            sfxSlider.value = sfxVolume;
+            
+            // 🔥 打開設定時，檢查綁定狀態
+            updateAccountUI();
         }
     });
 }
@@ -265,6 +197,82 @@ if(document.getElementById('settings-save-name-btn')) {
     });
 }
 
+// 🔥 新增：帳號綁定功能 (遊客轉正)
+const bindBtn = document.getElementById('bind-account-btn');
+if (bindBtn) {
+    bindBtn.addEventListener('click', async () => {
+        const email = document.getElementById('bind-email-input').value.trim();
+        const pass = document.getElementById('bind-pass-input').value.trim();
+        
+        if (!email || !pass) return alert("請輸入 Email 和密碼");
+        if (pass.length < 6) return alert("密碼長度至少需 6 碼");
+        if (!currentUser) return alert("請先登入遊戲");
+
+        // 1. 建立憑證
+        const credential = EmailAuthProvider.credential(email, pass);
+
+        try {
+            bindBtn.innerText = "綁定中...";
+            bindBtn.classList.add('btn-disabled');
+
+            // 2. 連結帳號 (這會把匿名帳號轉為 Email 帳號，且保留 UID 和資料)
+            const userCred = await linkWithCredential(currentUser, credential);
+            const user = userCred.user;
+            currentUser = user; // 更新當前用戶
+
+            // 3. 更新資料庫內的 email 欄位
+            await updateDoc(doc(db, "users", user.uid), { 
+                email: email,
+                isAnonymous: false // 標記已非匿名
+            });
+
+            alert("✅ 綁定成功！您現在可以使用 Email 登入，資料不會遺失。");
+            
+            // 4. 更新 UI
+            updateAccountUI();
+            
+            // 清空輸入框
+            document.getElementById('bind-email-input').value = "";
+            document.getElementById('bind-pass-input').value = "";
+
+        } catch (error) {
+            console.error("綁定失敗", error);
+            if (error.code === 'auth/email-already-in-use') {
+                alert("綁定失敗：此 Email 已經被其他帳號註冊過了。");
+            } else if (error.code === 'auth/invalid-email') {
+                alert("綁定失敗：Email 格式不正確。");
+            } else if (error.code === 'auth/weak-password') {
+                alert("綁定失敗：密碼強度不足。");
+            } else {
+                alert(`綁定失敗：${error.message}`);
+            }
+        } finally {
+            bindBtn.innerText = "綁定帳號";
+            bindBtn.classList.remove('btn-disabled');
+        }
+    });
+}
+
+// 🔥 新增：更新帳號綁定 UI 狀態
+function updateAccountUI() {
+    const formContainer = document.getElementById('bind-form-container');
+    const statusContainer = document.getElementById('bind-status-container');
+    const currentEmailDisplay = document.getElementById('current-bind-email');
+
+    if (!currentUser) return;
+
+    // 判斷是否為匿名登入 (isAnonymous 為 true 代表是遊客)
+    if (currentUser.isAnonymous) {
+        if(formContainer) formContainer.classList.remove('hidden');
+        if(statusContainer) statusContainer.classList.add('hidden');
+    } else {
+        if(formContainer) formContainer.classList.add('hidden');
+        if(statusContainer) statusContainer.classList.remove('hidden');
+        if(currentEmailDisplay) currentEmailDisplay.innerText = currentUser.email || "已綁定 (Email)";
+    }
+}
+
+// ... (兌換碼與其他邏輯保持不變) ...
 if(document.getElementById('redeem-btn')) {
     document.getElementById('redeem-btn').addEventListener('click', async () => {
         const codeInput = document.getElementById('redeem-code-input');
@@ -293,20 +301,8 @@ if(document.getElementById('redeem-btn')) {
 const notificationModal = document.getElementById('notification-modal');
 const notificationList = document.getElementById('notification-list');
 
-if(document.getElementById('notification-btn')) {
-    document.getElementById('notification-btn').addEventListener('click', () => { playSound('click'); openNotificationModal(); });
-}
-if(document.getElementById('close-notification-btn')) {
-    document.getElementById('close-notification-btn').addEventListener('click', () => {
-        playSound('click');
-        notificationModal.classList.add('hidden');
-        isNotifBatchMode = false; selectedNotifIds.clear();
-        if (currentUser) {
-            localStorage.setItem(`lastReadNotifTime_${currentUser.uid}`, Date.now().toString());
-            checkUnreadNotifications();
-        }
-    });
-}
+if(document.getElementById('notification-btn')) document.getElementById('notification-btn').addEventListener('click', () => { playSound('click'); openNotificationModal(); });
+if(document.getElementById('close-notification-btn')) document.getElementById('close-notification-btn').addEventListener('click', () => { playSound('click'); notificationModal.classList.add('hidden'); isNotifBatchMode = false; selectedNotifIds.clear(); if (currentUser) { localStorage.setItem(`lastReadNotifTime_${currentUser.uid}`, Date.now().toString()); checkUnreadNotifications(); } });
 
 async function openNotificationModal() {
     if(currentUser) await loadUserData(currentUser);
@@ -326,9 +322,7 @@ async function fetchGlobalAnnouncements() {
     } catch(e) { console.warn("讀取公告失敗", e); }
 }
 
-function toggleNotifBatchMode() {
-    isNotifBatchMode = !isNotifBatchMode; selectedNotifIds.clear(); playSound('click'); renderNotifications();
-}
+function toggleNotifBatchMode() { isNotifBatchMode = !isNotifBatchMode; selectedNotifIds.clear(); playSound('click'); renderNotifications(); }
 
 function toggleSelectAllNotifs() {
     playSound('click');
@@ -344,10 +338,7 @@ function toggleSelectAllNotifs() {
     renderNotifications();
 }
 
-function toggleNotifSelection(id) {
-    if (selectedNotifIds.has(id)) selectedNotifIds.delete(id); else selectedNotifIds.add(id);
-    playSound('click'); renderNotifications(); 
-}
+function toggleNotifSelection(id) { if (selectedNotifIds.has(id)) selectedNotifIds.delete(id); else selectedNotifIds.add(id); playSound('click'); renderNotifications(); }
 
 async function executeBatchDelete() {
     if (selectedNotifIds.size === 0) return alert("請至少選擇一條通知！");
@@ -372,7 +363,6 @@ async function executeBatchDelete() {
 
 function renderNotifications() {
     notificationList.innerHTML = "";
-    
     const toolbar = document.createElement('div');
     toolbar.style.cssText = "padding:10px; display:flex; justify-content:flex-end; border-bottom:1px solid #555; margin-bottom:10px; gap:10px;";
     
@@ -401,7 +391,6 @@ function renderNotifications() {
     currentVisibleNotifs.forEach(item => {
         const div = document.createElement('div');
         div.style.transition = "all 0.2s";
-        
         let isSelectable = true;
         if (item.type === 'system') {
             const isClaimed = claimedNotifs.includes(item.id);
@@ -423,7 +412,6 @@ function renderNotifications() {
             const isClaimed = claimedNotifs.includes(item.id);
             const hasReward = item.reward && item.reward.type !== 'none' && item.reward.amount > 0;
             let subText = isClaimed ? "已領取" : (hasReward ? `🎁 點擊領取: ${item.reward.amount} ${item.reward.type === 'gems' ? '鑽石' : '金幣'}` : "📢 系統公告");
-            
             div.className = `notification-item ${isClaimed ? 'claimed' : ''}`;
             div.innerHTML = `<div><div class="notif-title">${item.title}</div><div style="font-size:0.8em; color:#ccc;">${subText}</div></div><div class="notif-status">${isClaimed ? '✔' : (hasReward ? '🎁' : 'ℹ️')}</div>`;
             if (!isNotifBatchMode) {
@@ -435,23 +423,11 @@ function renderNotifications() {
             const isWin = item.result === 'win';
             const colorClass = isWin ? 'log-def-win' : 'log-def-lose';
             const resultText = isWin ? '🛡️ 防守成功' : '💔 防守失敗';
-            
-            // 🔥 修改：顯示所有資源損失
-            const moneyText = isWin ? '無損失' : 
-                `<div style="font-size:0.8em; color:#e74c3c; line-height:1.2; margin-top:3px;">
-                    -${item.goldLost || 0} G<br>
-                    -${item.foodLost || 0} 🌾<br>
-                    -${item.woodLost || 0} 🌲<br>
-                    -${item.ironLost || 0} 🔩
-                </div>`;
-                
+            const moneyText = isWin ? '無損失' : `<div style="font-size:0.8em; color:#e74c3c; line-height:1.2; margin-top:3px;">-${item.goldLost || 0} G<br>-${item.foodLost || 0} 🌾<br>-${item.woodLost || 0} 🪵<br>-${item.ironLost || 0} ⛏️</div>`;
             const revengeHint = (!isNotifBatchMode && item.attackerUid) ? '<div class="revenge-tag" style="background:#e74c3c; padding:2px 5px; border-radius:3px; font-size:0.8em;">復仇 ⚔️</div>' : '';
-            
             div.className = `notification-item notif-battle-log ${colorClass}`;
             const checkMark = (isNotifBatchMode && selectedNotifIds.has(item.id)) ? `<span style="margin-right:10px; font-size:1.2em;">✅</span>` : (isNotifBatchMode ? `<span style="margin-right:10px; font-size:1.2em; opacity:0.3;">⬜</span>` : "");
-            
             div.innerHTML = `<div style="display:flex; align-items:center; width:100%;">${checkMark}<div style="width:100%; padding-right: ${isNotifBatchMode ? '0' : '30px'};"><div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="font-weight:bold; color:#fff;">⚔️ ${item.attackerName} 攻擊了你</span><span style="font-size:0.8em; color:#aaa;">${date}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div><span style="font-weight:bold; ${isWin ? 'color:#2ecc71' : 'color:#e74c3c'}">${resultText}</span><span style="margin-left:5px;">${moneyText}</span></div>${revengeHint}</div></div></div>`;
-            
             if (!isNotifBatchMode) {
                 const deleteSingleBtn = document.createElement('div');
                 deleteSingleBtn.className = "delete-log-btn";
@@ -490,31 +466,23 @@ const userInfo = document.getElementById('user-info');
 const gameUI = document.getElementById('game-ui');
 const userNameDisplay = document.getElementById('user-name');
 
-if(document.getElementById('email-signup-btn')) {
-    document.getElementById('email-signup-btn').addEventListener('click', () => { 
-        if(!isFirebaseReady) return alert("Firebase 尚未初始化");
-        playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; 
-        if(!email || !pass) return alert("請輸入帳號密碼");
-        createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { await updateProfile(res.user, { displayName: "新玩家" }); location.reload(); }).catch(e=>alert(e.message)); 
-    });
-}
-if(document.getElementById('email-login-btn')) {
-    document.getElementById('email-login-btn').addEventListener('click', () => { 
-        if(!isFirebaseReady) return alert("Firebase 尚未初始化");
-        playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; 
-        if(!email || !pass) return alert("請輸入帳號密碼");
-        signInWithEmailAndPassword(auth, email, pass).catch(e=>alert(e.message)); 
-    });
-}
-if(document.getElementById('guest-btn')) {
-    document.getElementById('guest-btn').addEventListener('click', () => { 
-        if(!isFirebaseReady) return alert("Firebase 尚未初始化");
-        playSound('click'); signInAnonymously(auth).then(async (res) => { await updateProfile(res.user, { displayName: "神秘客" }); }).catch(e=>alert(e.message)); 
-    });
-}
-if(document.getElementById('logout-btn')) {
-    document.getElementById('logout-btn').addEventListener('click', () => { playSound('click'); signOut(auth).then(() => location.reload()); });
-}
+if(document.getElementById('email-signup-btn')) document.getElementById('email-signup-btn').addEventListener('click', () => { 
+    if(!isFirebaseReady) return alert("Firebase 尚未初始化");
+    playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; 
+    if(!email || !pass) return alert("請輸入帳號密碼");
+    createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { await updateProfile(res.user, { displayName: "新玩家" }); location.reload(); }).catch(e=>alert(e.message)); 
+});
+if(document.getElementById('email-login-btn')) document.getElementById('email-login-btn').addEventListener('click', () => { 
+    if(!isFirebaseReady) return alert("Firebase 尚未初始化");
+    playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; 
+    if(!email || !pass) return alert("請輸入帳號密碼");
+    signInWithEmailAndPassword(auth, email, pass).catch(e=>alert(e.message)); 
+});
+if(document.getElementById('guest-btn')) document.getElementById('guest-btn').addEventListener('click', () => { 
+    if(!isFirebaseReady) return alert("Firebase 尚未初始化");
+    playSound('click'); signInAnonymously(auth).then(async (res) => { await updateProfile(res.user, { displayName: "神秘客" }); }).catch(e=>alert(e.message)); 
+});
+if(document.getElementById('logout-btn')) document.getElementById('logout-btn').addEventListener('click', () => { playSound('click'); signOut(auth).then(() => location.reload()); });
 
 if (isFirebaseReady && auth) {
     onAuthStateChanged(auth, async (user) => {
@@ -528,6 +496,9 @@ if (isFirebaseReady && auth) {
                 await loadUserData(user); 
                 await calculateTotalPowerOnly(user.uid); 
                 loadLeaderboard();
+                
+                // 🔥 登入後檢查是否為遊客，並初始化綁定 UI (雖然這裡 Modal 預設隱藏，但確保資料正確)
+                updateAccountUI();
             } catch(e) { console.error("載入使用者資料失敗", e); }
         } else { 
             if(loginSection) loginSection.style.display = 'block'; 
@@ -537,7 +508,6 @@ if (isFirebaseReady && auth) {
     });
 }
 
-// 🔥 統一資源管理與更新邏輯
 const currencyHandler = (action, data, extraType = 'gold') => {
     if (action === 'check') {
         if (extraType === 'iron') return iron >= data;
@@ -565,10 +535,7 @@ const currencyHandler = (action, data, extraType = 'gold') => {
         if (data.type === 'food') food += val; 
         if (data.type === 'wood') wood += val; 
     }
-    if (action === 'refresh') { 
-        updateUIDisplay(); 
-        updateCurrencyCloud(); 
-    }
+    if (action === 'refresh') { updateUIDisplay(); updateCurrencyCloud(); }
     return true;
 };
 
@@ -618,8 +585,6 @@ async function loadUserData(user) {
 
     await Inventory.loadInventory(user.uid);
     updatePvpContext(currentUser, Inventory.getAllCards());
-    
-    // 🔥 載入完成後，更新主畫面最新卡片
     updateLatestCardsUI();
 }
 
@@ -655,12 +620,8 @@ function clearDeployment() {
     Inventory.refreshInventory();
 }
 
-if(document.getElementById('clear-deploy-btn')) {
-    document.getElementById('clear-deploy-btn').addEventListener('click', () => { playSound('click'); clearDeployment(); });
-}
-if(document.getElementById('inventory-clear-btn')) {
-    document.getElementById('inventory-clear-btn').addEventListener('click', () => { playSound('click'); clearDeployment(); });
-}
+if(document.getElementById('clear-deploy-btn')) document.getElementById('clear-deploy-btn').addEventListener('click', () => { playSound('click'); clearDeployment(); });
+if(document.getElementById('inventory-clear-btn')) document.getElementById('inventory-clear-btn').addEventListener('click', () => { playSound('click'); clearDeployment(); });
 
 if(document.getElementById('speed-btn')) {
     const savedSpeed = localStorage.getItem('battleSpeed');
@@ -701,34 +662,21 @@ if(document.getElementById('sort-select')) document.getElementById('sort-select'
     Inventory.filterInventory(document.querySelector('.filter-btn.active')?.dataset?.filter || 'ALL');
 });
 
-// ==========================================
-// 🔥 修改：抽卡系統實作 (Gacha Logic)
-// ==========================================
-
 async function performGacha(times) {
     if (!currentUser) return alert("請先登入！");
-    
-    // 檢查資源
     const cost = times * 100;
     if (gems < cost) return alert(`鑽石不足！需要 ${cost} 鑽石`);
-    
-    // 1. 先扣除資源
     gems -= cost;
     updateUIDisplay();
-    
-    // 播放音效
     playSound('draw');
 
-    // 2. 🔥 預先計算結果 (為了決定特效顏色)
     const results = [];
-    let maxRarityValue = 0; // 1=R, 2=SR, 3=SSR
+    let maxRarityValue = 0; 
 
     for (let i = 0; i < times; i++) {
         let rarity = 'R';
         let rarityVal = 1;
         const rand = Math.random();
-        
-        // 十連抽保底機制
         if (times === 10 && i === 9) {
             const totalSRSSR = RATES.SSR + RATES.SR;
             const normalizedSSR = RATES.SSR / totalSRSSR;
@@ -739,62 +687,46 @@ async function performGacha(times) {
             else if (rand < RATES.SSR + RATES.SR) { rarity = 'SR'; rarityVal = 2; }
             else { rarity = 'R'; rarityVal = 1; }
         }
-        
         if (rarityVal > maxRarityValue) maxRarityValue = rarityVal;
-
         const pool = cardDatabase.filter(c => c.rarity === rarity);
         const card = pool[Math.floor(Math.random() * pool.length)];
         results.push(card);
     }
 
-    // 3. 🔥 設定動畫特效 (根據最高稀有度)
     const overlay = document.getElementById('gacha-overlay');
     const summonCircle = document.getElementById('summon-circle');
     const summonBurst = document.getElementById('summon-burst');
     const summonText = document.getElementById('summon-text');
 
     if(overlay && summonCircle) {
-        // 重置樣式
         summonCircle.className = ''; 
         summonBurst.className = '';
         summonText.style.color = 'white';
         summonText.innerText = "召喚中...";
 
-        // 根據稀有度添加光圈樣式
         if (maxRarityValue === 3) {
-            // SSR
             summonCircle.classList.add('glow-ssr');
             summonBurst.classList.add('burst-active'); 
             summonText.style.color = '#f1c40f';
             summonText.innerText = "✨ SSR降臨 ✨";
             playSound('ssr'); 
         } else if (maxRarityValue === 2) {
-            // SR
             summonCircle.classList.add('glow-sr');
             summonText.style.color = '#9b59b6';
         } else {
-            // R
             summonCircle.classList.add('glow-r');
         }
-
         overlay.classList.remove('hidden');
     }
 
-    // 4. 背景執行儲存
     const promises = results.map(card => Inventory.saveCardToCloud(card));
     
-    // 動畫等待時間
     setTimeout(async () => {
         try {
             const savedCards = await Promise.all(promises);
             await updateCurrencyCloud(); 
-            
-            // 隱藏召喚動畫，顯示結果
             if(overlay) overlay.classList.add('hidden');
-            
             showGachaReveal(savedCards);
-            
-            // 🔥 抽完後立即更新主畫面的最新卡片
             updateLatestCardsUI();
         } catch (e) {
             console.error("抽卡錯誤", e);
@@ -807,29 +739,21 @@ async function performGacha(times) {
 function showGachaReveal(cards) {
     const modal = document.getElementById('gacha-reveal-modal');
     const container = document.getElementById('gacha-reveal-container');
-    const nextHint = document.getElementById('gacha-next-hint');
-    
     modal.classList.remove('hidden');
     container.innerHTML = "";
     gachaQueue = [...cards];
     gachaIndex = 0;
-    
-    // 顯示第一張
     showNextGachaCard();
-    
-    // 綁定點擊顯示下一張
     modal.onclick = (e) => {
-        // 避免點擊 Skip 按鈕觸發
         if (e.target.id === 'gacha-skip-btn') return;
-        
         if (gachaQueue.length > 0) {
             playSound('reveal');
             showNextGachaCard();
         } else {
             modal.classList.add('hidden');
             modal.onclick = null;
-            Inventory.filterInventory('ALL'); // 刷新背包
-            updateLatestCardsUI(); // 再次確保刷新主畫面
+            Inventory.filterInventory('ALL'); 
+            updateLatestCardsUI(); 
         }
     };
 }
@@ -837,28 +761,20 @@ function showGachaReveal(cards) {
 function showNextGachaCard() {
     const card = gachaQueue.shift();
     if (!card) return;
-    
     const container = document.getElementById('gacha-reveal-container');
     container.innerHTML = ""; 
-    
     createGachaCardElement(card, container);
-    
     if (card.rarity === 'SSR') playSound('ssr');
     else if (card.rarity === 'SR') playSound('reveal');
     else playSound('draw');
-    
-    if (gachaQueue.length === 0) {
-        document.getElementById('gacha-next-hint').innerText = "點擊任意處關閉";
-    } else {
-        document.getElementById('gacha-next-hint').innerText = "點擊螢幕顯示下一張";
-    }
+    if (gachaQueue.length === 0) document.getElementById('gacha-next-hint').innerText = "點擊任意處關閉";
+    else document.getElementById('gacha-next-hint').innerText = "點擊螢幕顯示下一張";
 }
 
 function createGachaCardElement(card, container) {
     const cardDiv = document.createElement('div');
     const charPath = `assets/cards/${card.id}.webp`;
     const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
-    
     cardDiv.className = `large-card ${card.rarity} reveal-anim`; 
     cardDiv.innerHTML = `
         <div class="large-card-inner">
@@ -875,8 +791,6 @@ function createGachaCardElement(card, container) {
     `;
     container.appendChild(cardDiv);
 }
-
-// ------------------------------------
 
 if(document.getElementById('enter-battle-mode-btn')) document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
@@ -906,9 +820,7 @@ document.querySelectorAll('.level-btn').forEach(btn => {
     });
 });
 
-if(document.getElementById('close-level-select-btn')) {
-    document.getElementById('close-level-select-btn').addEventListener('click', () => { playSound('click'); document.getElementById('level-selection-modal').classList.add('hidden'); });
-}
+if(document.getElementById('close-level-select-btn')) document.getElementById('close-level-select-btn').addEventListener('click', () => { playSound('click'); document.getElementById('level-selection-modal').classList.add('hidden'); });
 
 document.querySelectorAll('.defense-slot').forEach(slot => {
     slot.addEventListener('click', () => {
@@ -916,7 +828,6 @@ document.querySelectorAll('.defense-slot').forEach(slot => {
         if(isBattleActive) return; 
         playSound('click'); 
         const slotIndex = parseInt(slot.dataset.slot);
-        
         if (battleSlots[slotIndex]) { 
             const newSlots = [...battleSlots];
             newSlots[slotIndex] = null;
@@ -1064,15 +975,12 @@ if(document.getElementById('auto-deploy-btn')) document.getElementById('auto-dep
 
 async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     const diffSettings = DIFFICULTY_SETTINGS[currentDifficulty] || DIFFICULTY_SETTINGS['normal'];
-    
-    // --- 資源獎勵計算 ---
     let goldMultiplier = currentDifficulty === 'easy' ? 0.5 : (currentDifficulty === 'hard' ? 2.0 : 1.0);
     let finalGold = Math.floor(earnedGold * goldMultiplier * 0.5); 
     let gemReward = isWin ? (diffSettings.gemReward || 0) : 0;
     let ironReward = isWin ? Math.floor(finalGold * 0.01) : 0; 
     let woodReward = isWin ? Math.floor(finalGold * 0.05) : 0; 
 
-    // --- 設定 UI ---
     const modal = document.getElementById('battle-result-modal'); 
     const title = document.getElementById('result-title'); 
     const goldText = document.getElementById('result-gold'); 
@@ -1087,7 +995,6 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
         gemText.style.display = 'block'; 
         gemText.innerText = `💎 +${gemReward}`;
         
-        // 紀錄關卡進度
         if (currentUser) {
             const progressKey = `${currentPlayingLevelId}_${currentDifficulty}`;
             if (!completedLevels[progressKey]) { 
@@ -1103,33 +1010,20 @@ async function handleBattleEnd(isWin, earnedGold, heroStats, enemyStats) {
     }
     
     goldText.innerHTML = `💰 +${finalGold}<br>🔩 +${ironReward} | 🌲 +${woodReward}`;
-    
-    // 更新資源
     gold += finalGold; gems += gemReward; iron += ironReward; wood += woodReward;
     await updateCurrencyCloud(); 
     updateUIDisplay();
-
-    // 🔥🔥🔥 關鍵呼叫：渲染 DPS 圖表 (只傳入 heroStats，不傳入 enemyStats) 🔥🔥🔥
     renderDpsChart(heroStats);
 
-    btn.onclick = () => { 
-        playSound('click'); 
-        modal.classList.add('hidden'); 
-        resetBattleState(); 
-    };
+    btn.onclick = () => { playSound('click'); modal.classList.add('hidden'); resetBattleState(); };
 }
 
-// 🔥 新增：PVE 專用的傷害/治療統計圖表 (只顯示我方)
 function renderDpsChart(heroStats) {
     const dpsContainer = document.getElementById('dps-chart'); 
-    dpsContainer.innerHTML = ""; // 清空舊資料
+    dpsContainer.innerHTML = ""; 
 
-    // --- 建立切換按鈕 (傷害 / 治療) ---
     const tabs = document.createElement('div');
-    tabs.style.display = "flex"; 
-    tabs.style.justifyContent = "center"; 
-    tabs.style.gap = "10px"; 
-    tabs.style.marginBottom = "10px";
+    tabs.style.display = "flex"; tabs.style.justifyContent = "center"; tabs.style.gap = "10px"; tabs.style.marginBottom = "10px";
     
     tabs.innerHTML = `
         <button id="show-dmg-btn" class="btn-secondary active" style="padding:5px 15px; background:#e74c3c; border:1px solid #fff;">⚔️ 傷害</button>
@@ -1137,41 +1031,28 @@ function renderDpsChart(heroStats) {
     `;
     dpsContainer.appendChild(tabs);
 
-    // --- 建立列表捲動容器 ---
     const listContainer = document.createElement('div');
-    listContainer.style.maxHeight = "200px"; // 設定最大高度
-    listContainer.style.overflowY = "auto";  // 超出時捲動
+    listContainer.style.maxHeight = "200px"; 
+    listContainer.style.overflowY = "auto"; 
     dpsContainer.appendChild(listContainer);
 
-    let currentMode = 'damage'; // 預設模式
+    let currentMode = 'damage'; 
 
-    // --- 內部函式：渲染列表 ---
     const renderList = () => {
         listContainer.innerHTML = "";
-        
-        // 根據模式決定讀取的欄位 (totalDamage / totalHealing) 與顏色
         const statKey = currentMode === 'damage' ? 'totalDamage' : 'totalHealing';
         const barColor = currentMode === 'damage' ? '#e74c3c' : '#2ecc71';
 
         if (heroStats && heroStats.length > 0) {
-            // 1. 排序 (由大到小)
             const sortedHeroes = [...heroStats].sort((a, b) => (b[statKey] || 0) - (a[statKey] || 0));
-            
-            // 2. 找出最大值 (用來計算長度百分比)
             const maxVal = Math.max(sortedHeroes[0][statKey] || 1, 1); 
 
             sortedHeroes.forEach(h => {
                 const val = h[statKey] || 0;
-                
-                // 如果是治療模式且數值為0，可以略過不顯示
                 if (currentMode === 'healing' && val === 0) return;
-
                 const percent = (val / maxVal) * 100;
-                
                 const row = document.createElement('div');
-                row.className = 'dps-row'; // 使用 CSS 定義的樣式
-                
-                // 3. 建立 HTML (頭像 + 資訊 + 進度條)
+                row.className = 'dps-row'; 
                 row.innerHTML = `
                     <div class="dps-icon" style="background-image: url('assets/cards/${h.id}.webp');"></div>
                     <div class="dps-bar-container">
@@ -1186,52 +1067,30 @@ function renderDpsChart(heroStats) {
                 `;
                 listContainer.appendChild(row);
             });
-
-            // 如果列表為空 (例如治療模式下沒人補血)
-            if (listContainer.children.length === 0) {
-                listContainer.innerHTML = "<div style='text-align:center; color:#777; padding:10px;'>無數據</div>";
-            }
+            if (listContainer.children.length === 0) listContainer.innerHTML = "<div style='text-align:center; color:#777; padding:10px;'>無數據</div>";
         } else {
             listContainer.innerHTML = "<div style='text-align:center; color:#777; padding:10px;'>無數據</div>";
         }
     };
 
-    // 初次渲染
     renderList();
 
-    // --- 按鈕事件綁定 ---
     const dmgBtn = tabs.querySelector('#show-dmg-btn'); 
     const healBtn = tabs.querySelector('#show-heal-btn');
 
     dmgBtn.onclick = () => { 
         if (currentMode === 'damage') return;
         currentMode = 'damage'; 
-        
-        // 更新按鈕樣式
-        dmgBtn.style.opacity = "1"; 
-        dmgBtn.style.background = "#e74c3c"; 
-        dmgBtn.style.borderColor = "#fff";
-        
-        healBtn.style.opacity = "0.6"; 
-        healBtn.style.background = "#95a5a6"; 
-        healBtn.style.borderColor = "#777";
-        
+        dmgBtn.style.opacity = "1"; dmgBtn.style.background = "#e74c3c"; dmgBtn.style.borderColor = "#fff";
+        healBtn.style.opacity = "0.6"; healBtn.style.background = "#95a5a6"; healBtn.style.borderColor = "#777";
         renderList(); 
     };
 
     healBtn.onclick = () => { 
         if (currentMode === 'healing') return;
         currentMode = 'healing'; 
-        
-        // 更新按鈕樣式
-        healBtn.style.opacity = "1"; 
-        healBtn.style.background = "#2ecc71"; 
-        healBtn.style.borderColor = "#fff";
-        
-        dmgBtn.style.opacity = "0.6"; 
-        dmgBtn.style.background = "#95a5a6"; 
-        dmgBtn.style.borderColor = "#777";
-        
+        healBtn.style.opacity = "1"; healBtn.style.background = "#2ecc71"; healBtn.style.borderColor = "#fff";
+        dmgBtn.style.opacity = "0.6"; dmgBtn.style.background = "#95a5a6"; dmgBtn.style.borderColor = "#777";
         renderList(); 
     };
 }

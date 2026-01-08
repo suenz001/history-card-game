@@ -464,7 +464,27 @@
                         <button id="redeem-btn" class="btn-secondary" style="background:#8e44ad;">兌換</button>
                     </div>
                 </div>
+                
                 <hr style="border-color: #555; margin: 15px 0;">
+
+                <div class="setting-item" id="account-bind-section">
+                    <label>🔐 帳號安全 (遊客綁定)</label>
+                    
+                    <div id="bind-form-container">
+                        <p style="font-size:0.8em; color:#bdc3c7; margin-bottom:5px;">綁定信箱以防資料遺失。</p>
+                        <input type="email" id="bind-email-input" placeholder="輸入電子郵件" style="width:100%; margin-bottom:5px;">
+                        <input type="password" id="bind-pass-input" placeholder="設定密碼 (至少6碼)" style="width:100%;">
+                        <button id="bind-account-btn" class="btn-primary" style="width:100%; margin-top:5px; background-color:#3498db;">綁定帳號</button>
+                    </div>
+
+                    <div id="bind-status-container" class="hidden" style="background:rgba(0,0,0,0.3); padding:10px; border-radius:5px; text-align:center;">
+                        <div style="color:#2ecc71; font-weight:bold; margin-bottom:5px;">✔ 已綁定帳號</div>
+                        <div id="current-bind-email" style="font-size:0.9em; color:#fff;"></div>
+                    </div>
+                </div>
+
+                <hr style="border-color: #555; margin: 15px 0;">
+
                 <div class="setting-item">
                     <label>背景音樂 (BGM)</label>
                     <div class="control-row">
