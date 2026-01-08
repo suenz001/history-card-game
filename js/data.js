@@ -265,7 +265,7 @@ export const cardDatabase = [
     },
     { 
         id: 19, name: "華盛頓", rarity: "SR", atk: 215, hp: 2100, 
-        unitType: ""CAVALRY", // 騎兵 (滑膛槍)
+        unitType: "CAVALRY", // 騎兵 (滑膛槍)
         title: "開國元勛", attackType: "melee", skillKey: "RESTORE_MANA_ALLIES", skillParams: { range: 20, manaAmount: 20, dmgMult: 1.2 } 
     },
     { 
