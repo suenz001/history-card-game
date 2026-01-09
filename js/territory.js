@@ -11,7 +11,7 @@ const BUILDING_CONFIG = {
         baseCost: 2000, costFactor: 1.6, 
         // 時間：基礎 1 小時，指數成長 (Lv10 約需 26 小時)
         baseTime: 3600, timeFactor: 1.5, 
-        maxLevel: 20 // 開放更高上限
+        maxLevel: 20 // 🔥 修改：開放至 Lv.20
     },
     farm: { 
         name: "🌾 農田", 
