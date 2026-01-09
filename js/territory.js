@@ -2,50 +2,52 @@
 import { doc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { playSound } from './audio.js';
 
-// --- 建築設定檔 (平衡性調整版：長時間升級 & 低木頭消耗) ---
+// --- 建築設定檔 (老手向平衡：時間大幅拉長，資源消耗提高) ---
 const BUILDING_CONFIG = {
     castle: { 
         name: "🏰 主堡", 
         desc: "領地的核心，限制其他建築的最高等級。",
-        baseCost: 1000, costFactor: 1.5, 
-        // 🔥 時間調整：基礎 10 分鐘，成長係數 1.4 (Lv10 約需 3.5 小時)
-        baseTime: 600, timeFactor: 1.4, 
-        maxLevel: 10 
+        // 費用：高昂的升級費用
+        baseCost: 2000, costFactor: 1.6, 
+        // 時間：基礎 1 小時，指數成長 (Lv10 約需 26 小時)
+        baseTime: 3600, timeFactor: 1.5, 
+        maxLevel: 20 // 開放更高上限
     },
     farm: { 
         name: "🌾 農田", 
         desc: "生產糧食，軍隊補給的基礎。",
-        baseCost: 500, costFactor: 1.4, 
-        // 🔥 時間調整：基礎 5 分鐘，成長係數 1.35 (Lv10 約需 1.2 小時)
-        baseTime: 300, timeFactor: 1.35, 
-        baseProd: 900, prodFactor: 1.35, 
+        baseCost: 800, costFactor: 1.5, 
+        // 時間：基礎 30 分鐘，成長較緩 (Lv10 約需 10 小時)
+        baseTime: 1800, timeFactor: 1.4, 
+        // 產量：成長幅度適中
+        baseProd: 1000, prodFactor: 1.25, 
         resource: 'food' 
     },
     lumber: { 
         name: "🪓 伐木場", 
         desc: "生產木頭，建設建築的基礎資源。",
-        baseCost: 600, costFactor: 1.4, 
-        // 🔥 時間調整：基礎 5 分鐘，成長係數 1.35
-        baseTime: 300, timeFactor: 1.35, 
-        baseProd: 300, prodFactor: 1.35, 
+        baseCost: 800, costFactor: 1.5, 
+        // 時間：基礎 30 分鐘
+        baseTime: 1800, timeFactor: 1.4, 
+        baseProd: 500, prodFactor: 1.25, 
         resource: 'wood' 
     },
     mine: { 
         name: "⛏️ 礦場", 
         desc: "生產鐵礦，這是強化英雄裝備的關鍵資源。",
-        baseCost: 800, costFactor: 1.4, 
-        // 🔥 時間調整：基礎 8 分鐘，成長係數 1.35
-        baseTime: 480, timeFactor: 1.35, 
-        baseProd: 50, prodFactor: 1.2, 
+        baseCost: 1000, costFactor: 1.5, 
+        // 時間：基礎 45 分鐘
+        baseTime: 2700, timeFactor: 1.4, 
+        baseProd: 100, prodFactor: 1.2, 
         resource: 'iron'
     },
     warehouse: { 
         name: "📦 倉庫", 
         desc: "決定資源的儲存上限 (時間限制)。",
-        baseCost: 400, costFactor: 1.3, 
-        // 🔥 時間調整：基礎 5 分鐘，成長係數 1.3
-        baseTime: 300, timeFactor: 1.3, 
-        baseCapHours: 4, capFactor: 1.15 
+        baseCost: 500, costFactor: 1.4, 
+        // 時間：基礎 20 分鐘
+        baseTime: 1200, timeFactor: 1.35, 
+        baseCapHours: 6, capFactor: 1.1 // 倉庫容量成長較慢，迫使玩家頻繁上線或升級
     }
 };
 
@@ -188,7 +190,6 @@ function renderTerritory() {
     });
 }
 
-// 修改：木頭費用調整為金幣的 10%
 function renderUpgradeButton(type, data, config) {
     if (data.upgradeEndTime > Date.now()) {
         return `<button class="btn-secondary btn-disabled" id="btn-upgrade-${type}" disabled>🚧 建造中...</button>`;
@@ -201,8 +202,7 @@ function renderUpgradeButton(type, data, config) {
     }
 
     const goldCost = Math.floor(config.baseCost * Math.pow(config.costFactor, data.level));
-    // 🔥 修改：木頭消耗為金幣的 10%
-    const woodCost = Math.floor(goldCost * 0.1); 
+    const woodCost = Math.floor(goldCost * 0.1); // 木頭消耗為金幣的 10%
     
     const timeSec = Math.floor(config.baseTime * Math.pow(config.timeFactor, data.level));
     const timeStr = formatTime(timeSec);
@@ -372,5 +372,6 @@ function updateTerritoryUI() {
 function formatTime(seconds) {
     if (seconds < 60) return `${Math.floor(seconds)}秒`;
     if (seconds < 3600) return `${Math.floor(seconds/60)}分 ${Math.floor(seconds%60)}秒`;
-    return `${Math.floor(seconds/3600)}時 ${Math.floor((seconds%3600)/60)}分`;
+    if (seconds < 86400) return `${Math.floor(seconds/3600)}時 ${Math.floor((seconds%3600)/60)}分`;
+    return `${Math.floor(seconds/86400)}天 ${Math.floor((seconds%86400)/3600)}時`;
 }
