@@ -2,7 +2,18 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 // 🔥 新增：linkWithCredential, EmailAuthProvider
-import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInAnonymously, updateProfile, linkWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { 
+    getAuth, 
+    signOut, 
+    onAuthStateChanged, 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signInAnonymously, 
+    updateProfile, 
+    linkWithCredential, 
+    EmailAuthProvider,
+    sendPasswordResetEmail  // 🔥 這裡已加入
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // 引入模組
 import { HERO_BIOS } from './js/bios.js';
@@ -150,6 +161,38 @@ setTimeout(() => {
              }
         });
     }
+
+    // 🔥 新增：忘記密碼功能
+    const forgotBtn = document.getElementById('forgot-pass-btn');
+    if (forgotBtn) {
+        forgotBtn.addEventListener('click', () => {
+            playSound('click');
+            const email = document.getElementById('email-input').value.trim();
+            
+            // 檢查使用者是否已輸入 Email
+            if (!email) {
+                return alert("請先在上方的「電子信箱」欄位輸入您的 Email，系統才能發送重置信件給您。");
+            }
+
+            if (confirm(`確定要發送密碼重置信件到：\n${email} 嗎？`)) {
+                sendPasswordResetEmail(auth, email)
+                    .then(() => {
+                        alert("✅ 重置信件已發送！\n請前往您的信箱收信 (若沒收到請檢查垃圾郵件)。\n點擊信中連結重設密碼後，即可使用新密碼登入。");
+                    })
+                    .catch((error) => {
+                        console.error("重置密碼失敗", error);
+                        if (error.code === 'auth/user-not-found') {
+                            alert("❌ 找不到此信箱註冊的帳號。");
+                        } else if (error.code === 'auth/invalid-email') {
+                            alert("❌ 信箱格式不正確。");
+                        } else {
+                            alert("❌ 發送失敗，請稍後再試。\n" + error.message);
+                        }
+                    });
+            }
+        });
+    }
+
 }, 500);
 
 // --- 設定相關 ---
@@ -205,7 +248,7 @@ if (bindBtn) {
         const pass = document.getElementById('bind-pass-input').value.trim();
         
         if (!email || !pass) return alert("請輸入 Email 和密碼");
-        if (pass.length < 6) return alert("密碼長度至少需 6 碼");
+        if (pass.length < 6) return alert("密碼強度至少需 6 碼");
         if (!currentUser) return alert("請先登入遊戲");
 
         // 1. 建立憑證
