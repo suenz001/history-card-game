@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://suenz001.github.io/history-card-game/sitemap.xml
