@@ -605,7 +605,7 @@ async function loadUserData(user) {
         if(!data.email && user.email) updateData.email = user.email;
         updateDoc(userRef, updateData);
     } else { 
-        gems = 1000; gold = 5000; iron = 500; food = 0; wood = 0; 
+        gems = 5000; gold = 5000; iron = 5000; food = 5000; wood = 5000; 
         claimedNotifs = []; deletedSystemNotifs = []; battleLogs = []; completedLevels = {};
         await setDoc(userRef, { 
             name: user.displayName || "未命名", email: user.email || null, 
