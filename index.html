@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歷史英靈：策略對決</title>
-<meta name="google-site-verification" content="rUWOR0-82xcLnEEm-y9E4HnHyzsBxWXY9kK9DHXYD7Q" />
-    <link rel="stylesheet" href="style.css?v=128">
+    <meta name="google-site-verification" content="rUWOR0-82xcLnEEm-y9E4HnHyzsBxWXY9kK9DHXYD7Q" />
+    <link rel="stylesheet" href="style.css?v=129">
     <style>
         /* --- 建築升級進度條樣式 --- */
         .build-progress-bar {
@@ -36,67 +36,62 @@
         }
 
         /* --- 🔥 布陣畫面優化樣式 (放大 & 集中) --- */
-        
-        /* 1. 容器設定：讓內容垂直與水平置中 */
         .lanes-wrapper {
             display: flex;
             flex-direction: column;
-            justify-content: center; /* 垂直置中 */
-            align-items: center;     /* 水平置中 */
+            justify-content: center;
+            align-items: center;
             height: 100%;
             width: 100%;
-            gap: 15px; /* 行與行之間的距離 */
+            gap: 15px;
             padding: 20px 0;
             box-sizing: border-box;
             z-index: 10;
             position: relative;
         }
 
-        /* 2. 每一行設定：讓卡片水平置中且緊湊 */
         .lane-row {
             display: flex;
-            justify-content: center; /* 水平置中 */
-            gap: 15px; /* 卡片左右間距 */
-            width: auto; /* 寬度自動，依內容而定 */
+            justify-content: center;
+            gap: 15px;
+            width: auto;
         }
 
-        /* 3. 卡片插槽設定：放大尺寸 */
         .defense-slot {
-            width: 100px;  /* 🔥 寬度加大 */
-            height: 150px; /* 🔥 高度加大 */
+            width: 100px;
+            height: 150px;
             border: 2px dashed rgba(255, 255, 255, 0.4);
-            background: rgba(0, 0, 0, 0.3); /* 半透明黑底，增加對比 */
+            background: rgba(0, 0, 0, 0.3);
             border-radius: 8px;
             position: relative;
             transition: all 0.2s;
             cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3); /* 增加陰影 */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
 
         .defense-slot:hover {
             border-color: #f1c40f;
             background: rgba(241, 196, 15, 0.1);
-            transform: translateY(-3px); /* 滑鼠懸停時微微上浮 */
+            transform: translateY(-3px);
         }
 
         .defense-slot.active {
-            border: 2px solid #f39c12; /* 上陣時金框 */
+            border: 2px solid #f39c12;
             background: none;
         }
 
-        /* 4. 卡片資訊覆蓋層優化 */
         .deploy-card-info {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
             z-index: 5;
-            text-shadow: 1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000; /* 強力描邊 */
+            text-shadow: 1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000;
         }
 
         .deploy-info-top-left {
             position: absolute;
             top: 4px; left: 6px;
-            font-size: 0.85em; /* 字體微調 */
+            font-size: 0.85em;
             color: #fff;
             font-weight: bold;
         }
@@ -104,10 +99,9 @@
         .deploy-info-top-right {
             position: absolute;
             top: 4px; right: 6px;
-            font-size: 1.1em; /* 兵種圖示放大 */
+            font-size: 1.1em;
         }
 
-        /* 戰力標籤 (稍微往上移一點，避免遮擋星數) */
         .deploy-power-tag {
             position: absolute;
             bottom: 24px; 
@@ -128,7 +122,7 @@
             width: 100%;
             text-align: center;
             color: #f1c40f;
-            font-size: 1.1em; /* 星星放大 */
+            font-size: 1.1em;
             letter-spacing: 1px;
         }
 
@@ -136,7 +130,7 @@
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 2.5em; /* 加號放大 */
+            font-size: 2.5em;
             color: rgba(255,255,255,0.3);
             font-weight: bold;
         }
@@ -211,6 +205,8 @@
                     </div>
 
                     <button id="enter-battle-mode-btn" class="btn-danger" style="width: 100%; margin-bottom: 10px; font-size: 1.2em; border: 2px solid #fff; box-shadow: 0 0 10px #c0392b;">⚔️ 前往戰場 (選擇關卡)</button>
+                    
+                    <button id="enter-adventure-mode-btn" class="btn-primary" style="width: 100%; margin-bottom: 20px; font-size: 1.2em; background: #e67e22; border: 2px solid #fff; box-shadow: 0 0 10px #d35400;">🐲 進入冒險模式 (動作版)</button>
 
                     <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                         <button id="pvp-menu-btn" class="btn-primary" style="flex: 1; background: #2980b9; border: 2px solid #fff;">🛡️ 設定防守隊伍</button>
@@ -603,33 +599,28 @@
         </div>
     </div>
 
-    <script type="module" src="js/inventory.js"></script>
-    <script type="module" src="js/territory.js"></script> <script type="module" src="main.js"></script>
-
-<button id="enter-battle-mode-btn" class="btn-danger" style="...">...</button>
-<button id="enter-adventure-mode-btn" class="btn-primary" style="width: 100%; margin-bottom: 20px; font-size: 1.2em; background: #e67e22; border: 2px solid #fff; box-shadow: 0 0 10px #d35400;">🐲 進入冒險模式 (動作版)</button>
-
-
-<div id="adventure-screen" class="hidden">
-    <canvas id="adv-canvas"></canvas>
-    
-    <div id="adv-ui-layer">
-        <div class="adv-top-bar">
-            <div class="adv-player-info">
-                <div class="adv-avatar">👤</div>
-                <div class="adv-bars">
-                    <div class="adv-hp-bar"><div style="width: 100%;"></div></div>
-                    <div class="adv-mp-bar"><div style="width: 100%;"></div></div>
+    <div id="adventure-screen" class="hidden">
+        <canvas id="adv-canvas"></canvas>
+        <div id="adv-ui-layer">
+            <div class="adv-top-bar">
+                <div class="adv-player-info">
+                    <div class="adv-avatar">👤</div>
+                    <div class="adv-bars">
+                        <div class="adv-hp-bar"><div style="width: 100%;"></div></div>
+                        <div class="adv-mp-bar"><div style="width: 100%;"></div></div>
+                    </div>
                 </div>
+                <button id="adv-exit-btn" class="btn-danger" style="padding: 5px 15px;">🏳️ 退出冒險</button>
             </div>
-            <button id="adv-exit-btn" class="btn-danger" style="padding: 5px 15px;">🏳️ 退出冒險</button>
-        </div>
-        
-        <div class="adv-controls-hint">
-            使用 WASD 或 方向鍵 移動<br>
-            J: 攻擊 | K: 跳躍
+            <div class="adv-controls-hint">
+                使用 WASD 或 方向鍵 移動<br>
+                J: 攻擊 | K: 跳躍
+            </div>
         </div>
     </div>
-</div>
+
+    <script type="module" src="js/inventory.js"></script>
+    <script type="module" src="js/territory.js"></script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>
