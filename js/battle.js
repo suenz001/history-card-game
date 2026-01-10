@@ -63,12 +63,24 @@ function ensureBattleListeners() {
     }
 }
 
-// 🔥 新增：更新戰場尺寸 (Resize 時呼叫)
+// 🔥 修正：更新戰場尺寸 (加入防呆機制，避免隱藏時寬度為 0 導致瞬移)
 function updateBattleDimensions() {
     if (!battleContainerEl) battleContainerEl = document.querySelector('.battle-field-container');
+    
     if (battleContainerEl) {
-        containerW = battleContainerEl.offsetWidth;
-        containerH = battleContainerEl.offsetHeight;
+        // 如果 offsetWidth 是 0 (代表可能還沒顯示)，則嘗試使用預設值或視窗寬度
+        const w = battleContainerEl.offsetWidth;
+        const h = battleContainerEl.offsetHeight;
+
+        if (w > 0 && h > 0) {
+            containerW = w;
+            containerH = h;
+        } else {
+            // 還抓不到尺寸時的備案，避免算出來是 0
+            containerW = window.innerWidth > 0 ? window.innerWidth : 1000;
+            // 保持原本 CSS 設計的比例或高度
+            containerH = 500; 
+        }
     }
 }
 
@@ -142,7 +154,7 @@ function prepareLevel() {
     
     const container = document.querySelector('.battle-field-container');
     if(container) {
-        battleContainerEl = container; // 更新參考
+        battleContainerEl = container; 
         container.style.backgroundImage = `url('${config.bg}'), linear-gradient(#2c3e50 1px, transparent 1px), linear-gradient(90deg, #2c3e50 1px, transparent 1px)`;
         container.style.backgroundSize = "cover"; 
         container.style.backgroundBlendMode = "normal"; 
@@ -160,6 +172,7 @@ function prepareLevel() {
     const retreatBtn = document.getElementById('retreat-btn');
     if(retreatBtn) retreatBtn.innerText = "🏳️ 撤退";
     
+    // 1. 先顯示戰鬥畫面
     document.getElementById('battle-screen').classList.remove('hidden');
 
     const lanesWrapper = document.querySelector('.lanes-wrapper');
@@ -171,7 +184,14 @@ function prepareLevel() {
     renderBattleSlots();
     updateStartButton();
     updateBattleUI(); 
-    updateBattleDimensions(); // 確保尺寸正確
+    
+    // 🔥 修正：畫面顯示後，強制等待一小段時間再計算尺寸，確保抓到正確寬高
+    setTimeout(() => {
+        updateBattleDimensions();
+        // 如果已經有單位生成了，強制重繪一次位置
+        heroEntities.forEach(h => renderUnitPosition(h));
+        enemies.forEach(e => renderUnitPosition(e));
+    }, 50);
     
     if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
 }
