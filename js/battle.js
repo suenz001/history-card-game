@@ -36,11 +36,6 @@ let battleState = {
 let gameLoopId = null;
 let onBattleEndCallback = null;
 
-// 🔥 優化：快取戰場容器尺寸，用於 transform 計算
-let battleContainerEl = null;
-let containerW = 1000;
-let containerH = 500;
-
 function safePlaySound(type) {
     try { playSound(type); } catch (e) { console.warn(`音效播放失敗 [${type}]:`, e); }
 }
@@ -63,54 +58,10 @@ function ensureBattleListeners() {
     }
 }
 
-// 🔥 修正：更新戰場尺寸 (加入防呆機制，避免隱藏時寬度為 0 導致瞬移)
-function updateBattleDimensions() {
-    if (!battleContainerEl) battleContainerEl = document.querySelector('.battle-field-container');
-    
-    if (battleContainerEl) {
-        // 如果 offsetWidth 是 0 (代表可能還沒顯示)，則嘗試使用預設值或視窗寬度
-        const w = battleContainerEl.offsetWidth;
-        const h = battleContainerEl.offsetHeight;
-
-        if (w > 0 && h > 0) {
-            containerW = w;
-            containerH = h;
-        } else {
-            // 還抓不到尺寸時的備案，使用視窗寬度，避免算出來是 0
-            containerW = window.innerWidth > 0 ? window.innerWidth : 1000;
-            // 保持原本 CSS 設計的比例或高度
-            containerH = 500; 
-        }
-    }
-}
-
-// 🔥 新增：高效渲染單位位置 (使用 GPU 加速的 transform)
-function renderUnitPosition(unit) {
-    if (!unit.el) return;
-    
-    // 如果容器寬度異常，嘗試重新抓取
-    if (containerW <= 0) updateBattleDimensions();
-
-    // 將百分比座標轉換為像素座標 (使用 Math.round 確保整數像素，提升銳利度)
-    const px = Math.round((unit.position / 100) * containerW);
-    const py = Math.round((unit.y / 100) * containerH);
-    
-    // 判斷是否翻轉 (scaleX -1)
-    const scaleX = unit.isFlipped ? -1 : 1;
-    
-    // 使用 translate3d 啟動硬體加速
-    unit.el.style.transform = `translate3d(${px}px, ${py}px, 0) translateY(-50%) scaleX(${scaleX})`;
-}
-
 export function initBattle(levelId = 1, progress = {}) {
     currentLevelId = levelId;
     userProgress = progress; 
     ensureBattleListeners(); 
-    
-    // 初始化尺寸監聽
-    updateBattleDimensions();
-    window.addEventListener('resize', updateBattleDimensions);
-    
     prepareLevel();
 }
 
@@ -157,7 +108,6 @@ function prepareLevel() {
     
     const container = document.querySelector('.battle-field-container');
     if(container) {
-        battleContainerEl = container; 
         container.style.backgroundImage = `url('${config.bg}'), linear-gradient(#2c3e50 1px, transparent 1px), linear-gradient(90deg, #2c3e50 1px, transparent 1px)`;
         container.style.backgroundSize = "cover"; 
         container.style.backgroundBlendMode = "normal"; 
@@ -175,9 +125,9 @@ function prepareLevel() {
     const retreatBtn = document.getElementById('retreat-btn');
     if(retreatBtn) retreatBtn.innerText = "🏳️ 撤退";
     
-    // 1. 先顯示戰鬥畫面
     document.getElementById('battle-screen').classList.remove('hidden');
 
+    // 🔥 修正：強制設定布陣區為不透明且顯示，解決第一次進入時透明的問題
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) {
         lanesWrapper.style.display = 'flex';
@@ -187,14 +137,6 @@ function prepareLevel() {
     renderBattleSlots();
     updateStartButton();
     updateBattleUI(); 
-    
-    // 🔥 修正：畫面顯示後，強制等待一小段時間再計算尺寸，確保抓到正確寬高
-    setTimeout(() => {
-        updateBattleDimensions();
-        // 如果已經有單位生成了，強制重繪一次位置
-        heroEntities.forEach(h => renderUnitPosition(h));
-        enemies.forEach(e => renderUnitPosition(e));
-    }, 50);
     
     if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
 }
@@ -225,26 +167,30 @@ function updateDifficultyButtons() {
     }
 }
 
+// 🔥 強力清理 + 新樣式渲染
 function renderBattleSlots() {
     const battleSlotsEl = document.querySelectorAll('.lanes-wrapper .defense-slot');
     battleSlotsEl.forEach(slotDiv => {
         const index = parseInt(slotDiv.dataset.slot); const hero = battleSlots[index];
         const placeholder = slotDiv.querySelector('.slot-placeholder'); 
         
+        // 強力清空：只保留 placeholder
         Array.from(slotDiv.children).forEach(child => {
             if (!child.classList.contains('slot-placeholder')) {
                 child.remove();
             }
         });
         
+        // 重置樣式
         slotDiv.style.background = '';
         slotDiv.classList.remove('active');
 
         if (hero) {
             placeholder.style.display = 'none'; 
             slotDiv.classList.add('active');
-            slotDiv.style.background = 'none';
+            slotDiv.style.background = 'none'; // 確保不透明
 
+            // 準備數據
             const charPath = `assets/cards/${hero.id}.webp`; 
             const framePath = `assets/frames/${hero.rarity.toLowerCase()}.png`;
             const level = hero.level || 1;
@@ -258,6 +204,7 @@ function renderBattleSlots() {
             if(uType === 'CAVALRY') typeIcon = '🐴';
             else if(uType === 'ARCHER') typeIcon = '🏹';
 
+            // 建立 HTML
             const img = document.createElement('img');
             img.src = charPath;
             img.onerror = () => { this.src='https://placehold.co/120x180?text=No+Image'; };
@@ -281,7 +228,7 @@ function renderBattleSlots() {
 
         } else { 
             placeholder.style.display = 'block'; 
-            slotDiv.style.background = 'rgba(0, 0, 0, 0.3)'; 
+            slotDiv.style.background = 'rgba(0, 0, 0, 0.3)'; // 空格保持半透明
         }
     });
     
@@ -347,8 +294,6 @@ function startBattle() {
     if(foodCostContainer) foodCostContainer.style.display = 'none';
 
     setupBattleEnvironment();
-    // 確保生成前再更新一次尺寸
-    updateBattleDimensions();
     spawnHeroes();
     startWave(1); 
     gameLoop();
@@ -381,7 +326,6 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
     const waveNotif = document.getElementById('wave-notification');
     if(waveNotif) waveNotif.innerText = "⚔️ PVP 對決開始 ⚔️";
     
-    updateBattleDimensions(); // 生成前確保尺寸正確
     spawnHeroes(); 
     spawnPvpEnemies(enemyTeamData); 
     updateBattleUI();
@@ -409,13 +353,13 @@ function setupBattleEnvironment() {
     if(heroMonitorList) heroMonitorList.innerHTML = '';
     if(enemyMonitorList) enemyMonitorList.innerHTML = '';
 
+    // 🔥 隱藏布陣區
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) {
         lanesWrapper.style.display = 'none';
         lanesWrapper.style.opacity = '1';
     }
     
-    updateBattleDimensions(); // 戰鬥開始前強制更新尺寸
     updateBattleUI();
     
     const startBtn = document.getElementById('start-battle-btn');
@@ -459,6 +403,7 @@ export function resetBattleState() {
     const battleScreen = document.getElementById('battle-screen');
     const waveNotif = document.getElementById('wave-notification');
     
+    // 🔥 恢復布陣區顯示
     const lanesWrapper = document.querySelector('.lanes-wrapper');
     if(lanesWrapper) {
         lanesWrapper.style.display = 'flex';
@@ -506,51 +451,22 @@ function spawnHeroes() {
         const el = document.createElement('div');
         el.className = `hero-unit ${card.rarity}`;
         el.style.backgroundImage = `url(assets/cards/${card.id}.webp)`;
-        
-        // 🔥 關鍵修復：JS 強制移除動畫，防止 CSS 快取導致的瞬移
-        el.style.transition = 'none !important';
-        el.style.left = '0px'; 
-        el.style.top = '0px'; 
+        el.style.left = `${startPos}%`;
+        el.style.top = `${startY}%`;
         
         el.innerHTML = `
             <div class="hero-hp-bar"><div style="width:100%"></div></div>
             <div class="hero-mana-bar"><div style="width:0%"></div></div>
             <div class="${badgeClass}">${typeIcon}</div>
         `;
-        
-        // 準備數據
+        container.appendChild(el);
+
         let finalHp = card.hp;
         if(card.attackType === 'ranged') finalHp = Math.floor(card.hp * 0.45);
 
-        const newHero = {
-            ...card,
-            title: realTitle,
-            maxHp: finalHp, currentHp: finalHp,
-            maxMana: 100, currentMana: 0, 
-            lane: lane, position: startPos, y: startY,
-            speed: 0.05,
-            range: card.attackType === 'ranged' ? 16 : 4, 
-            atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.35) : card.atk, 
-            lastAttackTime: 0, 
-            el: el, 
-            monitorEl: null, 
-            patrolDir: 1, 
-            totalDamage: 0,
-            totalHealing: 0,
-            isInvincible: false,
-            immunityStacks: 0,
-            skillKey: realSkillKey,
-            skillParams: realSkillParams,
-            isFlipped: false 
-        };
-
-        // 🔥 關鍵修復：先設定好位置，再加入 DOM
-        renderUnitPosition(newHero);
-        container.appendChild(el);
-        
-        // 生成側邊欄項目
+        let monitorItem = null;
         if(monitorList) {
-            let monitorItem = document.createElement('div');
+            monitorItem = document.createElement('div');
             monitorItem.className = 'monitor-item';
             monitorItem.innerHTML = `
                 <div class="monitor-icon" style="background-image: url('assets/cards/${card.id}.webp');"></div>
@@ -561,10 +477,28 @@ function spawnHeroes() {
                 </div>
             `;
             monitorList.appendChild(monitorItem);
-            newHero.monitorEl = monitorItem;
         }
-        
-        heroEntities.push(newHero);
+
+        heroEntities.push({
+            ...card,
+            title: realTitle,
+            maxHp: finalHp, currentHp: finalHp,
+            maxMana: 100, currentMana: 0, 
+            lane: lane, position: startPos, y: startY,
+            speed: 0.05,
+            range: card.attackType === 'ranged' ? 16 : 4, 
+            atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.35) : card.atk, 
+            lastAttackTime: 0, 
+            el: el, 
+            monitorEl: monitorItem, 
+            patrolDir: 1, 
+            totalDamage: 0,
+            totalHealing: 0,
+            isInvincible: false,
+            immunityStacks: 0,
+            skillKey: realSkillKey,
+            skillParams: realSkillParams
+        });
     });
 }
 
@@ -626,12 +560,10 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     
     el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
     el.style.backgroundSize = 'cover';
-    
-    // 🔥 關鍵修復：JS 強制移除動畫
-    el.style.transition = 'none !important';
-    el.style.left = '0px';
-    el.style.top = '0px';
-    
+    el.style.left = `${startPos}%`;
+    el.style.top = `${startY}%`;
+    el.classList.add('unit-flipped');
+
     if(!enemyCard.isBoss) { el.style.border = '2px solid #e74c3c'; }
 
     el.innerHTML = `
@@ -639,6 +571,7 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
         <div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>
     `;
+    container.appendChild(el);
 
     if(attackType === 'ranged') finalHp = Math.floor(finalHp * 0.45);
 
@@ -659,7 +592,7 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         enemyMonitorList.appendChild(monitorItem);
     }
 
-    const newEnemy = {
+    enemies.push({
         ...enemyCard, 
         id: realId,
         title: finalTitle,
@@ -677,15 +610,8 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         totalDamage: 0,
         totalHealing: 0,
         skillKey: finalSkillKey,
-        skillParams: finalSkillParams,
-        isFlipped: true 
-    };
-    
-    // 🔥 關鍵修復：先設定位置，再加入 DOM
-    renderUnitPosition(newEnemy);
-    container.appendChild(el);
-    
-    enemies.push(newEnemy);
+        skillParams: finalSkillParams
+    });
 }
 
 function showBossWarning() {
@@ -774,24 +700,10 @@ function spawnEnemy() {
                 }
             }
             const bossX = 10 + Math.random() * 80; const bossY = 10 + Math.random() * 80;
-            const boss = { 
-                id: Date.now(), maxHp: 30000 * diffMultHp, currentHp: 30000 * diffMultHp, atk: 500 * diffMultAtk, 
-                lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true,
-                isFlipped: true // Boss 預設朝左
-            };
+            const boss = { id: Date.now(), maxHp: 30000 * diffMultHp, currentHp: 30000 * diffMultHp, atk: 500 * diffMultAtk, lane: -1, position: bossX, y: bossY, speed: 0.02, el: null, lastAttackTime: 0, isBoss: true };
             const el = document.createElement('div'); el.className = 'enemy-unit boss'; el.innerHTML = `😈<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
-            
-            // 🔥 關鍵修復：JS 強制移除動畫
-            el.style.transition = 'none !important';
-            el.style.left = '0px'; el.style.top = '0px';
-            
-            // 先渲染位置，再 Append
-            boss.el = el; 
-            renderUnitPosition(boss); 
-            container.appendChild(el); 
-            
-            enemies.push(boss); 
-            triggerBossEntranceEffect(boss);
+            el.style.top = `${boss.y}%`; el.style.left = `${boss.position}%`;
+            container.appendChild(el); boss.el = el; enemies.push(boss); triggerBossEntranceEffect(boss);
         };
         if (battleState.spawned === 0) {
             battleState.isBossSpawning = true; showBossWarning().then(() => { performBossSpawn(); battleState.isBossSpawning = false; });
@@ -804,10 +716,12 @@ function fireBossSkill(boss) {
     const container = document.querySelector('.battle-field-container');
     if(!container) return;
     
+    // 1. 原本的 AOE 設定
     const aoe = boss.aoeConfig || { radius: 15, damageMult: 1.0, effect: 'shockwave', color: '#e74c3c' };
     showDamageText(boss.position, boss.y - 15, "蓄力中...", "skill-title"); 
     safePlaySound('magic');
 
+    // 2. 尋找目標
     let target = null; let minDist = 9999;
     heroEntities.forEach(h => {
         const dx = h.position - boss.position; const dy = h.y - boss.y; const dist = Math.sqrt(dx*dx + dy*dy);
@@ -816,34 +730,31 @@ function fireBossSkill(boss) {
     if (!target && heroEntities.length > 0) target = heroEntities[Math.floor(Math.random() * heroEntities.length)];
     if (!target) target = { position: 20, y: 50 }; 
 
+    // 🔥 3. 強制執行卡片技能 (如無敵、補血、Buff)
     const combatContext = { 
         dealDamage, 
         healTarget, 
         getCombatGroups, 
-        enemies,     
-        heroEntities  
+        enemies,      // 對 Boss 來說，enemies 是他的隊友
+        heroEntities  // heroEntities 是他的敵人
     };
     executeSkill(boss, target, combatContext);
 
+    // 4. 發射 AOE 投射物
     const projectile = document.createElement('div'); projectile.className = 'boss-projectile';
-    // 計算像素座標，因為 vfx 相關功能依賴 offsetLeft 等像素
-    const startPx = (boss.position / 100) * containerW;
-    const startPy = (boss.y / 100) * containerH;
-    const endPx = (target.position / 100) * containerW;
-    const endPy = (target.y / 100) * containerH;
-
-    projectile.style.left = `${startPx}px`; projectile.style.top = `${startPy}px`;
+    projectile.style.left = `${boss.position}%`; projectile.style.top = `${boss.y}%`;
     container.appendChild(projectile);
     
     void projectile.offsetWidth; 
-    projectile.style.left = `${endPx}px`; 
-    projectile.style.top = `${endPy}px`;
+    projectile.style.left = `${target.position}%`; 
+    projectile.style.top = `${target.y}%`;
     
     setTimeout(() => {
         projectile.remove(); 
         createBossVfx(target.position, target.y, aoe.effect, aoe.color); 
         safePlaySound('explosion');
         
+        // AOE 傷害結算
         heroEntities.forEach(hero => {
             const dx = hero.position - target.position; const dy = hero.y - target.y; const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < aoe.radius) { 
@@ -863,6 +774,7 @@ function fireBossSkill(boss) {
                     showDamageText(hero.position, hero.y, `-${dmg}`, 'hero-dmg');
                 }
                 
+                // 擊退效果
                 if(hero.position < boss.position) hero.position -= 1; else hero.position += 1;
             }
         });
@@ -919,6 +831,7 @@ function dealDamage(source, target, multiplier) {
     else if (sType === 'CAVALRY' && tType === 'ARCHER') multiplier *= COUNTER_BONUS;
     else if (sType === 'ARCHER' && tType === 'INFANTRY') multiplier *= COUNTER_BONUS;
 
+    // 🔥 修正：PVP 傷害倍率改為 1.0 (正常傷害)
     if (isPvpMode) multiplier *= 1.0; 
 
     const dmg = Math.floor(source.atk * multiplier);
@@ -985,6 +898,7 @@ function gameLoop() {
         }
 
         if (hero.currentMana < hero.maxMana) {
+            // 🔥 修正：PVP 回魔速度下修至 0.12
             let manaRate = isPvpMode ? 0.12 : 0.02; 
             hero.currentMana += manaRate * gameSpeed; 
             if(hero.currentMana > hero.maxMana) hero.currentMana = hero.maxMana;
@@ -1009,6 +923,7 @@ function gameLoop() {
                     
                     fireProjectile(hero.el, nearestEnemy.el, projType, () => {
                         if (nearestEnemy.el && nearestEnemy.currentHp > 0) {
+                            // 🔥 無敵與格擋檢查 (新增)
                             if (nearestEnemy.isInvincible) {
                                 showDamageText(nearestEnemy.position, nearestEnemy.y, `免疫`, 'gold-text');
                                 safePlaySound('block');
@@ -1045,19 +960,17 @@ function gameLoop() {
         hero.position += pushX; hero.y += pushY; hero.y = Math.max(10, Math.min(90, hero.y)); hero.position = Math.max(0, Math.min(100, hero.position));
         
         if (hero.el) {
-            // 🔥 優化：使用 transform 渲染
-            // 判斷翻轉 (如果目標在左邊，則翻轉)
-            if (nearestEnemy && nearestEnemy.position < hero.position) {
-                hero.isFlipped = true; 
-            } else {
-                hero.isFlipped = false;
-            }
-            renderUnitPosition(hero);
-
+            hero.el.style.left = `${hero.position}%`; hero.el.style.top = `${hero.y}%`; 
             hero.el.querySelector('.hero-hp-bar div').style.width = `${Math.max(0, (hero.currentHp/hero.maxHp)*100)}%`;
             const manaPercent = (hero.currentMana / hero.maxMana) * 100;
             hero.el.querySelector('.hero-mana-bar div').style.width = `${manaPercent}%`;
             if(hero.currentMana >= hero.maxMana) hero.el.classList.add('mana-full'); else hero.el.classList.remove('mana-full');
+
+            if (nearestEnemy && nearestEnemy.position < hero.position) {
+                hero.el.classList.add('unit-flipped'); 
+            } else {
+                hero.el.classList.remove('unit-flipped'); 
+            }
         }
     }
 
@@ -1101,6 +1014,7 @@ function gameLoop() {
         });
 
         if (enemy.isPvpHero) {
+            // 🔥 修正：PVP 敵方回魔速度同步下修至 0.12
             if (enemy.currentMana < enemy.maxMana) { 
                 enemy.currentMana += 0.12 * gameSpeed; 
                 if(enemy.currentMana > enemy.maxMana) enemy.currentMana = enemy.maxMana; 
@@ -1160,17 +1074,15 @@ function gameLoop() {
         enemy.y += dodgeY * gameSpeed; enemy.y = Math.max(10, Math.min(90, enemy.y)); enemy.position = Math.max(0, Math.min(100, enemy.position));
 
         if (enemy.el) {
-            // 🔥 優化：使用 transform 渲染
-            // 判斷翻轉 (如果英雄在左邊，則面向左，即 scaleX(-1) -> isFlipped=true)
-            // 假設敵人圖片預設面向右 (或左，視您的素材而定，此處保留原邏輯：Hero 在右時不翻轉)
-            if (nearestHero && nearestHero.position > enemy.position) {
-                enemy.isFlipped = false; // 面向右
-            } else {
-                enemy.isFlipped = true; // 面向左
-            }
-            renderUnitPosition(enemy);
-
+            enemy.el.style.left = `${enemy.position}%`; enemy.el.style.top = `${enemy.y}%`;
             enemy.el.querySelector('.enemy-hp-bar div').style.width = `${Math.max(0, (enemy.currentHp/enemy.maxHp)*100)}%`;
+            
+            // 修正轉向邏輯：使用 class 控制
+            if (nearestHero && nearestHero.position > enemy.position) {
+                enemy.el.classList.remove('unit-flipped'); // 英雄在右邊，面向右
+            } else {
+                enemy.el.classList.add('unit-flipped'); // 英雄在左邊，面向左
+            }
         }
     }
 
