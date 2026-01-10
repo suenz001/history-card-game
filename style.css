@@ -163,7 +163,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 #batch-confirm-btn { background: #e74c3c; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 1em; }
 #batch-confirm-btn:hover { background: #c0392b; }
 
-/* 🔥 戰鬥中：已部署卡片樣式 🔥 */
+/* 戰鬥中：已部署卡片樣式 */
 .card.is-deployed { filter: grayscale(1) brightness(0.6); pointer-events: none; border-color: #7f8c8d !important; }
 .card.is-deployed::after { content: '已部署'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2em; font-weight: bold; color: white; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px; white-space: nowrap; z-index: 30; }
 
@@ -232,11 +232,13 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     border: 4px solid #fff; /* 邊框加粗 */
     display: flex; justify-content: center; align-items: center; 
     font-size: 1.2em; z-index: 20; 
-    transition: left 0.1s linear; 
     box-shadow: 0 0 10px rgba(0,0,0,0.5); 
-    transform: translateY(-50%); 
     background-size: cover; 
     background-position: center 15%;
+    
+    /* 🔥 關鍵修正：移除 transition: left/top/transform，改由 JS 全權控制，避免瞬移 */
+    transform: translateY(-50%) scaleX(1);
+    transform-origin: center center;
 }
 .hero-unit.SSR { border-color: #f1c40f; }
 .hero-unit.SR { border-color: #9b59b6; }
@@ -337,9 +339,11 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     border: 4px solid #fff; 
     display: flex; justify-content: center; align-items: center; 
     font-size: 1.2em; z-index: 5; 
-    transition: left 0.1s linear; 
     box-shadow: 0 0 10px rgba(0,0,0,0.5); 
-    transform: translateY(-50%); 
+    
+    /* 🔥 關鍵修正：移除 transition，避免初始生成的瞬移問題 */
+    transform: translateY(-50%) scaleX(1);
+    transform-origin: center center;
 }
 
 /* 🔥 魔王樣式 - 巨大化修正 */
@@ -555,7 +559,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     height: 100%; background: #f1c40f; transition: width 0.5s ease-out;
 }
 
-/* 🔥 修正 1：兵種圖示改到右下角，避免擋住人物 - 2倍化修正 */
+/* 兵種圖示 */
 .hero-type-badge {
     position: absolute; 
     bottom: -5px; 
@@ -569,9 +573,15 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     border: 2px solid white; /* 增加白邊 */
 }
 
-/* 🔥 新增：遠程兵種圖示改為紅色 */
+/* 遠程兵種圖示 */
 .hero-type-badge.ranged {
     background-color: #e74c3c;
+}
+
+/* 騎兵專屬 */
+.hero-type-badge.cavalry {
+    background-color: #27ae60;
+    box-shadow: 0 0 5px #2ecc71;
 }
 
 /* 戰鬥內容容器 */
@@ -604,7 +614,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .monitor-hp-bg { width: 100%; height: 6px; background: #555; border-radius: 3px; overflow: hidden; }
 .monitor-hp-fill { height: 100%; background: #2ecc71; transition: width 0.2s; width: 100%; }
 
-/* 🔥 新增：側邊欄氣力條 */
+/* 側邊欄氣力條 */
 .monitor-mana-bg {
     width: 100%; height: 4px; background: #333; border-radius: 2px; overflow: hidden; margin-top: 2px;
 }
@@ -612,7 +622,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     height: 100%; background: #3498db; width: 0%; transition: width 0.2s;
 }
 
-/* 🔥 新增：側邊欄摺疊狀態 */
+/* 側邊欄摺疊狀態 */
 .battle-monitor-sidebar.collapsed {
     width: 0;
     padding: 10px 0; 
@@ -620,7 +630,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     overflow: hidden;
 }
 
-/* 🔥 新增：側邊欄切換按鈕 */
+/* 側邊欄切換按鈕 */
 #toggle-sidebar-btn {
     position: absolute;
     right: 180px;
@@ -771,7 +781,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 全場轟炸 */
 .global-bomb-effect {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: white; opacity: 0;
+    background: white; opacity: 0.8;
     z-index: 2000; pointer-events: none;
     animation: globalFlash 0.3s ease-out;
 }
@@ -847,7 +857,11 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     box-sizing: border-box;
     border: 3px solid #7f8c8d;
     text-align: left;
-    overflow-y: auto; /* 內容多時可捲動 */
+    overflow: hidden; /* 這裡設為 hidden，捲動交給 bio-section */
+    height: 100%;
+    
+    /* 🔥 iOS 修正關鍵 3：確保背面在翻轉後能接收觸控 */
+    z-index: 10; 
 }
 
 /* 背面稀有度邊框顏色 */
@@ -868,9 +882,10 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     display: flex; align-items: center; gap: 5px;
 }
 .card-back-text {
-    font-size: 0.95em;
-    line-height: 1.6;
+    font-size: 0.9em;
+    line-height: 1.5;
     color: #ecf0f1;
+    white-space: pre-wrap; /* 保留換行格式 */
     text-shadow: 1px 1px 2px black;
 }
 .flip-hint {
@@ -879,6 +894,52 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     font-size: 0.8em;
     color: #95a5a6;
     animation: pulse 2s infinite;
+}
+
+/* 上半部：技能說明 (固定高度，不捲動) */
+.card-skill-section {
+    flex: 0 0 auto; /* 不會縮放 */
+    width: 100%;
+    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 10px;
+}
+
+/* 下半部：人物生平 */
+.card-bio-section {
+    flex: 1;
+    width: 100%;
+    overflow-y: auto;
+    
+    /* 🔥 iOS 修正關鍵 1：開啟慣性捲動 */
+    -webkit-overflow-scrolling: touch; 
+    
+    /* 🔥 iOS 修正關鍵 2：解決 3D 翻轉後無法捲動的 Bug */
+    transform: translate3d(0,0,0);
+    
+    /* 其他樣式 */
+    min-height: 0;
+    text-align: left;
+    padding-right: 5px;
+    
+    /* 讓點擊事件可以穿透到 JS 偵測 */
+    pointer-events: auto; 
+}
+
+/* 優化捲軸樣式 (讓它好看一點) */
+.card-bio-section::-webkit-scrollbar {
+    width: 6px;
+}
+.card-bio-section::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+.card-bio-section::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 3px;
+}
+.card-bio-section::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.6);
 }
 
 /* --- style.css 新增特效區 --- */
@@ -1017,8 +1078,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
-/* style.css 新增或修改 */
-
 /* 敵方血條顏色 (紅色) */
 .monitor-hp-fill.enemy {
     background: #e74c3c !important;
@@ -1028,8 +1087,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .battle-monitor-sidebar h3 {
     flex-shrink: 0;
 }
-
-/* style.css 新增 */
 
 /* 關卡選擇 Grid */
 .level-grid {
@@ -1069,122 +1126,32 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     color: #f1c40f;
 }
 
-/* 鎖定的關卡樣式 (預留用) */
-.level-btn.locked {
-    opacity: 0.6;
-    filter: grayscale(1);
-    /* cursor: not-allowed; */ /* 目前先不鎖，方便測試 */
+/* 鎖定的關卡樣式 */
+.level-btn.locked,
+.difficulty-btn.locked {
+    opacity: 0.5;
+    filter: grayscale(100%);
+    cursor: not-allowed !important;
+    position: relative;
+    pointer-events: none; /* 禁止點擊 */
 }
 
-/* style.css 新增或取代以下內容 */
-
-/* 卡片背面容器：設定為彈性佈局，確保高度固定 */
-.large-card-back {
-    display: flex;
-    flex-direction: column; /* 垂直排列 */
-    justify-content: flex-start;
-    align-items: center;
-    padding: 20px 15px; /* 增加內距 */
-    box-sizing: border-box;
-    overflow: hidden; /* 隱藏超出容器的部分，交給子元素捲動 */
-    height: 100%; /* 確保佔滿整個卡片高度 */
+/* 鎖頭圖示 */
+.level-btn.locked::after,
+.difficulty-btn.locked::after {
+    content: "🔒";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2em;
+    text-shadow: 0 0 5px black;
+    z-index: 10;
 }
 
-/* 上半部：技能說明 (固定高度，不捲動) */
-.card-skill-section {
-    flex: 0 0 auto; /* 不會縮放 */
-    width: 100%;
-    margin-bottom: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-    padding-bottom: 10px;
+.difficulty-btn.locked::after {
+    font-size: 1.2em; /* 難度按鈕較小，鎖頭縮小 */
 }
-
-/* style.css - 修正 iOS 捲動問題 */
-
-/* 下半部：人物生平 */
-.card-bio-section {
-    flex: 1;
-    width: 100%;
-    overflow-y: auto;
-    
-    /* 🔥 iOS 修正關鍵 1：開啟慣性捲動 */
-    -webkit-overflow-scrolling: touch; 
-    
-    /* 🔥 iOS 修正關鍵 2：解決 3D 翻轉後無法捲動的 Bug */
-    transform: translate3d(0,0,0);
-    
-    /* 其他樣式 */
-    min-height: 0;
-    text-align: left;
-    padding-right: 5px;
-    
-    /* 讓點擊事件可以穿透到 JS 偵測 */
-    pointer-events: auto; 
-}
-
-/* 確保背面容器的層級正確 */
-.large-card-back {
-    /* ...原有樣式... */
-    background: linear-gradient(135deg, #34495e 0%, #1a252f 100%);
-    color: white;
-    transform: rotateY(180deg);
-    display: flex;
-    flex-direction: column;
-    padding: 20px;
-    box-sizing: border-box;
-    border: 3px solid #7f8c8d;
-    text-align: left;
-    overflow: hidden; /* 這裡設為 hidden，捲動交給 bio-section */
-    height: 100%;
-    
-    /* 🔥 iOS 修正關鍵 3：確保背面在翻轉後能接收觸控 */
-    z-index: 10; 
-}
-
-/* 優化捲軸樣式 (讓它好看一點) */
-.card-bio-section::-webkit-scrollbar {
-    width: 6px;
-}
-.card-bio-section::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 3px;
-}
-.card-bio-section::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.4);
-    border-radius: 3px;
-}
-.card-bio-section::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.6);
-}
-
-/* 確保標題樣式清晰 */
-.card-back-title {
-    color: #f1c40f;
-    font-size: 1.1em;
-    font-weight: bold;
-    margin-bottom: 5px;
-    text-align: center;
-}
-
-.card-back-text {
-    font-size: 0.9em;
-    line-height: 1.5;
-    color: #ecf0f1;
-    white-space: pre-wrap; /* 保留換行格式 */
-}
-
-/* 底部提示字 */
-.flip-hint {
-    flex: 0 0 auto;
-    margin-top: 10px;
-    font-size: 0.8em;
-    color: #95a5a6;
-    opacity: 0.8;
-}
-
-/* style.css 最下方新增 */
-
-/* style.css 最下方新增或替換 */
 
 /* 工作室 Logo 容器 */
 .studio-logo-container {
@@ -1203,8 +1170,8 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 #studio-logo {
     /* 🔥 關鍵修正：限制最大寬度 */
     width: 100%;        /* 讓圖片具有響應式特性 */
-    max-width: 360px;   /* 強制限制最大寬度為 120px (解決電腦版過大問題) */
-    height: auto;       /* 保持原始長寬比，圖片才不會變形 */
+    max-width: 360px;   /* 強制限制最大寬度為 120px */
+    height: auto;       /* 保持原始長寬比 */
     
     display: block;
     opacity: 0.9;       /* 稍微透明增加質感 */
@@ -1217,8 +1184,9 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     transform: scale(1.05);
     opacity: 1;
 }
+
 /* =========================================
-   🔥 圖鑑系統專用樣式 (請加在 style.css 最下方)
+   🔥 圖鑑系統專用樣式
    ========================================= */
 
 /* 1. 圖鑑容器佈局 (關鍵修正：讓它能滑動且不超出視窗) */
@@ -1354,36 +1322,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: translate(-50%, -50%) rotate(720deg) scale(1.5); opacity: 0; }
 }
 
-/* style.css 新增部分 */
-
-/* 關卡與難度按鈕的鎖定狀態 */
-.level-btn.locked,
-.difficulty-btn.locked {
-    opacity: 0.5;
-    filter: grayscale(100%);
-    cursor: not-allowed !important;
-    position: relative;
-    pointer-events: none; /* 禁止點擊 */
-}
-
-/* 鎖頭圖示 (覆蓋在按鈕上) */
-.level-btn.locked::after,
-.difficulty-btn.locked::after {
-    content: "🔒";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 2em;
-    text-shadow: 0 0 5px black;
-    z-index: 10;
-}
-
-.difficulty-btn.locked::after {
-    font-size: 1.2em; /* 難度按鈕較小，鎖頭縮小 */
-}
-
-/* style.css 新增：通知紅點 */
+/* 通知紅點 */
 #notification-btn {
     position: relative; /* 讓紅點可以絕對定位 */
 }
@@ -1412,33 +1351,12 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     display: none;
 }
 
-/* style.css 最下方新增 */
-
-/* 騎兵專屬：綠色底色 */
-.hero-type-badge.cavalry {
-    background-color: #27ae60; /* 翡翠綠 */
-    box-shadow: 0 0 5px #2ecc71;
-}
-
-/* style.css 最下方新增 */
-
-/* 確保所有戰鬥單位預設垂直置中且面向右 */
-.hero-unit, .enemy-unit {
-    transform: translateY(-50%) scaleX(1);
-    transform-origin: center center; /* 確保翻轉時以中心為軸 */
-    transition: transform 0.1s linear; /* 增加一點轉向的平滑感 */
-}
-
 /* 當單位需要面向左時，套用此 class */
 .unit-flipped {
     transform: translateY(-50%) scaleX(-1) !important;
 }
 
 /* 🔥 關鍵修正：當父層被翻轉時，把內部的血條、氣力條、兵種圖示「翻回來」(負負得正) */
-/* 修正重點：
-   1. transform: translateX(-50%) -> 維持置中
-   2. scaleX(-1) -> 抵銷父層鏡像，確保血條方向正確
-*/
 .unit-flipped .hero-hp-bar,
 .unit-flipped .enemy-hp-bar,
 .unit-flipped .hero-mana-bar {
