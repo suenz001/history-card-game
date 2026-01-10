@@ -1690,3 +1690,63 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     padding: 10px;
     border-radius: 5px;
 }
+
+/* style.css 新增技能列樣式 */
+
+#adv-skill-bar-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    pointer-events: auto; /* 讓按鈕可點擊 */
+}
+
+.adv-skill-slot {
+    width: 60px;
+    height: 60px;
+    position: relative;
+    border: 2px solid #aaa;
+    border-radius: 8px;
+    background: #222;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.1s;
+}
+
+.adv-skill-slot:active {
+    transform: scale(0.95);
+}
+
+.adv-skill-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 冷卻遮罩 */
+.adv-skill-cooldown {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%; /* 高度會由 JS 控制變化 */
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-weight: bold;
+    font-size: 1.2em;
+    transition: height 0.1s linear;
+}
+
+.adv-skill-slot.ready {
+    border-color: #f1c40f;
+    box-shadow: 0 0 10px #f1c40f;
+}
