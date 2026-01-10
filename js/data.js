@@ -177,7 +177,7 @@ export const cardDatabase = [
     },
     { 
         id: 15, name: "漢尼拔", rarity: "SSR", atk: 295, hp: 3100, 
-        unitType: "CAVALRY", title: "戰略之父", attackType: "melee", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 20, buffRate: 1.05, dmgMult: 1.5 } 
+        unitType: "CAVALRY", title: "戰略之父", attackType: "melee", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 10, buffRate: 1.02, dmgMult: 1.5 } 
     },
     { 
         id: 16, name: "埃及豔后", rarity: "SSR", atk: 270, hp: 2800, 
@@ -185,7 +185,7 @@ export const cardDatabase = [
     },
     { 
         id: 17, name: "宮本武藏", rarity: "SSR", atk: 330, hp: 2500, 
-        unitType: "INFANTRY", title: "二天一流", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.10, dmgMult: 2.0 } 
+        unitType: "INFANTRY", title: "二天一流", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.05, dmgMult: 2.0 } 
     },
     { 
         id: 31, name: "亞瑟王", rarity: "SSR", atk: 300, hp: 3400, 
@@ -193,7 +193,7 @@ export const cardDatabase = [
     },
     { 
         id: 32, name: "呂布", rarity: "SSR", atk: 340, hp: 2700, 
-        unitType: "CAVALRY", title: "飛將", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.10, dmgMult: 2.5 } 
+        unitType: "CAVALRY", title: "飛將", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.02, dmgMult: 2.5 } 
     },
     { 
         id: 33, name: "諾貝爾", rarity: "SSR", atk: 315, hp: 2650, 
