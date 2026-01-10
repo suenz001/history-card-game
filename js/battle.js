@@ -76,7 +76,7 @@ function updateBattleDimensions() {
             containerW = w;
             containerH = h;
         } else {
-            // 還抓不到尺寸時的備案，避免算出來是 0
+            // 還抓不到尺寸時的備案，使用視窗寬度，避免算出來是 0
             containerW = window.innerWidth > 0 ? window.innerWidth : 1000;
             // 保持原本 CSS 設計的比例或高度
             containerH = 500; 
@@ -96,9 +96,9 @@ function renderUnitPosition(unit) {
     const py = Math.round((unit.y / 100) * containerH);
     
     // 判斷是否翻轉 (scaleX -1)
-    // 注意：CSS 中原本有 translateY(-50%) 用於垂直置中，這裡必須保留
     const scaleX = unit.isFlipped ? -1 : 1;
     
+    // 使用 translate3d 啟動硬體加速
     unit.el.style.transform = `translate3d(${px}px, ${py}px, 0) translateY(-50%) scaleX(${scaleX})`;
 }
 
@@ -347,6 +347,8 @@ function startBattle() {
     if(foodCostContainer) foodCostContainer.style.display = 'none';
 
     setupBattleEnvironment();
+    // 確保生成前再更新一次尺寸
+    updateBattleDimensions();
     spawnHeroes();
     startWave(1); 
     gameLoop();
@@ -379,6 +381,7 @@ export function startPvpMatch(enemyTeamData, playerTeamData) {
     const waveNotif = document.getElementById('wave-notification');
     if(waveNotif) waveNotif.innerText = "⚔️ PVP 對決開始 ⚔️";
     
+    updateBattleDimensions(); // 生成前確保尺寸正確
     spawnHeroes(); 
     spawnPvpEnemies(enemyTeamData); 
     updateBattleUI();
@@ -503,7 +506,9 @@ function spawnHeroes() {
         const el = document.createElement('div');
         el.className = `hero-unit ${card.rarity}`;
         el.style.backgroundImage = `url(assets/cards/${card.id}.webp)`;
-        // 🔥 初始化樣式：強制設為 0，改由 transform 控制
+        
+        // 🔥 關鍵修復：JS 強制移除動畫，防止 CSS 快取導致的瞬移
+        el.style.transition = 'none !important';
         el.style.left = '0px'; 
         el.style.top = '0px'; 
         
@@ -512,25 +517,10 @@ function spawnHeroes() {
             <div class="hero-mana-bar"><div style="width:0%"></div></div>
             <div class="${badgeClass}">${typeIcon}</div>
         `;
-        container.appendChild(el);
-
+        
+        // 準備數據
         let finalHp = card.hp;
         if(card.attackType === 'ranged') finalHp = Math.floor(card.hp * 0.45);
-
-        let monitorItem = null;
-        if(monitorList) {
-            monitorItem = document.createElement('div');
-            monitorItem.className = 'monitor-item';
-            monitorItem.innerHTML = `
-                <div class="monitor-icon" style="background-image: url('assets/cards/${card.id}.webp');"></div>
-                <div class="monitor-info">
-                    <div class="monitor-name">${card.name}</div>
-                    <div class="monitor-hp-bg"><div class="monitor-hp-fill" style="width: 100%;"></div></div>
-                    <div class="monitor-mana-bg"><div class="monitor-mana-fill" style="width: 0%;"></div></div>
-                </div>
-            `;
-            monitorList.appendChild(monitorItem);
-        }
 
         const newHero = {
             ...card,
@@ -543,7 +533,7 @@ function spawnHeroes() {
             atk: card.attackType === 'ranged' ? Math.floor(card.atk * 0.35) : card.atk, 
             lastAttackTime: 0, 
             el: el, 
-            monitorEl: monitorItem, 
+            monitorEl: null, 
             patrolDir: 1, 
             totalDamage: 0,
             totalHealing: 0,
@@ -551,11 +541,29 @@ function spawnHeroes() {
             immunityStacks: 0,
             skillKey: realSkillKey,
             skillParams: realSkillParams,
-            isFlipped: false // 🔥 新增：狀態快取
+            isFlipped: false 
         };
-        
-        // 🔥 初始化渲染
+
+        // 🔥 關鍵修復：先設定好位置，再加入 DOM
         renderUnitPosition(newHero);
+        container.appendChild(el);
+        
+        // 生成側邊欄項目
+        if(monitorList) {
+            let monitorItem = document.createElement('div');
+            monitorItem.className = 'monitor-item';
+            monitorItem.innerHTML = `
+                <div class="monitor-icon" style="background-image: url('assets/cards/${card.id}.webp');"></div>
+                <div class="monitor-info">
+                    <div class="monitor-name">${card.name}</div>
+                    <div class="monitor-hp-bg"><div class="monitor-hp-fill" style="width: 100%;"></div></div>
+                    <div class="monitor-mana-bg"><div class="monitor-mana-fill" style="width: 0%;"></div></div>
+                </div>
+            `;
+            monitorList.appendChild(monitorItem);
+            newHero.monitorEl = monitorItem;
+        }
+        
         heroEntities.push(newHero);
     });
 }
@@ -618,7 +626,9 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
     
     el.style.backgroundImage = `url(assets/cards/${realId}.webp)`;
     el.style.backgroundSize = 'cover';
-    // 🔥 初始化樣式
+    
+    // 🔥 關鍵修復：JS 強制移除動畫
+    el.style.transition = 'none !important';
     el.style.left = '0px';
     el.style.top = '0px';
     
@@ -629,7 +639,6 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         <div class="hero-mana-bar" style="top: -8px; opacity: 0.8;"><div style="width:0%"></div></div>
         <div class="hero-type-badge" style="background:#c0392b;">${typeIcon}</div>
     `;
-    container.appendChild(el);
 
     if(attackType === 'ranged') finalHp = Math.floor(finalHp * 0.45);
 
@@ -669,11 +678,13 @@ function spawnSingleEnemyFromCard(enemyCard, container) {
         totalHealing: 0,
         skillKey: finalSkillKey,
         skillParams: finalSkillParams,
-        isFlipped: true // 敵人預設面向左 (Flipped)
+        isFlipped: true 
     };
     
-    // 🔥 初始化渲染
+    // 🔥 關鍵修復：先設定位置，再加入 DOM
     renderUnitPosition(newEnemy);
+    container.appendChild(el);
+    
     enemies.push(newEnemy);
 }
 
@@ -769,11 +780,16 @@ function spawnEnemy() {
                 isFlipped: true // Boss 預設朝左
             };
             const el = document.createElement('div'); el.className = 'enemy-unit boss'; el.innerHTML = `😈<div class="enemy-hp-bar"><div style="width:100%"></div></div>`;
-            // 初始化樣式
+            
+            // 🔥 關鍵修復：JS 強制移除動畫
+            el.style.transition = 'none !important';
             el.style.left = '0px'; el.style.top = '0px';
-            container.appendChild(el); 
+            
+            // 先渲染位置，再 Append
             boss.el = el; 
-            renderUnitPosition(boss); // 初始渲染
+            renderUnitPosition(boss); 
+            container.appendChild(el); 
+            
             enemies.push(boss); 
             triggerBossEntranceEffect(boss);
         };
