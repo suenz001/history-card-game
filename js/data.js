@@ -1,6 +1,6 @@
 // js/data.js
 
-export const RATES = { SSR: 0.05, SR: 0.25, R: 0.70 };
+export const RATES = { SSR: 0.02, SR: 0.25, R: 0.73 };
 export const DISMANTLE_VALUES = { SSR: 2000, SR: 500, R: 100 };
 
 // 🔥 1. 難度設定 (平衡性優化版)
