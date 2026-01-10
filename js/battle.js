@@ -88,9 +88,12 @@ function updateBattleDimensions() {
 function renderUnitPosition(unit) {
     if (!unit.el) return;
     
-    // 將百分比座標轉換為像素座標
-    const px = (unit.position / 100) * containerW;
-    const py = (unit.y / 100) * containerH;
+    // 如果容器寬度異常，嘗試重新抓取
+    if (containerW <= 0) updateBattleDimensions();
+
+    // 將百分比座標轉換為像素座標 (使用 Math.round 確保整數像素，提升銳利度)
+    const px = Math.round((unit.position / 100) * containerW);
+    const py = Math.round((unit.y / 100) * containerH);
     
     // 判斷是否翻轉 (scaleX -1)
     // 注意：CSS 中原本有 translateY(-50%) 用於垂直置中，這裡必須保留
