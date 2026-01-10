@@ -1,6 +1,8 @@
 // js/adventure.js
 import { playSound } from './audio.js';
 import * as Inventory from './inventory.js';
+// 🔥 引入搖桿模組
+import { initJoystick } from './joystick.js';
 
 let db = null;
 let currentUser = null;
@@ -36,9 +38,8 @@ const gameState = {
     camera: { x: 0, y: 0 }
 };
 
-// 背景裝飾物 (樹、山) - 隨機生成一次就好
+// 背景裝飾物 (樹、山)
 let decorations = [];
-
 let vfxList = [];
 
 export function initAdventure(database, user) {
@@ -51,6 +52,10 @@ export function initAdventure(database, user) {
     const exitBtn = document.getElementById('adv-exit-btn');
     if (exitBtn) exitBtn.addEventListener('click', stopAdventure);
 
+    // 🔥 初始化搖桿監聽 (傳入 gameState 以便修改 keys)
+    initJoystick(gameState);
+
+    // 鍵盤監聽 (電腦版備用)
     window.addEventListener('keydown', (e) => {
         if (!isRunning) return;
         if (gameState.keys.hasOwnProperty(e.key)) gameState.keys[e.key] = true;
@@ -182,6 +187,7 @@ function renderSkillBar() {
         slot.appendChild(img);
         slot.appendChild(cdMask);
         slot.addEventListener('click', () => activateSkill(index));
+        // 手機觸控支援
         slot.addEventListener('touchstart', (e) => { e.preventDefault(); activateSkill(index); });
         container.appendChild(slot);
     });
@@ -227,8 +233,7 @@ function update() {
     const k = gameState.keys;
 
     // 1. 玩家移動 (X軸在世界座標內，Y軸有模擬深度)
-    // 這裡我們把 y 當作「深度」(Z軸)，越下面越近
-    // 為了簡化，我們設定 y 的範圍在 groundY 到 groundY + 100
+    // 搖桿會修改 k.w, k.a, k.s, k.d，所以這裡邏輯通用
     
     // 水平移動
     if (k.a || k.ArrowLeft) p.x -= p.speed;
