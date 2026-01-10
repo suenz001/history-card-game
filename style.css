@@ -1017,8 +1017,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
-/* style.css 新增或修改 */
-
 /* 敵方血條顏色 (紅色) */
 .monitor-hp-fill.enemy {
     background: #e74c3c !important;
@@ -1028,8 +1026,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .battle-monitor-sidebar h3 {
     flex-shrink: 0;
 }
-
-/* style.css 新增 */
 
 /* 關卡選擇 Grid */
 .level-grid {
@@ -1076,8 +1072,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     /* cursor: not-allowed; */ /* 目前先不鎖，方便測試 */
 }
 
-/* style.css 新增或取代以下內容 */
-
 /* 卡片背面容器：設定為彈性佈局，確保高度固定 */
 .large-card-back {
     display: flex;
@@ -1098,8 +1092,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     border-bottom: 1px solid rgba(255, 255, 255, 0.3);
     padding-bottom: 10px;
 }
-
-/* style.css - 修正 iOS 捲動問題 */
 
 /* 下半部：人物生平 */
 .card-bio-section {
@@ -1181,10 +1173,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     color: #95a5a6;
     opacity: 0.8;
 }
-
-/* style.css 最下方新增 */
-
-/* style.css 最下方新增或替換 */
 
 /* 工作室 Logo 容器 */
 .studio-logo-container {
@@ -1354,8 +1342,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     100% { transform: translate(-50%, -50%) rotate(720deg) scale(1.5); opacity: 0; }
 }
 
-/* style.css 新增部分 */
-
 /* 關卡與難度按鈕的鎖定狀態 */
 .level-btn.locked,
 .difficulty-btn.locked {
@@ -1383,7 +1369,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     font-size: 1.2em; /* 難度按鈕較小，鎖頭縮小 */
 }
 
-/* style.css 新增：通知紅點 */
+/* 通知紅點 */
 #notification-btn {
     position: relative; /* 讓紅點可以絕對定位 */
 }
@@ -1412,15 +1398,11 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     display: none;
 }
 
-/* style.css 最下方新增 */
-
 /* 騎兵專屬：綠色底色 */
 .hero-type-badge.cavalry {
     background-color: #27ae60; /* 翡翠綠 */
     box-shadow: 0 0 5px #2ecc71;
 }
-
-/* style.css 最下方新增 */
 
 /* 確保所有戰鬥單位預設垂直置中且面向右 */
 .hero-unit, .enemy-unit {
@@ -1609,6 +1591,10 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     background-color: #000;
     z-index: 3000; /* 比一般戰鬥畫面更高 */
     overflow: hidden;
+    /* 🔥 關鍵：禁止瀏覽器預設的觸控行為 (如雙擊縮放、滑動翻頁) */
+    touch-action: none; 
+    /* 🔥 關鍵：禁止 iOS Safari 的橡皮筋迴彈效果 */
+    overscroll-behavior: none; 
 }
 
 #adv-canvas {
@@ -1682,29 +1668,32 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 .adv-controls-hint {
     position: absolute;
-    bottom: 20px;
+    /* bottom: 20px; 移除舊的 */
+    top: 80px; /* 🔥 改到左上角 (血條下方) */
     left: 20px;
     color: rgba(255, 255, 255, 0.7);
     font-family: monospace;
     background: rgba(0,0,0,0.5);
     padding: 10px;
     border-radius: 5px;
+    pointer-events: none; /* 防止遮擋操作 */
 }
 
 /* style.css 新增技能列樣式 */
 
 #adv-skill-bar-container {
     position: absolute;
-    bottom: 20px;
+    bottom: 20px; /* 🔥 貼近底部 */
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     gap: 10px;
     background: rgba(0, 0, 0, 0.6);
-    padding: 10px;
+    padding: 8px 15px; /* 🔥 增加 padding */
     border-radius: 15px;
     border: 1px solid rgba(255, 255, 255, 0.3);
     pointer-events: auto; /* 讓按鈕可點擊 */
+    z-index: 9000; /* 🔥 確保在搖桿之下或不干擾 */
 }
 
 .adv-skill-slot {
@@ -1751,14 +1740,12 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     box-shadow: 0 0 10px #f1c40f;
 }
 
-/* style.css - 虛擬搖桿樣式 */
-
 /* style.css - 虛擬搖桿樣式 (修正版) */
 
 #virtual-joystick-zone {
     position: absolute;
-    bottom: 50px;
-    left: 50px;
+    bottom: 120px; /* 🔥 往上移 */
+    left: 40px;    /* 🔥 稍微調整 */
     width: 120px;
     height: 120px;
     z-index: 9999; /* 🔥 加高層級，確保在最上層 */
@@ -1797,11 +1784,17 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 手機版位置優化 */
 @media (max-width: 768px) {
     #adv-skill-bar-container {
-        bottom: 10px;
+        bottom: 10px; /* 技能列貼底 */
         transform: translateX(-50%) scale(0.85);
+        padding: 5px;
+        gap: 5px;
+    }
+    .adv-skill-slot {
+        width: 50px; /* 卡片稍微縮小 */
+        height: 50px;
     }
     #virtual-joystick-zone {
-        bottom: 40px; /* 稍微往上移，避免跟手機底部手勢衝突 */
+        bottom: 150px; /* 🔥 手機上再高一點，避免跟手機底部手勢衝突 */
         left: 30px;
     }
 }
