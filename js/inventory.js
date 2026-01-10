@@ -39,8 +39,9 @@ export function initInventory(database, user, currencyCallback, pvpCallback) {
     onCurrencyUpdate = currencyCallback;
     onPvpSelectionDone = pvpCallback;
     
-    // 🔥 初始化時，自動將「強制刷新」按鈕插入到介面中
+    // 初始化 UI 元件
     injectRefreshButton();
+    injectAutoDismantleButton(); // 🔥 新增：插入自動分解按鈕
     bindInventoryEvents();
 }
 
@@ -57,41 +58,61 @@ export function refreshInventory() {
     filterInventory();
 }
 
-// 🔥 新增：動態插入「強制刷新」按鈕 (免改 HTML)
+// 動態插入「強制刷新」按鈕
 function injectRefreshButton() {
-    // 避免重複插入
     if (document.getElementById('force-refresh-btn')) return;
-
-    // 找到背包 Modal 的標題容器 (.modal-header 裡面的那個 div)
     const headerGroup = document.querySelector('#inventory-modal .modal-header > div');
     
     if (headerGroup) {
         const btn = document.createElement('button');
         btn.id = 'force-refresh-btn';
         btn.className = 'btn-secondary';
-        // 設定樣式：橘色背景，大小適中
         btn.style.cssText = "background:#e67e22; font-size: 0.8em; padding: 5px 10px; border: 1px solid #fff;"; 
         btn.innerText = "🔄 強制刷新";
-        
         btn.onclick = () => {
             playSound('click');
             if (confirm("確定要從伺服器重新下載最新資料嗎？\n(這會消耗少量讀取配額)")) {
-                // 🔥 呼叫讀取函式，並傳入 true (代表強制刷新)
                 loadInventory(currentUser.uid, true);
             }
         };
-        
-        // 插在下拉選單之前，或是容器的最後面
         headerGroup.appendChild(btn);
     }
 }
 
-// 🔥 新增：儲存背包到本地快取 (減少 Read 消耗)
+// 🔥 新增：動態插入「自動清理」按鈕到批量操作列
+function injectAutoDismantleButton() {
+    if (document.getElementById('auto-clean-btn')) return;
+    
+    const batchBar = document.getElementById('batch-action-bar');
+    if (batchBar) {
+        // 建立新按鈕
+        const btn = document.createElement('button');
+        btn.id = 'auto-clean-btn';
+        btn.className = 'btn-danger';
+        // 設定樣式：紅色背景，明顯一點
+        btn.style.cssText = "background:#c0392b; margin-right: 10px; font-weight:bold;"; 
+        btn.innerText = "⚡ 自動清理冗餘";
+        
+        btn.onclick = () => {
+            playSound('click');
+            autoDismantleRedundant();
+        };
+        
+        // 插入到 "確認分解" 按鈕的前面
+        const confirmBtn = document.getElementById('batch-confirm-btn');
+        if (confirmBtn) {
+            batchBar.insertBefore(btn, confirmBtn);
+        } else {
+            batchBar.appendChild(btn);
+        }
+    }
+}
+
+// 儲存背包到本地快取
 function saveToLocalStorage() {
     if (currentUser && allUserCards.length > 0) {
         try {
             const cacheKey = `inv_cache_${currentUser.uid}`;
-            // 只存數據文字，不存圖片，所以 300kb 圖片不影響這裡
             localStorage.setItem(cacheKey, JSON.stringify(allUserCards));
             console.log("💾 背包已快取至本地");
         } catch (e) {
@@ -100,12 +121,11 @@ function saveToLocalStorage() {
     }
 }
 
-// --- 資料讀取 (已優化 Read 用量 + 支援強制刷新) ---
+// --- 資料讀取 ---
 export async function loadInventory(uid, forceRefresh = false) {
     if(!uid) uid = currentUser?.uid;
     if(!uid) return;
 
-    // 重置篩選 (預設全選)
     invRarityFilters.clear();
     invTypeFilters.clear();
     updateFilterButtonsUI('inventory');
@@ -115,29 +135,24 @@ export async function loadInventory(uid, forceRefresh = false) {
 
     const cacheKey = `inv_cache_${uid}`;
 
-    // 🔥 步驟 1：如果不是強制刷新，先檢查快取
     if (!forceRefresh) {
         const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
             try {
-                console.log("⚡ 使用本地快取讀取背包 (節省流量)");
+                console.log("⚡ 使用本地快取讀取背包");
                 allUserCards = JSON.parse(cachedData);
-                
                 if (allUserCards.length > 0 && !allUserCards[0].docId) throw new Error("快取資料損毀");
-
                 updateInventoryCounts();
                 filterInventory();
-                return; // 成功讀取快取，直接結束
+                return; 
             } catch (e) {
-                console.warn("快取讀取失敗，轉為下載", e);
                 localStorage.removeItem(cacheKey);
             }
         }
     }
 
-    // 🔥 步驟 2：從 Firebase 下載 (強制刷新 或 無快取時)
     try {
-        console.log("🌐 從 Firebase 下載背包資料 (消耗 Read)...");
+        console.log("🌐 從 Firebase 下載背包資料...");
         const q = query(collection(db, "inventory"), where("owner", "==", uid));
         const querySnapshot = await getDocs(q);
         allUserCards = [];
@@ -146,7 +161,6 @@ export async function loadInventory(uid, forceRefresh = false) {
             let data = docSnap.data();
             const baseCard = cardDatabase.find(c => c.id == data.id);
             
-            // 數值同步與防呆
             if(baseCard) {
                 data.baseAtk = baseCard.atk;
                 data.baseHp = baseCard.hp;
@@ -154,13 +168,10 @@ export async function loadInventory(uid, forceRefresh = false) {
                 data.title = baseCard.title;
                 data.name = baseCard.name;
                 data.skillKey = baseCard.skillKey;
-                // 注意：這裡不要直接賦值 skillParams，交給 calculateCardStats 統一處理
                 
                 if (!data.level) data.level = 1;
                 if (!data.stars) data.stars = 0;
 
-                // 🔥 統一使用 calculateCardStats 計算數值與技能倍率
-                // (先暫存 docId 以便計算函數內使用或識別)
                 data.docId = docSnap.id;
                 calculateCardStats(data);
             } else {
@@ -172,9 +183,7 @@ export async function loadInventory(uid, forceRefresh = false) {
             allUserCards.push(data); 
         });
         
-        // 下載後更新快取
         saveToLocalStorage();
-
         updateInventoryCounts();
         filterInventory(); 
         
@@ -182,13 +191,7 @@ export async function loadInventory(uid, forceRefresh = false) {
 
     } catch (e) {
         console.error("Load Inventory Failed:", e);
-        if(container) {
-            if (e.code === 'resource-exhausted') {
-                container.innerHTML = "<p style='color:#e74c3c'>⚠️ 每日配額已滿，無法刷新。<br>請等待重置或升級方案。</p>";
-            } else {
-                container.innerHTML = "<p>讀取失敗，請稍後再試</p>";
-            }
-        }
+        if(container) container.innerHTML = "<p>讀取失敗，請稍後再試</p>";
     }
 }
 
@@ -202,17 +205,11 @@ export async function saveCardToCloud(card) {
         level: 1, stars: 0, obtainedAt: new Date(), owner: currentUser.uid, id: card.id 
     });
     
-    // 建立新卡片物件
     const newCard = { ...card, docId: docRef.id, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 0, obtainedAt: new Date() };
-    
-    // 計算初始狀態 (0星)
     calculateCardStats(newCard);
     
     allUserCards.push(newCard);
-    
-    // 更新快取
     saveToLocalStorage();
-    
     updateInventoryCounts();
     return newCard;
 }
@@ -287,7 +284,6 @@ export function renderCard(card, targetContainer) {
     return cardDiv;
 }
 
-// 處理按鈕點擊邏輯
 function handleFilterClick(mode, filterValue) {
     const raritySet = mode === 'inventory' ? invRarityFilters : galRarityFilters;
     const typeSet = mode === 'inventory' ? invTypeFilters : galTypeFilters;
@@ -306,7 +302,6 @@ function handleFilterClick(mode, filterValue) {
     }
 
     updateFilterButtonsUI(mode);
-
     if (mode === 'inventory') filterInventory();
     else filterGallery();
 }
@@ -317,7 +312,6 @@ function updateFilterButtonsUI(mode) {
     
     const btnClass = mode === 'inventory' ? '.filter-btn' : '.gallery-filter-btn';
     const buttons = document.querySelectorAll(btnClass);
-
     const isAll = (raritySet.size === 0 && typeSet.size === 0);
 
     buttons.forEach(btn => {
@@ -325,16 +319,12 @@ function updateFilterButtonsUI(mode) {
         if (val === 'ALL') {
             if (isAll) btn.classList.add('active'); else btn.classList.remove('active');
         } else {
-            if (raritySet.has(val) || typeSet.has(val)) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
+            if (raritySet.has(val) || typeSet.has(val)) btn.classList.add('active');
+            else btn.classList.remove('active');
         }
     });
 }
 
-// 背包篩選邏輯
 export function filterInventory(ignoreVal) {
     const container = document.getElementById('inventory-grid');
     if(!container) return; 
@@ -358,7 +348,6 @@ export function filterInventory(ignoreVal) {
     currentDisplayList.forEach((card) => { renderCard(card, container); });
 }
 
-// 時間戳記轉換
 function getTime(dateObj) {
     if (!dateObj) return 0;
     if (dateObj.seconds) return dateObj.seconds * 1000; 
@@ -421,30 +410,21 @@ export function openCardModal(card) {
 
 export function openEnemyDetailModal(enemyCard) {
     isViewingEnemy = true;
-
     const baseCard = cardDatabase.find(c => c.id == enemyCard.id);
     let displayCard = { ...baseCard, ...enemyCard };
 
     if (baseCard) {
-        // 🔥 計算敵方數值 (不影響我方背包)
-        // 為了簡單，這裡用簡單的模擬計算，不寫入 skillParams
         const level = displayCard.level || 1;
         const stars = displayCard.stars !== undefined ? displayCard.stars : 0; 
-        
         const levelBonus = (level - 1) * 0.03;
         const starBonus = stars * 0.20;
-        
         const baseAtk = displayCard.baseAtk || baseCard.atk;
         const baseHp = displayCard.baseHp || baseCard.hp;
 
         displayCard.atk = Math.floor(baseAtk * (1 + levelBonus) * (1 + starBonus));
         displayCard.hp = Math.floor(baseHp * (1 + levelBonus) * (1 + starBonus));
-        
-        // 注意：敵方技能倍率這裡暫時顯示基礎值，若要顯示強化值需同樣套用 calculate 邏輯
-        // 但因為敵方通常是複製過來的數據，我們信任傳進來的 enemyCard 數據
         displayCard.skillKey = baseCard.skillKey;
         if (!displayCard.skillParams) displayCard.skillParams = baseCard.skillParams; 
-        
         displayCard.unitType = baseCard.unitType || 'INFANTRY';
     }
 
@@ -454,7 +434,6 @@ export function openEnemyDetailModal(enemyCard) {
     const detailModal = document.getElementById('detail-modal');
     detailModal.classList.remove('hidden'); 
     detailModal.style.zIndex = "99999"; 
-    
     renderDetailCard();
 }
 
@@ -467,10 +446,8 @@ function renderDetailCard() {
     const charPath = `assets/cards/${card.id}.webp`;
     const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
     const level = card.level || 1;
-    
     const stars = card.stars !== undefined ? card.stars : 0;
     const starString = stars > 0 ? '★'.repeat(stars) : '';
-    
     const idString = String(card.id).padStart(3, '0');
     
     const baseConfig = cardDatabase.find(c => c.id == card.id);
@@ -497,7 +474,6 @@ function renderDetailCard() {
 
     const backFace = document.createElement('div');
     backFace.className = `large-card-back ${card.rarity}`;
-    
     backFace.innerHTML = `
         <div class="card-skill-section">
             <div class="card-back-title">✨ 技能效果</div>
@@ -518,7 +494,6 @@ function renderDetailCard() {
     setupDetailButtons(card);
 }
 
-// 🔥 修改：卡片升級按鈕
 function setupDetailButtons(card) {
     const upgradeLevelBtn = document.getElementById('upgrade-level-btn'); 
     const upgradeStarBtn = document.getElementById('upgrade-star-btn');
@@ -539,7 +514,6 @@ function setupDetailButtons(card) {
     } else { 
         const goldCost = card.level * 100; 
         const ironCost = Math.floor(goldCost * 0.2); 
-        
         upgradeLevelBtn.innerHTML = `⬆️ 升級 <span style="font-size:0.8em;">(${goldCost}G / ${ironCost}鐵)</span>`; 
         upgradeLevelBtn.classList.remove('btn-disabled'); 
         upgradeLevelBtn.onclick = () => upgradeCardLevel(goldCost, ironCost); 
@@ -565,7 +539,6 @@ function setupDetailButtons(card) {
     }
 }
 
-// 🔥 修改：升級消耗邏輯 (扣除金幣與鐵礦)
 async function upgradeCardLevel(goldCost, ironCost) {
     if(!onCurrencyUpdate) return;
     
@@ -581,16 +554,11 @@ async function upgradeCardLevel(goldCost, ironCost) {
     
     playSound('coin'); 
     card.level++; 
-    calculateCardStats(card); // 重新計算數值
+    calculateCardStats(card); 
     playSound('upgrade'); 
     
-    // 儲存時，我們只儲存基本屬性，不儲存動態計算的 skillParams
-    // skillParams 會在每次讀取時根據星數動態產生
     await updateDoc(doc(db, "inventory", card.docId), { level: card.level, atk: card.atk, hp: card.hp }); 
-    
-    // 🔥 同步更新快取
     saveToLocalStorage();
-
     renderDetailCard();
     onCurrencyUpdate('refresh'); 
 }
@@ -609,14 +577,11 @@ async function upgradeCardStar() {
     if(idx > -1) allUserCards.splice(idx, 1);
     
     card.stars++; 
-    calculateCardStats(card); // 重新計算數值與技能倍率
+    calculateCardStats(card); 
     playSound('upgrade'); 
     
     await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
-    
-    // 🔥 同步更新快取
     saveToLocalStorage();
-
     updateInventoryCounts();
     filterInventory(); 
     renderDetailCard(); 
@@ -626,7 +591,6 @@ async function upgradeCardStar() {
 async function dismantleCurrentCard() {
     const card = currentDisplayList[currentCardIndex]; 
     const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
-    
     const totalValue = baseValue * (card.stars + 1);
 
     if (card.rarity !== 'R') { 
@@ -638,15 +602,11 @@ async function dismantleCurrentCard() {
         playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
         
         onCurrencyUpdate('add', totalValue);
-        
         onCurrencyUpdate('refresh'); 
         
         const idx = allUserCards.findIndex(c => c.docId === card.docId);
         if(idx > -1) allUserCards.splice(idx, 1);
-        
-        // 🔥 同步更新快取
         saveToLocalStorage();
-
         updateInventoryCounts();
         document.getElementById('detail-modal').classList.add('hidden'); 
         filterInventory(); 
@@ -654,54 +614,25 @@ async function dismantleCurrentCard() {
     } catch (e) { console.error("分解失敗", e); }
 }
 
-// 🔥 核心修改：數值與技能倍率計算機
 function calculateCardStats(card) { 
-    // 1. 基礎屬性計算
     const levelBonus = (card.level - 1) * 0.03; 
     const starBonus = card.stars * 0.20; 
     card.atk = Math.floor(card.baseAtk * (1 + levelBonus) * (1 + starBonus)); 
     card.hp = Math.floor(card.baseHp * (1 + levelBonus) * (1 + starBonus)); 
 
-    // 2. 技能倍率動態計算 (每升1星 +10% 效果)
-    // 必須從 cardDatabase 取得原始 skillParams 進行計算，避免重複疊加
     const baseCard = cardDatabase.find(c => c.id == card.id);
-    
     if (baseCard && baseCard.skillParams) {
-        // 🔥 重要：深拷貝原始參數，避免修改到資料庫
         const newParams = { ...baseCard.skillParams };
-        const starSkillBonus = card.stars * 0.10; // 10% per star
+        const starSkillBonus = card.stars * 0.10; 
 
-        // 針對不同的參數進行加成
-        // (A) 傷害倍率 (Damage Multiplier)
-        if (newParams.dmgMult) {
-            newParams.dmgMult = parseFloat((newParams.dmgMult * (1 + starSkillBonus)).toFixed(2));
-        }
-        // (B) 治療比率 (Heal Rate)
-        if (newParams.healRate) {
-            newParams.healRate = parseFloat((newParams.healRate * (1 + starSkillBonus)).toFixed(2));
-        }
-        // (C) Buff 倍率 (Buff Rate)
-        if (newParams.buffRate) {
-            newParams.buffRate = parseFloat((newParams.buffRate * (1 + starSkillBonus)).toFixed(2));
-        }
-        // (D) 無敵/狀態持續時間 (Duration)
-        if (newParams.duration) {
-            newParams.duration = Math.floor(newParams.duration * (1 + starSkillBonus));
-        }
-        // (E) 斬殺血線 (Threshold)
-        if (newParams.threshold) {
-            newParams.threshold = parseFloat((newParams.threshold * (1 + starSkillBonus)).toFixed(2));
-        }
-        // (F) 全體回氣量 (Mana Amount)
-        if (newParams.manaAmount) {
-            newParams.manaAmount = Math.floor(newParams.manaAmount * (1 + starSkillBonus));
-        }
-        // (G) 自身回氣量 (Mana Restore)
-        if (newParams.manaRestore) {
-            newParams.manaRestore = Math.floor(newParams.manaRestore * (1 + starSkillBonus));
-        }
+        if (newParams.dmgMult) newParams.dmgMult = parseFloat((newParams.dmgMult * (1 + starSkillBonus)).toFixed(2));
+        if (newParams.healRate) newParams.healRate = parseFloat((newParams.healRate * (1 + starSkillBonus)).toFixed(2));
+        if (newParams.buffRate) newParams.buffRate = parseFloat((newParams.buffRate * (1 + starSkillBonus)).toFixed(2));
+        if (newParams.duration) newParams.duration = Math.floor(newParams.duration * (1 + starSkillBonus));
+        if (newParams.threshold) newParams.threshold = parseFloat((newParams.threshold * (1 + starSkillBonus)).toFixed(2));
+        if (newParams.manaAmount) newParams.manaAmount = Math.floor(newParams.manaAmount * (1 + starSkillBonus));
+        if (newParams.manaRestore) newParams.manaRestore = Math.floor(newParams.manaRestore * (1 + starSkillBonus));
 
-        // 將計算後的參數覆蓋回卡片物件
         card.skillParams = newParams;
     }
 }
@@ -731,6 +662,99 @@ function calculateBatchTotal() {
     if(batchInfo) batchInfo.innerHTML = `已選 <span style="color:#e74c3c">${count}</span> 張，獲得 <span style="color:#f1c40f">${totalGold} G</span>`; 
     if(btn) {
         if (count > 0) btn.classList.remove('btn-disabled'); else btn.classList.add('btn-disabled'); 
+    }
+}
+
+// 🔥 新增：自動清理冗餘卡片 (Auto Dismantle)
+async function autoDismantleRedundant() {
+    if (!currentUser) return;
+    if (allUserCards.length === 0) return alert("背包是空的");
+
+    // 1. 分組邏輯
+    const groups = {};
+    allUserCards.forEach(card => {
+        if (!groups[card.id]) groups[card.id] = [];
+        groups[card.id].push(card);
+    });
+
+    const toDismantle = [];
+    let totalValue = 0;
+
+    // 2. 篩選邏輯
+    for (const id in groups) {
+        let cards = groups[id];
+        if (cards.length < 2) continue; // 只有一張就不動
+
+        // 排序：先看星數(高->低)，再看等級(高->低)
+        cards.sort((a, b) => {
+            if (b.stars !== a.stars) return b.stars - a.stars;
+            return b.level - a.level;
+        });
+
+        // 索引 0 是最強的 (保留)，從索引 1 開始檢查
+        for (let i = 1; i < cards.length; i++) {
+            const card = cards[i];
+
+            // 安全檢查：是否出戰中
+            const isDeployed = battleSlots.some(s => s && s.docId === card.docId);
+            if (!isDeployed) {
+                toDismantle.push(card);
+                const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
+                totalValue += baseValue * (card.stars + 1);
+            }
+        }
+    }
+
+    if (toDismantle.length === 0) {
+        return alert("沒有發現可清理的冗餘卡片。\n(每種英雄都已保留最強的一張，或多餘卡片正在出戰中)");
+    }
+
+    // 3. 確認與執行
+    const confirmMsg = `⚡ 自動清理系統偵測到 ${toDismantle.length} 張冗餘卡片。\n\n` +
+                       `規則：保留每種英雄最高星、最高等的一張，其餘分解。\n` +
+                       `預計獲得：${totalValue} 金幣\n\n` +
+                       `⚠️ 確定要執行分解嗎？`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const btn = document.getElementById('auto-clean-btn');
+        if(btn) btn.innerText = "清理中...";
+        
+        const deletePromises = [];
+        toDismantle.forEach(card => {
+            if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId)));
+        });
+
+        await Promise.all(deletePromises);
+
+        // 播放音效
+        playSound('dismantle'); setTimeout(() => playSound('coin'), 300);
+
+        // 更新資源
+        if(onCurrencyUpdate) onCurrencyUpdate('add', totalValue);
+        onCurrencyUpdate('refresh');
+
+        // 更新本地資料
+        const deletedIds = new Set(toDismantle.map(c => c.docId));
+        allUserCards = allUserCards.filter(c => !deletedIds.has(c.docId));
+        
+        saveToLocalStorage();
+        updateInventoryCounts();
+        filterInventory();
+
+        alert(`清理完成！\n已分解 ${toDismantle.length} 張卡片，獲得 ${totalValue} 金幣。`);
+
+    } catch (e) {
+        console.error("自動清理失敗", e);
+        alert("清理過程中發生錯誤，請重試");
+    } finally {
+        const btn = document.getElementById('auto-clean-btn');
+        if(btn) btn.innerText = "⚡ 自動清理冗餘";
+        
+        // 如果是在批量模式下執行的，順便清空選取狀態
+        selectedBatchCards.clear();
+        calculateBatchTotal();
     }
 }
 
@@ -770,7 +794,6 @@ export async function autoStarUp() {
 
         for (let i = 0; i < cards.length; i++) {
             let mainCard = cards[i];
-            
             if (deletedDocIds.has(mainCard.docId)) continue;
             
             if (mainCard.stars >= 5) {
@@ -782,7 +805,6 @@ export async function autoStarUp() {
 
             for (let j = i + 1; j < cards.length; j++) {
                 let fodder = cards[j];
-                
                 if (deletedDocIds.has(fodder.docId)) continue;
                 if (mainCard.stars >= 5) break;
                 
@@ -819,10 +841,7 @@ export async function autoStarUp() {
         
         playSound('upgrade');
         allUserCards = newCardsState; 
-        
-        // 🔥 同步更新快取
         saveToLocalStorage();
-
         updateInventoryCounts();
         filterInventory(); 
         
@@ -989,6 +1008,10 @@ function bindInventoryEvents() {
         
         if (isBatchMode) { 
             btn.classList.add('active'); btn.innerText = "❌ 退出批量"; bar.classList.remove('hidden'); confirmBtn.innerText = "確認分解"; 
+            
+            // 🔥 確保自動清理按鈕被插入 (若尚未存在)
+            injectAutoDismantleButton();
+
         } else { 
             btn.classList.remove('active'); btn.innerText = "🔧 批量分解"; bar.classList.add('hidden'); 
         }
@@ -1027,7 +1050,6 @@ function bindInventoryEvents() {
             selectedBatchCards.clear(); 
             isBatchMode = false; 
             
-            // 🔥 同步更新快取
             saveToLocalStorage();
 
             const toggleBtn = document.getElementById('batch-toggle-btn');
