@@ -1587,7 +1587,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh; /* 🔥 改為 100dvh (Dynamic Viewport Height)，自動扣除瀏覽器工具列高度 */
     background-color: #000;
     z-index: 3000; /* 比一般戰鬥畫面更高 */
     overflow: hidden;
@@ -1683,7 +1683,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 #adv-skill-bar-container {
     position: absolute;
-    bottom: 20px; /* 🔥 貼近底部 */
+    bottom: calc(20px + env(safe-area-inset-bottom)); /* 🔥 自動加上安全區域距離 */
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -1744,7 +1744,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 #virtual-joystick-zone {
     position: absolute;
-    bottom: 120px; /* 🔥 往上移 */
+    bottom: calc(120px + env(safe-area-inset-bottom)); /* 🔥 自動加上安全區域距離 */
     left: 40px;    /* 🔥 稍微調整 */
     width: 120px;
     height: 120px;
@@ -1784,7 +1784,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 /* 手機版位置優化 */
 @media (max-width: 768px) {
     #adv-skill-bar-container {
-        bottom: 10px; /* 技能列貼底 */
+        bottom: calc(10px + env(safe-area-inset-bottom)); /* 技能列貼底，避開橫條 */
         transform: translateX(-50%) scale(0.85);
         padding: 5px;
         gap: 5px;
@@ -1794,7 +1794,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
         height: 50px;
     }
     #virtual-joystick-zone {
-        bottom: 150px; /* 🔥 手機上再高一點，避免跟手機底部手勢衝突 */
+        bottom: calc(150px + env(safe-area-inset-bottom)); /* 🔥 手機上再高一點，避免跟手機底部手勢衝突 */
         left: 30px;
     }
 }
