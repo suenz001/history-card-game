@@ -606,4 +606,31 @@
     <script type="module" src="js/inventory.js"></script>
     <script type="module" src="js/territory.js"></script> <script type="module" src="main.js"></script>
 </body>
+
+<button id="enter-battle-mode-btn" class="btn-danger" style="...">...</button>
+<button id="enter-adventure-mode-btn" class="btn-primary" style="width: 100%; margin-bottom: 20px; font-size: 1.2em; background: #e67e22; border: 2px solid #fff; box-shadow: 0 0 10px #d35400;">🐲 進入冒險模式 (動作版)</button>
+
+
+<div id="adventure-screen" class="hidden">
+    <canvas id="adv-canvas"></canvas>
+    
+    <div id="adv-ui-layer">
+        <div class="adv-top-bar">
+            <div class="adv-player-info">
+                <div class="adv-avatar">👤</div>
+                <div class="adv-bars">
+                    <div class="adv-hp-bar"><div style="width: 100%;"></div></div>
+                    <div class="adv-mp-bar"><div style="width: 100%;"></div></div>
+                </div>
+            </div>
+            <button id="adv-exit-btn" class="btn-danger" style="padding: 5px 15px;">🏳️ 退出冒險</button>
+        </div>
+        
+        <div class="adv-controls-hint">
+            使用 WASD 或 方向鍵 移動<br>
+            J: 攻擊 | K: 跳躍
+        </div>
+    </div>
+</div>
+
 </html>

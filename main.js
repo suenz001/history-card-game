@@ -1,7 +1,6 @@
 // main.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, setDoc, getDoc, updateDoc, deleteDoc, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-// 🔥 新增：linkWithCredential, EmailAuthProvider
 import { 
     getAuth, 
     signOut, 
@@ -12,7 +11,7 @@ import {
     updateProfile, 
     linkWithCredential, 
     EmailAuthProvider,
-    sendPasswordResetEmail  // 🔥 這裡已加入
+    sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // 引入模組
@@ -23,6 +22,9 @@ import { initBattle, resetBattleState, setBattleSlots, setGameSpeed, setOnBattle
 import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/pvp.js';
 import * as Inventory from './js/inventory.js';
 import * as Territory from './js/territory.js';
+
+// 🔥 新增：引入冒險模式模組
+import { initAdventure, updateAdventureContext } from './js/adventure.js';
 
 // ... (updateLatestCardsUI 函式保持不變) ...
 function updateLatestCardsUI() {
@@ -122,6 +124,9 @@ setTimeout(() => {
         }, Inventory.openEnemyDetailModal, currencyHandler); 
     }
     
+    // 🔥 新增：初始化冒險模式 (傳入 db 與當前使用者)
+    initAdventure(db, currentUser);
+
     // 按鈕綁定...
     const invBtn = document.getElementById('inventory-btn');
     if (invBtn) invBtn.addEventListener('click', () => { playSound('click'); if (!currentUser) return alert("請先登入"); document.getElementById('inventory-title').innerText = "🎒 背包"; Inventory.setPvpSelectionMode(null, null); document.getElementById('inventory-modal').classList.remove('hidden'); Inventory.filterInventory('ALL'); });
@@ -162,18 +167,14 @@ setTimeout(() => {
         });
     }
 
-    // 🔥 新增：忘記密碼功能
     const forgotBtn = document.getElementById('forgot-pass-btn');
     if (forgotBtn) {
         forgotBtn.addEventListener('click', () => {
             playSound('click');
             const email = document.getElementById('email-input').value.trim();
-            
-            // 檢查使用者是否已輸入 Email
             if (!email) {
                 return alert("請先在上方的「電子信箱」欄位輸入您的 Email，系統才能發送重置信件給您。");
             }
-
             if (confirm(`確定要發送密碼重置信件到：\n${email} 嗎？`)) {
                 sendPasswordResetEmail(auth, email)
                     .then(() => {
@@ -212,8 +213,6 @@ if(document.getElementById('settings-btn')) {
             sfxToggle.checked = isSfxOn; 
             bgmSlider.value = bgmVolume; 
             sfxSlider.value = sfxVolume;
-            
-            // 🔥 打開設定時，檢查綁定狀態
             updateAccountUI();
         }
     });
@@ -240,7 +239,6 @@ if(document.getElementById('settings-save-name-btn')) {
     });
 }
 
-// 🔥 新增：帳號綁定功能 (遊客轉正)
 const bindBtn = document.getElementById('bind-account-btn');
 if (bindBtn) {
     bindBtn.addEventListener('click', async () => {
@@ -251,30 +249,24 @@ if (bindBtn) {
         if (pass.length < 6) return alert("密碼強度至少需 6 碼");
         if (!currentUser) return alert("請先登入遊戲");
 
-        // 1. 建立憑證
         const credential = EmailAuthProvider.credential(email, pass);
 
         try {
             bindBtn.innerText = "綁定中...";
             bindBtn.classList.add('btn-disabled');
 
-            // 2. 連結帳號 (這會把匿名帳號轉為 Email 帳號，且保留 UID 和資料)
             const userCred = await linkWithCredential(currentUser, credential);
             const user = userCred.user;
-            currentUser = user; // 更新當前用戶
+            currentUser = user;
 
-            // 3. 更新資料庫內的 email 欄位
             await updateDoc(doc(db, "users", user.uid), { 
                 email: email,
-                isAnonymous: false // 標記已非匿名
+                isAnonymous: false 
             });
 
             alert("✅ 綁定成功！您現在可以使用 Email 登入，資料不會遺失。");
-            
-            // 4. 更新 UI
             updateAccountUI();
             
-            // 清空輸入框
             document.getElementById('bind-email-input').value = "";
             document.getElementById('bind-pass-input').value = "";
 
@@ -296,7 +288,6 @@ if (bindBtn) {
     });
 }
 
-// 🔥 新增：更新帳號綁定 UI 狀態
 function updateAccountUI() {
     const formContainer = document.getElementById('bind-form-container');
     const statusContainer = document.getElementById('bind-status-container');
@@ -304,7 +295,6 @@ function updateAccountUI() {
 
     if (!currentUser) return;
 
-    // 判斷是否為匿名登入 (isAnonymous 為 true 代表是遊客)
     if (currentUser.isAnonymous) {
         if(formContainer) formContainer.classList.remove('hidden');
         if(statusContainer) statusContainer.classList.add('hidden');
@@ -315,7 +305,6 @@ function updateAccountUI() {
     }
 }
 
-// ... (兌換碼與其他邏輯保持不變) ...
 if(document.getElementById('redeem-btn')) {
     document.getElementById('redeem-btn').addEventListener('click', async () => {
         const codeInput = document.getElementById('redeem-code-input');
@@ -539,8 +528,6 @@ if (isFirebaseReady && auth) {
                 await loadUserData(user); 
                 await calculateTotalPowerOnly(user.uid); 
                 loadLeaderboard();
-                
-                // 🔥 登入後檢查是否為遊客，並初始化綁定 UI (雖然這裡 Modal 預設隱藏，但確保資料正確)
                 updateAccountUI();
             } catch(e) { console.error("載入使用者資料失敗", e); }
         } else { 
@@ -615,6 +602,10 @@ async function loadUserData(user) {
         }); 
     }
     updateUIDisplay();
+    
+    // 🔥 同步使用者資料給冒險模式
+    updateAdventureContext(user);
+    
     await fetchGlobalAnnouncements();
     checkUnreadNotifications();
 
