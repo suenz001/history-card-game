@@ -18,11 +18,11 @@ export function updateAdventureContext(user) {
 const gameState = {
     // 🔥 世界設定
     worldWidth: 3000, // 世界總寬度
-    groundY: 0,       // 地面高度 (由 canvas 高度決定)
+    groundY: 0,       // 地平線高度 (稍後由 canvas 高度決定)
     
     player: {
         x: 100, y: 300, width: 50, height: 80,
-        speed: 8, color: '#f1c40f', // 稍微加速，跑地圖比較快
+        speed: 8, color: '#f1c40f',
         hp: 1000, maxHp: 1000,
         atk: 50, range: 120,
         attackCooldown: 0,
@@ -52,10 +52,10 @@ export function initAdventure(database, user) {
     const exitBtn = document.getElementById('adv-exit-btn');
     if (exitBtn) exitBtn.addEventListener('click', stopAdventure);
 
-    // 🔥 初始化搖桿監聽 (傳入 gameState 以便修改 keys)
+    // 🔥 初始化搖桿監聽
     initJoystick(gameState);
 
-    // 鍵盤監聽 (電腦版備用)
+    // 鍵盤監聽
     window.addEventListener('keydown', (e) => {
         if (!isRunning) return;
         if (gameState.keys.hasOwnProperty(e.key)) gameState.keys[e.key] = true;
@@ -81,49 +81,45 @@ function startAdventure() {
     isRunning = true;
 
     // 1. 初始化環境
-    gameState.groundY = canvas.height * 0.7; // 地平線在 70% 高度
+    // 🔥 修改：地平線設為螢幕高度的 50%，讓草地變大
+    gameState.groundY = canvas.height * 0.5; 
     
-    // 2. 初始化玩家 (放在左邊)
+    // 2. 初始化玩家
     gameState.player.x = 100;
-    gameState.player.y = gameState.groundY; // 站在地上
+    gameState.player.y = gameState.groundY; // 站在地平線上
     gameState.player.hp = gameState.player.maxHp;
     vfxList = [];
 
-    // 3. 生成背景裝飾 (讓捲動更有感)
+    // 3. 生成背景裝飾
     decorations = [];
-    // 造幾座山
     for(let i=0; i<10; i++) {
         decorations.push({
             type: 'mountain',
             x: Math.random() * gameState.worldWidth,
-            y: gameState.groundY,
+            y: gameState.groundY, // 山底在地平線
             w: 300 + Math.random() * 500,
             h: 200 + Math.random() * 300,
-            color: i % 2 === 0 ? '#2c3e50' : '#34495e' // 深淺交錯
+            color: i % 2 === 0 ? '#2c3e50' : '#34495e'
         });
     }
-    // 造幾棵樹
     for(let i=0; i<30; i++) {
         decorations.push({
             type: 'tree',
             x: Math.random() * gameState.worldWidth,
-            y: gameState.groundY,
+            y: gameState.groundY, // 樹根在地平線
             w: 30 + Math.random() * 20,
             h: 100 + Math.random() * 100,
             color: '#27ae60'
         });
     }
-    // 按照 Y 軸排序，遠的先畫
     decorations.sort((a,b) => (a.y - a.h) - (b.y - b.h));
 
-    // 4. 生成敵人 (分散在地圖各處)
+    // 4. 生成敵人
     gameState.enemies = [];
-    // 每隔 400px 放一隻怪
     for(let i=1; i<=6; i++) {
-        spawnEnemy(400 * i, gameState.groundY);
+        spawnEnemy(400 * i, gameState.groundY + 50); // 讓敵人稍微分散在Y軸
     }
-    // 最後放一隻大一點的 (BOSS雛型)
-    spawnEnemy(2800, gameState.groundY, true);
+    spawnEnemy(2800, gameState.groundY + 20, true);
 
     loadEquippedCards();
     gameLoop();
@@ -141,17 +137,18 @@ function resizeCanvas() {
     if (canvas) {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        gameState.groundY = canvas.height * 0.7; // 重算地平線
+        // 🔥 修改：RWD 時也要保持 50% 地平線
+        gameState.groundY = canvas.height * 0.5;
     }
 }
 
 function spawnEnemy(x, y, isBoss = false) {
     gameState.enemies.push({
         x: x, 
-        y: y, // 腳的位置
+        y: y, 
         width: isBoss ? 120 : 60, 
         height: isBoss ? 180 : 90,
-        color: isBoss ? '#8e44ad' : '#e74c3c', // BOSS 紫色，小怪紅色
+        color: isBoss ? '#8e44ad' : '#e74c3c',
         hp: isBoss ? 5000 : 500, 
         maxHp: isBoss ? 5000 : 500,
         isBoss: isBoss
@@ -187,7 +184,6 @@ function renderSkillBar() {
         slot.appendChild(img);
         slot.appendChild(cdMask);
         slot.addEventListener('click', () => activateSkill(index));
-        // 手機觸控支援
         slot.addEventListener('touchstart', (e) => { e.preventDefault(); activateSkill(index); });
         container.appendChild(slot);
     });
@@ -231,32 +227,28 @@ function activateSkill(index) {
 function update() {
     const p = gameState.player;
     const k = gameState.keys;
-
-    // 1. 玩家移動 (X軸在世界座標內，Y軸有模擬深度)
-    // 搖桿會修改 k.w, k.a, k.s, k.d，所以這裡邏輯通用
     
-    // 水平移動
+    // 1. 移動邏輯
+    // 水平
     if (k.a || k.ArrowLeft) p.x -= p.speed;
     if (k.d || k.ArrowRight) p.x += p.speed;
     
-    // 深度移動 (上下)
-    if (k.w || k.ArrowUp) p.y -= p.speed * 0.7; // 深度移動慢一點
+    // 垂直 (深度)
+    if (k.w || k.ArrowUp) p.y -= p.speed * 0.7; 
     if (k.s || k.ArrowDown) p.y += p.speed * 0.7;
 
-    // 🔥 世界邊界限制
+    // 🔥 邊界限制 (修正飛天問題)
+    // 左右限制
     if (p.x < 0) p.x = 0;
     if (p.x > gameState.worldWidth - p.width) p.x = gameState.worldWidth - p.width;
     
-    // 🔥 深度限制 (只能在路面上走)
-    if (p.y < gameState.groundY - 50) p.y = gameState.groundY - 50; // 最遠處
-    if (p.y > canvas.height - p.height) p.y = canvas.height - p.height; // 最近處
+    // 上下限制 (關鍵修正：p.y 不能小於 groundY)
+    // p.y 是角色的「腳底」位置
+    if (p.y < gameState.groundY) p.y = gameState.groundY; // 禁止穿過地平線 (天空)
+    if (p.y > canvas.height) p.y = canvas.height;         // 禁止穿過螢幕下方
 
-    // 🔥 攝影機跟隨邏輯
-    // 目標：讓玩家顯示在螢幕中間 (canvas.width / 2)
-    // Camera.x = Player.x - ScreenHalf
+    // 攝影機跟隨
     gameState.camera.x = p.x - canvas.width / 2;
-
-    // 攝影機邊界限制 (不能拍到世界外面)
     if (gameState.camera.x < 0) gameState.camera.x = 0;
     if (gameState.camera.x > gameState.worldWidth - canvas.width) {
         gameState.camera.x = gameState.worldWidth - canvas.width;
@@ -268,9 +260,9 @@ function update() {
         const target = findNearestEnemy();
         if (target) {
             const dx = target.x - p.x;
-            const dy = target.y - p.y; // 深度差
-            // 攻擊判定範圍 (包含 X 軸和深度)
-            if (Math.abs(dx) < p.range && Math.abs(dy) < 50) {
+            const dy = target.y - p.y;
+            // 判定範圍加大一點，讓自動攻擊更靈敏
+            if (Math.abs(dx) < p.range && Math.abs(dy) < 80) {
                 performAutoAttack(target);
                 p.attackCooldown = p.attackSpeed;
             }
@@ -288,11 +280,11 @@ function update() {
         }
     });
 
-    // 5. 特效更新
+    // 5. 特效
     vfxList.forEach(v => v.life--);
     vfxList = vfxList.filter(v => v.life > 0);
 
-    // 6. UI 血條
+    // 6. UI 更新
     const hpPct = (p.hp / p.maxHp) * 100;
     const hpBar = document.getElementById('adv-hp-fill');
     if(hpBar) hpBar.style.width = `${hpPct}%`;
@@ -320,9 +312,9 @@ function performAutoAttack(target) {
     vfxList.push({
         type: 'line',
         x1: gameState.player.x + gameState.player.width/2,
-        y1: gameState.player.y, // 從腳底或身體中心發出
+        y1: gameState.player.y - gameState.player.height/2, // 從身體中心發出
         x2: target.x + target.width/2,
-        y2: target.y,
+        y2: target.y - target.height/2,
         life: 5, color: '#fff'
     });
 }
@@ -348,59 +340,53 @@ function updateSkillUI(index) {
     }
 }
 
-// 繪圖核心
 function draw() {
-    // 1. 清空螢幕 (這是 UI 層，不移動)
-    ctx.fillStyle = '#87CEEB'; // 天空藍
+    // 1. 天空
+    ctx.fillStyle = '#87CEEB'; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 🔥 2. 套用攝影機視角 (開始移動世界)
+    // 🔥 2. 移動鏡頭
     ctx.save();
     ctx.translate(-gameState.camera.x, 0); 
-    // ^ 這行代碼是核心！所有這之後畫的東西都會跟著鏡頭移動
 
-    // 畫背景裝飾 (山、樹)
+    // 背景 (山、樹)
     decorations.forEach(d => {
         ctx.fillStyle = d.color;
         if (d.type === 'mountain') {
-            // 畫山 (三角形)
             ctx.beginPath();
             ctx.moveTo(d.x, d.y);
             ctx.lineTo(d.x + d.w/2, d.y - d.h);
             ctx.lineTo(d.x + d.w, d.y);
             ctx.fill();
         } else {
-            // 畫樹 (矩形樹幹 + 圓形樹葉)
-            ctx.fillStyle = '#8B4513'; // 樹幹
+            ctx.fillStyle = '#8B4513';
             ctx.fillRect(d.x + d.w/3, d.y - d.h/2, d.w/3, d.h/2);
-            ctx.fillStyle = d.color; // 樹葉
+            ctx.fillStyle = d.color;
             ctx.beginPath();
             ctx.arc(d.x + d.w/2, d.y - d.h/2, d.w, 0, Math.PI*2);
             ctx.fill();
         }
     });
 
-    // 畫地板 (橫跨整個世界)
-    ctx.fillStyle = '#27ae60'; // 草地綠
+    // 地板 (草地)
+    ctx.fillStyle = '#27ae60';
     ctx.fillRect(0, gameState.groundY, gameState.worldWidth, canvas.height - gameState.groundY);
     
-    // 畫終點線 (在 3000px 處)
+    // 終點
     ctx.fillStyle = '#f1c40f';
     ctx.fillRect(gameState.worldWidth - 50, gameState.groundY - 200, 20, 200);
 
-    // 畫影子 (共用)
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    
-    // 畫敵人 (注意座標是 e.y - e.height，因為我們的 y 是腳底)
+    // 畫敵人
     gameState.enemies.forEach(e => {
         // 影子
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
         ctx.ellipse(e.x + e.width/2, e.y, e.width/2, 10, 0, 0, Math.PI * 2);
         ctx.fill();
-        // 本體
+        // 本體 (以腳底為基準點，往上畫)
         ctx.fillStyle = e.color;
         ctx.fillRect(e.x, e.y - e.height, e.width, e.height);
-        // Boss 標記
+        
         if(e.isBoss) {
             ctx.fillStyle = 'white';
             ctx.font = '20px Arial';
@@ -422,13 +408,13 @@ function draw() {
     ctx.fill();
     // 本體
     ctx.fillStyle = p.color;
-    ctx.fillRect(p.x, p.y - p.height, p.width, p.height); // y 是腳底，所以要減 height
+    ctx.fillRect(p.x, p.y - p.height, p.width, p.height);
     // 名字
     ctx.fillStyle = 'white';
     ctx.font = '14px Arial';
     ctx.fillText("我方英雄", p.x, p.y - p.height - 10);
 
-    // 畫特效
+    // 特效
     vfxList.forEach(v => {
         if (v.type === 'text') {
             ctx.fillStyle = v.color;
@@ -438,16 +424,13 @@ function draw() {
             ctx.strokeStyle = v.color;
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(v.x1, v.y1 - 40); // 稍微調高攻擊線起點
-            ctx.lineTo(v.x2, v.y2 - 40);
+            ctx.moveTo(v.x1, v.y1);
+            ctx.lineTo(v.x2, v.y2);
             ctx.stroke();
         }
     });
 
-    // 🔥 3. 結束視角 (回復原點，避免影響之後的 UI)
     ctx.restore();
-    
-    // 這裡可以畫固定在螢幕上的 UI (如虛擬搖桿)，不受鏡頭影響
 }
 
 function gameLoop() {
