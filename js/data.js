@@ -157,11 +157,11 @@ export const cardDatabase = [
     // ================= SSR =================
     { 
         id: 1, name: "秦始皇", rarity: "SSR", atk: 280, hp: 3500, 
-        unitType: "INFANTRY", title: "千古一帝", attackType: "melee", skillKey: "HEAL_AND_STRIKE", skillParams: { healRate: 0.40, dmgMult: 1.5 } 
+        unitType: "INFANTRY", title: "千古一帝", attackType: "melee", skillKey: "HEAL_AND_STRIKE", skillParams: { healRate: 0.35, dmgMult: 1.5 } 
     },
     { 
         id: 2, name: "亞歷山大", rarity: "SSR", atk: 300, hp: 3200, 
-        unitType: "CAVALRY", title: "征服王", attackType: "melee", skillKey: "INVINCIBLE_STRIKE", skillParams: { duration: 3000, dmgMult: 1.5 } 
+        unitType: "CAVALRY", title: "征服王", attackType: "melee", skillKey: "INVINCIBLE_STRIKE", skillParams: { duration: 2000, dmgMult: 1.5 } 
     },
     { 
         id: 3, name: "拿破崙", rarity: "SSR", atk: 320, hp: 2600, 
@@ -177,27 +177,27 @@ export const cardDatabase = [
     },
     { 
         id: 15, name: "漢尼拔", rarity: "SSR", atk: 295, hp: 3100, 
-        unitType: "CAVALRY", title: "戰略之父", attackType: "melee", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 20, buffRate: 1.10, dmgMult: 1.5 } 
+        unitType: "CAVALRY", title: "戰略之父", attackType: "melee", skillKey: "BUFF_ALLIES_ATK", skillParams: { range: 20, buffRate: 1.05, dmgMult: 1.5 } 
     },
     { 
         id: 16, name: "埃及豔后", rarity: "SSR", atk: 270, hp: 2800, 
-        unitType: "ARCHER", title: "尼羅河女王", attackType: "ranged", skillKey: "HEAL_ALLIES", skillParams: { range: 20, healRate: 0.20, dmgMult: 1.5 } 
+        unitType: "ARCHER", title: "尼羅河女王", attackType: "ranged", skillKey: "HEAL_ALLIES", skillParams: { range: 10, healRate: 0.20, dmgMult: 1.5 } 
     },
     { 
         id: 17, name: "宮本武藏", rarity: "SSR", atk: 330, hp: 2500, 
-        unitType: "INFANTRY", title: "二天一流", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.25, dmgMult: 2.0 } 
+        unitType: "INFANTRY", title: "二天一流", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.10, dmgMult: 2.0 } 
     },
     { 
         id: 31, name: "亞瑟王", rarity: "SSR", atk: 300, hp: 3400, 
-        unitType: "INFANTRY", title: "永恆之王", attackType: "melee", skillKey: "STACKABLE_IMMUNITY", skillParams: { count: 3, dmgMult: 2.0 } 
+        unitType: "INFANTRY", title: "永恆之王", attackType: "melee", skillKey: "STACKABLE_IMMUNITY", skillParams: { count: 3, dmgMult: 1.0 } 
     },
     { 
         id: 32, name: "呂布", rarity: "SSR", atk: 340, hp: 2700, 
-        unitType: "CAVALRY", title: "飛將", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.30, dmgMult: 2.5 } 
+        unitType: "CAVALRY", title: "飛將", attackType: "melee", skillKey: "SELF_BUFF_ATK", skillParams: { buffRate: 1.10, dmgMult: 2.5 } 
     },
     { 
         id: 33, name: "諾貝爾", rarity: "SSR", atk: 315, hp: 2650, 
-        unitType: "ARCHER", title: "炸藥之父", attackType: "ranged", skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.7 } 
+        unitType: "ARCHER", title: "炸藥之父", attackType: "ranged", skillKey: "GLOBAL_BOMB", skillParams: { dmgMult: 0.5 } 
     },
     { 
         id: 34, name: "武則天", rarity: "SSR", atk: 280, hp: 3000, 

@@ -692,10 +692,11 @@ function calculateCardStats(card) {
         if (newParams.threshold) {
             newParams.threshold = parseFloat((newParams.threshold * (1 + starSkillBonus)).toFixed(2));
         }
-        // (F) 回氣量 (Mana Amount / Restore)
+        // (F) 全體回氣量 (Mana Amount)
         if (newParams.manaAmount) {
             newParams.manaAmount = Math.floor(newParams.manaAmount * (1 + starSkillBonus));
         }
+        // (G) 自身回氣量 (Mana Restore)
         if (newParams.manaRestore) {
             newParams.manaRestore = Math.floor(newParams.manaRestore * (1 + starSkillBonus));
         }
