@@ -1753,55 +1753,55 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* style.css - 虛擬搖桿樣式 */
 
+/* style.css - 虛擬搖桿樣式 (修正版) */
+
 #virtual-joystick-zone {
     position: absolute;
     bottom: 50px;
     left: 50px;
     width: 120px;
     height: 120px;
-    z-index: 100;
-    /* 避免觸控時觸發瀏覽器的縮放或滾動 */
+    z-index: 9999; /* 🔥 加高層級，確保在最上層 */
     touch-action: none; 
     user-select: none;
-    /* 預設顯示，但在大螢幕電腦上可以考慮隱藏，這裡先都顯示方便測試 */
     display: flex;
     justify-content: center;
     align-items: center;
+    pointer-events: auto; /* 🔥 關鍵！這行讓搖桿可以被觸摸，不受父層影響 */
 }
 
 #joystick-base {
     width: 100%;
     height: 100%;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.15); /* 稍微亮一點 */
+    border: 2px solid rgba(255, 255, 255, 0.5);
     border-radius: 50%;
     position: relative;
-    backdrop-filter: blur(2px);
-    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    backdrop-filter: blur(4px);
+    box-shadow: 0 0 15px rgba(0,0,0,0.5);
 }
 
 #joystick-stick {
     width: 50px;
     height: 50px;
-    background: rgba(241, 196, 15, 0.8); /* 金色搖桿 */
+    background: radial-gradient(circleAt 30% 30%, #f1c40f, #f39c12); /* 漸層質感 */
     border-radius: 50%;
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%); /* 初始居中 */
-    box-shadow: 0 0 5px rgba(0,0,0,0.5);
-    pointer-events: none; /* 讓觸控穿透到 zone 或 base */
-    transition: transform 0.05s; /* 讓回彈稍微平滑一點，但拖曳時我們會用 JS 覆蓋 */
+    transform: translate(-50%, -50%);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+    pointer-events: none;
 }
 
-/* 手機版優化：如果螢幕很小，調整技能列位置以免擋住搖桿 */
+/* 手機版位置優化 */
 @media (max-width: 768px) {
     #adv-skill-bar-container {
         bottom: 10px;
-        transform: translateX(-50%) scale(0.8); /* 縮小一點 */
+        transform: translateX(-50%) scale(0.85);
     }
     #virtual-joystick-zone {
-        bottom: 30px;
-        left: 20px;
+        bottom: 40px; /* 稍微往上移，避免跟手機底部手勢衝突 */
+        left: 30px;
     }
 }

@@ -583,42 +583,35 @@
         </div>
     </div>
 
-    <div id="adventure-screen" class="hidden">
+<div id="adventure-screen" class="hidden">
         <canvas id="adv-canvas"></canvas>
-<div id="adv-ui-layer">
-        <div class="adv-top-bar">
-            <div class="adv-player-info">
-                <div class="adv-avatar">👤</div>
-                <div class="adv-bars">
-                    <div class="adv-hp-bar"><div id="adv-hp-fill" style="width: 100%;"></div></div>
-                    <div class="adv-mp-bar"><div style="width: 100%;"></div></div>
+        
+        <div id="adv-ui-layer">
+            <div class="adv-top-bar">
+                <div class="adv-player-info">
+                    <div class="adv-avatar">👤</div>
+                    <div class="adv-bars">
+                        <div class="adv-hp-bar"><div id="adv-hp-fill" style="width: 100%;"></div></div>
+                        <div class="adv-mp-bar"><div style="width: 100%;"></div></div>
+                    </div>
+                </div>
+                <button id="adv-exit-btn" class="btn-danger" style="padding: 5px 15px;">🏳️ 退出冒險</button>
+            </div>
+
+            <div id="adv-skill-bar-container"></div>
+
+            <div id="virtual-joystick-zone">
+                <div id="joystick-base">
+                    <div id="joystick-stick"></div>
                 </div>
             </div>
-            <button id="adv-exit-btn" class="btn-danger" style="padding: 5px 15px;">🏳️ 退出冒險</button>
-        </div>
 
-        <div id="adv-skill-bar-container">
+            <div class="adv-controls-hint">
+                電腦：WASD 移動<br>
+                手機：左下角搖桿
             </div>
-
-        <div class="adv-controls-hint">
-            使用 WASD 移動，接近敵人自動攻擊<br>
-            點擊下方卡片施放技能
-<div id="adventure-screen" class="hidden">
-    <canvas id="adv-canvas"></canvas>
-    
-    <div id="adv-ui-layer">
-        <div id="virtual-joystick-zone">
-            <div id="joystick-base">
-                <div id="joystick-stick"></div>
-            </div>
-        </div>
-
-        <div class="adv-controls-hint">
-            電腦：WASD 移動<br>
-            手機：左下角搖桿移動
         </div>
     </div>
-</div>
 
     <script type="module" src="js/inventory.js"></script>
     <script type="module" src="js/territory.js"></script>
