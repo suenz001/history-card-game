@@ -154,21 +154,22 @@ export async function loadInventory(uid, forceRefresh = false) {
                 data.title = baseCard.title;
                 data.name = baseCard.name;
                 data.skillKey = baseCard.skillKey;
-                data.skillParams = baseCard.skillParams;
-
+                // 注意：這裡不要直接賦值 skillParams，交給 calculateCardStats 統一處理
+                
                 if (!data.level) data.level = 1;
                 if (!data.stars) data.stars = 0;
 
-                const levelBonus = (data.level - 1) * 0.03; 
-                const starBonus = data.stars * 0.20; 
-                data.atk = Math.floor(data.baseAtk * (1 + levelBonus) * (1 + starBonus)); 
-                data.hp = Math.floor(data.baseHp * (1 + levelBonus) * (1 + starBonus));
+                // 🔥 統一使用 calculateCardStats 計算數值與技能倍率
+                // (先暫存 docId 以便計算函數內使用或識別)
+                data.docId = docSnap.id;
+                calculateCardStats(data);
             } else {
                 if (!data.baseAtk) { data.baseAtk = data.atk || 100; data.baseHp = data.hp || 500; }
                 if (!data.stars) data.stars = 0;
+                data.docId = docSnap.id;
             }
 
-            allUserCards.push({ ...data, docId: docSnap.id }); 
+            allUserCards.push(data); 
         });
         
         // 下載後更新快取
@@ -200,7 +201,13 @@ export async function saveCardToCloud(card) {
         skillKey: card.skillKey || null, skillParams: card.skillParams || null,
         level: 1, stars: 0, obtainedAt: new Date(), owner: currentUser.uid, id: card.id 
     });
+    
+    // 建立新卡片物件
     const newCard = { ...card, docId: docRef.id, baseAtk: card.atk, baseHp: card.hp, level: 1, stars: 0, obtainedAt: new Date() };
+    
+    // 計算初始狀態 (0星)
+    calculateCardStats(newCard);
+    
     allUserCards.push(newCard);
     
     // 更新快取
@@ -419,6 +426,8 @@ export function openEnemyDetailModal(enemyCard) {
     let displayCard = { ...baseCard, ...enemyCard };
 
     if (baseCard) {
+        // 🔥 計算敵方數值 (不影響我方背包)
+        // 為了簡單，這裡用簡單的模擬計算，不寫入 skillParams
         const level = displayCard.level || 1;
         const stars = displayCard.stars !== undefined ? displayCard.stars : 0; 
         
@@ -431,8 +440,11 @@ export function openEnemyDetailModal(enemyCard) {
         displayCard.atk = Math.floor(baseAtk * (1 + levelBonus) * (1 + starBonus));
         displayCard.hp = Math.floor(baseHp * (1 + levelBonus) * (1 + starBonus));
         
+        // 注意：敵方技能倍率這裡暫時顯示基礎值，若要顯示強化值需同樣套用 calculate 邏輯
+        // 但因為敵方通常是複製過來的數據，我們信任傳進來的 enemyCard 數據
         displayCard.skillKey = baseCard.skillKey;
-        displayCard.skillParams = baseCard.skillParams;
+        if (!displayCard.skillParams) displayCard.skillParams = baseCard.skillParams; 
+        
         displayCard.unitType = baseCard.unitType || 'INFANTRY';
     }
 
@@ -467,7 +479,7 @@ function renderDetailCard() {
     
     const skillDesc = getSkillDescription(card.skillKey, card.skillParams);
     const bioData = HERO_BIOS[card.id]; 
-    // 🔥 修改：全部靠左對齊 (text-align: left)
+    
     let bioHtml = bioData ? 
         `<div style="font-size: 0.9em; color: #f39c12; margin-bottom: 8px; font-weight: bold; text-align: left;">【${bioData.era}】</div>
          <div style="font-size: 0.95em; line-height: 1.6; text-align: left; color: #ddd;">${bioData.text}</div>` 
@@ -485,7 +497,7 @@ function renderDetailCard() {
 
     const backFace = document.createElement('div');
     backFace.className = `large-card-back ${card.rarity}`;
-    // 🔥 修改：技能說明改為靠左 (text-align: left)
+    
     backFace.innerHTML = `
         <div class="card-skill-section">
             <div class="card-back-title">✨ 技能效果</div>
@@ -569,9 +581,11 @@ async function upgradeCardLevel(goldCost, ironCost) {
     
     playSound('coin'); 
     card.level++; 
-    calculateCardStats(card); 
+    calculateCardStats(card); // 重新計算數值
     playSound('upgrade'); 
     
+    // 儲存時，我們只儲存基本屬性，不儲存動態計算的 skillParams
+    // skillParams 會在每次讀取時根據星數動態產生
     await updateDoc(doc(db, "inventory", card.docId), { level: card.level, atk: card.atk, hp: card.hp }); 
     
     // 🔥 同步更新快取
@@ -595,7 +609,7 @@ async function upgradeCardStar() {
     if(idx > -1) allUserCards.splice(idx, 1);
     
     card.stars++; 
-    calculateCardStats(card); 
+    calculateCardStats(card); // 重新計算數值與技能倍率
     playSound('upgrade'); 
     
     await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
@@ -606,7 +620,7 @@ async function upgradeCardStar() {
     updateInventoryCounts();
     filterInventory(); 
     renderDetailCard(); 
-    alert(`升星成功！目前 ${card.stars} ★`);
+    alert(`升星成功！目前 ${card.stars} ★\n技能效果已提升 10%！`);
 }
 
 async function dismantleCurrentCard() {
@@ -640,11 +654,55 @@ async function dismantleCurrentCard() {
     } catch (e) { console.error("分解失敗", e); }
 }
 
+// 🔥 核心修改：數值與技能倍率計算機
 function calculateCardStats(card) { 
+    // 1. 基礎屬性計算
     const levelBonus = (card.level - 1) * 0.03; 
     const starBonus = card.stars * 0.20; 
     card.atk = Math.floor(card.baseAtk * (1 + levelBonus) * (1 + starBonus)); 
     card.hp = Math.floor(card.baseHp * (1 + levelBonus) * (1 + starBonus)); 
+
+    // 2. 技能倍率動態計算 (每升1星 +10% 效果)
+    // 必須從 cardDatabase 取得原始 skillParams 進行計算，避免重複疊加
+    const baseCard = cardDatabase.find(c => c.id == card.id);
+    
+    if (baseCard && baseCard.skillParams) {
+        // 🔥 重要：深拷貝原始參數，避免修改到資料庫
+        const newParams = { ...baseCard.skillParams };
+        const starSkillBonus = card.stars * 0.10; // 10% per star
+
+        // 針對不同的參數進行加成
+        // (A) 傷害倍率 (Damage Multiplier)
+        if (newParams.dmgMult) {
+            newParams.dmgMult = parseFloat((newParams.dmgMult * (1 + starSkillBonus)).toFixed(2));
+        }
+        // (B) 治療比率 (Heal Rate)
+        if (newParams.healRate) {
+            newParams.healRate = parseFloat((newParams.healRate * (1 + starSkillBonus)).toFixed(2));
+        }
+        // (C) Buff 倍率 (Buff Rate)
+        if (newParams.buffRate) {
+            newParams.buffRate = parseFloat((newParams.buffRate * (1 + starSkillBonus)).toFixed(2));
+        }
+        // (D) 無敵/狀態持續時間 (Duration)
+        if (newParams.duration) {
+            newParams.duration = Math.floor(newParams.duration * (1 + starSkillBonus));
+        }
+        // (E) 斬殺血線 (Threshold)
+        if (newParams.threshold) {
+            newParams.threshold = parseFloat((newParams.threshold * (1 + starSkillBonus)).toFixed(2));
+        }
+        // (F) 回氣量 (Mana Amount / Restore)
+        if (newParams.manaAmount) {
+            newParams.manaAmount = Math.floor(newParams.manaAmount * (1 + starSkillBonus));
+        }
+        if (newParams.manaRestore) {
+            newParams.manaRestore = Math.floor(newParams.manaRestore * (1 + starSkillBonus));
+        }
+
+        // 將計算後的參數覆蓋回卡片物件
+        card.skillParams = newParams;
+    }
 }
 
 // --- 批量操作 ---
