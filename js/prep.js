@@ -61,11 +61,15 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
     // 綁定轉蛋按鈕
     const gachaBtns = document.querySelectorAll('#tab-gacha button');
     if (gachaBtns.length >= 2) {
-        // 先移除舊監聽器 (防止重複綁定)，如果沒有 cloneNode 可以略過
-        // 這裡簡單直接綁定，假設 init 只會執行一次
         gachaBtns[0].onclick = () => performGacha(1);
         gachaBtns[1].onclick = () => performGacha(10);
     }
+}
+
+// 🔥 新增：供外部更新使用者資料 (例如重整後)
+export function updatePrepUser(user) {
+    currentUser = user;
+    updateResourceDisplay();
 }
 
 export function updatePrepData(data) {
@@ -81,16 +85,30 @@ export function openPrepScreen() {
     const modal = document.getElementById('adventure-prep-modal');
     modal.classList.remove('hidden');
     
+    // 🔥 每次打開都更新一下資源顯示
+    updateResourceDisplay();
+
     switchTab('equip');
     handleSlotClick(null); 
 
-    // 🔥 修正：檢查商店是否需要刷新 (24小時冷卻)
     checkAndRefreshShop();
     renderShop();
 
     renderPrepCards(); 
     renderEquippedSlots(); 
     calculateAndShowStats(); 
+}
+
+// 🔥 新增：更新介面上的鑽石與金幣
+function updateResourceDisplay() {
+    if (!currentUser) return;
+
+    // 請確認你的 index.html 中有對應這兩個 ID 的元素
+    const goldEl = document.getElementById('prep-gold-amount');
+    const gemEl = document.getElementById('prep-gem-amount');
+
+    if (goldEl) goldEl.innerText = currentUser.gold || 0;
+    if (gemEl) gemEl.innerText = currentUser.gems || 0;
 }
 
 function switchTab(tabId) {
@@ -258,7 +276,6 @@ function calculateAndShowStats() {
             if (item && item.stats) {
                 if (item.stats.atk) totalAtk += item.stats.atk;
                 if (item.stats.def) totalHp += item.stats.def * 10;
-                // 注意：這裡還可以加入 item.stats.defBonus 等其他屬性
                 if (item.stats.defBonus) totalHp += item.stats.defBonus * 10;
             }
         });
@@ -292,14 +309,13 @@ function renderPrepCards() {
 }
 
 // -------------------------------------------------------------
-// 🛒 商店系統實作
+// 🛒 商店系統
 // -------------------------------------------------------------
 
 function checkAndRefreshShop() {
     const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000;
     
-    // 如果沒有商店資料，或者距離上次刷新超過 24 小時
     if (!adventureData.shopItems || 
         adventureData.shopItems.length === 0 || 
         (now - adventureData.shopLastRefresh) > oneDay) {
@@ -307,17 +323,14 @@ function checkAndRefreshShop() {
         generateDailyShop();
         adventureData.shopLastRefresh = now;
         
-        // 立即存檔，避免玩家刷新後重新整理網頁又重置
         if(onSave) onSave(adventureData);
         console.log("商店已刷新");
     } else {
-        // 載入舊的商店資料
         shopItems = adventureData.shopItems;
     }
 }
 
 function generateDailyShop() {
-    // 隨機挑選 6 個商品 (只出 R 和 SR)
     const allItems = getAllItems().filter(i => i.rarity !== 'SSR');
     shopItems = [];
     
@@ -325,10 +338,9 @@ function generateDailyShop() {
         const blueprint = allItems[Math.floor(Math.random() * allItems.length)];
         shopItems.push({
             ...blueprint,
-            price: blueprint.rarity === 'SR' ? 2000 : 500 // 簡單定價
+            price: blueprint.rarity === 'SR' ? 2000 : 500 
         });
     }
-    // 同步到 adventureData
     if(adventureData) adventureData.shopItems = shopItems;
 }
 
@@ -354,27 +366,21 @@ function renderShop() {
 function buyItem(blueprint, index) {
     if(!handleCurrency) return;
     
-    // 1. 檢查錢
     if(!handleCurrency('check', blueprint.price, 'gold')) {
         return alert("金幣不足！");
     }
 
-    // 2. 扣錢
     handleCurrency('deduct', blueprint.price, 'gold');
     handleCurrency('refresh');
+    updateResourceDisplay(); // 🔥 購買後更新顯示
 
-    // 3. 生成裝備並給玩家
     const newItem = generateItemInstance(blueprint.id);
     adventureData.inventory.push(newItem);
 
-    // 4. 更新介面
     playSound('coin');
     alert(`購買成功！獲得 ${newItem.name}`);
     
-    // 移除已買商品 (避免重複買)
     shopItems.splice(index, 1);
-    
-    // 🔥 同步回 adventureData 並存檔
     adventureData.shopItems = shopItems;
     
     renderShop();
@@ -384,32 +390,29 @@ function buyItem(blueprint, index) {
 }
 
 // -------------------------------------------------------------
-// 🔮 轉蛋系統實作
+// 🔮 轉蛋系統
 // -------------------------------------------------------------
 
 function performGacha(times) {
     if(!handleCurrency) return;
-    const cost = times * 200; // 單抽 200 鑽
+    const cost = times * 200; 
     
-    // 1. 檢查鑽石
     if(!handleCurrency('check', cost, 'gems')) {
         return alert(`鑽石不足！需要 ${cost} 💎`);
     }
 
-    // 2. 扣鑽
     handleCurrency('deduct', cost, 'gems');
     handleCurrency('refresh');
+    updateResourceDisplay(); // 🔥 轉蛋後更新顯示
     playSound('draw');
 
     const results = [];
     const allItems = getAllItems();
 
-    // 簡單權重：SSR 5%, SR 20%, R 75%
     for(let i=0; i<times; i++) {
         let rarity = 'R';
         const rand = Math.random();
         
-        // 十連抽最後一抽保底 SR
         if(times === 10 && i === 9) {
             rarity = Math.random() < 0.2 ? 'SSR' : 'SR';
         } else {
@@ -417,18 +420,13 @@ function performGacha(times) {
             else if(rand < 0.25) rarity = 'SR';
         }
 
-        // 從該稀有度池中隨機挑選
         const pool = allItems.filter(x => x.rarity === rarity);
         const blueprint = pool[Math.floor(Math.random() * pool.length)];
-        
-        // 生成實例 (數值浮動)
         results.push(generateItemInstance(blueprint.id));
     }
 
-    // 3. 發獎
     results.forEach(item => adventureData.inventory.push(item));
     
-    // 4. 顯示結果 (簡單條列式)
     const hasSSR = results.some(i => i.rarity === 'SSR');
     if(hasSSR) playSound('ssr');
 
@@ -439,7 +437,5 @@ function performGacha(times) {
     alert(msg);
 
     renderInventoryList();
-    
-    // 5. 存檔
     if(onSave) onSave(adventureData);
 }
