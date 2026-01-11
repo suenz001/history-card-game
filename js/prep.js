@@ -1,7 +1,7 @@
 // js/prep.js
 import { playSound } from './audio.js';
 import * as Inventory from './inventory.js';
-import { updatePlayerStats } from './adventure.js';
+import { updatePlayerStats, startAdventure } from './adventure.js';
 import { generateItemInstance, getAllItems, EQUIP_TYPES, WEAPON_TYPES } from './items.js';
 
 let db = null;
@@ -29,13 +29,25 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
         });
     });
 
+    // 綁定「出發冒險」按鈕
     document.getElementById('prep-start-battle-btn').addEventListener('click', () => {
         playSound('click');
+        
+        // 1. 更新數值到 adventure.js
         if(adventureData && adventureData.stats) {
             updatePlayerStats(adventureData.stats, adventureData.equipment?.weapon?.subType || 'unarmed');
         }
+        
+        // 2. 隱藏整裝視窗
         document.getElementById('adventure-prep-modal').classList.add('hidden');
-        if(startBattleCallback) startBattleCallback();
+        
+        // 3. 呼叫開始戰鬥 (這會觸發 adventure.js 的 startAdventure)
+        if(startBattleCallback) {
+            // 給予一點延遲，讓 Modal 隱藏動畫先跑一點點，避免與 Canvas 搶資源
+            setTimeout(() => {
+                startBattleCallback();
+            }, 50);
+        }
     });
 
     document.getElementById('close-prep-btn').addEventListener('click', () => {
@@ -228,7 +240,6 @@ function renderInventoryList() {
     filteredItems.forEach(item => {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'equip-slot'; 
-        // 樣式已由 style.css 的 .prep-grid-list .equip-slot 控制
         itemDiv.style.borderColor = item.color || '#fff';
         
         const img = document.createElement('img');

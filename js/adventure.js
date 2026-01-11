@@ -23,7 +23,6 @@ heroSprites.staff.src = 'assets/hero/hero_staff.png';
 
 export function updateAdventureContext(user) {
     currentUser = user;
-    // 🔥 更新玩家暱稱
     if (user && user.displayName) {
         gameState.playerName = user.displayName;
     } else {
@@ -31,15 +30,14 @@ export function updateAdventureContext(user) {
     }
 }
 
-// 🔥 新增：接收整裝介面傳來的數值
+// 接收整裝介面傳來的數值
 export function updatePlayerStats(stats, weaponType) {
     if (stats) {
         gameState.player.maxHp = stats.hp;
         gameState.player.atk = stats.atk;
-        gameState.player.hp = stats.hp; // 滿血出發
+        gameState.player.hp = stats.hp; 
     }
     if (weaponType) {
-        // 對應 items.js 的 subType 到圖片 key
         if(['sword', 'bow', 'staff'].includes(weaponType)) {
             gameState.player.weapon = weaponType;
         } else {
@@ -52,7 +50,7 @@ export function updatePlayerStats(stats, weaponType) {
 const gameState = {
     worldWidth: 3000,
     groundY: 0,
-    playerName: "我方英雄", // 🔥 預設名稱
+    playerName: "我方英雄",
     
     player: {
         x: 100, y: 300, 
@@ -79,7 +77,7 @@ let vfxList = [];
 
 export function initAdventure(database, user) {
     db = database;
-    updateAdventureContext(user); // 初始化時設定名字
+    updateAdventureContext(user);
 
     const exitBtn = document.getElementById('adv-exit-btn');
     if (exitBtn) exitBtn.addEventListener('click', stopAdventure);
@@ -98,18 +96,27 @@ export function initAdventure(database, user) {
 }
 
 export function startAdventure() {
+    // 1. 強制確保 DOM 狀態正確
     const screen = document.getElementById('adventure-screen');
+    const prepModal = document.getElementById('adventure-prep-modal');
+    
+    if (prepModal) prepModal.classList.add('hidden'); // 🔥 確保整裝介面關閉
+    screen.classList.remove('hidden'); // 🔥 顯示冒險畫面
+
     canvas = document.getElementById('adv-canvas');
     if (!canvas) return;
     ctx = canvas.getContext('2d');
 
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    screen.classList.remove('hidden');
-    isRunning = true;
+    // 2. 延遲一下再 Resize，確保 CSS transition 完成後尺寸正確
+    setTimeout(() => {
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        isRunning = true;
+        gameLoop();
+    }, 100);
 
-    gameState.groundY = canvas.height * 0.5; 
-    
+    // 3. 重置遊戲狀態
+    gameState.groundY = window.innerHeight * 0.5; 
     gameState.player.x = 100;
     gameState.player.y = gameState.groundY + 100;
     gameState.player.facingRight = true;
@@ -142,14 +149,12 @@ export function startAdventure() {
     // 敵人生成
     gameState.enemies = [];
     for(let i=1; i<=6; i++) {
-        let randomDepth = gameState.groundY + Math.random() * (canvas.height - gameState.groundY - 50);
+        let randomDepth = gameState.groundY + Math.random() * (window.innerHeight - gameState.groundY - 50);
         spawnEnemy(400 * i, randomDepth); 
     }
     spawnEnemy(2800, gameState.groundY + 100, true);
 
     loadEquippedCards();
-    
-    gameLoop();
 }
 
 function stopAdventure() {
@@ -427,10 +432,9 @@ function draw() {
             }
             ctx.restore();
 
-            // 🔥 顯示玩家暱稱
             ctx.fillStyle = 'white';
             ctx.font = `bold ${Math.floor(14 * scale)}px Arial`;
-            ctx.textAlign = 'center'; // 文字置中
+            ctx.textAlign = 'center'; 
             ctx.fillText(gameState.playerName, entity.x, entity.y - drawH - 10);
 
         } else {
