@@ -1250,4 +1250,3 @@ async function loadLeaderboard() {
         list.innerHTML = "讀取失敗";
     }
 }
-}
