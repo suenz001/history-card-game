@@ -25,7 +25,8 @@ import * as Territory from './js/territory.js';
 
 // 🔥 冒險模式相關引入
 import { initAdventure, updateAdventureContext, startAdventure } from './js/adventure.js';
-import { initPrepScreen, openPrepScreen, updatePrepData } from './js/prep.js';
+// 🔥 引入 updatePrepResources
+import { initPrepScreen, openPrepScreen, updatePrepData, updatePrepResources } from './js/prep.js';
 import { generateItemInstance } from './js/items.js';
 
 function updateLatestCardsUI() {
@@ -128,31 +129,27 @@ setTimeout(() => {
     // --- 冒險模式初始化 ---
     initAdventure(db, currentUser);
 
-    // 🔥 定義存檔回調函式 (讓 prep.js 可以呼叫)
     const handleAdventureSave = async (newAdventureData) => {
         if (!currentUser) return;
         try {
             await updateDoc(doc(db, "users", currentUser.uid), {
                 adventure: newAdventureData,
-                gems: gems, // 同步最新的錢
+                gems: gems, 
                 gold: gold
             });
-            // console.log("冒險資料已儲存");
         } catch(e) {
             console.error("存檔失敗", e);
         }
     };
 
-    // 初始化整裝介面，並傳入所需的 callback
     initPrepScreen(
         db, 
         currentUser, 
-        () => { startAdventure(); }, // 出發回調
-        handleAdventureSave,         // 🔥 存檔回調
-        currencyHandler              // 🔥 金流回調 (買東西用)
+        () => { startAdventure(); }, 
+        handleAdventureSave,         
+        currencyHandler              
     );
 
-    // 綁定「進入冒險模式」按鈕 -> 開啟整裝介面
     const advBtn = document.getElementById('enter-adventure-mode-btn');
     if (advBtn) {
         const newBtn = advBtn.cloneNode(true);
@@ -161,7 +158,10 @@ setTimeout(() => {
         newBtn.addEventListener('click', () => {
             playSound('click');
             if (!currentUser) return alert("請先登入");
-            openPrepScreen(); // 開啟整裝視窗
+            
+            // 🔥 更新資源顯示後再開啟
+            updatePrepResources(gems, gold);
+            openPrepScreen(); 
         });
     }
 
@@ -1249,4 +1249,5 @@ async function loadLeaderboard() {
         console.warn("排行榜讀取失敗", e);
         list.innerHTML = "讀取失敗";
     }
+}
 }

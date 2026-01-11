@@ -600,11 +600,17 @@
                 <div class="prep-hero-panel">
                     <div class="prep-hero-preview">
                         <img id="prep-hero-img" src="assets/hero/hero_unarmed.png" style="height: 120px; object-fit: contain;">
-                        <div class="prep-stats">
-                            <div>⚔️ 攻擊: <span id="prep-atk">0</span></div>
-                            <div>❤️ 生命: <span id="prep-hp">0</span></div>
+<div class="prep-stats" style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; width: 100%; font-size: 0.9em; margin-top: 10px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 5px;">
+                            <div>⚔️ 攻擊: <span id="prep-atk" style="color:#f1c40f;">0</span></div>
+                            <div>❤️ 生命: <span id="prep-hp" style="color:#2ecc71;">0</span></div>
+                            <div>🛡️ 防禦: <span id="prep-def" style="color:#3498db;">0</span></div>
+                            <div>⚡ 攻速: <span id="prep-aspd">0</span></div>
+                            <div>🎯 距離: <span id="prep-range">0</span></div>
+                            <div>🏃 移速: <span id="prep-move">100%</span></div>
+                            <div style="grid-column: span 2; border-top: 1px solid #555; margin-top: 2px; padding-top: 2px;">
+                                ⚖️ 負重: <span id="prep-weight">0</span> / <span id="prep-max-weight">50</span>
+                            </div>
                         </div>
-                    </div>
 
                     <div class="prep-equip-grid">
                         <div class="equip-slot" data-type="weapon" title="武器">⚔️ <div class="slot-label">武器</div></div>
