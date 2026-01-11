@@ -23,10 +23,11 @@ import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/p
 import * as Inventory from './js/inventory.js';
 import * as Territory from './js/territory.js';
 
-// 🔥 新增：引入冒險模式模組
-import { initAdventure, updateAdventureContext } from './js/adventure.js';
+// 🔥 修改：引入 startAdventure (以便從整裝介面呼叫)
+import { initAdventure, updateAdventureContext, startAdventure } from './js/adventure.js';
+// 🔥 新增：引入整裝介面模組
+import { initPrepScreen, openPrepScreen } from './js/prep.js';
 
-// ... (updateLatestCardsUI 函式保持不變) ...
 function updateLatestCardsUI() {
     const container = document.getElementById('card-display-area');
     if (!container) return;
@@ -124,10 +125,35 @@ setTimeout(() => {
         }, Inventory.openEnemyDetailModal, currencyHandler); 
     }
     
-    // 🔥 新增：初始化冒險模式 (傳入 db 與當前使用者)
+    // --- 冒險模式相關初始化 ---
+    
+    // 1. 初始化冒險模式 (核心邏輯)
     initAdventure(db, currentUser);
 
-    // 按鈕綁定...
+    // 2. 初始化整裝介面 (UI)
+    // 當玩家在整裝介面點擊「出發」時，會呼叫 startAdventure()
+    initPrepScreen(db, currentUser, () => {
+        startAdventure(); 
+    });
+
+    // 3. 綁定按鈕：打開整裝介面
+    const advBtn = document.getElementById('enter-adventure-mode-btn');
+    if (advBtn) {
+        // 🔥 關鍵技巧：複製按鈕來移除舊的 Event Listener
+        // 這樣可以防止點擊按鈕時同時觸發「打開介面」和「直接開始遊戲」
+        const newBtn = advBtn.cloneNode(true);
+        advBtn.parentNode.replaceChild(newBtn, advBtn);
+
+        newBtn.addEventListener('click', () => {
+            playSound('click');
+            if (!currentUser) return alert("請先登入");
+            
+            // 打開整裝視窗
+            openPrepScreen();
+        });
+    }
+
+    // --- 其他按鈕綁定 ---
     const invBtn = document.getElementById('inventory-btn');
     if (invBtn) invBtn.addEventListener('click', () => { playSound('click'); if (!currentUser) return alert("請先登入"); document.getElementById('inventory-title').innerText = "🎒 背包"; Inventory.setPvpSelectionMode(null, null); document.getElementById('inventory-modal').classList.remove('hidden'); Inventory.filterInventory('ALL'); });
 
