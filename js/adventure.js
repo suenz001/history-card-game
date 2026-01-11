@@ -21,6 +21,50 @@ heroSprites.sword.src = 'assets/hero/hero_sword.png';
 heroSprites.bow.src = 'assets/hero/hero_bow.png';
 heroSprites.staff.src = 'assets/hero/hero_staff.png';
 
+// 🔥 冒險模式專用技能庫 (對應 data.js 的 skillKey)
+const ADVENTURE_SKILLS = {
+    'HEAL_ALLIES': (gameState) => {
+        const heal = 200;
+        gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + heal);
+        createFloatingText(gameState.player.x, gameState.player.y - 100, `+${heal}`, '#2ecc71');
+        playSound('coin');
+        return "治癒";
+    },
+    'HEAVY_STRIKE': (gameState) => {
+        const target = findNearestEnemy();
+        if (target) {
+            takeDamage(target, 500);
+            createFloatingText(target.x, target.y - 100, `500`, '#e74c3c');
+            playSound('slash'); // 假設有這個音效，或用 draw
+        } else {
+            createFloatingText(gameState.player.x, gameState.player.y - 100, `無目標`, '#aaa');
+        }
+        return "重擊";
+    },
+    'MULTI_TARGET_STRIKE': (gameState) => {
+        // 全畫面敵人傷害
+        let hitCount = 0;
+        gameState.enemies.forEach(e => {
+            if (e.x > gameState.camera.x && e.x < gameState.camera.x + canvas.width) {
+                takeDamage(e, 300);
+                createFloatingText(e.x, e.y - 100, `300`, '#f1c40f');
+                hitCount++;
+            }
+        });
+        if (hitCount > 0) playSound('ssr');
+        return "全軍突擊";
+    },
+    // 預設技能
+    'DEFAULT': (gameState) => {
+        const target = findNearestEnemy();
+        if (target) {
+            takeDamage(target, 400);
+            createFloatingText(target.x, target.y - 100, `400`, '#e74c3c');
+        }
+        return "攻擊";
+    }
+};
+
 export function updateAdventureContext(user) {
     currentUser = user;
     // 🔥 更新玩家暱稱
@@ -181,6 +225,7 @@ function spawnEnemy(x, y, isBoss = false) {
 
 function loadEquippedCards() {
     const allCards = Inventory.getAllCards();
+    // 簡單邏輯：取戰力最高的前 6 張
     const strongCards = [...allCards].sort((a,b) => (b.atk+b.hp) - (a.atk+a.hp)).slice(0, 6);
     gameState.equippedCards = strongCards.map(card => ({
         ...card, currentCooldown: 0, maxCooldown: 300
@@ -217,35 +262,32 @@ function activateSkill(index) {
     const skill = gameState.equippedCards[index];
     if (skill.currentCooldown > 0) return;
 
-    let skillName = "重擊";
+    // 🔥 切換武器外觀
     if (skill.unitType === 'ARCHER') gameState.player.weapon = 'bow';
     else if (skill.unitType === 'INFANTRY') gameState.player.weapon = 'sword';
     else gameState.player.weapon = 'staff';
 
-    if (skill.name.includes("秦始皇") || skill.unitType === 'INFANTRY') {
-        const heal = 200;
-        gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + heal);
-        createFloatingText(gameState.player.x, gameState.player.y - 100, `+${heal}`, '#2ecc71');
-        skillName = "治癒";
-        playSound('coin'); 
-    } else if (skill.name.includes("拿破崙") || skill.unitType === 'CAVALRY') {
-        gameState.enemies.forEach(e => {
-            takeDamage(e, 300);
-            createFloatingText(e.x, e.y - 100, `300`, '#f1c40f');
-        });
-        skillName = "全軍突擊";
-        playSound('ssr');
+    // 🔥 使用 SkillKey 判斷技能效果
+    const key = skill.skillKey || 'DEFAULT';
+    let skillName = "攻擊";
+    
+    if (ADVENTURE_SKILLS[key]) {
+        skillName = ADVENTURE_SKILLS[key](gameState);
     } else {
-        const target = findNearestEnemy();
-        if (target) {
-            takeDamage(target, 500);
-            createFloatingText(target.x, target.y - 100, `500`, '#e74c3c');
-        } else {
-            createFloatingText(gameState.player.x, gameState.player.y - 100, `無目標`, '#aaa');
-        }
-        skillName = "重擊";
-        playSound('draw');
+        // Fallback: 如果找不到對應 key，給一個預設傷害
+        skillName = ADVENTURE_SKILLS['DEFAULT'](gameState);
     }
+    
+    // 特殊處理：如果是拿破崙或騎兵，視為全軍突擊 (保留原邏輯兼容)
+    if (skill.name.includes("拿破崙") || skill.unitType === 'CAVALRY') {
+         skillName = ADVENTURE_SKILLS['MULTI_TARGET_STRIKE'](gameState);
+    } else if (skill.name.includes("秦始皇")) {
+         skillName = ADVENTURE_SKILLS['HEAL_ALLIES'](gameState);
+    }
+
+    if (!skillName) skillName = "技能"; // 防止 undefined
+    console.log(`施放技能: ${skillName}`);
+    playSound('draw');
 
     skill.currentCooldown = skill.maxCooldown;
     updateSkillUI(index);
@@ -365,12 +407,14 @@ function getScale(y) {
 }
 
 function draw() {
+    // 清空畫布
     ctx.fillStyle = '#87CEEB'; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
     ctx.translate(-gameState.camera.x, 0); 
 
+    // 繪製背景裝飾
     decorations.forEach(d => {
         ctx.fillStyle = d.color;
         if (d.type === 'mountain') {
@@ -389,11 +433,15 @@ function draw() {
         }
     });
 
+    // 地面
     ctx.fillStyle = '#27ae60';
     ctx.fillRect(0, gameState.groundY, gameState.worldWidth, canvas.height - gameState.groundY);
+    
+    // 終點旗幟
     ctx.fillStyle = '#f1c40f';
     ctx.fillRect(gameState.worldWidth - 50, gameState.groundY - 200, 20, 200);
 
+    // 排序渲染順序 (Y軸排序，讓下方物體蓋住上方)
     let renderList = [];
     renderList.push({ type: 'player', data: gameState.player, y: gameState.player.y });
     gameState.enemies.forEach(e => { renderList.push({ type: 'enemy', data: e, y: e.y }); });
@@ -405,6 +453,7 @@ function draw() {
         const drawW = entity.width * scale;
         const drawH = entity.height * scale;
         
+        // 陰影
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
         ctx.ellipse(entity.x, entity.y, drawW/3, 10 * scale, 0, 0, Math.PI * 2);
@@ -419,6 +468,7 @@ function draw() {
             const scaleX = p.facingRight ? scale : -scale;
             ctx.scale(scaleX, scale);
 
+            // 🔥 優化：檢查圖片是否載入完成，避免閃爍
             if (sprite.complete && sprite.naturalWidth !== 0) {
                 ctx.drawImage(sprite, -entity.width/2, -entity.height/2, entity.width, entity.height);
             } else {
@@ -427,13 +477,14 @@ function draw() {
             }
             ctx.restore();
 
-            // 🔥 顯示玩家暱稱
+            // 顯示玩家暱稱
             ctx.fillStyle = 'white';
             ctx.font = `bold ${Math.floor(14 * scale)}px Arial`;
-            ctx.textAlign = 'center'; // 文字置中
+            ctx.textAlign = 'center'; 
             ctx.fillText(gameState.playerName, entity.x, entity.y - drawH - 10);
 
         } else {
+            // 敵人繪製 (目前用方塊，之後可換圖)
             const drawX = entity.x - drawW/2;
             const drawY = entity.y - drawH;
             ctx.fillStyle = entity.color;
@@ -444,6 +495,7 @@ function draw() {
                 ctx.font = `${Math.floor(20 * scale)}px Arial`;
                 ctx.fillText("BOSS", drawX + 10, drawY - 20);
             }
+            // 血條
             const barH = 5 * scale;
             ctx.fillStyle = 'red';
             ctx.fillRect(drawX, drawY - barH - 5, drawW, barH);
@@ -452,6 +504,7 @@ function draw() {
         }
     });
 
+    // 特效與飄字
     vfxList.forEach(v => {
         if (v.type === 'text') {
             ctx.fillStyle = v.color;

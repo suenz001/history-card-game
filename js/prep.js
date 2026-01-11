@@ -58,17 +58,22 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
         });
     }
 
-    // 綁定轉蛋按鈕 (因為是動態生成的HTML，可能要檢查是否存在)
-    // 這裡假設按鈕已經在 index.html 裡面寫死了
+    // 綁定轉蛋按鈕
     const gachaBtns = document.querySelectorAll('#tab-gacha button');
     if (gachaBtns.length >= 2) {
-        gachaBtns[0].addEventListener('click', () => performGacha(1));  // 單抽
-        gachaBtns[1].addEventListener('click', () => performGacha(10)); // 十連
+        // 先移除舊監聽器 (防止重複綁定)，如果沒有 cloneNode 可以略過
+        // 這裡簡單直接綁定，假設 init 只會執行一次
+        gachaBtns[0].onclick = () => performGacha(1);
+        gachaBtns[1].onclick = () => performGacha(10);
     }
 }
 
 export function updatePrepData(data) {
     adventureData = data;
+    // 確保資料結構完整
+    if (!adventureData.shopItems) adventureData.shopItems = [];
+    if (!adventureData.shopLastRefresh) adventureData.shopLastRefresh = 0;
+
     calculateAndShowStats();
 }
 
@@ -79,8 +84,8 @@ export function openPrepScreen() {
     switchTab('equip');
     handleSlotClick(null); 
 
-    // 每次打開重新進貨 (簡單邏輯)
-    generateDailyShop();
+    // 🔥 修正：檢查商店是否需要刷新 (24小時冷卻)
+    checkAndRefreshShop();
     renderShop();
 
     renderPrepCards(); 
@@ -126,7 +131,6 @@ function equipItem(itemUid) {
     renderInventoryList();
     calculateAndShowStats();
     
-    // 🔥 自動存檔
     if(onSave) onSave(adventureData);
 }
 
@@ -142,7 +146,6 @@ function unequipItem(slotType) {
     renderInventoryList();
     calculateAndShowStats();
 
-    // 🔥 自動存檔
     if(onSave) onSave(adventureData);
 }
 
@@ -250,12 +253,16 @@ function calculateAndShowStats() {
     let totalAtk = 50; 
     let totalHp = 1000;
 
-    Object.values(adventureData.equipment).forEach(item => {
-        if (item && item.stats) {
-            if (item.stats.atk) totalAtk += item.stats.atk;
-            if (item.stats.def) totalHp += item.stats.def * 10;
-        }
-    });
+    if (adventureData.equipment) {
+        Object.values(adventureData.equipment).forEach(item => {
+            if (item && item.stats) {
+                if (item.stats.atk) totalAtk += item.stats.atk;
+                if (item.stats.def) totalHp += item.stats.def * 10;
+                // 注意：這裡還可以加入 item.stats.defBonus 等其他屬性
+                if (item.stats.defBonus) totalHp += item.stats.defBonus * 10;
+            }
+        });
+    }
 
     adventureData.stats = { hp: totalHp, atk: totalAtk };
 
@@ -288,6 +295,27 @@ function renderPrepCards() {
 // 🛒 商店系統實作
 // -------------------------------------------------------------
 
+function checkAndRefreshShop() {
+    const now = Date.now();
+    const oneDay = 24 * 60 * 60 * 1000;
+    
+    // 如果沒有商店資料，或者距離上次刷新超過 24 小時
+    if (!adventureData.shopItems || 
+        adventureData.shopItems.length === 0 || 
+        (now - adventureData.shopLastRefresh) > oneDay) {
+            
+        generateDailyShop();
+        adventureData.shopLastRefresh = now;
+        
+        // 立即存檔，避免玩家刷新後重新整理網頁又重置
+        if(onSave) onSave(adventureData);
+        console.log("商店已刷新");
+    } else {
+        // 載入舊的商店資料
+        shopItems = adventureData.shopItems;
+    }
+}
+
 function generateDailyShop() {
     // 隨機挑選 6 個商品 (只出 R 和 SR)
     const allItems = getAllItems().filter(i => i.rarity !== 'SSR');
@@ -300,6 +328,8 @@ function generateDailyShop() {
             price: blueprint.rarity === 'SR' ? 2000 : 500 // 簡單定價
         });
     }
+    // 同步到 adventureData
+    if(adventureData) adventureData.shopItems = shopItems;
 }
 
 function renderShop() {
@@ -343,10 +373,13 @@ function buyItem(blueprint, index) {
     
     // 移除已買商品 (避免重複買)
     shopItems.splice(index, 1);
+    
+    // 🔥 同步回 adventureData 並存檔
+    adventureData.shopItems = shopItems;
+    
     renderShop();
-    renderInventoryList(); // 刷新背包顯示剛買的
+    renderInventoryList(); 
 
-    // 5. 存檔
     if(onSave) onSave(adventureData);
 }
 
@@ -396,7 +429,6 @@ function performGacha(times) {
     results.forEach(item => adventureData.inventory.push(item));
     
     // 4. 顯示結果 (簡單條列式)
-    // 為了 UX，過濾出最高稀有度來決定音效
     const hasSSR = results.some(i => i.rarity === 'SSR');
     if(hasSSR) playSound('ssr');
 
