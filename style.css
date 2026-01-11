@@ -1781,74 +1781,59 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     pointer-events: none;
 }
 
-/* === 7. 冒險模式：整裝大廳 (Prep Screen) - 修正版 === */
+/* style.css - 冒險模式整裝介面 (修正對齊) */
 
-/* 佈局容器 (使用 Flex 撐開高度) */
+/* 佈局容器 */
 .prep-container {
     background: rgba(0,0,0,0.2);
     border-radius: 8px;
     padding: 10px;
-    display: flex; /* 🔥 關鍵：PC 版橫向排列 */
-    gap: 15px;
-    flex: 1;          
-    min-height: 0;    
-    overflow: hidden; 
 }
 
 /* 左側：英雄面板 */
 .prep-hero-panel {
-    flex: 0 0 320px; /* 固定寬度，避免被擠壓 */
+    flex: 1;
     background: #34495e;
     border-radius: 8px;
     padding: 10px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    overflow-y: auto; 
+    overflow-y: auto;
 }
 
 .prep-hero-preview {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 15px;
     background: rgba(0,0,0,0.3);
     padding: 10px;
     border-radius: 8px;
-    cursor: pointer;
+    cursor: pointer; /* 🔥 提示可點擊 */
     transition: 0.2s;
-    border: 1px solid transparent;
 }
-.prep-hero-preview:hover { 
-    background: rgba(255,255,255,0.1); 
-    border-color: rgba(255,255,255,0.3);
+.prep-hero-preview:hover {
+    background: rgba(255,255,255,0.1); /* 🔥 hover 效果 */
 }
 
-.prep-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5px;
-    width: 100%;
-    font-size: 0.85em;
-    text-align: left;
-    margin-top: 5px;
-    box-sizing: border-box;
-}
-
-/* 左側裝備網格 (2x3) */
+/* 裝備網格 (2x3) */
 .prep-equip-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-bottom: 10px;
+    grid-template-columns: repeat(2, 1fr); /* 兩列 */
+    gap: 8px;
 }
 
-.prep-equip-grid .equip-slot {
+.equip-slot {
     background: #222;
     border: 2px solid #555;
     border-radius: 5px;
+    
+    /* 🔥 正方形優化 */
     width: 100%;
-    aspect-ratio: 1 / 1; /* 強制正方形 */
+    height: auto;
+    aspect-ratio: 1 / 1;
+    
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -1858,14 +1843,11 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     font-size: 1.5em;
     transition: 0.2s;
 }
-.prep-equip-grid .equip-slot:hover, 
-.prep-equip-grid .equip-slot.selected { 
-    border-color: #f1c40f !important; 
-    box-shadow: 0 0 10px rgba(241, 196, 15, 0.3); 
-    background: rgba(241, 196, 15, 0.1);
-}
-.prep-equip-grid .equip-slot .slot-label {
-    font-size: 0.8rem; color: #aaa; margin-top: 2px;
+.equip-slot:hover, .equip-slot.selected { border-color: #f1c40f; box-shadow: 0 0 10px rgba(241, 196, 15, 0.3); }
+.equip-slot .slot-label {
+    font-size: 0.4em;
+    color: #aaa;
+    margin-top: 2px;
 }
 
 /* 物品槽 */
@@ -1873,7 +1855,6 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     display: flex;
     gap: 5px;
     justify-content: center;
-    flex-wrap: wrap;
 }
 .item-slot {
     width: 40px; height: 40px;
@@ -1886,125 +1867,118 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* 右側：動作面板 */
 .prep-action-panel {
-    flex: 1; /* 佔滿剩餘寬度 */
+    flex: 2;
     background: #2c3e50;
     border-radius: 8px;
     display: flex;
     flex-direction: column;
     border: 1px solid #555;
-    min-width: 0; 
-    overflow: hidden;
 }
 
-.prep-tabs { display: flex; border-bottom: 1px solid #555; background: #222; flex-shrink: 0; }
-.prep-tab-btn { flex: 1; background: transparent; border: none; padding: 12px; color: #aaa; cursor: pointer; font-weight: bold; border-right: 1px solid #444; }
-.prep-tab-btn.active { background: #e67e22; color: white; }
-
-.prep-tab-content { 
-    display: none; 
-    flex: 1; 
-    padding: 10px; 
-    overflow-y: auto; 
-}
-.prep-tab-content.active { display: block; }
-
-/* 右側裝備列表 (Grid 佈局) */
-.prep-grid-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-    gap: 10px;
-    align-content: start;
-}
-
-.prep-grid-list .equip-slot {
-    background: #222;
-    border: 2px solid #555;
-    border-radius: 5px;
+/* 分頁按鈕 */
+.prep-tabs {
     display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
+    border-bottom: 1px solid #555;
+}
+.prep-tab-btn {
+    flex: 1;
+    background: #34495e;
+    border: none;
+    padding: 10px;
+    color: #aaa;
     cursor: pointer;
-    padding: 5px;
-    box-sizing: border-box;
-    height: 120px;
-    width: 100%;
+    font-weight: bold;
+    border-right: 1px solid #555;
+}
+.prep-tab-btn.active {
+    background: #e67e22;
+    color: white;
+}
+.prep-tab-btn:hover:not(.active) {
+    background: #3e5871;
 }
 
-.prep-grid-list .equip-slot img {
-    width: 50px; height: 50px; margin-bottom: 5px; object-fit: contain;
+/* 分頁內容 */
+.prep-tab-content {
+    display: none; /* 預設隱藏 */
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+}
+.prep-tab-content.active {
+    display: block; /* 顯示選中的 */
 }
 
-.slot-label { font-size: 0.8em; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-weight: bold; }
-.slot-stats { font-size: 0.7em; color: #ccc; margin-top: 2px; line-height: 1.2; text-align: center; white-space: pre-wrap; width: 100%; }
-
-/* 商店與關卡 */
-.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
-.shop-item { background: rgba(255,255,255,0.05); border: 1px solid #555; padding: 10px; border-radius: 5px; text-align: center; }
-.level-select-grid { display: flex; flex-direction: column; gap: 8px; }
-.prep-level-btn { background: #34495e; color: white; border: 2px solid #777; padding: 15px; border-radius: 8px; cursor: pointer; text-align: left; }
-.prep-level-btn.selected { border-color: #f1c40f; background: rgba(241, 196, 15, 0.1); }
-.prep-level-btn.locked { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
-
-/* === 8. 冒險模式：戰鬥畫面 === */
-#adventure-screen {
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
-    background-color: #000; z-index: 3000; overflow: hidden;
-    touch-action: none; overscroll-behavior: none;
+/* 🔥 右側裝備列表 (修正對齊) */
+.prep-grid-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start; /* 🔥 強制靠左 */
+    align-content: flex-start;
+    gap: 10px; /* 項目間距 */
+    text-align: left; /* 內容靠左 */
 }
-#adv-canvas { display: block; width: 100%; height: 100%; background-color: #333; }
-#adv-ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; padding: 20px; box-sizing: border-box; }
-.adv-top-bar { display: flex; justify-content: space-between; align-items: flex-start; }
-.adv-player-info { display: flex; gap: 10px; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 10px; pointer-events: auto; }
-.adv-avatar { width: 50px; height: 50px; background: #555; border-radius: 50%; border: 2px solid #fff; display: flex; justify-content: center; align-items: center; font-size: 1.5em; }
-.adv-bars { display: flex; flex-direction: column; justify-content: center; gap: 5px; width: 150px; }
-.adv-hp-bar, .adv-mp-bar { width: 100%; height: 10px; background: #333; border-radius: 5px; border: 1px solid #fff; overflow: hidden; }
-.adv-hp-bar div { background: #e74c3c; height: 100%; }
-.adv-mp-bar div { background: #3498db; height: 100%; }
-#adv-exit-btn { pointer-events: auto; }
-.adv-controls-hint { position: absolute; top: 80px; left: 20px; color: rgba(255, 255, 255, 0.7); font-family: monospace; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; pointer-events: none; }
-#adv-skill-bar-container { position: absolute; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: rgba(0, 0, 0, 0.6); padding: 8px 15px; border-radius: 15px; border: 1px solid #aaa; pointer-events: auto; z-index: 9000; }
-.adv-skill-slot { width: 60px; height: 60px; position: relative; border: 2px solid #aaa; border-radius: 8px; background: #222; cursor: pointer; overflow: hidden; transition: transform 0.1s; }
-.adv-skill-slot:active { transform: scale(0.95); }
-.adv-skill-img { width: 100%; height: 100%; object-fit: cover; }
-.adv-skill-cooldown { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; font-size: 1.2em; transition: height 0.1s linear; }
-.adv-skill-slot.ready { border-color: #f1c40f; box-shadow: 0 0 10px #f1c40f; }
-#virtual-joystick-zone { position: absolute; bottom: calc(120px + env(safe-area-inset-bottom)); left: 40px; width: 120px; height: 120px; z-index: 9999; touch-action: none; user-select: none; display: flex; justify-content: center; align-items: center; pointer-events: auto; }
-#joystick-base { width: 100%; height: 100%; background: rgba(255, 255, 255, 0.15); border: 2px solid rgba(255, 255, 255, 0.5); border-radius: 50%; position: relative; backdrop-filter: blur(4px); box-shadow: 0 0 15px rgba(0,0,0,0.5); }
-#joystick-stick { width: 50px; height: 50px; background: radial-gradient(circleAt 30% 30%, #f1c40f, #f39c12); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 6px rgba(0,0,0,0.4); pointer-events: none; }
 
-.hidden { display: none !important; }
-@keyframes goldPulse { from { box-shadow: 0 0 10px rgba(241, 196, 15, 0.5); } to { box-shadow: 0 0 25px rgba(241, 196, 15, 1); } }
+/* 商店與關卡樣式 */
+.shop-grid, .level-select-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+}
+.shop-item {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid #555;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+}
+.shop-icon { font-size: 2em; margin-bottom: 5px; }
 
-/* === 9. 🔥 手機版響應式設定 (放在最後面，確保覆蓋) === */
+.prep-level-btn {
+    background: #34495e;
+    color: white;
+    border: 2px solid #777;
+    padding: 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+}
+.prep-level-btn.selected {
+    border-color: #f1c40f;
+    background: rgba(241, 196, 15, 0.1);
+}
+.prep-level-btn.locked {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(1);
+}
+
+/* 手機版適配 */
 @media (max-width: 768px) {
-    .card { width: 100px; height: 150px; }
-    .status-bar { font-size: 0.9em; }
-
-    /* 整裝介面手機版：強制垂直排列 */
+    #adv-skill-bar-container {
+        bottom: calc(10px + env(safe-area-inset-bottom)); /* 技能列貼底，避開橫條 */
+        transform: translateX(-50%) scale(0.85);
+        padding: 5px;
+        gap: 5px;
+    }
+    .adv-skill-slot {
+        width: 50px; /* 卡片稍微縮小 */
+        height: 50px;
+    }
+    #virtual-joystick-zone {
+        bottom: calc(150px + env(safe-area-inset-bottom)); /* 🔥 手機上再高一點，避免跟手機底部手勢衝突 */
+        left: 30px;
+    }
+    /* 整裝介面手機版 */
     .prep-container {
-        flex-direction: column; 
-        height: auto;
-        max-height: 80vh; 
-        overflow-y: auto;
-        gap: 10px;
+        flex-direction: column; /* 改為上下排列 */
+        overflow-y: auto; /* 整個容器捲動 */
     }
-    
-    .prep-hero-panel { 
-        flex: none; 
-        width: 100%; 
-        overflow: visible; 
+    .prep-hero-panel {
+        flex: none; /* 高度自適應 */
     }
-    
-    .prep-action-panel { 
-        flex: 1; 
-        width: 100%; 
-        min-height: 400px; /* 確保列表有空間 */
+    .prep-action-panel {
+        flex: 1;
+        min-height: 300px;
     }
-    
-    .prep-equip-grid { gap: 5px; }
-    
-    #adv-skill-bar-container { bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%) scale(0.85); padding: 5px; gap: 5px; }
-    .adv-skill-slot { width: 50px; height: 50px; }
-    #virtual-joystick-zone { bottom: calc(150px + env(safe-area-inset-bottom)); left: 30px; }
 }
