@@ -225,6 +225,8 @@ function renderEquippedSlots() {
     }
 }
 
+// js/prep.js - 替換 renderInventoryList 函式
+
 function renderInventoryList() {
     const list = document.getElementById('prep-equip-list');
     list.innerHTML = "";
@@ -244,21 +246,58 @@ function renderInventoryList() {
     
     filteredItems.forEach(item => {
         const itemDiv = document.createElement('div');
-        itemDiv.className = 'equip-slot'; 
-        itemDiv.style.width = '80px'; itemDiv.style.height = '80px'; itemDiv.style.margin = '0'; 
+        itemDiv.className = 'equip-slot'; // 使用新的 CSS class
         itemDiv.style.borderColor = item.color || '#fff';
         
-        const img = document.createElement('img');
-        img.src = item.img;
-        img.onerror = () => { img.src = 'https://placehold.co/60x60?text=Item'; };
-        img.style.width = '60%'; img.style.height = '60%'; img.style.objectFit = 'contain';
+        // 🔥 1. 圖片處理：強制換成 webp
+        // 假設原始路徑是 assets/items/xxx.png，替換副檔名
+        let imgSrc = item.img;
+        if (imgSrc && imgSrc.endsWith('.png')) {
+            imgSrc = imgSrc.replace('.png', '.webp');
+        }
         
-        const label = document.createElement('div');
-        label.className = 'slot-label';
-        label.innerText = item.name;
+        // 🔥 2. 組裝數值 HTML
+        let statsHtml = "";
         
-        itemDiv.appendChild(img);
-        itemDiv.appendChild(label);
+        // 顯示攻擊 (atk)
+        if (item.stats && item.stats.atk) {
+            statsHtml += `
+                <div class="equip-stat-row">
+                    <span>⚔️ 攻擊</span><span class="equip-stat-val">${item.stats.atk}</span>
+                </div>`;
+        }
+        
+        // 顯示防禦 (def)
+        if (item.stats && item.stats.def) {
+            statsHtml += `
+                <div class="equip-stat-row">
+                    <span>🛡️ 防禦</span><span class="equip-stat-val">${item.stats.def}</span>
+                </div>`;
+        }
+
+        // 顯示特殊屬性 (攻速/距離) 
+        // 註：這需要你的 items.js 有產生這些數值，如果沒有，我們可以根據 subType 顯示文字
+        if (item.type === 'weapon') {
+            let typeText = "近戰";
+            if(item.subType === 'bow') typeText = "遠程 (弓)";
+            else if(item.subType === 'staff') typeText = "遠程 (杖)";
+            
+            statsHtml += `
+                <div class="equip-stat-row" style="color:#aaa;">
+                    <span>類型</span><span>${typeText}</span>
+                </div>`;
+        }
+
+        // 組合 HTML：上方正方形圖 + 下方詳細資料
+        itemDiv.innerHTML = `
+            <div class="equip-img-box">
+                <img src="${imgSrc}" onerror="this.src='https://placehold.co/100x100?text=Item'">
+            </div>
+            <div class="equip-details">
+                <div class="equip-name" style="color:${item.color}">${item.name}</div>
+                ${statsHtml}
+            </div>
+        `;
         
         itemDiv.onclick = () => equipItem(item.uid);
         list.appendChild(itemDiv);
