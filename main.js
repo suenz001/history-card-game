@@ -23,10 +23,10 @@ import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/p
 import * as Inventory from './js/inventory.js';
 import * as Territory from './js/territory.js';
 
-// 🔥 修改：引入 startAdventure (以便從整裝介面呼叫)
+// 🔥 冒險模式相關引入
 import { initAdventure, updateAdventureContext, startAdventure } from './js/adventure.js';
-// 🔥 新增：引入整裝介面模組
-import { initPrepScreen, openPrepScreen } from './js/prep.js';
+import { initPrepScreen, openPrepScreen, updatePrepData } from './js/prep.js';
+import { generateItemInstance } from './js/items.js'; // 🔥 新增：用於生成新手裝備
 
 function updateLatestCardsUI() {
     const container = document.getElementById('card-display-area');
@@ -125,31 +125,25 @@ setTimeout(() => {
         }, Inventory.openEnemyDetailModal, currencyHandler); 
     }
     
-    // --- 冒險模式相關初始化 ---
-    
-    // 1. 初始化冒險模式 (核心邏輯)
+    // --- 冒險模式初始化 ---
     initAdventure(db, currentUser);
 
-    // 2. 初始化整裝介面 (UI)
-    // 當玩家在整裝介面點擊「出發」時，會呼叫 startAdventure()
+    // 初始化整裝介面，並設定「出發」按鈕的回調
     initPrepScreen(db, currentUser, () => {
         startAdventure(); 
     });
 
-    // 3. 綁定按鈕：打開整裝介面
+    // 綁定「進入冒險模式」按鈕 -> 開啟整裝介面
     const advBtn = document.getElementById('enter-adventure-mode-btn');
     if (advBtn) {
-        // 🔥 關鍵技巧：複製按鈕來移除舊的 Event Listener
-        // 這樣可以防止點擊按鈕時同時觸發「打開介面」和「直接開始遊戲」
+        // 使用 cloneNode 移除舊的 Event Listener (防止重複綁定)
         const newBtn = advBtn.cloneNode(true);
         advBtn.parentNode.replaceChild(newBtn, advBtn);
 
         newBtn.addEventListener('click', () => {
             playSound('click');
             if (!currentUser) return alert("請先登入");
-            
-            // 打開整裝視窗
-            openPrepScreen();
+            openPrepScreen(); // 開啟整裝視窗
         });
     }
 
@@ -614,22 +608,70 @@ async function loadUserData(user) {
         battleLogs = data.battleLogs || [];
         completedLevels = data.completedLevels || {};
         
+        // 🔥 冒險模式資料初始化檢查
+        let adventureData = data.adventure;
+        
+        // 如果該使用者還沒有冒險資料 (新玩家或老玩家第一次玩冒險)，幫他產生初始裝備
+        if (!adventureData) {
+            console.log("初始化冒險模式資料...");
+            
+            // 產生初始裝備：生鏽鐵劍(R) & 草鞋(R)
+            const starterSword = generateItemInstance('w_sword_r_01');
+            const starterShoes = generateItemInstance('a_shoes_r_01');
+            
+            // 建立預設資料結構
+            adventureData = {
+                inventory: [starterSword, starterShoes], // 背包
+                equipment: {
+                    weapon: null,
+                    head: null,
+                    armor: null,
+                    gloves: null,
+                    legs: null,
+                    shoes: null
+                },
+                stats: {
+                    hp: 1000,
+                    atk: 50
+                }
+            };
+            
+            // 寫入資料庫
+            await updateDoc(userRef, { adventure: adventureData });
+        }
+        
+        // 將冒險資料傳遞給 prep.js，讓 UI 可以顯示
+        updatePrepData(adventureData);
+
         const updateData = { lastLoginAt: serverTimestamp() };
         if(!data.email && user.email) updateData.email = user.email;
         updateDoc(userRef, updateData);
     } else { 
         gems = 5000; gold = 5000; iron = 5000; food = 5000; wood = 5000; 
         claimedNotifs = []; deletedSystemNotifs = []; battleLogs = []; completedLevels = {};
+        
+        // 新帳號直接包含冒險資料
+        const starterSword = generateItemInstance('w_sword_r_01');
+        const starterShoes = generateItemInstance('a_shoes_r_01');
+        
+        const adventureData = {
+            inventory: [starterSword, starterShoes],
+            equipment: { weapon: null, head: null, armor: null, gloves: null, legs: null, shoes: null },
+            stats: { hp: 1000, atk: 50 }
+        };
+
         await setDoc(userRef, { 
             name: user.displayName || "未命名", email: user.email || null, 
             gems, gold, iron, food, wood, combatPower: 0, 
             claimedNotifs: [], deletedSystemNotifs: [], battleLogs: [], completedLevels: {}, 
+            adventure: adventureData, // 🔥 寫入冒險資料
             createdAt: new Date(), lastLoginAt: serverTimestamp() 
         }); 
+        
+        updatePrepData(adventureData);
     }
     updateUIDisplay();
     
-    // 🔥 同步使用者資料給冒險模式
     updateAdventureContext(user);
     
     await fetchGlobalAnnouncements();
