@@ -2,16 +2,16 @@
 import { playSound } from './audio.js';
 import * as Inventory from './inventory.js';
 import { updatePlayerStats } from './adventure.js';
-import { generateItemInstance, getAllItems, EQUIP_TYPES, WEAPON_TYPES } from './items.js';
+import { generateItemInstance, getAllItems, EQUIP_TYPES } from './items.js';
 
 let db = null;
 let currentUser = null;
 let startBattleCallback = null;
 let onSave = null;
-let handleCurrency = null; 
+let handleCurrency = null; // 金流管理
 let adventureData = null; 
 let currentSelectedSlot = null; 
-let shopItems = []; 
+let shopItems = []; // 暫存商店列表
 
 // 初始化整裝介面
 export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb) {
@@ -29,22 +29,13 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
         });
     });
 
-    // 綁定「出發冒險」按鈕
     document.getElementById('prep-start-battle-btn').addEventListener('click', () => {
         playSound('click');
-        
-        // 1. 更新數值到 adventure.js
         if(adventureData && adventureData.stats) {
             updatePlayerStats(adventureData.stats, adventureData.equipment?.weapon?.subType || 'unarmed');
         }
-        
-        // 🔥 修正：不要在這裡隱藏 Modal，交給 adventure.js 的 startAdventure 統一處理
-        // document.getElementById('adventure-prep-modal').classList.add('hidden'); // 移除這行
-        
-        // 2. 呼叫開始戰鬥
-        if(startBattleCallback) {
-            startBattleCallback();
-        }
+        document.getElementById('adventure-prep-modal').classList.add('hidden');
+        if(startBattleCallback) startBattleCallback();
     });
 
     document.getElementById('close-prep-btn').addEventListener('click', () => {
@@ -67,19 +58,13 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
         });
     }
 
+    // 綁定轉蛋按鈕 (因為是動態生成的HTML，可能要檢查是否存在)
+    // 這裡假設按鈕已經在 index.html 裡面寫死了
     const gachaBtns = document.querySelectorAll('#tab-gacha button');
     if (gachaBtns.length >= 2) {
-        gachaBtns[0].addEventListener('click', () => performGacha(1));  
-        gachaBtns[1].addEventListener('click', () => performGacha(10)); 
+        gachaBtns[0].addEventListener('click', () => performGacha(1));  // 單抽
+        gachaBtns[1].addEventListener('click', () => performGacha(10)); // 十連
     }
-}
-
-// 🔥 新增：更新介面上的資源顯示
-export function updatePrepResources(gems, gold) {
-    const gemEl = document.getElementById('prep-gems');
-    const goldEl = document.getElementById('prep-gold');
-    if(gemEl) gemEl.innerText = gems;
-    if(goldEl) goldEl.innerText = gold;
 }
 
 export function updatePrepData(data) {
@@ -94,6 +79,7 @@ export function openPrepScreen() {
     switchTab('equip');
     handleSlotClick(null); 
 
+    // 每次打開重新進貨 (簡單邏輯)
     generateDailyShop();
     renderShop();
 
@@ -140,6 +126,7 @@ function equipItem(itemUid) {
     renderInventoryList();
     calculateAndShowStats();
     
+    // 🔥 自動存檔
     if(onSave) onSave(adventureData);
 }
 
@@ -155,6 +142,7 @@ function unequipItem(slotType) {
     renderInventoryList();
     calculateAndShowStats();
 
+    // 🔥 自動存檔
     if(onSave) onSave(adventureData);
 }
 
@@ -216,7 +204,6 @@ function renderEquippedSlots() {
     }
 }
 
-// 🔥 優化：顯示裝備數值
 function renderInventoryList() {
     const list = document.getElementById('prep-equip-list');
     list.innerHTML = "";
@@ -237,117 +224,43 @@ function renderInventoryList() {
     filteredItems.forEach(item => {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'equip-slot'; 
+        itemDiv.style.width = '80px'; itemDiv.style.height = '80px'; itemDiv.style.margin = '0'; 
         itemDiv.style.borderColor = item.color || '#fff';
         
         const img = document.createElement('img');
         img.src = item.img;
         img.onerror = () => { img.src = 'https://placehold.co/60x60?text=Item'; };
+        img.style.width = '60%'; img.style.height = '60%'; img.style.objectFit = 'contain';
         
         const label = document.createElement('div');
         label.className = 'slot-label';
         label.innerText = item.name;
-        if(item.rarity === 'SSR') label.style.color = '#f1c40f';
-        else if(item.rarity === 'SR') label.style.color = '#9b59b6';
-        else label.style.color = '#fff';
-
-        // 🔥 生成數值文字
-        const statsDiv = document.createElement('div');
-        statsDiv.className = 'slot-stats';
-        let statText = "";
-        
-        if (item.type === 'weapon') {
-            statText += `攻:${item.stats.atk}\n`;
-            if(item.stats.atkSpeed) statText += `速:${item.stats.atkSpeed}\n`;
-            if(item.stats.range) statText += `距:${item.stats.range}`;
-        } else {
-            if(item.stats.def) statText += `防:${item.stats.def}\n`;
-            if(item.stats.weight) statText += `重:${item.stats.weight}\n`;
-            if(item.stats.moveSpeedBonus) statText += `跑:+${item.stats.moveSpeedBonus}%`;
-        }
-        statsDiv.innerText = statText;
         
         itemDiv.appendChild(img);
         itemDiv.appendChild(label);
-        itemDiv.appendChild(statsDiv);
         
         itemDiv.onclick = () => equipItem(item.uid);
         list.appendChild(itemDiv);
     });
 }
 
-// 🔥 優化：計算並顯示所有詳細數值 (含負重懲罰)
 function calculateAndShowStats() {
     if(!adventureData) return;
 
-    // 基礎數值
-    let stats = {
-        atk: 50,
-        hp: 1000,
-        def: 0,
-        atkSpeed: 60,  // 攻擊間隔 (越小越快)
-        range: 120,    // 攻擊距離
-        moveSpeed: 8,  // 基礎跑速 (對應 adventure.js 的 speed: 8)
-        weight: 0,
-        maxWeight: 50  // 最大負重
-    };
+    let totalAtk = 50; 
+    let totalHp = 1000;
 
-    let moveSpeedBonusPct = 0; // 跑速加成百分比
-
-    // 累加裝備數值
     Object.values(adventureData.equipment).forEach(item => {
         if (item && item.stats) {
-            if (item.stats.atk) stats.atk += item.stats.atk;
-            if (item.stats.def) {
-                stats.def += item.stats.def;
-                stats.hp += item.stats.def * 10; // 簡單換算：1防禦 = 10血量
-            }
-            // 武器會覆蓋攻速與距離 (取主手)
-            if (item.type === 'weapon') {
-                if (item.stats.atkSpeed) stats.atkSpeed = item.stats.atkSpeed;
-                if (item.stats.range) stats.range = item.stats.range;
-            }
-            if (item.stats.weight) stats.weight += item.stats.weight;
-            if (item.stats.moveSpeedBonus) moveSpeedBonusPct += item.stats.moveSpeedBonus;
+            if (item.stats.atk) totalAtk += item.stats.atk;
+            if (item.stats.def) totalHp += item.stats.def * 10;
         }
     });
 
-    // 計算負重懲罰 (超重 1 點扣 2% 跑速)
-    let weightPenaltyPct = 0;
-    if (stats.weight > stats.maxWeight) {
-        weightPenaltyPct = (stats.weight - stats.maxWeight) * 2;
-    }
+    adventureData.stats = { hp: totalHp, atk: totalAtk };
 
-    // 最終跑速計算 (顯示百分比)
-    // 基礎 100% + 裝備加成 - 負重懲罰
-    let finalMoveSpeedPct = 100 + moveSpeedBonusPct - weightPenaltyPct;
-    if (finalMoveSpeedPct < 10) finalMoveSpeedPct = 10; // 最低 10%
-
-    // 寫回 adventureData，讓 adventure.js 使用
-    adventureData.stats = { 
-        ...stats,
-        // 這裡需要換算回 adventure.js 的 speed 數值 (基礎 8)
-        finalMoveSpeed: stats.moveSpeed * (finalMoveSpeedPct / 100)
-    };
-
-    // 更新 UI 顯示
-    document.getElementById('prep-atk').innerText = stats.atk;
-    document.getElementById('prep-hp').innerText = stats.hp;
-    document.getElementById('prep-def').innerText = stats.def;
-    document.getElementById('prep-aspd').innerText = stats.atkSpeed;
-    document.getElementById('prep-range').innerText = stats.range;
-    
-    const moveEl = document.getElementById('prep-move');
-    moveEl.innerText = `${finalMoveSpeedPct}%`;
-    if(weightPenaltyPct > 0) moveEl.style.color = '#e74c3c'; // 紅字警告
-    else if(moveSpeedBonusPct > 0) moveEl.style.color = '#2ecc71'; // 綠字加成
-    else moveEl.style.color = 'white';
-
-    const weightEl = document.getElementById('prep-weight');
-    weightEl.innerText = stats.weight;
-    if(stats.weight > stats.maxWeight) weightEl.style.color = '#e74c3c';
-    else weightEl.style.color = 'white';
-    
-    document.getElementById('prep-max-weight').innerText = stats.maxWeight;
+    document.getElementById('prep-atk').innerText = totalAtk;
+    document.getElementById('prep-hp').innerText = totalHp;
 }
 
 function renderPrepCards() {
@@ -376,13 +289,15 @@ function renderPrepCards() {
 // -------------------------------------------------------------
 
 function generateDailyShop() {
+    // 隨機挑選 6 個商品 (只出 R 和 SR)
     const allItems = getAllItems().filter(i => i.rarity !== 'SSR');
     shopItems = [];
+    
     for(let i=0; i<6; i++) {
         const blueprint = allItems[Math.floor(Math.random() * allItems.length)];
         shopItems.push({
             ...blueprint,
-            price: blueprint.rarity === 'SR' ? 2000 : 500
+            price: blueprint.rarity === 'SR' ? 2000 : 500 // 簡單定價
         });
     }
 }
@@ -400,6 +315,7 @@ function renderShop() {
             <div class="shop-name" style="font-size:0.9em; margin:5px 0;">${item.name}</div>
             <button class="btn-mini" style="width:100%;">${item.price} G</button>
         `;
+        
         div.querySelector('button').addEventListener('click', () => buyItem(item, index));
         container.appendChild(div);
     });
@@ -407,21 +323,30 @@ function renderShop() {
 
 function buyItem(blueprint, index) {
     if(!handleCurrency) return;
-    if(!handleCurrency('check', blueprint.price, 'gold')) { return alert("金幣不足！"); }
+    
+    // 1. 檢查錢
+    if(!handleCurrency('check', blueprint.price, 'gold')) {
+        return alert("金幣不足！");
+    }
 
+    // 2. 扣錢
     handleCurrency('deduct', blueprint.price, 'gold');
     handleCurrency('refresh');
-    // 🔥 同步更新介面上的錢
-    updatePrepResources(document.getElementById('gem-count').innerText, document.getElementById('gold-count').innerText);
 
+    // 3. 生成裝備並給玩家
     const newItem = generateItemInstance(blueprint.id);
     adventureData.inventory.push(newItem);
 
+    // 4. 更新介面
     playSound('coin');
     alert(`購買成功！獲得 ${newItem.name}`);
+    
+    // 移除已買商品 (避免重複買)
     shopItems.splice(index, 1);
     renderShop();
-    renderInventoryList();
+    renderInventoryList(); // 刷新背包顯示剛買的
+
+    // 5. 存檔
     if(onSave) onSave(adventureData);
 }
 
@@ -431,35 +356,47 @@ function buyItem(blueprint, index) {
 
 function performGacha(times) {
     if(!handleCurrency) return;
-    const cost = times * 200;
+    const cost = times * 200; // 單抽 200 鑽
     
-    if(!handleCurrency('check', cost, 'gems')) { return alert(`鑽石不足！需要 ${cost} 💎`); }
+    // 1. 檢查鑽石
+    if(!handleCurrency('check', cost, 'gems')) {
+        return alert(`鑽石不足！需要 ${cost} 💎`);
+    }
 
+    // 2. 扣鑽
     handleCurrency('deduct', cost, 'gems');
     handleCurrency('refresh');
-    // 🔥 同步更新介面上的錢
-    updatePrepResources(document.getElementById('gem-count').innerText, document.getElementById('gold-count').innerText);
     playSound('draw');
 
     const results = [];
     const allItems = getAllItems();
 
+    // 簡單權重：SSR 5%, SR 20%, R 75%
     for(let i=0; i<times; i++) {
         let rarity = 'R';
         const rand = Math.random();
-        if (times === 10 && i === 9) {
+        
+        // 十連抽最後一抽保底 SR
+        if(times === 10 && i === 9) {
             rarity = Math.random() < 0.2 ? 'SSR' : 'SR';
         } else {
             if(rand < 0.05) rarity = 'SSR';
             else if(rand < 0.25) rarity = 'SR';
         }
+
+        // 從該稀有度池中隨機挑選
         const pool = allItems.filter(x => x.rarity === rarity);
         const blueprint = pool[Math.floor(Math.random() * pool.length)];
+        
+        // 生成實例 (數值浮動)
         results.push(generateItemInstance(blueprint.id));
     }
 
+    // 3. 發獎
     results.forEach(item => adventureData.inventory.push(item));
     
+    // 4. 顯示結果 (簡單條列式)
+    // 為了 UX，過濾出最高稀有度來決定音效
     const hasSSR = results.some(i => i.rarity === 'SSR');
     if(hasSSR) playSound('ssr');
 
@@ -470,5 +407,7 @@ function performGacha(times) {
     alert(msg);
 
     renderInventoryList();
+    
+    // 5. 存檔
     if(onSave) onSave(adventureData);
 }
