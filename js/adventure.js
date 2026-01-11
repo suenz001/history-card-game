@@ -96,12 +96,14 @@ export function initAdventure(database, user) {
 }
 
 export function startAdventure() {
-    // 1. 強制確保 DOM 狀態正確
+    // 1. 強制確保 DOM 狀態正確，徹底隱藏主大廳
     const screen = document.getElementById('adventure-screen');
     const prepModal = document.getElementById('adventure-prep-modal');
+    const gameUI = document.getElementById('game-ui');
     
-    if (prepModal) prepModal.classList.add('hidden'); // 🔥 確保整裝介面關閉
-    screen.classList.remove('hidden'); // 🔥 顯示冒險畫面
+    if (prepModal) prepModal.classList.add('hidden'); // 關閉整裝視窗
+    if (gameUI) gameUI.classList.add('hidden');       // 🔥 關鍵：隱藏主大廳
+    screen.classList.remove('hidden');                // 顯示冒險畫面
 
     canvas = document.getElementById('adv-canvas');
     if (!canvas) return;
@@ -160,7 +162,14 @@ export function startAdventure() {
 function stopAdventure() {
     isRunning = false;
     cancelAnimationFrame(animationFrameId);
+    
+    // 恢復介面狀態
     document.getElementById('adventure-screen').classList.add('hidden');
+    
+    // 🔥 恢復顯示主大廳
+    const gameUI = document.getElementById('game-ui');
+    if (gameUI) gameUI.classList.remove('hidden');
+    
     window.removeEventListener('resize', resizeCanvas);
     playSound('click');
 }
