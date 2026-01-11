@@ -1781,16 +1781,14 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     pointer-events: none;
 }
 
-/* --- 修正後的整裝介面樣式 (請覆蓋 style.css 原本後半段關於 prep 的部分) --- */
+/* === 7. 冒險模式：整裝大廳 (Prep Screen) - 修正版 === */
 
-/* === 7. 冒險模式：整裝大廳 (Prep Screen) === */
-
-/* 佈局容器 */
+/* 佈局容器 (使用 Flex 撐開高度) */
 .prep-container {
     background: rgba(0,0,0,0.2);
     border-radius: 8px;
     padding: 10px;
-    display: flex; /* 🔥 關鍵修正：PC 版要橫向排列 */
+    display: flex; /* 🔥 關鍵：PC 版橫向排列 */
     gap: 15px;
     flex: 1;          
     min-height: 0;    
@@ -1799,7 +1797,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* 左側：英雄面板 */
 .prep-hero-panel {
-    flex: 0 0 320px; /* 固定寬度 */
+    flex: 0 0 320px; /* 固定寬度，避免被擠壓 */
     background: #34495e;
     border-radius: 8px;
     padding: 10px;
@@ -1888,7 +1886,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* 右側：動作面板 */
 .prep-action-panel {
-    flex: 1; 
+    flex: 1; /* 佔滿剩餘寬度 */
     background: #2c3e50;
     border-radius: 8px;
     display: flex;
@@ -1978,14 +1976,14 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .hidden { display: none !important; }
 @keyframes goldPulse { from { box-shadow: 0 0 10px rgba(241, 196, 15, 0.5); } to { box-shadow: 0 0 25px rgba(241, 196, 15, 1); } }
 
-/* === 9. 🔥 手機版響應式設定 (放在最後面，確保權重最高) === */
+/* === 9. 🔥 手機版響應式設定 (放在最後面，確保覆蓋) === */
 @media (max-width: 768px) {
     .card { width: 100px; height: 150px; }
     .status-bar { font-size: 0.9em; }
 
     /* 整裝介面手機版：強制垂直排列 */
     .prep-container {
-        flex-direction: column; /* 上下排列 */
+        flex-direction: column; 
         height: auto;
         max-height: 80vh; 
         overflow-y: auto;
