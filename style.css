@@ -1824,30 +1824,89 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     gap: 8px;
 }
 
+/* 🔥 2. 裝備卡片樣式：改為長方形，垂直排列內容 */
 .equip-slot {
-    background: #222;
-    border: 2px solid #555;
-    border-radius: 5px;
-    
-    /* 🔥 正方形優化 */
-    width: 100%;
-    height: auto;
-    aspect-ratio: 1 / 1;
+    /* 覆寫原本可能的固定寬高 */
+    width: auto !important;
+    height: auto !important;
+    aspect-ratio: 0.65; /* 設定長寬比，讓它呈現長方形 */
     
     display: flex;
-    flex-direction: column;
+    flex-direction: column; /* 上圖下文 */
+    align-items: center;
+    
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid #555;
+    border-radius: 8px;
+    padding: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.equip-slot:hover {
+    transform: translateY(-3px);
+    border-color: #f1c40f;
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+.equip-slot.selected {
+    border-color: #e74c3c;
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.6);
+}
+
+/* 🔥 3. 圖片區域：保持正方形 WebP */
+.equip-img-box {
+    width: 100%;
+    aspect-ratio: 1; /* 強制正方形 */
+    background: rgba(0,0,0,0.3);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    display: flex;
     justify-content: center;
     align-items: center;
-    cursor: pointer;
-    position: relative;
-    font-size: 1.5em;
-    transition: 0.2s;
+    overflow: hidden;
 }
-.equip-slot:hover, .equip-slot.selected { border-color: #f1c40f; box-shadow: 0 0 10px rgba(241, 196, 15, 0.3); }
-.equip-slot .slot-label {
-    font-size: 0.4em;
-    color: #aaa;
-    margin-top: 2px;
+
+.equip-img-box img {
+    width: 90%;
+    height: 90%;
+    object-fit: contain;
+}
+
+/* 🔥 4. 詳細數值區域 */
+.equip-details {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.equip-name {
+    font-size: 0.9em;
+    font-weight: bold;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    padding-bottom: 2px;
+}
+
+.equip-stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75em;
+    color: #ddd;
+    line-height: 1.4;
+}
+
+.equip-stat-val {
+    color: #f1c40f;
+    font-weight: bold;
 }
 
 /* 物品槽 */
@@ -1909,14 +1968,15 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     display: block; /* 顯示選中的 */
 }
 
-/* 🔥 右側裝備列表 (修正對齊) */
+/* 🔥 1. 修改裝備列表網格：加大寬度，自適應排列 */
 .prep-grid-list {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-start; /* 🔥 強制靠左 */
-    align-content: flex-start;
-    gap: 10px; /* 項目間距 */
-    text-align: left; /* 內容靠左 */
+    display: grid;
+    /* 每個格子最小 140px，最大平分空間 (變成寬長方形) */
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); 
+    gap: 12px;
+    padding: 10px;
+    max-height: 500px;
+    overflow-y: auto;
 }
 
 /* 商店與關卡樣式 */
