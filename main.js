@@ -23,7 +23,7 @@ import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/p
 import * as Inventory from './js/inventory.js';
 import * as Territory from './js/territory.js';
 
-// 🔥 冒險模式相關引入 (修正：加入 updatePrepUser)
+// 🔥 冒險模式相關引入
 import { initAdventure, updateAdventureContext, startAdventure } from './js/adventure.js';
 import { initPrepScreen, openPrepScreen, updatePrepData, updatePrepUser } from './js/prep.js';
 import { generateItemInstance } from './js/items.js';
@@ -162,9 +162,13 @@ setTimeout(() => {
             playSound('click');
             if (!currentUser) return alert("請先登入");
             
-            // 🔥【關鍵修正】：打開介面前，強制更新 prep.js 內的使用者資料
-            // 這樣才能確保冒險者營地看到的金幣/鑽石是最新的
-            updatePrepUser(currentUser); 
+            // 🔥【關鍵修正 1】：手動組合包含金幣/鑽石的資料傳給 prep.js
+            // 因為 currentUser 本身不包含 gold/gems
+            updatePrepUser({
+                ...currentUser,
+                gold: gold,
+                gems: gems
+            }); 
             
             openPrepScreen(); // 開啟整裝視窗
         });
@@ -581,6 +585,7 @@ if (isFirebaseReady && auth) {
     });
 }
 
+// 🔥 修改：currencyHandler 新增邏輯，讓 prep.js 隨時知道最新的錢
 const currencyHandler = (action, data, extraType = 'gold') => {
     if (action === 'check') {
         if (extraType === 'iron') return iron >= data;
@@ -608,6 +613,16 @@ const currencyHandler = (action, data, extraType = 'gold') => {
         if (data.type === 'food') food += val; 
         if (data.type === 'wood') wood += val; 
     }
+    
+    // 🔥 關鍵修正：當錢有變動時，同步更新給 Prep 介面
+    if (currentUser && (action === 'deduct' || action === 'add' || action === 'add_resource')) {
+        updatePrepUser({
+            ...currentUser,
+            gold: gold,
+            gems: gems
+        });
+    }
+
     if (action === 'refresh') { updateUIDisplay(); updateCurrencyCloud(); }
     return true;
 };
