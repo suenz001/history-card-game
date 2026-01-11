@@ -1,7 +1,7 @@
 // js/prep.js
 import { playSound } from './audio.js';
 import * as Inventory from './inventory.js';
-import { updatePlayerStats, startAdventure } from './adventure.js';
+import { updatePlayerStats } from './adventure.js';
 import { generateItemInstance, getAllItems, EQUIP_TYPES, WEAPON_TYPES } from './items.js';
 
 let db = null;
@@ -38,15 +38,12 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
             updatePlayerStats(adventureData.stats, adventureData.equipment?.weapon?.subType || 'unarmed');
         }
         
-        // 2. 隱藏整裝視窗
-        document.getElementById('adventure-prep-modal').classList.add('hidden');
+        // 🔥 修正：不要在這裡隱藏 Modal，交給 adventure.js 的 startAdventure 統一處理
+        // document.getElementById('adventure-prep-modal').classList.add('hidden'); // 移除這行
         
-        // 3. 呼叫開始戰鬥 (這會觸發 adventure.js 的 startAdventure)
+        // 2. 呼叫開始戰鬥
         if(startBattleCallback) {
-            // 給予一點延遲，讓 Modal 隱藏動畫先跑一點點，避免與 Canvas 搶資源
-            setTimeout(() => {
-                startBattleCallback();
-            }, 50);
+            startBattleCallback();
         }
     });
 
