@@ -26,7 +26,7 @@ import * as Territory from './js/territory.js';
 // 🔥 冒險模式相關引入
 import { initAdventure, updateAdventureContext, startAdventure } from './js/adventure.js';
 import { initPrepScreen, openPrepScreen, updatePrepData } from './js/prep.js';
-import { generateItemInstance } from './js/items.js'; // 🔥 新增：用於生成新手裝備
+import { generateItemInstance } from './js/items.js';
 
 function updateLatestCardsUI() {
     const container = document.getElementById('card-display-area');
@@ -128,15 +128,33 @@ setTimeout(() => {
     // --- 冒險模式初始化 ---
     initAdventure(db, currentUser);
 
-    // 初始化整裝介面，並設定「出發」按鈕的回調
-    initPrepScreen(db, currentUser, () => {
-        startAdventure(); 
-    });
+    // 🔥 定義存檔回調函式 (讓 prep.js 可以呼叫)
+    const handleAdventureSave = async (newAdventureData) => {
+        if (!currentUser) return;
+        try {
+            await updateDoc(doc(db, "users", currentUser.uid), {
+                adventure: newAdventureData,
+                gems: gems, // 同步最新的錢
+                gold: gold
+            });
+            // console.log("冒險資料已儲存");
+        } catch(e) {
+            console.error("存檔失敗", e);
+        }
+    };
+
+    // 初始化整裝介面，並傳入所需的 callback
+    initPrepScreen(
+        db, 
+        currentUser, 
+        () => { startAdventure(); }, // 出發回調
+        handleAdventureSave,         // 🔥 存檔回調
+        currencyHandler              // 🔥 金流回調 (買東西用)
+    );
 
     // 綁定「進入冒險模式」按鈕 -> 開啟整裝介面
     const advBtn = document.getElementById('enter-adventure-mode-btn');
     if (advBtn) {
-        // 使用 cloneNode 移除舊的 Event Listener (防止重複綁定)
         const newBtn = advBtn.cloneNode(true);
         advBtn.parentNode.replaceChild(newBtn, advBtn);
 
