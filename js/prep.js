@@ -15,7 +15,6 @@ export function initPrepScreen(database, user, onStartBattle) {
     currentUser = user;
     startBattleCallback = onStartBattle;
 
-    // 綁定分頁按鈕
     const tabs = document.querySelectorAll('.prep-tab-btn');
     tabs.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -24,25 +23,20 @@ export function initPrepScreen(database, user, onStartBattle) {
         });
     });
 
-    // 綁定開始戰鬥按鈕
     document.getElementById('prep-start-battle-btn').addEventListener('click', () => {
         playSound('click');
-        // 同步數值到 adventure.js
         if(adventureData && adventureData.stats) {
             updatePlayerStats(adventureData.stats, adventureData.equipment?.weapon?.subType || 'unarmed');
         }
-        
         document.getElementById('adventure-prep-modal').classList.add('hidden');
         if(startBattleCallback) startBattleCallback();
     });
 
-    // 綁定關閉/返回按鈕
     document.getElementById('close-prep-btn').addEventListener('click', () => {
         playSound('click');
         document.getElementById('adventure-prep-modal').classList.add('hidden');
     });
 
-    // 綁定左側裝備槽點擊事件
     document.querySelectorAll('.equip-slot[data-type]').forEach(slot => {
         slot.addEventListener('click', () => {
             playSound('click');
@@ -50,36 +44,30 @@ export function initPrepScreen(database, user, onStartBattle) {
         });
     });
 
-    // 🔥 新增：綁定主角預覽圖點擊 -> 顯示全部裝備
     const heroPreview = document.querySelector('.prep-hero-preview');
     if (heroPreview) {
         heroPreview.addEventListener('click', () => {
             playSound('click');
-            handleSlotClick(null); // 傳入 null 代表取消篩選
+            handleSlotClick(null); 
         });
     }
 }
 
-// 更新資料 (由 main.js 載入後呼叫)
 export function updatePrepData(data) {
     adventureData = data;
-    calculateAndShowStats(); // 重新計算數值
+    calculateAndShowStats();
 }
 
-// 開啟整裝視窗
 export function openPrepScreen() {
     const modal = document.getElementById('adventure-prep-modal');
     modal.classList.remove('hidden');
     
-    // 預設切換到裝備分頁
     switchTab('equip');
-    
-    // 🔥 預設顯示全部裝備 (不選中任何槽位)
     handleSlotClick(null); 
 
-    renderPrepCards(); // 顯示攜帶卡片
-    renderEquippedSlots(); // 顯示已裝備的圖示
-    calculateAndShowStats(); // 更新數值
+    renderPrepCards(); 
+    renderEquippedSlots(); 
+    calculateAndShowStats(); 
 }
 
 function switchTab(tabId) {
@@ -90,58 +78,41 @@ function switchTab(tabId) {
     document.getElementById(`tab-${tabId}`).classList.add('active');
 }
 
-// 處理點擊裝備槽
 function handleSlotClick(slotType) {
     currentSelectedSlot = slotType;
-
-    // 清除所有高亮
     document.querySelectorAll('.equip-slot').forEach(s => s.classList.remove('selected'));
-    
     if (slotType) {
-        // 如果有指定槽位，就高亮該槽位
         const targetSlot = document.querySelector(`.equip-slot[data-type="${slotType}"]`);
         if(targetSlot) targetSlot.classList.add('selected');
     }
-
-    // 刷新右側列表 (若 slotType 為 null，renderInventoryList 會自動顯示全部)
     renderInventoryList();
 }
 
-// 穿上裝備
 function equipItem(itemUid) {
     if (!adventureData) return;
-
-    // 1. 找到要穿的裝備
     const itemIndex = adventureData.inventory.findIndex(i => i.uid === itemUid);
     if (itemIndex === -1) return;
     const newItem = adventureData.inventory[itemIndex];
-
-    // 2. 檢查目前該槽位是否已有裝備
-    const slotType = newItem.type; // weapon, head...
+    const slotType = newItem.type;
     const oldItem = adventureData.equipment[slotType];
 
-    // 3. 如果有舊裝備，脫下來放回背包
     if (oldItem) {
         adventureData.inventory.push(oldItem);
     }
 
-    // 4. 穿上新裝備，並從背包移除
     adventureData.equipment[slotType] = newItem;
     adventureData.inventory.splice(itemIndex, 1);
 
-    // 5. 更新介面
     playSound('upgrade');
     renderEquippedSlots();
     renderInventoryList();
     calculateAndShowStats();
 }
 
-// 脫下裝備 (點擊已裝備的圖示時觸發)
 function unequipItem(slotType) {
     const item = adventureData.equipment[slotType];
     if (!item) return;
 
-    // 放回背包
     adventureData.inventory.push(item);
     adventureData.equipment[slotType] = null;
 
@@ -151,7 +122,7 @@ function unequipItem(slotType) {
     calculateAndShowStats();
 }
 
-// 渲染左側已裝備的格子
+// 🔥 渲染已裝備格子 (包含文字顏色邏輯)
 function renderEquippedSlots() {
     if (!adventureData) return;
 
@@ -159,12 +130,10 @@ function renderEquippedSlots() {
         const type = slot.dataset.type;
         const item = adventureData.equipment[type];
         
-        // 清空舊內容，保留 label
         const label = slot.querySelector('.slot-label');
         slot.innerHTML = ''; 
         
         if (item) {
-            // 顯示裝備圖片
             const img = document.createElement('img');
             img.src = item.img;
             img.style.width = '80%';
@@ -172,11 +141,26 @@ function renderEquippedSlots() {
             img.style.objectFit = 'contain';
             
             slot.appendChild(img);
-            slot.style.borderColor = item.color || '#fff'; // 稀有度框
+            slot.style.borderColor = item.color || '#fff'; 
             
-            // 點擊事件：如果是當前選中的，再點一次就是脫下
+            // 🔥 更新文字與顏色
+            label.innerText = item.name;
+            if(item.rarity === 'SSR') {
+                label.style.color = '#f1c40f'; // 金色
+                label.style.textShadow = '0 0 5px #f1c40f'; // 增加光暈
+            } else if(item.rarity === 'SR') {
+                label.style.color = '#9b59b6'; // 紫色
+                label.style.textShadow = 'none';
+            } else if(item.rarity === 'R') {
+                label.style.color = '#3498db'; // 藍色
+                label.style.textShadow = 'none';
+            } else {
+                label.style.color = '#fff';
+                label.style.textShadow = 'none';
+            }
+
             slot.onclick = (e) => {
-                e.stopPropagation(); // 避免觸發 handleSlotClick 的切換
+                e.stopPropagation(); 
                 if (currentSelectedSlot === type) {
                     if(confirm(`要卸下 ${item.name} 嗎？`)) {
                         unequipItem(type);
@@ -186,7 +170,6 @@ function renderEquippedSlots() {
                 }
             };
         } else {
-            // 顯示預設 icon
             let icon = '';
             if(type === 'weapon') icon = '⚔️';
             else if(type === 'head') icon = '🪖';
@@ -197,27 +180,30 @@ function renderEquippedSlots() {
             
             slot.innerHTML = `${icon}`;
             slot.style.borderColor = '#555';
+            
+            // 🔥 恢復預設文字 (從 title 屬性讀取，例如 "武器")
+            label.innerText = slot.getAttribute('title') || "裝備";
+            label.style.color = '#aaa';
+            label.style.textShadow = 'none';
+
             slot.onclick = () => handleSlotClick(type);
         }
-        slot.appendChild(label); // 加回標籤
+        slot.appendChild(label); 
     });
     
-    // 重新高亮選中的
     if(currentSelectedSlot) {
         document.querySelector(`.equip-slot[data-type="${currentSelectedSlot}"]`)?.classList.add('selected');
     }
 }
 
-// 渲染右側背包列表 (根據 currentSelectedSlot 篩選)
 function renderInventoryList() {
     const list = document.getElementById('prep-equip-list');
     list.innerHTML = "";
 
     if (!adventureData || !adventureData.inventory) return;
 
-    // 篩選邏輯：如果沒有選中任何槽位，則顯示全部
     const filteredItems = adventureData.inventory.filter(item => {
-        if (!currentSelectedSlot) return true; // 🔥 顯示全部
+        if (!currentSelectedSlot) return true;
         return item.type === currentSelectedSlot;
     });
 
@@ -229,9 +215,9 @@ function renderInventoryList() {
     
     filteredItems.forEach(item => {
         const itemDiv = document.createElement('div');
-        itemDiv.className = 'equip-slot'; // 重用樣式 (現在是正方形)
+        itemDiv.className = 'equip-slot'; 
         itemDiv.style.width = '80px';
-        itemDiv.style.height = '80px'; // 這裡強制覆寫為固定大小，配合 grid-list
+        itemDiv.style.height = '80px'; 
         itemDiv.style.margin = '0'; 
         itemDiv.style.borderColor = item.color || '#fff';
         
@@ -249,34 +235,27 @@ function renderInventoryList() {
         itemDiv.appendChild(img);
         itemDiv.appendChild(label);
         
-        // 點擊 -> 穿上
         itemDiv.onclick = () => equipItem(item.uid);
 
         list.appendChild(itemDiv);
     });
 }
 
-// 計算並顯示數值
 function calculateAndShowStats() {
     if(!adventureData) return;
 
-    // 基礎數值
     let totalAtk = 50; 
     let totalHp = 1000;
 
-    // 加上所有裝備數值
     Object.values(adventureData.equipment).forEach(item => {
         if (item && item.stats) {
             if (item.stats.atk) totalAtk += item.stats.atk;
-            // 防具加血量邏輯 (目前 items.js 定義的是 def，這裡簡化為 1 def = 10 hp)
             if (item.stats.def) totalHp += item.stats.def * 10;
         }
     });
 
-    // 更新資料
     adventureData.stats = { hp: totalHp, atk: totalAtk };
 
-    // 更新 UI
     document.getElementById('prep-atk').innerText = totalAtk;
     document.getElementById('prep-hp').innerText = totalHp;
 }
