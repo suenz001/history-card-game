@@ -23,9 +23,9 @@ import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/p
 import * as Inventory from './js/inventory.js';
 import * as Territory from './js/territory.js';
 
-// 🔥 冒險模式相關引入
+// 🔥 冒險模式相關引入 (修正：加入 updatePrepUser)
 import { initAdventure, updateAdventureContext, startAdventure } from './js/adventure.js';
-import { initPrepScreen, openPrepScreen, updatePrepData } from './js/prep.js';
+import { initPrepScreen, openPrepScreen, updatePrepData, updatePrepUser } from './js/prep.js';
 import { generateItemInstance } from './js/items.js';
 
 function updateLatestCardsUI() {
@@ -161,6 +161,11 @@ setTimeout(() => {
         newBtn.addEventListener('click', () => {
             playSound('click');
             if (!currentUser) return alert("請先登入");
+            
+            // 🔥【關鍵修正】：打開介面前，強制更新 prep.js 內的使用者資料
+            // 這樣才能確保冒險者營地看到的金幣/鑽石是最新的
+            updatePrepUser(currentUser); 
+            
             openPrepScreen(); // 開啟整裝視窗
         });
     }
