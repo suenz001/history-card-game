@@ -1785,28 +1785,28 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* === 7. 冒險模式：整裝大廳 (Prep Screen) === */
 
-/* 佈局容器 (使用 Flex 撐開高度) */
+/* 佈局容器 */
 .prep-container {
     background: rgba(0,0,0,0.2);
     border-radius: 8px;
     padding: 10px;
-    display: flex;
+    display: flex; /* 🔥 關鍵修正：PC 版要橫向排列 */
     gap: 15px;
-    flex: 1;          /* 自動填滿剩餘高度 */
-    min-height: 0;    /* 關鍵：防止內容溢出容器 */
-    overflow: hidden; /* 防止撐開 Modal */
+    flex: 1;          
+    min-height: 0;    
+    overflow: hidden; 
 }
 
 /* 左側：英雄面板 */
 .prep-hero-panel {
-    flex: 0 0 320px; /* PC版固定寬度，確保不會被擠壓 */
+    flex: 0 0 320px; /* 固定寬度 */
     background: #34495e;
     border-radius: 8px;
     padding: 10px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    overflow-y: auto; /* 內容過多時可捲動 */
+    overflow-y: auto; 
 }
 
 .prep-hero-preview {
@@ -1850,7 +1850,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     border: 2px solid #555;
     border-radius: 5px;
     width: 100%;
-    aspect-ratio: 1 / 1; /* 🔥 強制正方形 */
+    aspect-ratio: 1 / 1; /* 強制正方形 */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -1888,13 +1888,13 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* 右側：動作面板 */
 .prep-action-panel {
-    flex: 1; /* 佔滿剩餘寬度 */
+    flex: 1; 
     background: #2c3e50;
     border-radius: 8px;
     display: flex;
     flex-direction: column;
     border: 1px solid #555;
-    min-width: 0; /* 關鍵：防止 Flex 子元素撐開 */
+    min-width: 0; 
     overflow: hidden;
 }
 
@@ -1906,19 +1906,18 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     display: none; 
     flex: 1; 
     padding: 10px; 
-    overflow-y: auto; /* 內容捲動 */
+    overflow-y: auto; 
 }
 .prep-tab-content.active { display: block; }
 
-/* 🔥 右側裝備列表 (改用 Grid 佈局，靠左對齊) */
+/* 右側裝備列表 (Grid 佈局) */
 .prep-grid-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* 自動填滿，最小 90px */
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
     gap: 10px;
     align-content: start;
 }
 
-/* 右側列表的格子樣式 */
 .prep-grid-list .equip-slot {
     background: #222;
     border: 2px solid #555;
@@ -1930,11 +1929,10 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     cursor: pointer;
     padding: 5px;
     box-sizing: border-box;
-    height: 120px; /* 固定高度，長方形 */
-    width: 100%;   /* 填滿 Grid 格子 */
+    height: 120px;
+    width: 100%;
 }
 
-/* 列表內的圖片 */
 .prep-grid-list .equip-slot img {
     width: 50px; height: 50px; margin-bottom: 5px; object-fit: contain;
 }
@@ -1980,39 +1978,34 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .hidden { display: none !important; }
 @keyframes goldPulse { from { box-shadow: 0 0 10px rgba(241, 196, 15, 0.5); } to { box-shadow: 0 0 25px rgba(241, 196, 15, 1); } }
 
-/* === 9. 🔥 手機版響應式設定 (放在最後面，確保覆蓋) === */
+/* === 9. 🔥 手機版響應式設定 (放在最後面，確保權重最高) === */
 @media (max-width: 768px) {
-    /* 主畫面調整 */
     .card { width: 100px; height: 150px; }
     .status-bar { font-size: 0.9em; }
 
     /* 整裝介面手機版：強制垂直排列 */
     .prep-container {
-        flex-direction: column; 
+        flex-direction: column; /* 上下排列 */
         height: auto;
-        flex: 1;
-        overflow-y: auto; /* 整個容器捲動 */
+        max-height: 80vh; 
+        overflow-y: auto;
         gap: 10px;
     }
     
-    /* 左側面板自動高度 */
     .prep-hero-panel { 
         flex: none; 
         width: 100%; 
-        overflow: visible; /* 讓內容撐開 */
+        overflow: visible; 
     }
     
-    /* 右側面板自動填滿 */
     .prep-action-panel { 
         flex: 1; 
         width: 100%; 
         min-height: 400px; /* 確保列表有空間 */
     }
     
-    /* 裝備格子微調 */
     .prep-equip-grid { gap: 5px; }
     
-    /* 冒險模式 UI 調整 */
     #adv-skill-bar-container { bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%) scale(0.85); padding: 5px; gap: 5px; }
     .adv-skill-slot { width: 50px; height: 50px; }
     #virtual-joystick-zone { bottom: calc(150px + env(safe-area-inset-bottom)); left: 30px; }
