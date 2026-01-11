@@ -57,8 +57,12 @@ export function initAdventure(database, user) {
     db = database;
     currentUser = user;
 
+    // 🔥 註解掉：這裡原本直接綁定按鈕進入遊戲
+    // 現在改由 main.js 控制按鈕 -> 打開整裝介面 -> 再由整裝介面呼叫 startAdventure
+    /*
     const startBtn = document.getElementById('enter-adventure-mode-btn');
     if (startBtn) startBtn.addEventListener('click', () => { playSound('click'); startAdventure(); });
+    */
 
     const exitBtn = document.getElementById('adv-exit-btn');
     if (exitBtn) exitBtn.addEventListener('click', stopAdventure);
@@ -76,8 +80,10 @@ export function initAdventure(database, user) {
     });
 }
 
-function startAdventure() {
-    if (!currentUser) return alert("請先登入！");
+// 🔥 修改：加上 export，讓外部 (prep.js) 可以呼叫此函式開始遊戲
+export function startAdventure() {
+    // 再次檢查登入狀態 (雖然 Prep 介面已經檢查過了，但雙重保險)
+    if (!currentUser && !gameState.player) return alert("請先登入！");
     
     const screen = document.getElementById('adventure-screen');
     canvas = document.getElementById('adv-canvas');
@@ -89,7 +95,10 @@ function startAdventure() {
     screen.classList.remove('hidden');
     isRunning = true;
 
+    // 初始化環境 (地平線設為螢幕高度的 50%)
     gameState.groundY = canvas.height * 0.5; 
+    
+    // 初始化玩家
     gameState.player.x = 100;
     gameState.player.y = gameState.groundY + 100;
     gameState.player.hp = gameState.player.maxHp;
@@ -131,14 +140,13 @@ function startAdventure() {
 
     loadEquippedCards();
     
-    // 🔥 自動決定初始武器
-    // 邏輯：根據背包中最強的卡片類型來決定
+    // 自動決定初始武器
     if (gameState.equippedCards.length > 0) {
-        const mainCard = gameState.equippedCards[0]; // 第一張是最強的
+        const mainCard = gameState.equippedCards[0];
         if (mainCard.unitType === 'ARCHER') gameState.player.weapon = 'bow';
         else if (mainCard.unitType === 'INFANTRY') gameState.player.weapon = 'sword';
-        else if (mainCard.unitType === 'CAVALRY') gameState.player.weapon = 'staff'; // 騎兵暫時拿法杖(或長槍)
-        else gameState.player.weapon = 'staff'; // 其他用法杖
+        else if (mainCard.unitType === 'CAVALRY') gameState.player.weapon = 'staff'; 
+        else gameState.player.weapon = 'staff';
     } else {
         gameState.player.weapon = 'unarmed';
     }
@@ -211,7 +219,7 @@ function activateSkill(index) {
     const skill = gameState.equippedCards[index];
     if (skill.currentCooldown > 0) return;
 
-    // 🔥 施放技能時，短暫切換武器 (視覺效果)
+    // 施放技能時，短暫切換武器 (視覺效果)
     if (skill.unitType === 'ARCHER') gameState.player.weapon = 'bow';
     else if (skill.unitType === 'INFANTRY') gameState.player.weapon = 'sword';
     else gameState.player.weapon = 'staff';
@@ -237,7 +245,6 @@ function activateSkill(index) {
             createFloatingText(target.x, target.y - 100, `500`, '#e74c3c');
         } else {
             createFloatingText(gameState.player.x, gameState.player.y - 100, `無目標`, '#aaa');
-            // return; // 註解掉：沒目標也可以空放技能耍帥
         }
         skillName = "重擊";
         playSound('draw');
@@ -251,24 +258,20 @@ function update() {
     const p = gameState.player;
     const k = gameState.keys;
     
-    // 1. 移動邏輯 & 🔥 判斷方向
-    let isMoving = false;
-    
+    // 1. 移動邏輯 & 判斷方向
     // 往左
     if (k.a || k.ArrowLeft) {
         p.x -= p.speed;
-        p.facingRight = false; // 🔥 設定面向左
-        isMoving = true;
+        p.facingRight = false; // 設定面向左
     }
     // 往右
     if (k.d || k.ArrowRight) {
         p.x += p.speed;
-        p.facingRight = true;  // 🔥 設定面向右
-        isMoving = true;
+        p.facingRight = true;  // 設定面向右
     }
     
-    if (k.w || k.ArrowUp) { p.y -= p.speed * 0.7; isMoving = true; }
-    if (k.s || k.ArrowDown) { p.y += p.speed * 0.7; isMoving = true; }
+    if (k.w || k.ArrowUp) { p.y -= p.speed * 0.7; }
+    if (k.s || k.ArrowDown) { p.y += p.speed * 0.7; }
 
     // 邊界限制
     if (p.x < 0) p.x = 0;
@@ -291,7 +294,7 @@ function update() {
             const dx = target.x - p.x;
             const dy = target.y - p.y;
             if (Math.abs(dx) < p.range && Math.abs(dy) < 80) {
-                // 🔥 自動轉向敵人
+                // 自動轉向敵人
                 p.facingRight = dx > 0;
                 performAutoAttack(target);
                 p.attackCooldown = p.attackSpeed;
@@ -440,42 +443,39 @@ function draw() {
         const entity = item.data;
         const scale = getScale(entity.y);
         
-        // 修正：圖片大小
+        // 圖片大小
         const drawW = entity.width * scale;
         const drawH = entity.height * scale;
         
         // 影子 (共用)
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
-        // 影子位置要在腳下
         ctx.ellipse(entity.x, entity.y, drawW/3, 10 * scale, 0, 0, Math.PI * 2);
         ctx.fill();
 
         if (item.type === 'player') {
-            // 🔥 繪製玩家圖片 (支援翻轉)
             const p = entity;
             const sprite = heroSprites[p.weapon] || heroSprites.unarmed;
 
-            ctx.save(); // 儲存畫布狀態
+            ctx.save(); 
             
-            // 1. 移動到圖片繪製中心點 (注意 entity.x 是中心點或腳下)
-            ctx.translate(p.x, p.y - drawH/2); // 移動到身體中心
+            // 1. 移動到圖片繪製中心點 (entity.x, entity.y 是腳底)
+            ctx.translate(p.x, p.y - drawH/2); 
             
             // 2. 縮放與翻轉
-            // 如果面向左，X軸縮放為 -scale，否則為 scale
             const scaleX = p.facingRight ? scale : -scale;
             ctx.scale(scaleX, scale);
 
-            // 3. 繪製圖片 (因為已經 translate 到中心了，所以從 -w/2, -h/2 開始畫)
-            // 如果圖片載入失敗，畫個方塊當備案
+            // 3. 繪製圖片
             if (sprite.complete && sprite.naturalWidth !== 0) {
+                // 從 -w/2, -h/2 開始畫，讓圖片置中
                 ctx.drawImage(sprite, -entity.width/2, -entity.height/2, entity.width, entity.height);
             } else {
                 ctx.fillStyle = p.color;
                 ctx.fillRect(-entity.width/2, -entity.height/2, entity.width, entity.height);
             }
             
-            ctx.restore(); // 恢復畫布狀態
+            ctx.restore();
 
             // 名字
             ctx.fillStyle = 'white';
@@ -483,8 +483,7 @@ function draw() {
             ctx.fillText("我方英雄", entity.x - 30, entity.y - drawH - 10);
 
         } else {
-            // 繪製敵人 (目前還是色塊，未來可換圖)
-            // x, y 修正為底部中心
+            // 繪製敵人
             const drawX = entity.x - drawW/2;
             const drawY = entity.y - drawH;
 
