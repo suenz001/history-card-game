@@ -16,7 +16,6 @@ const heroSprites = {
     bow: new Image(),
     staff: new Image()
 };
-// 設定圖片路徑
 heroSprites.unarmed.src = 'assets/hero/hero_unarmed.png';
 heroSprites.sword.src = 'assets/hero/hero_sword.png';
 heroSprites.bow.src = 'assets/hero/hero_bow.png';
@@ -26,20 +25,40 @@ export function updateAdventureContext(user) {
     currentUser = user;
 }
 
+// 🔥 新增：接收整裝介面傳來的數值
+export function updatePlayerStats(stats, weaponType) {
+    if (stats) {
+        gameState.player.maxHp = stats.hp;
+        gameState.player.atk = stats.atk;
+        gameState.player.hp = stats.hp; // 滿血出發
+    }
+    if (weaponType) {
+        // 對應 items.js 的 subType 到圖片 key
+        // sword -> sword, bow -> bow, staff -> staff
+        // 如果是 unarmed 或是其他，預設 unarmed
+        if(['sword', 'bow', 'staff'].includes(weaponType)) {
+            gameState.player.weapon = weaponType;
+        } else {
+            gameState.player.weapon = 'unarmed';
+        }
+    }
+    console.log("冒險數值已更新:", gameState.player);
+}
+
 const gameState = {
     worldWidth: 3000,
     groundY: 0,
     
     player: {
         x: 100, y: 300, 
-        width: 100, height: 100, // 🔥 調整為圖片適合的大小 (可依實際圖片微調)
+        width: 100, height: 100, 
         speed: 8, color: '#f1c40f',
         hp: 1000, maxHp: 1000,
         atk: 50, range: 120,
         attackCooldown: 0,
         attackSpeed: 60,
-        weapon: 'unarmed', // 🔥 當前武器狀態 (unarmed, sword, bow, staff)
-        facingRight: true  // 🔥 面向狀態 (true=右, false=左)
+        weapon: 'unarmed',
+        facingRight: true
     },
     enemies: [],
     equippedCards: [],
@@ -57,13 +76,6 @@ export function initAdventure(database, user) {
     db = database;
     currentUser = user;
 
-    // 🔥 註解掉：這裡原本直接綁定按鈕進入遊戲
-    // 現在改由 main.js 控制按鈕 -> 打開整裝介面 -> 再由整裝介面呼叫 startAdventure
-    /*
-    const startBtn = document.getElementById('enter-adventure-mode-btn');
-    if (startBtn) startBtn.addEventListener('click', () => { playSound('click'); startAdventure(); });
-    */
-
     const exitBtn = document.getElementById('adv-exit-btn');
     if (exitBtn) exitBtn.addEventListener('click', stopAdventure);
 
@@ -80,10 +92,8 @@ export function initAdventure(database, user) {
     });
 }
 
-// 🔥 修改：加上 export，讓外部 (prep.js) 可以呼叫此函式開始遊戲
 export function startAdventure() {
-    // 再次檢查登入狀態 (雖然 Prep 介面已經檢查過了，但雙重保險)
-    if (!currentUser && !gameState.player) return alert("請先登入！");
+    // 再次檢查 (prep.js 已經把 stats 更新進來了)
     
     const screen = document.getElementById('adventure-screen');
     canvas = document.getElementById('adv-canvas');
@@ -95,14 +105,11 @@ export function startAdventure() {
     screen.classList.remove('hidden');
     isRunning = true;
 
-    // 初始化環境 (地平線設為螢幕高度的 50%)
     gameState.groundY = canvas.height * 0.5; 
     
-    // 初始化玩家
     gameState.player.x = 100;
     gameState.player.y = gameState.groundY + 100;
-    gameState.player.hp = gameState.player.maxHp;
-    // 預設面向右邊
+    // 這裡不重置 hp 和 atk，保留 updatePlayerStats 設定的數值
     gameState.player.facingRight = true;
     vfxList = [];
 
@@ -140,17 +147,6 @@ export function startAdventure() {
 
     loadEquippedCards();
     
-    // 自動決定初始武器
-    if (gameState.equippedCards.length > 0) {
-        const mainCard = gameState.equippedCards[0];
-        if (mainCard.unitType === 'ARCHER') gameState.player.weapon = 'bow';
-        else if (mainCard.unitType === 'INFANTRY') gameState.player.weapon = 'sword';
-        else if (mainCard.unitType === 'CAVALRY') gameState.player.weapon = 'staff'; 
-        else gameState.player.weapon = 'staff';
-    } else {
-        gameState.player.weapon = 'unarmed';
-    }
-
     gameLoop();
 }
 
@@ -219,11 +215,6 @@ function activateSkill(index) {
     const skill = gameState.equippedCards[index];
     if (skill.currentCooldown > 0) return;
 
-    // 施放技能時，短暫切換武器 (視覺效果)
-    if (skill.unitType === 'ARCHER') gameState.player.weapon = 'bow';
-    else if (skill.unitType === 'INFANTRY') gameState.player.weapon = 'sword';
-    else gameState.player.weapon = 'staff';
-
     let skillName = "重擊";
     if (skill.name.includes("秦始皇") || skill.unitType === 'INFANTRY') {
         const heal = 200;
@@ -262,12 +253,12 @@ function update() {
     // 往左
     if (k.a || k.ArrowLeft) {
         p.x -= p.speed;
-        p.facingRight = false; // 設定面向左
+        p.facingRight = false; 
     }
     // 往右
     if (k.d || k.ArrowRight) {
         p.x += p.speed;
-        p.facingRight = true;  // 設定面向右
+        p.facingRight = true; 
     }
     
     if (k.w || k.ArrowUp) { p.y -= p.speed * 0.7; }
@@ -294,7 +285,6 @@ function update() {
             const dx = target.x - p.x;
             const dy = target.y - p.y;
             if (Math.abs(dx) < p.range && Math.abs(dy) < 80) {
-                // 自動轉向敵人
                 p.facingRight = dx > 0;
                 performAutoAttack(target);
                 p.attackCooldown = p.attackSpeed;
@@ -345,7 +335,7 @@ function performAutoAttack(target) {
     // 簡單的特效
     vfxList.push({
         type: 'line',
-        x1: gameState.player.x + (gameState.player.facingRight ? 40 : -40), // 從武器方向發出
+        x1: gameState.player.x + (gameState.player.facingRight ? 40 : -40), 
         y1: gameState.player.y - 50, 
         x2: target.x + target.width/2,
         y2: target.y - target.height/2,
@@ -468,7 +458,6 @@ function draw() {
 
             // 3. 繪製圖片
             if (sprite.complete && sprite.naturalWidth !== 0) {
-                // 從 -w/2, -h/2 開始畫，讓圖片置中
                 ctx.drawImage(sprite, -entity.width/2, -entity.height/2, entity.width, entity.height);
             } else {
                 ctx.fillStyle = p.color;
