@@ -49,6 +49,15 @@ export function initPrepScreen(database, user, onStartBattle) {
             handleSlotClick(slot.dataset.type);
         });
     });
+
+    // 🔥 新增：綁定主角預覽圖點擊 -> 顯示全部裝備
+    const heroPreview = document.querySelector('.prep-hero-preview');
+    if (heroPreview) {
+        heroPreview.addEventListener('click', () => {
+            playSound('click');
+            handleSlotClick(null); // 傳入 null 代表取消篩選
+        });
+    }
 }
 
 // 更新資料 (由 main.js 載入後呼叫)
@@ -62,9 +71,11 @@ export function openPrepScreen() {
     const modal = document.getElementById('adventure-prep-modal');
     modal.classList.remove('hidden');
     
-    // 預設選中武器槽，並切換到裝備分頁
+    // 預設切換到裝備分頁
     switchTab('equip');
-    handleSlotClick('weapon'); 
+    
+    // 🔥 預設顯示全部裝備 (不選中任何槽位)
+    handleSlotClick(null); 
 
     renderPrepCards(); // 顯示攜帶卡片
     renderEquippedSlots(); // 顯示已裝備的圖示
@@ -83,12 +94,16 @@ function switchTab(tabId) {
 function handleSlotClick(slotType) {
     currentSelectedSlot = slotType;
 
-    // UI 高亮
+    // 清除所有高亮
     document.querySelectorAll('.equip-slot').forEach(s => s.classList.remove('selected'));
-    const targetSlot = document.querySelector(`.equip-slot[data-type="${slotType}"]`);
-    if(targetSlot) targetSlot.classList.add('selected');
+    
+    if (slotType) {
+        // 如果有指定槽位，就高亮該槽位
+        const targetSlot = document.querySelector(`.equip-slot[data-type="${slotType}"]`);
+        if(targetSlot) targetSlot.classList.add('selected');
+    }
 
-    // 刷新右側列表 (只顯示該部位裝備)
+    // 刷新右側列表 (若 slotType 為 null，renderInventoryList 會自動顯示全部)
     renderInventoryList();
 }
 
@@ -119,8 +134,6 @@ function equipItem(itemUid) {
     renderEquippedSlots();
     renderInventoryList();
     calculateAndShowStats();
-    
-    // (這裡應該要呼叫 updateDoc 存檔，但為了流暢先只更動記憶體)
 }
 
 // 脫下裝備 (點擊已裝備的圖示時觸發)
@@ -202,23 +215,24 @@ function renderInventoryList() {
 
     if (!adventureData || !adventureData.inventory) return;
 
-    // 篩選：只顯示符合目前槽位的裝備 (或全部)
+    // 篩選邏輯：如果沒有選中任何槽位，則顯示全部
     const filteredItems = adventureData.inventory.filter(item => {
-        if (!currentSelectedSlot) return true;
+        if (!currentSelectedSlot) return true; // 🔥 顯示全部
         return item.type === currentSelectedSlot;
     });
 
     if (filteredItems.length === 0) {
-        list.innerHTML = '<p style="color:#aaa; text-align:center; width:100%; margin-top:20px;">沒有可用的裝備</p>';
+        const msg = currentSelectedSlot ? "沒有此部位裝備" : "背包是空的";
+        list.innerHTML = `<p style="color:#aaa; text-align:center; width:100%; margin-top:20px;">${msg}</p>`;
         return;
     }
     
     filteredItems.forEach(item => {
         const itemDiv = document.createElement('div');
-        itemDiv.className = 'equip-slot'; // 重用樣式
+        itemDiv.className = 'equip-slot'; // 重用樣式 (現在是正方形)
         itemDiv.style.width = '80px';
-        itemDiv.style.height = '80px';
-        itemDiv.style.margin = '0'; // grid gap 處理間距
+        itemDiv.style.height = '80px'; // 這裡強制覆寫為固定大小，配合 grid-list
+        itemDiv.style.margin = '0'; 
         itemDiv.style.borderColor = item.color || '#fff';
         
         const img = document.createElement('img');
