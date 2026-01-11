@@ -18,7 +18,7 @@ export function updateAdventureContext(user) {
 const gameState = {
     // 🔥 世界設定
     worldWidth: 3000, // 世界總寬度
-    groundY: 0,       // 地平線高度 (稍後由 canvas 高度決定)
+    groundY: 0,       // 地平線高度 (由 canvas 高度決定)
     
     player: {
         x: 100, y: 300, width: 50, height: 80,
@@ -80,13 +80,12 @@ function startAdventure() {
     screen.classList.remove('hidden');
     isRunning = true;
 
-    // 1. 初始化環境
-    // 🔥 修改：地平線設為螢幕高度的 50%，讓草地變大
+    // 1. 初始化環境 (地平線設為螢幕高度的 50%)
     gameState.groundY = canvas.height * 0.5; 
     
     // 2. 初始化玩家
     gameState.player.x = 100;
-    gameState.player.y = gameState.groundY; // 站在地平線上
+    gameState.player.y = gameState.groundY + 100; // 初始位置稍微往下放一點，不要貼著地平線
     gameState.player.hp = gameState.player.maxHp;
     vfxList = [];
 
@@ -112,14 +111,17 @@ function startAdventure() {
             color: '#27ae60'
         });
     }
+    // 背景物件依照 Y 排序 (雖然都在 groundY，但可能有微小差異或為了未來擴充)
     decorations.sort((a,b) => (a.y - a.h) - (b.y - b.h));
 
     // 4. 生成敵人
     gameState.enemies = [];
     for(let i=1; i<=6; i++) {
-        spawnEnemy(400 * i, gameState.groundY + 50); // 讓敵人稍微分散在Y軸
+        // 隨機分布在不同深度，測試遮擋效果
+        let randomDepth = gameState.groundY + Math.random() * (canvas.height - gameState.groundY - 50);
+        spawnEnemy(400 * i, randomDepth); 
     }
-    spawnEnemy(2800, gameState.groundY + 20, true);
+    spawnEnemy(2800, gameState.groundY + 100, true); // BOSS
 
     loadEquippedCards();
     gameLoop();
@@ -137,7 +139,6 @@ function resizeCanvas() {
     if (canvas) {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        // 🔥 修改：RWD 時也要保持 50% 地平線
         gameState.groundY = canvas.height * 0.5;
     }
 }
@@ -229,23 +230,18 @@ function update() {
     const k = gameState.keys;
     
     // 1. 移動邏輯
-    // 水平
     if (k.a || k.ArrowLeft) p.x -= p.speed;
     if (k.d || k.ArrowRight) p.x += p.speed;
-    
-    // 垂直 (深度)
     if (k.w || k.ArrowUp) p.y -= p.speed * 0.7; 
     if (k.s || k.ArrowDown) p.y += p.speed * 0.7;
 
-    // 🔥 邊界限制 (修正飛天問題)
-    // 左右限制
+    // 邊界限制
     if (p.x < 0) p.x = 0;
     if (p.x > gameState.worldWidth - p.width) p.x = gameState.worldWidth - p.width;
     
-    // 上下限制 (關鍵修正：p.y 不能小於 groundY)
-    // p.y 是角色的「腳底」位置
-    if (p.y < gameState.groundY) p.y = gameState.groundY; // 禁止穿過地平線 (天空)
-    if (p.y > canvas.height) p.y = canvas.height;         // 禁止穿過螢幕下方
+    // 深度限制
+    if (p.y < gameState.groundY) p.y = gameState.groundY; 
+    if (p.y > canvas.height) p.y = canvas.height;
 
     // 攝影機跟隨
     gameState.camera.x = p.x - canvas.width / 2;
@@ -261,7 +257,7 @@ function update() {
         if (target) {
             const dx = target.x - p.x;
             const dy = target.y - p.y;
-            // 判定範圍加大一點，讓自動攻擊更靈敏
+            // 判定範圍
             if (Math.abs(dx) < p.range && Math.abs(dy) < 80) {
                 performAutoAttack(target);
                 p.attackCooldown = p.attackSpeed;
@@ -272,19 +268,16 @@ function update() {
     // 3. 移除死亡敵人
     gameState.enemies = gameState.enemies.filter(e => e.hp > 0);
 
-    // 4. 技能冷卻
+    // 4. 技能冷卻 & 特效 & UI
     gameState.equippedCards.forEach((card, i) => {
         if (card.currentCooldown > 0) {
             card.currentCooldown--;
             updateSkillUI(i);
         }
     });
-
-    // 5. 特效
     vfxList.forEach(v => v.life--);
     vfxList = vfxList.filter(v => v.life > 0);
 
-    // 6. UI 更新
     const hpPct = (p.hp / p.maxHp) * 100;
     const hpBar = document.getElementById('adv-hp-fill');
     if(hpBar) hpBar.style.width = `${hpPct}%`;
@@ -308,11 +301,12 @@ function findNearestEnemy() {
 
 function performAutoAttack(target) {
     takeDamage(target, gameState.player.atk);
+    // 傷害文字也要考慮目標的高度做位移
     createFloatingText(target.x, target.y - target.height, `${gameState.player.atk}`, '#fff');
     vfxList.push({
         type: 'line',
         x1: gameState.player.x + gameState.player.width/2,
-        y1: gameState.player.y - gameState.player.height/2, // 從身體中心發出
+        y1: gameState.player.y - gameState.player.height/2,
         x2: target.x + target.width/2,
         y2: target.y - target.height/2,
         life: 5, color: '#fff'
@@ -340,16 +334,37 @@ function updateSkillUI(index) {
     }
 }
 
+// 🔥 計算縮放比例 (透視效果核心)
+function getScale(y) {
+    // 假設 groundY (地平線) 是最遠處，scale 為 0.8
+    // canvas.height (螢幕最下方) 是最近處，scale 為 1.2
+    const minScale = 0.8;
+    const maxScale = 1.2;
+    
+    // 計算 y 在可走區域的百分比 (0 ~ 1)
+    const minY = gameState.groundY;
+    const maxY = canvas.height;
+    
+    // 防呆，避免除以零
+    if (maxY === minY) return 1;
+
+    let percent = (y - minY) / (maxY - minY);
+    // 限制在 0~1 之間
+    if (percent < 0) percent = 0;
+    if (percent > 1) percent = 1;
+
+    return minScale + percent * (maxScale - minScale);
+}
+
 function draw() {
     // 1. 天空
     ctx.fillStyle = '#87CEEB'; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 🔥 2. 移動鏡頭
     ctx.save();
     ctx.translate(-gameState.camera.x, 0); 
 
-    // 背景 (山、樹)
+    // 2. 背景 (山、樹)
     decorations.forEach(d => {
         ctx.fillStyle = d.color;
         if (d.type === 'mountain') {
@@ -368,7 +383,7 @@ function draw() {
         }
     });
 
-    // 地板 (草地)
+    // 3. 地板
     ctx.fillStyle = '#27ae60';
     ctx.fillRect(0, gameState.groundY, gameState.worldWidth, canvas.height - gameState.groundY);
     
@@ -376,45 +391,78 @@ function draw() {
     ctx.fillStyle = '#f1c40f';
     ctx.fillRect(gameState.worldWidth - 50, gameState.groundY - 200, 20, 200);
 
-    // 畫敵人
-    gameState.enemies.forEach(e => {
-        // 影子
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.beginPath();
-        ctx.ellipse(e.x + e.width/2, e.y, e.width/2, 10, 0, 0, Math.PI * 2);
-        ctx.fill();
-        // 本體 (以腳底為基準點，往上畫)
-        ctx.fillStyle = e.color;
-        ctx.fillRect(e.x, e.y - e.height, e.width, e.height);
-        
-        if(e.isBoss) {
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
-            ctx.fillText("BOSS", e.x + 10, e.y - e.height - 20);
-        }
-        // 血條
-        ctx.fillStyle = 'red';
-        ctx.fillRect(e.x, e.y - e.height - 10, e.width, 5);
-        ctx.fillStyle = '#2ecc71';
-        ctx.fillRect(e.x, e.y - e.height - 10, e.width * (e.hp/e.maxHp), 5);
+    // 🔥 4. 準備繪製佇列 (處理深度排序)
+    let renderList = [];
+
+    // 加入玩家
+    renderList.push({
+        type: 'player',
+        data: gameState.player,
+        y: gameState.player.y // 排序依據：腳底位置
     });
 
-    // 畫玩家
-    const p = gameState.player;
-    // 影子
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath();
-    ctx.ellipse(p.x + p.width/2, p.y, p.width/2, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // 本體
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x, p.y - p.height, p.width, p.height);
-    // 名字
-    ctx.fillStyle = 'white';
-    ctx.font = '14px Arial';
-    ctx.fillText("我方英雄", p.x, p.y - p.height - 10);
+    // 加入敵人
+    gameState.enemies.forEach(e => {
+        renderList.push({
+            type: 'enemy',
+            data: e,
+            y: e.y
+        });
+    });
 
-    // 特效
+    // 🔥 排序：Y 越小 (越上面/越遠) 先畫，Y 越大 (越下面/越近) 後畫
+    renderList.sort((a, b) => a.y - b.y);
+
+    // 🔥 5. 繪製所有實體 (套用縮放)
+    renderList.forEach(item => {
+        const entity = item.data;
+        
+        // 取得當前 Y 軸對應的縮放比例
+        const scale = getScale(entity.y);
+        
+        // 計算縮放後的寬高
+        const drawW = entity.width * scale;
+        const drawH = entity.height * scale;
+        
+        // 計算繪製座標 (保持底部中心對齊)
+        // x: 實體中心點不變，往左修正在縮放後的寬度
+        const drawX = entity.x + (entity.width - drawW) / 2;
+        const drawY = entity.y; // 腳底位置不變
+
+        // 畫影子 (隨比例縮放)
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(entity.x + entity.width/2, drawY, drawW/2, 10 * scale, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 畫本體
+        ctx.fillStyle = entity.color;
+        // 注意：fillRect 是從左上角畫，所以 Y 要扣掉高度
+        ctx.fillRect(drawX, drawY - drawH, drawW, drawH);
+
+        // 畫額外資訊 (名字、血條、BOSS標記)
+        if (item.type === 'player') {
+            ctx.fillStyle = 'white';
+            ctx.font = `${Math.floor(14 * scale)}px Arial`; // 字體也要縮放
+            ctx.fillText("我方英雄", drawX, drawY - drawH - 5);
+        } else {
+            // 敵人
+            if(entity.isBoss) {
+                ctx.fillStyle = 'white';
+                ctx.font = `${Math.floor(20 * scale)}px Arial`;
+                ctx.fillText("BOSS", drawX + 10, drawY - drawH - 10);
+            }
+            // 血條 (跟隨縮放)
+            const barH = 5 * scale;
+            ctx.fillStyle = 'red';
+            ctx.fillRect(drawX, drawY - drawH - barH - 2, drawW, barH);
+            ctx.fillStyle = '#2ecc71';
+            ctx.fillRect(drawX, drawY - drawH - barH - 2, drawW * (entity.hp/entity.maxHp), barH);
+        }
+    });
+
+    // 6. 畫特效 (通常在最上層，不參與排序，或者依需求加入排序)
+    // 這裡我們讓特效也簡單跟隨鏡頭，但不做複雜縮放以免變形
     vfxList.forEach(v => {
         if (v.type === 'text') {
             ctx.fillStyle = v.color;
