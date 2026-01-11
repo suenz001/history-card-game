@@ -1781,25 +1781,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     pointer-events: none;
 }
 
-/* 手機版位置優化 */
-@media (max-width: 768px) {
-    #adv-skill-bar-container {
-        bottom: calc(10px + env(safe-area-inset-bottom)); /* 技能列貼底，避開橫條 */
-        transform: translateX(-50%) scale(0.85);
-        padding: 5px;
-        gap: 5px;
-    }
-    .adv-skill-slot {
-        width: 50px; /* 卡片稍微縮小 */
-        height: 50px;
-    }
-    #virtual-joystick-zone {
-        bottom: calc(150px + env(safe-area-inset-bottom)); /* 🔥 手機上再高一點，避免跟手機底部手勢衝突 */
-        left: 30px;
-    }
-}
-
-/* style.css - 冒險模式整裝介面 */
+/* style.css - 冒險模式整裝介面 (修正對齊) */
 
 /* 佈局容器 */
 .prep-container {
@@ -1849,8 +1831,9 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     cursor: pointer;
     position: relative;
     font-size: 1.5em;
+    transition: 0.2s;
 }
-.equip-slot:hover { border-color: #f1c40f; }
+.equip-slot:hover, .equip-slot.selected { border-color: #f1c40f; box-shadow: 0 0 10px rgba(241, 196, 15, 0.3); }
 .equip-slot .slot-label {
     font-size: 0.4em;
     color: #aaa;
@@ -1916,6 +1899,16 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     display: block; /* 顯示選中的 */
 }
 
+/* 🔥 右側裝備列表 (修正對齊) */
+.prep-grid-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start; /* 🔥 強制靠左 */
+    align-content: flex-start;
+    gap: 10px; /* 項目間距 */
+    text-align: left; /* 內容靠左 */
+}
+
 /* 商店與關卡樣式 */
 .shop-grid, .level-select-grid {
     display: grid;
@@ -1952,6 +1945,21 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 
 /* 手機版適配 */
 @media (max-width: 768px) {
+    #adv-skill-bar-container {
+        bottom: calc(10px + env(safe-area-inset-bottom)); /* 技能列貼底，避開橫條 */
+        transform: translateX(-50%) scale(0.85);
+        padding: 5px;
+        gap: 5px;
+    }
+    .adv-skill-slot {
+        width: 50px; /* 卡片稍微縮小 */
+        height: 50px;
+    }
+    #virtual-joystick-zone {
+        bottom: calc(150px + env(safe-area-inset-bottom)); /* 🔥 手機上再高一點，避免跟手機底部手勢衝突 */
+        left: 30px;
+    }
+    /* 整裝介面手機版 */
     .prep-container {
         flex-direction: column; /* 改為上下排列 */
         overflow-y: auto; /* 整個容器捲動 */
