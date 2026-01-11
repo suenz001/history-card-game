@@ -13,6 +13,27 @@ let adventureData = null;
 let currentSelectedSlot = null; 
 let shopItems = []; // 暫存商店列表
 
+// 🔥 屬性名稱對照表 (對應 items.js 的 stats key)
+const STAT_MAP = {
+    atk: "攻擊",
+    def: "防禦",
+    atkSpd: "攻速",
+    range: "距離",
+    area: "範圍",
+    crit: "爆擊",
+    moveSpd: "移速",
+    weight: "重量",
+    hp: "生命" 
+};
+
+// 🔥 元素屬性對照
+const ELEMENT_MAP = {
+    fire: { icon: "🔥", name: "火" },
+    ice: { icon: "❄️", name: "冰" },
+    poison: { icon: "☠️", name: "毒" },
+    none: { icon: "", name: "" }
+};
+
 // 初始化整裝介面
 export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb) {
     db = database;
@@ -167,33 +188,34 @@ function unequipItem(slotType) {
     if(onSave) onSave(adventureData);
 }
 
+// ------------------------------------------------------------------
+// 🔥 渲染左側「已裝備」欄位 (修正比例與圖片)
+// ------------------------------------------------------------------
 function renderEquippedSlots() {
     if (!adventureData) return;
 
     document.querySelectorAll('.equip-slot[data-type]').forEach(slot => {
         const type = slot.dataset.type;
         const item = adventureData.equipment[type];
-        const label = slot.querySelector('.slot-label');
-        slot.innerHTML = ''; 
+        const labelText = slot.getAttribute('title') || "裝備"; // 讀取 HTML 中的 title
+        
+        slot.innerHTML = ''; // 清空內容
         
         if (item) {
+            // 圖片處理 (強制轉 WebP)
+            let imgSrc = item.img || '';
+            if (imgSrc.endsWith('.png')) imgSrc = imgSrc.replace('.png', '.webp');
+
             const img = document.createElement('img');
-            img.src = item.img;
-            img.style.width = '80%'; img.style.height = '80%'; img.style.objectFit = 'contain';
+            img.src = imgSrc;
+            // 樣式已由 CSS 控制，這裡確保 onerror
+            img.onerror = () => { img.src = 'https://placehold.co/80x80?text=Equip'; };
+            
             slot.appendChild(img);
             slot.style.borderColor = item.color || '#fff'; 
+            slot.style.borderStyle = 'solid'; // 有裝備時改為實線
             
-            label.innerText = item.name;
-            if(item.rarity === 'SSR') {
-                label.style.color = '#f1c40f'; label.style.textShadow = '0 0 5px #f1c40f';
-            } else if(item.rarity === 'SR') {
-                label.style.color = '#9b59b6'; label.style.textShadow = 'none';
-            } else if(item.rarity === 'R') {
-                label.style.color = '#3498db'; label.style.textShadow = 'none';
-            } else {
-                label.style.color = '#fff'; label.style.textShadow = 'none';
-            }
-
+            // 點擊事件：卸下或切換
             slot.onclick = (e) => {
                 e.stopPropagation(); 
                 if (currentSelectedSlot === type) {
@@ -203,6 +225,7 @@ function renderEquippedSlots() {
                 }
             };
         } else {
+            // 空狀態
             let icon = '';
             if(type === 'weapon') icon = '⚔️';
             else if(type === 'head') icon = '🪖';
@@ -211,22 +234,29 @@ function renderEquippedSlots() {
             else if(type === 'legs') icon = '👖';
             else if(type === 'shoes') icon = '👞';
             
-            slot.innerHTML = `${icon}`;
+            slot.innerHTML = `<span style="font-size:1.5em; opacity:0.3;">${icon}</span>`;
             slot.style.borderColor = '#555';
-            label.innerText = slot.getAttribute('title') || "裝備";
-            label.style.color = '#aaa'; label.style.textShadow = 'none';
+            slot.style.borderStyle = 'dashed'; // 沒裝備時虛線
+            
+            // 標籤 (放在右下角)
+            const label = document.createElement('div');
+            label.className = 'slot-label';
+            label.innerText = labelText;
+            slot.appendChild(label);
+
             slot.onclick = () => handleSlotClick(type);
         }
-        slot.appendChild(label); 
     });
     
+    // 保持選中狀態的高亮
     if(currentSelectedSlot) {
         document.querySelector(`.equip-slot[data-type="${currentSelectedSlot}"]`)?.classList.add('selected');
     }
 }
 
-// js/prep.js - 替換 renderInventoryList 函式
-
+// ------------------------------------------------------------------
+// 🔥 渲染背包列表 (顯示詳細數值)
+// ------------------------------------------------------------------
 function renderInventoryList() {
     const list = document.getElementById('prep-equip-list');
     list.innerHTML = "";
@@ -246,49 +276,61 @@ function renderInventoryList() {
     
     filteredItems.forEach(item => {
         const itemDiv = document.createElement('div');
-        itemDiv.className = 'equip-slot'; // 使用新的 CSS class
+        itemDiv.className = 'equip-slot'; // 對應 style.css 的長方形卡片樣式
         itemDiv.style.borderColor = item.color || '#fff';
         
-        // 🔥 1. 圖片處理：強制換成 webp
-        // 假設原始路徑是 assets/items/xxx.png，替換副檔名
-        let imgSrc = item.img;
-        if (imgSrc && imgSrc.endsWith('.png')) {
-            imgSrc = imgSrc.replace('.png', '.webp');
-        }
+        // 圖片處理 (強制轉 WebP)
+        let imgSrc = item.img || '';
+        if (imgSrc.endsWith('.png')) imgSrc = imgSrc.replace('.png', '.webp');
         
-        // 🔥 2. 組裝數值 HTML
+        // --- 🔥 動態生成數值顯示 ---
         let statsHtml = "";
         
-        // 顯示攻擊 (atk)
-        if (item.stats && item.stats.atk) {
-            statsHtml += `
-                <div class="equip-stat-row">
-                    <span>⚔️ 攻擊</span><span class="equip-stat-val">${item.stats.atk}</span>
-                </div>`;
-        }
-        
-        // 顯示防禦 (def)
-        if (item.stats && item.stats.def) {
-            statsHtml += `
-                <div class="equip-stat-row">
-                    <span>🛡️ 防禦</span><span class="equip-stat-val">${item.stats.def}</span>
-                </div>`;
+        if (item.stats) {
+            // 1. 先處理特殊屬性：元素 (Element)
+            if (item.stats.element && item.stats.element.type !== 'none') {
+                const elType = item.stats.element.type;
+                const elVal = item.stats.element.value;
+                const elInfo = ELEMENT_MAP[elType] || { icon: "❓", name: elType };
+                statsHtml += `
+                    <div class="equip-stat-row" style="color:#ff9f43;">
+                        <span>屬性</span><span>${elInfo.icon} ${elInfo.name} ${elVal}</span>
+                    </div>`;
+            }
+
+            // 2. 遍歷其他數值
+            for (const [key, val] of Object.entries(item.stats)) {
+                if (key === 'element') continue; // 已經處理過了
+                if (val === 0) continue; // 數值為 0 不顯示
+
+                const name = STAT_MAP[key] || key; // 找不到對應就顯示原文
+                let displayVal = val;
+
+                // 特殊格式處理 (例如攻速如果是小數)
+                if (key === 'atkSpd' || key === 'moveSpd') {
+                    displayVal = val; // 可以視需求加單位
+                }
+
+                statsHtml += `
+                    <div class="equip-stat-row">
+                        <span>${name}</span><span class="equip-stat-val">${displayVal}</span>
+                    </div>`;
+            }
         }
 
-        // 顯示特殊屬性 (攻速/距離) 
-        // 註：這需要你的 items.js 有產生這些數值，如果沒有，我們可以根據 subType 顯示文字
+        // 顯示類型 (近戰/遠程) 輔助判斷
         if (item.type === 'weapon') {
-            let typeText = "近戰";
-            if(item.subType === 'bow') typeText = "遠程 (弓)";
-            else if(item.subType === 'staff') typeText = "遠程 (杖)";
+            let typeText = "武器";
+            if (item.subType === 'bow') typeText = "弓 (遠程)";
+            else if (item.subType === 'staff') typeText = "法杖 (範圍)";
+            else if (item.subType === 'sword') typeText = "劍 (近戰)";
             
             statsHtml += `
-                <div class="equip-stat-row" style="color:#aaa;">
+                <div class="equip-stat-row" style="color:#aaa; border-top:1px dashed #444; margin-top:2px; padding-top:2px;">
                     <span>類型</span><span>${typeText}</span>
                 </div>`;
         }
 
-        // 組合 HTML：上方正方形圖 + 下方詳細資料
         itemDiv.innerHTML = `
             <div class="equip-img-box">
                 <img src="${imgSrc}" onerror="this.src='https://placehold.co/100x100?text=Item'">
