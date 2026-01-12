@@ -225,85 +225,119 @@ function renderEquippedSlots() {
     }
 }
 
-// js/prep.js - 替換 renderInventoryList 函式
+// js/prep.js
 
+// 替換原本的 renderInventoryList
 function renderInventoryList() {
     const list = document.getElementById('prep-equip-list');
     list.innerHTML = "";
 
     if (!adventureData || !adventureData.inventory) return;
 
+    // 篩選目前的部位
     const filteredItems = adventureData.inventory.filter(item => {
         if (!currentSelectedSlot) return true;
         return item.type === currentSelectedSlot;
     });
 
     if (filteredItems.length === 0) {
-        const msg = currentSelectedSlot ? "沒有此部位裝備" : "背包是空的";
-        list.innerHTML = `<p style="color:#aaa; text-align:center; width:100%; margin-top:20px;">${msg}</p>`;
+        const msg = currentSelectedSlot ? "此部位沒有裝備" : "背包是空的";
+        list.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:#aaa;">${msg}</div>`;
         return;
     }
     
     filteredItems.forEach(item => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'equip-slot'; // 使用新的 CSS class
-        itemDiv.style.borderColor = item.color || '#fff';
+        // 1. 建立卡片容器
+        const card = document.createElement('div');
+        card.className = `equip-card rarity-${item.rarity}`; // 加上稀有度 class
         
-        // 🔥 1. 圖片處理：強制換成 webp
-        // 假設原始路徑是 assets/items/xxx.png，替換副檔名
+        // 2. 處理圖片 (保持你原本的 webp 邏輯，如果那是你的需求)
         let imgSrc = item.img;
         if (imgSrc && imgSrc.endsWith('.png')) {
-            imgSrc = imgSrc.replace('.png', '.webp');
+             imgSrc = imgSrc.replace('.png', '.webp');
         }
-        
-        // 🔥 2. 組裝數值 HTML
+
+        // 3. 準備數值 HTML (針對不同裝備類型顯示不同資料)
         let statsHtml = "";
-        
-        // 顯示攻擊 (atk)
-        if (item.stats && item.stats.atk) {
-            statsHtml += `
-                <div class="equip-stat-row">
-                    <span>⚔️ 攻擊</span><span class="equip-stat-val">${item.stats.atk}</span>
-                </div>`;
-        }
-        
-        // 顯示防禦 (def)
-        if (item.stats && item.stats.def) {
-            statsHtml += `
-                <div class="equip-stat-row">
-                    <span>🛡️ 防禦</span><span class="equip-stat-val">${item.stats.def}</span>
-                </div>`;
-        }
+        const s = item.stats || {};
 
-        // 顯示特殊屬性 (攻速/距離) 
-        // 註：這需要你的 items.js 有產生這些數值，如果沒有，我們可以根據 subType 顯示文字
         if (item.type === 'weapon') {
-            let typeText = "近戰";
-            if(item.subType === 'bow') typeText = "遠程 (弓)";
-            else if(item.subType === 'staff') typeText = "遠程 (杖)";
+            // --- ⚔️ 武器專用顯示 ---
+            // 攻擊力 (必備)
+            statsHtml += `<div class="stat-row"><span class="stat-label">⚔️ 攻擊</span><span class="stat-val highlight">${s.atk || 0}</span></div>`;
             
-            statsHtml += `
-                <div class="equip-stat-row" style="color:#aaa;">
-                    <span>類型</span><span>${typeText}</span>
-                </div>`;
+            // 攻速 (轉成秒數或顯示幀數)
+            const speedText = s.atkSpeed ? `${(s.atkSpeed/60).toFixed(1)}s` : '-';
+            statsHtml += `<div class="stat-row"><span class="stat-label">⚡ 攻速</span><span class="stat-val">${speedText}</span></div>`;
+            
+            // 距離
+            statsHtml += `<div class="stat-row"><span class="stat-label">🎯 距離</span><span class="stat-val">${s.range || 0}</span></div>`;
+            
+            // 範圍 (AOE)
+            statsHtml += `<div class="stat-row"><span class="stat-label">💥 範圍</span><span class="stat-val">${s.aoe || 0}</span></div>`;
+
+            // 元素傷害 (如果有)
+            if (s.element && s.element.type !== 'none') {
+                let elIcon = '';
+                let elColor = '#fff';
+                if(s.element.type === 'fire') { elIcon = '🔥'; elColor = '#e74c3c'; }
+                if(s.element.type === 'ice') { elIcon = '❄️'; elColor = '#3498db'; }
+                if(s.element.type === 'poison') { elIcon = '☠️'; elColor = '#9b59b6'; }
+                
+                statsHtml += `<div class="stat-row" style="grid-column: span 2;">
+                                <span class="stat-label">屬性</span>
+                                <span class="stat-val" style="color:${elColor}">${elIcon} ${s.element.value}</span>
+                              </div>`;
+            }
+
+        } else {
+            // --- 🛡️ 防具專用顯示 (頭盔、盔甲、鞋子等) ---
+            // 防禦 (必備)
+            statsHtml += `<div class="stat-row"><span class="stat-label">🛡️ 防禦</span><span class="stat-val highlight">${s.def || 0}</span></div>`;
+            
+            // 重量
+            statsHtml += `<div class="stat-row"><span class="stat-label">⚖️ 重量</span><span class="stat-val">${s.weight || 0}</span></div>`;
+            
+            // 跑速加成 (鞋子特有)
+            if (s.moveSpeedBonus) {
+                statsHtml += `<div class="stat-row" style="grid-column: span 2;">
+                                <span class="stat-label">💨 移速</span>
+                                <span class="stat-val highlight">+${s.moveSpeedBonus}%</span>
+                              </div>`;
+            }
         }
 
-        // 組合 HTML：上方正方形圖 + 下方詳細資料
-        itemDiv.innerHTML = `
-            <div class="equip-img-box">
+        // 4. 稀有度顏色設定
+        let nameColor = '#fff';
+        if(item.rarity === 'SSR') nameColor = '#f1c40f';
+        else if(item.rarity === 'SR') nameColor = '#9b59b6';
+        else if(item.rarity === 'R') nameColor = '#3498db';
+
+        // 5. 組裝 HTML
+        // 注意：這裡將 statsHtml 放入 .equip-stats-grid 中
+        card.innerHTML = `
+            <div class="equip-header" style="color:${nameColor}; border-bottom-color:${item.color || '#555'}">
+                ${item.name}
+            </div>
+            
+            <div class="equip-img-container">
                 <img src="${imgSrc}" onerror="this.src='https://placehold.co/100x100?text=Item'">
             </div>
-            <div class="equip-details">
-                <div class="equip-name" style="color:${item.color}">${item.name}</div>
+
+            <div class="equip-stats-grid">
                 ${statsHtml}
+            </div>
+
+            <div class="equip-desc">
+                ${item.desc || "這個裝備似乎隱藏著古老的力量..."}
             </div>
         `;
         
-        itemDiv.onclick = () => equipItem(item.uid);
-        list.appendChild(itemDiv);
+        // 點擊事件
+        card.onclick = () => equipItem(item.uid);
+        list.appendChild(card);
     });
 }
-
 function calculateAndShowStats() {
     if(!adventureData) return;
 
