@@ -2195,3 +2195,71 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .rarity-SSR { border-color: #f1c40f !important; box-shadow: inset 0 0 10px rgba(241, 196, 15, 0.2); }
 .rarity-SR { border-color: #9b59b6 !important; }
 .rarity-R { border-color: #3498db !important; }
+
+/* --- style.css (手機版整裝介面與滾動修正) --- */
+
+/* 1. 用來鎖定背景滾動的 Class (給 JS 用) */
+body.no-scroll {
+    overflow: hidden !important;
+    height: 100% !important;
+    touch-action: none; /* 禁止部分觸控操作傳遞 */
+}
+
+/* 2. 手機版佈局深度優化 */
+@media (max-width: 768px) {
+    /* 調整彈窗本體大小，讓它更適合手機螢幕 */
+    .modal-content {
+        width: 95% !important;
+        height: 90dvh !important; /* 使用動態視口高度，避開瀏覽器網址列 */
+        max-height: 90dvh !important;
+        padding: 10px !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* 整裝介面容器：這是真正負責「上下捲動」的地方 */
+    .prep-container {
+        display: flex;
+        flex-direction: column;
+        flex: 1;           /* 填滿剩餘空間 */
+        overflow-y: auto;  /* 🔥 關鍵：開啟垂直捲動 */
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch; /* 🔥 關鍵：開啟 iOS 慣性捲動 */
+        min-height: 0;     /* 避免 Flex 子元素溢出問題 */
+        gap: 15px;
+        padding-bottom: 20px; /* 底部留白，方便手指滑動 */
+    }
+
+    /* 上半部：英雄面板 (保持原樣，不要被壓縮) */
+    .prep-hero-panel {
+        flex: none; /* 不要伸縮，依內容高度顯示 */
+        width: 100%;
+        margin-bottom: 0;
+    }
+
+    /* 下半部：動作面板 (分頁與背包) */
+    .prep-action-panel {
+        flex: none; /* 🔥 關鍵：讓它自然撐開高度，不要被壓縮 */
+        min-height: 500px; /* 給予足夠的高度，確保分頁內容能完整顯示 */
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* 內部的列表：取消原本的捲動限制，交給外層 .prep-container 統一捲動 */
+    .prep-grid-list, .shop-grid, .level-select-grid {
+        max-height: none !important;
+        overflow-y: visible !important;
+        flex: 1;
+    }
+    
+    /* 修正分頁內容區域 */
+    .prep-tab-content {
+        overflow: visible !important; /* 讓內容撐開 */
+        flex: 1;
+    }
+
+    /* 修正裝備卡片在手機上的高度，避免太佔位 */
+    .equip-card {
+        height: 200px; /* 稍微縮小一點點 */
+    }
+}
