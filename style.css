@@ -1781,7 +1781,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     pointer-events: none;
 }
 
-/* style.css - 冒險模式整裝介面 (修正對齊) */
+/* style.css - 修正後的冒險模式整裝介面 */
 
 /* 佈局容器 */
 .prep-container {
@@ -1810,51 +1810,95 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     background: rgba(0,0,0,0.3);
     padding: 10px;
     border-radius: 8px;
-    cursor: pointer; /* 🔥 提示可點擊 */
+    cursor: pointer;
     transition: 0.2s;
 }
 .prep-hero-preview:hover {
-    background: rgba(255,255,255,0.1); /* 🔥 hover 效果 */
+    background: rgba(255,255,255,0.1);
 }
 
-/* 裝備網格 (2x3) */
+/* ------------------------------------------------ */
+/* 🔥 修正區塊開始：已裝備欄位 (左側) 改回正方形 */
+/* ------------------------------------------------ */
+
+/* 裝備網格：改回 3 欄，比較節省空間且美觀 */
 .prep-equip-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr); /* 兩列 */
-    gap: 8px;
+    grid-template-columns: repeat(3, 1fr); /* 🔥 3欄排列 */
+    gap: 12px;
+    margin-bottom: 20px;
+    justify-items: center; /* 水平置中 */
 }
 
-/* 🔥 2. 裝備卡片樣式：改為長方形，垂直排列內容 */
+/* 單個裝備格子：強制正方形 */
 .equip-slot {
-    /* 覆寫原本可能的固定寬高 */
-    width: auto !important;
-    height: auto !important;
-    aspect-ratio: 0.65; /* 設定長寬比，讓它呈現長方形 */
-    
-    display: flex;
-    flex-direction: column; /* 上圖下文 */
-    align-items: center;
+    width: 90px !important;  /* 🔥 固定寬度 */
+    height: 90px !important; /* 🔥 固定高度 = 正方形 */
+    aspect-ratio: 1 / 1;     /* 確保比例 */
     
     background: rgba(0, 0, 0, 0.6);
     border: 2px solid #555;
-    border-radius: 8px;
-    padding: 6px;
+    border-radius: 10px;
+    position: relative;
     cursor: pointer;
     transition: all 0.2s;
-    position: relative;
+    
+    /* 內容置中 */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden; 
+}
+
+/* 選中時的效果 */
+.equip-slot.selected {
+    border-color: #f1c40f;
+    box-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+    transform: scale(1.05);
 }
 
 .equip-slot:hover {
-    transform: translateY(-3px);
-    border-color: #f1c40f;
-    background: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    border-color: #ddd;
+    background: rgba(255, 255, 255, 0.1);
 }
 
-.equip-slot.selected {
-    border-color: #e74c3c;
-    box-shadow: 0 0 10px rgba(231, 76, 60, 0.6);
+/* 格子內的圖片 */
+.equip-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* 保持比例填滿 */
+    padding: 5px; 
+    box-sizing: border-box;
+    z-index: 1;
 }
+
+/* 格子內的標籤文字 (例如：武器、頭盔...) */
+.slot-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 10px;
+    background: rgba(0,0,0,0.7); /* 半透明黑底 */
+    padding: 2px 0;
+    z-index: 2;
+    pointer-events: none; /* 讓點擊穿透文字 */
+    white-space: nowrap;  /* 不換行 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 如果 prep.js 不小心生成了詳細資訊結構 (equip-details)，強制隱藏它，保持格子整潔 */
+.equip-slot .equip-details,
+.equip-slot .equip-img-box {
+    display: none !important;
+}
+
+/* ------------------------------------------------ */
+/* 🔥 修正區塊結束 */
+/* ------------------------------------------------ */
 
 /* 🔥 3. 圖片區域：保持正方形 WebP */
 .equip-img-box {
