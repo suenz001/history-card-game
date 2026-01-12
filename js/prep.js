@@ -167,33 +167,56 @@ function unequipItem(slotType) {
     if(onSave) onSave(adventureData);
 }
 
+// js/prep.js
+
 function renderEquippedSlots() {
     if (!adventureData) return;
 
     document.querySelectorAll('.equip-slot[data-type]').forEach(slot => {
         const type = slot.dataset.type;
         const item = adventureData.equipment[type];
-        const label = slot.querySelector('.slot-label');
+        
+        // 清空格子內容
         slot.innerHTML = ''; 
         
+        // 建立標籤元素 (顯示名稱或部位)
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'slot-label';
+
         if (item) {
-            const img = document.createElement('img');
-            img.src = item.img;
-            img.style.width = '80%'; img.style.height = '80%'; img.style.objectFit = 'contain';
-            slot.appendChild(img);
-            slot.style.borderColor = item.color || '#fff'; 
+            // --- 有裝備時的狀態 ---
             
-            label.innerText = item.name;
-            if(item.rarity === 'SSR') {
-                label.style.color = '#f1c40f'; label.style.textShadow = '0 0 5px #f1c40f';
-            } else if(item.rarity === 'SR') {
-                label.style.color = '#9b59b6'; label.style.textShadow = 'none';
-            } else if(item.rarity === 'R') {
-                label.style.color = '#3498db'; label.style.textShadow = 'none';
-            } else {
-                label.style.color = '#fff'; label.style.textShadow = 'none';
+            // 1. 處理圖片路徑 (跟 renderInventoryList 保持一致)
+            let imgSrc = item.img;
+            if (imgSrc && imgSrc.endsWith('.png')) {
+                 imgSrc = imgSrc.replace('.png', '.webp');
             }
 
+            // 2. 建立圖片元素
+            const img = document.createElement('img');
+            img.src = imgSrc;
+            img.onerror = () => { img.src = 'https://placehold.co/90x90?text=Error'; };
+            slot.appendChild(img);
+
+            // 3. 設定邊框顏色 (依稀有度)
+            if(item.rarity === 'SSR') {
+                slot.style.borderColor = '#f1c40f'; // 金
+                labelDiv.style.color = '#f1c40f';
+            } else if(item.rarity === 'SR') {
+                slot.style.borderColor = '#9b59b6'; // 紫
+                labelDiv.style.color = '#e0aaff';
+            } else if(item.rarity === 'R') {
+                slot.style.borderColor = '#3498db'; // 藍
+                labelDiv.style.color = '#aed9e0';
+            } else {
+                slot.style.borderColor = '#fff';
+                labelDiv.style.color = '#fff';
+            }
+
+            // 設定標籤文字為裝備名稱
+            labelDiv.innerText = item.name;
+
+            // 點擊事件：如果是當前選中的，再點一次就是卸下
             slot.onclick = (e) => {
                 e.stopPropagation(); 
                 if (currentSelectedSlot === type) {
@@ -202,8 +225,12 @@ function renderEquippedSlots() {
                     handleSlotClick(type);
                 }
             };
+
         } else {
+            // --- 空格子狀態 (Empty Slot) ---
+            
             let icon = '';
+            // 根據部位給一個預設 Emoji 當底圖
             if(type === 'weapon') icon = '⚔️';
             else if(type === 'head') icon = '🪖';
             else if(type === 'armor') icon = '🛡️';
@@ -211,15 +238,29 @@ function renderEquippedSlots() {
             else if(type === 'legs') icon = '👖';
             else if(type === 'shoes') icon = '👞';
             
-            slot.innerHTML = `${icon}`;
+            // 使用 span 顯示大圖示
+            const iconSpan = document.createElement('span');
+            iconSpan.style.fontSize = '32px';
+            iconSpan.style.opacity = '0.3'; // 讓它看起來像浮水印
+            iconSpan.innerText = icon;
+            slot.appendChild(iconSpan);
+
+            // 恢復預設邊框
             slot.style.borderColor = '#555';
-            label.innerText = slot.getAttribute('title') || "裝備";
-            label.style.color = '#aaa'; label.style.textShadow = 'none';
+            
+            // 標籤顯示部位名稱 (從 title 屬性抓取，例如 "武器")
+            labelDiv.innerText = slot.getAttribute('title') || type;
+            labelDiv.style.color = '#aaa';
+
+            // 點擊事件：單純選中該部位
             slot.onclick = () => handleSlotClick(type);
         }
-        slot.appendChild(label); 
+
+        // 最後把標籤加進去
+        slot.appendChild(labelDiv);
     });
     
+    // 保持目前的選中狀態 (高亮顯示)
     if(currentSelectedSlot) {
         document.querySelector(`.equip-slot[data-type="${currentSelectedSlot}"]`)?.classList.add('selected');
     }
