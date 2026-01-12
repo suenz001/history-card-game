@@ -35,12 +35,18 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
             updatePlayerStats(adventureData.stats, adventureData.equipment?.weapon?.subType || 'unarmed');
         }
         document.getElementById('adventure-prep-modal').classList.add('hidden');
-        if(startBattleCallback) startBattleCallback();
+// 🔥 新增：解除背景鎖定
+        document.body.classList.remove('no-scroll');    
+
+    if(startBattleCallback) startBattleCallback();
     });
 
     document.getElementById('close-prep-btn').addEventListener('click', () => {
         playSound('click');
         document.getElementById('adventure-prep-modal').classList.add('hidden');
+// 🔥 新增：解除背景鎖定
+        document.body.classList.remove('no-scroll');
+
     });
 
     document.querySelectorAll('.equip-slot[data-type]').forEach(slot => {
@@ -84,6 +90,9 @@ export function updatePrepData(data) {
 export function openPrepScreen() {
     const modal = document.getElementById('adventure-prep-modal');
     modal.classList.remove('hidden');
+    
+    // 🔥 新增：鎖定背景滾動
+    document.body.classList.add('no-scroll');
     
     // 🔥 每次打開都更新一下資源顯示
     updateResourceDisplay();
