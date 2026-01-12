@@ -2060,7 +2060,7 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
     background: linear-gradient(180deg, rgba(44, 62, 80, 0.9) 0%, rgba(0, 0, 0, 0.95) 100%);
     border: 2px solid #555;
     border-radius: 8px;
-    height: 320px; /* 🔥 關鍵：強制固定高度，不管內容多寡 */
+    height: 220px; /* 🔥 關鍵：強制固定高度，不管內容多寡 */
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -2131,18 +2131,19 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
 .stat-val.debuff { color: #e74c3c; }    /* 負面效果紅色 */
 
 /* 描述區域：填滿剩餘空間 */
+/* 確保描述文字 (如果有) 字體夠小且不佔太多空間 */
 .equip-desc {
-    padding: 8px;
-    font-size: 0.75em;
+    padding: 5px 8px; /* 稍微縮小內距 */
+    font-size: 0.7em; /* 字體再小一點 */
     color: #888;
-    line-height: 1.3;
+    line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
-    -webkit-line-clamp: 3; /* 最多顯示3行 */
+    -webkit-line-clamp: 2; /* 最多只顯示 2 行 */
     -webkit-box-orient: vertical;
     border-top: 1px solid rgba(255,255,255,0.05);
-    flex-grow: 1; /* 佔滿剩餘高度 */
+    /* 移除 flex-grow，讓它自然貼底，不強制撐開 */
     background: rgba(0,0,0,0.2);
 }
 
