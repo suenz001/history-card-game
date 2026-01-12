@@ -2042,3 +2042,111 @@ input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
         min-height: 300px;
     }
 }
+
+/* --- style.css 新增或修改 --- */
+
+/* 裝備列表容器：維持 Grid 佈局 */
+#prep-equip-list {
+    display: grid;
+    /* 自動填滿，最小寬度 160px，確保手機版也不會太擠 */
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); 
+    gap: 12px;
+    padding: 10px;
+}
+
+/* 單個裝備卡片：固定高度與樣式 */
+.equip-card {
+    position: relative;
+    background: linear-gradient(180deg, rgba(44, 62, 80, 0.9) 0%, rgba(0, 0, 0, 0.95) 100%);
+    border: 2px solid #555;
+    border-radius: 8px;
+    height: 320px; /* 🔥 關鍵：強制固定高度，不管內容多寡 */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.equip-card:active {
+    transform: scale(0.98);
+}
+
+.equip-card.selected {
+    box-shadow: 0 0 0 3px #f1c40f, 0 0 15px rgba(241, 196, 15, 0.5);
+    border-color: #f1c40f;
+}
+
+/* 頂部：稀有度條與名稱 */
+.equip-header {
+    padding: 8px 5px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.95em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 圖片區域 */
+.equip-img-container {
+    height: 100px; /* 固定圖片區高度 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0) 70%);
+    margin: 5px;
+}
+
+.equip-img-container img {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
+}
+
+/* 數值區域：使用 Grid 排列兩欄 */
+.equip-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 左右兩欄 */
+    gap: 4px 8px;
+    padding: 8px;
+    font-size: 0.8em;
+    color: #ccc;
+    background: rgba(0, 0, 0, 0.3);
+    flex-grow: 0; /* 不自動伸展，由內容決定 */
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stat-label { color: #aaa; font-size: 0.9em; }
+.stat-val { font-weight: bold; color: #fff; }
+.stat-val.highlight { color: #f1c40f; } /* 特殊數值亮色 */
+.stat-val.debuff { color: #e74c3c; }    /* 負面效果紅色 */
+
+/* 描述區域：填滿剩餘空間 */
+.equip-desc {
+    padding: 8px;
+    font-size: 0.75em;
+    color: #888;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3; /* 最多顯示3行 */
+    -webkit-box-orient: vertical;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    flex-grow: 1; /* 佔滿剩餘高度 */
+    background: rgba(0,0,0,0.2);
+}
+
+/* 稀有度顏色標籤 (JS 會動態加入 class) */
+.rarity-SSR { border-color: #f1c40f !important; box-shadow: inset 0 0 10px rgba(241, 196, 15, 0.2); }
+.rarity-SR { border-color: #9b59b6 !important; }
+.rarity-R { border-color: #3498db !important; }
