@@ -54,11 +54,9 @@ export function initAdventure(database, user) {
 
     document.getElementById('adv-exit-btn').addEventListener('click', stopAdventure);
 
-    // 鍵盤控制
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
     
-    // 建立切換按鈕
     createTargetSwitchButton();
 }
 
@@ -90,7 +88,6 @@ export function updatePlayerStats(stats, weaponData) {
     }
 }
 
-// --- 背景初始化 ---
 function initBackgrounds() {
     gameState.bgElements = { clouds: [], mountains: [], trees: [], groundDetails: [] };
     const w = canvas.width;
@@ -136,7 +133,6 @@ function initBackgrounds() {
     }
 }
 
-// 🔥 優化：切換按鈕 (確保點擊與觸控都有效)
 function createTargetSwitchButton() {
     if (document.getElementById('adv-target-btn')) return;
 
@@ -164,7 +160,6 @@ function createTargetSwitchButton() {
     });
     btn.innerHTML = '🎯'; 
     
-    // 獨立出來的處理函式
     const handleSwitch = (e) => {
         if (e.cancelable) e.preventDefault();
         e.stopPropagation();
@@ -179,7 +174,6 @@ function createTargetSwitchButton() {
         }, 150);
     };
 
-    // 同時綁定 click, mousedown, touchstart 確保萬無一失
     btn.addEventListener('click', handleSwitch);
     btn.addEventListener('touchstart', handleSwitch, { passive: false });
 
@@ -188,7 +182,7 @@ function createTargetSwitchButton() {
 
 function switchTarget() {
     const p = gameState.player;
-    const searchRange = 800; // 🔥 加大範圍，確保全螢幕都能抓到
+    const searchRange = 800; 
 
     const targets = gameState.enemies.filter(e => {
         const dist = Math.hypot(e.x - p.x, e.y - p.y);
@@ -229,13 +223,11 @@ function resizeCanvas() {
 function handleKey(e, isDown) {
     const k = e.key.toLowerCase();
     
-    // 僅在按下時觸發一次
     if (isDown) {
-        // 🔥 新增 Q 鍵切換
         if (k === 'tab' || k === 'q') { 
             e.preventDefault();
             switchTarget();
-            return; // 切換完就結束，不進入移動判斷
+            return; 
         }
     }
 
@@ -271,19 +263,15 @@ export function startAdventure() {
     gameLoop();
 }
 
-// 🔥 修改：退出回到營地 (Prep Modal)
 function stopAdventure() {
     isRunning = false;
     cancelAnimationFrame(animationFrameId);
     
-    // 1. 隱藏冒險畫面
     document.getElementById('adventure-screen').classList.add('hidden');
     
-    // 2. 顯示冒險者營地
     const prepModal = document.getElementById('adventure-prep-modal');
     if (prepModal) {
         prepModal.classList.remove('hidden');
-        // 確保手機版背景鎖定
         document.body.classList.add('no-scroll');
     }
 }
@@ -333,7 +321,7 @@ function update() {
 
     if (p.hp <= 0) {
         alert("你已經力盡倒下...");
-        stopAdventure(); // 這會觸發回到營地
+        stopAdventure(); 
     }
 }
 
@@ -529,10 +517,14 @@ function drawPlayer(p) {
     ctx.restore();
 }
 
+// 🔥 修正：敵人繪製 (解決文字翻轉問題)
 function drawEnemy(e) {
+    // 1. 先移動到位置 (共用座標)
     ctx.save();
     ctx.translate(e.x, e.y);
     
+    // --- 光圈與陰影 (不需翻轉) ---
+    // 鎖定光圈
     if (gameState.player.target === e) {
         ctx.save();
         ctx.strokeStyle = '#e74c3c'; 
@@ -546,11 +538,15 @@ function drawEnemy(e) {
         ctx.restore();
     }
 
-    if (e.direction === -1) ctx.scale(-1, 1);
-    
+    // 陰影
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath(); ctx.ellipse(0, 0, e.radius, e.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
 
+    // --- 身體 (需要根據方向翻轉) ---
+    ctx.save();
+    if (e.direction === -1) ctx.scale(-1, 1);
+    
+    // 繪製身體
     if (e.hitFlash > 0) {
         ctx.fillStyle = 'white';
         e.hitFlash--;
@@ -560,15 +556,33 @@ function drawEnemy(e) {
 
     if (e.type === 'boss') {
         ctx.fillRect(-40, -90, 80, 90);
-        ctx.fillStyle = 'yellow'; ctx.fillText("BOSS", -20, -100);
     } else {
         ctx.beginPath(); ctx.arc(0, -25, 25, 0, Math.PI*2); ctx.fill();
     }
+    ctx.restore(); // 結束翻轉
 
-    ctx.fillStyle = '#555'; ctx.fillRect(-20, -e.radius*2 - 15, 40, 6);
-    ctx.fillStyle = '#e74c3c'; ctx.fillRect(-20, -e.radius*2 - 15, 40 * (e.hp/e.maxHp), 6);
+    // --- UI 文字與血條 (絕對不翻轉！) ---
+    
+    // BOSS 字樣
+    if (e.type === 'boss') {
+        ctx.fillStyle = 'yellow'; 
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 20px Arial';
+        ctx.fillText("BOSS", 0, -100);
+    }
 
-    ctx.restore();
+    // 血條
+    const barW = 40;
+    const barH = 6;
+    const barY = -e.radius * 2 - 15;
+    
+    ctx.fillStyle = '#555'; 
+    ctx.fillRect(-barW/2, barY, barW, barH);
+    
+    ctx.fillStyle = '#e74c3c'; 
+    ctx.fillRect(-barW/2, barY, barW * (e.hp/e.maxHp), barH);
+
+    ctx.restore(); // 結束 translate
 }
 
 function explodeProjectile(p) {
