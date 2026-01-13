@@ -2280,3 +2280,31 @@ body.no-scroll {
         height: 200px;
     }
 }
+
+/* --- style.css 新增/修改 --- */
+
+/* 🔥 強制禁止畫布與 UI 層的觸控預設行為 (解決雙擊放大、拖曳滾動) */
+#adv-canvas, 
+#adv-ui-layer, 
+#virtual-joystick-zone,
+.game-container {
+    touch-action: none !important;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* 確保 UI 層在最上面，且不會阻擋事件 (按鈕除外) */
+#adv-ui-layer {
+    pointer-events: none; /*讓點擊穿透 UI 層，直接點到 Canvas 或搖桿 */
+}
+
+/* 但 UI 內部的按鈕要可以點 */
+#adv-ui-layer > * {
+    pointer-events: auto;
+}
+
+/* 確保切換按鈕在搖桿之上 */
+#adv-target-btn {
+    z-index: 20000 !important; /* 超高層級 */
+}
