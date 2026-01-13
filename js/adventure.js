@@ -15,7 +15,6 @@ const gameState = {
         hp: 1000, maxHp: 1000, 
         speed: 4, direction: 1, 
         width: 60, height: 60, 
-        // 預設武器
         weapon: { type: 'sword', range: 100, atkSpeed: 40, atk: 50 }, 
         attackCooldown: 0,
         target: null 
@@ -23,9 +22,16 @@ const gameState = {
     keys: { w: false, a: false, s: false, d: false },
     enemies: [],
     projectiles: [], 
-    vfx: [], // 特效陣列
+    vfx: [], 
     floatingTexts: [], 
-    gameTime: 0
+    gameTime: 0,
+    // 🔥 新增：背景物件陣列 (用於視差滾動)
+    bgElements: {
+        clouds: [],
+        mountains: [],
+        trees: [],
+        groundDetails: []
+    }
 };
 
 // 圖片資源
@@ -54,11 +60,9 @@ export function initAdventure(database, user) {
 
     document.getElementById('adv-exit-btn').addEventListener('click', stopAdventure);
 
-    // 鍵盤控制
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
     
-    // 建立按鈕
     createTargetSwitchButton();
 }
 
@@ -74,7 +78,6 @@ export function updatePlayerStats(stats, weaponData) {
         if (typeof weaponData === 'string') {
             gameState.player.weapon = { 
                 type: weaponData, 
-                // 法杖和弓箭射程遠
                 range: weaponData === 'bow' || weaponData === 'staff' ? 400 : 100,
                 atkSpeed: weaponData === 'bow' ? 45 : (weaponData === 'staff' ? 55 : 35),
                 atk: stats.atk || 50
@@ -89,10 +92,58 @@ export function updatePlayerStats(stats, weaponData) {
             };
         }
     }
-    console.log("裝備更新:", gameState.player.weapon);
 }
 
-// 🔥 1. 優化鎖定按鈕
+// --- 🔥 背景初始化 (隨機生成風景) ---
+function initBackgrounds() {
+    gameState.bgElements = { clouds: [], mountains: [], trees: [], groundDetails: [] };
+    const w = canvas.width;
+    const h = canvas.height;
+    const horizon = h / 3;
+
+    // 1. 雲朵 (天空)
+    for(let i=0; i<5; i++) {
+        gameState.bgElements.clouds.push({
+            x: Math.random() * w,
+            y: Math.random() * (horizon - 50),
+            size: 30 + Math.random() * 40,
+            speed: 0.2 + Math.random() * 0.3
+        });
+    }
+
+    // 2. 山脈 (遠景) - 產生地形起伏
+    for(let i=0; i<10; i++) {
+        gameState.bgElements.mountains.push({
+            x: i * (w / 8), // 平均分佈但稍微重疊
+            y: horizon,
+            width: 150 + Math.random() * 100,
+            height: 100 + Math.random() * 80,
+            color: `rgb(${90+Math.random()*20}, ${60+Math.random()*20}, ${50+Math.random()*20})`
+        });
+    }
+
+    // 3. 樹林 (中景)
+    for(let i=0; i<20; i++) {
+        gameState.bgElements.trees.push({
+            x: Math.random() * w,
+            y: horizon,
+            height: 40 + Math.random() * 40,
+            width: 20 + Math.random() * 10,
+            type: Math.random() > 0.5 ? 'pine' : 'round'
+        });
+    }
+
+    // 4. 地面細節 (草叢、石頭)
+    for(let i=0; i<30; i++) {
+        gameState.bgElements.groundDetails.push({
+            x: Math.random() * w,
+            y: horizon + Math.random() * (h - horizon),
+            type: Math.random() > 0.7 ? 'stone' : 'grass',
+            size: 5 + Math.random() * 10
+        });
+    }
+}
+
 function createTargetSwitchButton() {
     if (document.getElementById('adv-target-btn')) return;
 
@@ -115,7 +166,7 @@ function createTargetSwitchButton() {
         color: 'white',
         userSelect: 'none',
         cursor: 'pointer',
-        zIndex: '10000', // 確保最上層
+        zIndex: '10000', 
         touchAction: 'manipulation'
     });
     btn.innerHTML = '🎯'; 
@@ -124,11 +175,10 @@ function createTargetSwitchButton() {
         e.preventDefault();
         e.stopPropagation();
         
-        const found = switchTarget(); // 執行切換
+        const found = switchTarget(); 
         
-        // 按鈕視覺回饋
         btn.style.transform = 'scale(0.8)';
-        btn.style.backgroundColor = found ? '#2ecc71' : '#e74c3c'; // 綠色=有抓到，紅色=沒抓到
+        btn.style.backgroundColor = found ? '#2ecc71' : '#e74c3c'; 
         setTimeout(() => {
             btn.style.transform = 'scale(1)';
             btn.style.backgroundColor = 'rgba(52, 152, 219, 0.9)';
@@ -143,10 +193,7 @@ function createTargetSwitchButton() {
 
 function switchTarget() {
     const p = gameState.player;
-    // 🔥 加大搜尋範圍到 500，確保看得到的都能鎖定
     const searchRange = 500; 
-
-    // 找出範圍內活著的敵人
     const targets = gameState.enemies.filter(e => {
         const dist = Math.hypot(e.x - p.x, e.y - p.y);
         return dist <= searchRange && e.hp > 0;
@@ -157,14 +204,12 @@ function switchTarget() {
         return false;
     }
 
-    // 排序：由近到遠
     targets.sort((a, b) => {
         const distA = Math.hypot(a.x - p.x, a.y - p.y);
         const distB = Math.hypot(b.x - p.x, b.y - p.y);
         return distA - distB;
     });
 
-    // 切換邏輯
     let nextIndex = 0;
     if (p.target) {
         const currentIndex = targets.indexOf(p.target);
@@ -182,6 +227,8 @@ function resizeCanvas() {
     if (!canvas) return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    // 重新生成背景以適應新尺寸
+    if(isRunning) initBackgrounds();
 }
 
 function handleKey(e, isDown) {
@@ -210,6 +257,9 @@ export function startAdventure() {
     gameState.vfx = [];
     gameState.floatingTexts = [];
     gameState.gameTime = 0;
+
+    // 🔥 初始化背景元素
+    initBackgrounds();
 
     spawnEnemy(100, canvas.height - 100, 'melee');
     spawnEnemy(canvas.width - 100, canvas.height - 100, 'ranged');
@@ -282,18 +332,15 @@ function updateAutoAttack() {
     const p = gameState.player;
     if (p.attackCooldown > 0) p.attackCooldown--;
 
-    // 檢查鎖定目標狀態
     if (p.target) {
         if (!gameState.enemies.includes(p.target) || p.target.hp <= 0) {
             p.target = null;
         } else {
             const dist = Math.hypot(p.target.x - p.x, p.target.y - p.y);
-            // 只有超出視距才取消鎖定
             if (dist > 600) p.target = null; 
         }
     }
 
-    // 自動尋敵 (如果沒有鎖定)
     if (!p.target) {
         let nearest = null;
         let minInfo = Infinity;
@@ -306,13 +353,11 @@ function updateAutoAttack() {
                 }
             }
         });
-        p.target = nearest; // 自動攻擊最近的
+        p.target = nearest; 
     }
 
-    // 執行攻擊
     if (p.target && p.attackCooldown <= 0) {
         const dist = Math.hypot(p.target.x - p.x, p.target.y - p.y);
-        // 必須在射程內才開火
         if (dist <= p.weapon.range + 20) {
             const dx = p.target.x - p.x;
             if (dx !== 0) p.direction = dx > 0 ? 1 : -1;
@@ -326,7 +371,6 @@ function performPlayerAttack(target) {
     const w = p.weapon;
     p.attackCooldown = w.atkSpeed;
     
-    // 計算角度
     const angle = Math.atan2(target.y - p.y, target.x - p.x);
 
     if (w.type === 'bow') {
@@ -335,19 +379,14 @@ function performPlayerAttack(target) {
     } 
     else if (w.type === 'staff') {
         playSound('magic');
-        // 發射速度慢一點，方便看到軌跡
         spawnProjectile(p.x, p.y - 30, angle, 7, 'player', w.atk, '#3498db', 'orb');
     } 
     else {
-        // 🔥 劍擊特效
         playSound('slash');
-        // 在英雄前方產生特效
         spawnVfx(p.x + (30 * p.direction), p.y - 20, 'slash', p.direction);
         
-        // 傷害計算 (近戰小範圍扇形)
         gameState.enemies.forEach(e => {
             const d = Math.hypot(e.x - p.x, e.y - p.y);
-            // 判斷距離與方向
             const dirToEnemy = e.x > p.x ? 1 : -1;
             if (d < 80 && dirToEnemy === p.direction) {
                 damageEnemy(e, w.atk);
@@ -361,9 +400,9 @@ function draw() {
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    drawBackground();
+    // 🔥 繪製視差滾動背景
+    drawParallaxBackground();
 
-    // 排序
     const renderList = [
         { type: 'player', y: gameState.player.y, obj: gameState.player },
         ...gameState.enemies.map(e => ({ type: 'enemy', y: e.y, obj: e }))
@@ -375,35 +414,98 @@ function draw() {
         else drawEnemy(item.obj);
     });
 
-    drawVfx(); // 特效在最上層
+    drawVfx(); 
     drawProjectiles();
     drawFloatingTexts();
 }
 
-function drawBackground() {
+// 🔥 新增：視差滾動背景繪製
+function drawParallaxBackground() {
     const horizonY = canvas.height / 3;
+    const pX = gameState.player.x;
+
+    // 0. 天空背景 (漸層)
     const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
     skyGrad.addColorStop(0, '#87CEEB'); 
     skyGrad.addColorStop(1, '#E0F7FA'); 
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, canvas.width, horizonY);
 
-    // 山
-    ctx.fillStyle = '#5D4037'; 
-    ctx.beginPath();
-    ctx.moveTo(0, horizonY);
-    ctx.lineTo(canvas.width * 0.3, horizonY - 120);
-    ctx.lineTo(canvas.width * 0.5, horizonY - 40);
-    ctx.lineTo(canvas.width * 0.8, horizonY - 150);
-    ctx.lineTo(canvas.width, horizonY);
-    ctx.fill();
+    // 1. 雲朵 (移動最慢，係數 0.05)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    gameState.bgElements.clouds.forEach(c => {
+        // 計算視差位置 (加上時間移動)
+        const moveX = (c.x + gameState.gameTime * c.speed - pX * 0.05) % (canvas.width + 100);
+        const drawX = moveX < -100 ? moveX + canvas.width + 100 : moveX;
+        
+        ctx.beginPath();
+        ctx.arc(drawX, c.y, c.size, 0, Math.PI*2);
+        ctx.arc(drawX + c.size*0.8, c.y + 10, c.size*0.7, 0, Math.PI*2);
+        ctx.fill();
+    });
 
-    // 地板
+    // 2. 山脈 (遠景，係數 0.1)
+    gameState.bgElements.mountains.forEach(m => {
+        const moveX = (m.x - pX * 0.1) % (canvas.width + m.width);
+        const drawX = moveX < -m.width ? moveX + canvas.width + m.width : moveX;
+
+        ctx.fillStyle = m.color;
+        ctx.beginPath();
+        ctx.moveTo(drawX, m.y);
+        ctx.lineTo(drawX + m.width/2, m.y - m.height);
+        ctx.lineTo(drawX + m.width, m.y);
+        ctx.fill();
+    });
+
+    // 3. 地板 (中景)
     const groundGrad = ctx.createLinearGradient(0, horizonY, 0, canvas.height);
     groundGrad.addColorStop(0, '#7CB342'); 
     groundGrad.addColorStop(1, '#558B2F'); 
     ctx.fillStyle = groundGrad;
     ctx.fillRect(0, horizonY, canvas.width, canvas.height - horizonY);
+
+    // 4. 樹林 (位於地平線上，係數 0.3)
+    gameState.bgElements.trees.forEach(t => {
+        // 樹比較多，讓循環寬度寬一點以免重複感太重
+        const cycleW = canvas.width + 200;
+        let drawX = (t.x - pX * 0.3) % cycleW;
+        if (drawX < -50) drawX += cycleW;
+        
+        ctx.fillStyle = '#2E7D32';
+        if (t.type === 'pine') {
+            ctx.beginPath();
+            ctx.moveTo(drawX, t.y);
+            ctx.lineTo(drawX + t.width/2, t.y - t.height);
+            ctx.lineTo(drawX + t.width, t.y);
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.arc(drawX, t.y - t.height/2, t.height/2, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#5D4037'; // 樹幹
+            ctx.fillRect(drawX - 5, t.y - t.height/2, 10, t.height/2);
+        }
+    });
+
+    // 5. 🔥 地面細節 (草叢、土塊) - 係數 1.0 (跟著地板動，產生移動感)
+    gameState.bgElements.groundDetails.forEach(g => {
+        const cycleW = canvas.width;
+        // Y 軸不變，X 軸隨玩家移動
+        let drawX = (g.x - pX) % cycleW;
+        if (drawX < 0) drawX += cycleW;
+
+        if (g.type === 'grass') {
+            ctx.fillStyle = '#4CAF50';
+            ctx.beginPath();
+            ctx.arc(drawX, g.y, g.size, 0, Math.PI, true);
+            ctx.fill();
+        } else {
+            ctx.fillStyle = 'rgba(0,0,0,0.15)'; // 石頭/土塊陰影
+            ctx.beginPath();
+            ctx.ellipse(drawX, g.y, g.size, g.size/2, 0, 0, Math.PI*2);
+            ctx.fill();
+        }
+    });
 }
 
 function drawPlayer(p) {
@@ -474,18 +576,15 @@ function drawEnemy(e) {
 
 // --- 特效與子彈 ---
 
-// 🔥 3. 法術爆炸邏輯
 function explodeProjectile(p) {
-    // 產生爆炸特效
     spawnVfx(p.x, p.y, 'explosion', 1);
-    playSound('hit'); // 爆炸音效
+    playSound('hit'); 
 
-    // 範圍傷害 (AOE)
-    const aoeRadius = 100; // 爆炸半徑
+    const aoeRadius = 100; 
     gameState.enemies.forEach(e => {
         const dist = Math.hypot(e.x - p.x, e.y - p.y);
         if (dist <= aoeRadius) {
-            damageEnemy(e, p.dmg); // 每個敵人都受傷
+            damageEnemy(e, p.dmg); 
         }
     });
 }
@@ -499,20 +598,17 @@ function updateProjectiles() {
 
         let hit = false;
         if (p.owner === 'player') {
-            // 檢查有沒有撞到任何敵人
             for (let e of gameState.enemies) {
                 const dist = Math.hypot(p.x - e.x, p.y - e.y);
                 if (dist < e.radius + 10) {
                     hit = true;
                     if (p.type === 'orb') {
-                        // 法球：觸發爆炸
                         explodeProjectile(p);
                     } else {
-                        // 箭矢：單體傷害
                         damageEnemy(e, p.dmg);
                         spawnVfx(p.x, p.y, 'hit', 1);
                     }
-                    break; // 撞到一個就停
+                    break; 
                 }
             }
         } 
@@ -530,9 +626,7 @@ function updateProjectiles() {
     }
 }
 
-// 🔥 2. 繪製特效 (揮劍 + 爆炸)
 function spawnVfx(x, y, type, dir) {
-    // slash: 揮劍, explosion: 爆炸, hit: 小打擊
     gameState.vfx.push({ x, y, type, dir, life: type === 'explosion' ? 20 : 10, maxLife: type === 'explosion' ? 20 : 10 });
 }
 
@@ -548,7 +642,6 @@ function drawVfx() {
         ctx.save();
         ctx.translate(v.x, v.y);
         
-        // 揮劍特效 (半月斬)
         if (v.type === 'slash') {
             if (v.dir === -1) ctx.scale(-1, 1);
             ctx.fillStyle = `rgba(255, 255, 255, ${v.life / 10})`;
@@ -556,17 +649,15 @@ function drawVfx() {
             ctx.shadowColor = 'cyan';
             
             ctx.beginPath();
-            // 畫一個彎月形狀
             ctx.arc(0, 0, 50, -Math.PI/3, Math.PI/3); 
             ctx.arc(-10, 0, 40, Math.PI/3, -Math.PI/3, true);
             ctx.fill();
         } 
-        // 爆炸特效 (擴散圓圈)
         else if (v.type === 'explosion') {
-            const progress = 1 - (v.life / v.maxLife); // 0 -> 1
-            const radius = 10 + progress * 80; // 擴大
+            const progress = 1 - (v.life / v.maxLife); 
+            const radius = 10 + progress * 80; 
             
-            ctx.fillStyle = `rgba(52, 152, 219, ${1 - progress})`; // 藍色漸層消失
+            ctx.fillStyle = `rgba(52, 152, 219, ${1 - progress})`; 
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
             ctx.fill();
@@ -575,7 +666,6 @@ function drawVfx() {
             ctx.lineWidth = 2;
             ctx.stroke();
         }
-        // 普通打擊
         else if (v.type === 'hit') {
             ctx.fillStyle = 'rgba(255,255,0,0.8)';
             ctx.beginPath();
@@ -598,7 +688,6 @@ function drawProjectiles() {
             ctx.fillRect(-10, -2, 20, 4); 
             ctx.fillStyle = 'brown'; ctx.fillRect(10, -3, 5, 6); 
         } else {
-            // 魔球
             ctx.shadowBlur = 5;
             ctx.shadowColor = p.color;
             ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fill(); 
@@ -619,7 +708,6 @@ function damageEnemy(e, dmg) {
     e.hp -= dmg;
     e.hitFlash = 5;
     createFloatingText(e.x, e.y - 50, `-${Math.floor(dmg)}`, '#fff');
-    // 輕微擊退
     const pushDir = e.x > gameState.player.x ? 1 : -1;
     e.x += pushDir * 5; 
 }
