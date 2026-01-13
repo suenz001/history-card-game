@@ -2308,3 +2308,72 @@ body.no-scroll {
 #adv-target-btn {
     z-index: 20000 !important; /* 超高層級 */
 }
+
+/* --- style.css 新增技能欄樣式 --- */
+
+/* 技能欄容器 */
+#adv-skill-bar-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%); /* 水平置中 */
+    display: flex;
+    gap: 15px;
+    z-index: 9000;
+    pointer-events: auto; /* 允許點擊 */
+}
+
+/* 技能按鈕 */
+.adv-skill-btn {
+    width: 60px;
+    height: 60px;
+    background-size: cover;
+    background-position: center;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    position: relative;
+    cursor: pointer;
+    background-color: #333; /* 預設底色 */
+    overflow: hidden;
+    transition: transform 0.1s;
+}
+
+.adv-skill-btn:active {
+    transform: scale(0.95);
+}
+
+/* 稀有度邊框 */
+.adv-skill-btn.rarity-SSR { border-color: #f1c40f; box-shadow: 0 0 10px #f1c40f; }
+.adv-skill-btn.rarity-SR { border-color: #9b59b6; }
+.adv-skill-btn.rarity-R { border-color: #3498db; }
+
+/* 冷卻遮罩 (CD) */
+.skill-cd-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0%; /* 0% 代表沒冷卻，100% 代表冷卻中 */
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    transition: height 0.1s linear;
+}
+
+/* 技能圖示上顯示等級或消耗 (可選) */
+.skill-info-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: red;
+    color: white;
+    font-size: 10px;
+    padding: 2px 5px;
+    border-radius: 10px;
+    border: 1px solid white;
+}
