@@ -35,8 +35,8 @@ const gameState = {
     isPortalOpen: false,
     portal: { x: 0, y: 0, radius: 40, angle: 0 },
     
-    // 技能欄狀態
-    skills: []
+    // 技能欄狀態 (包含冷卻資訊)
+    skills: [] 
 };
 
 const heroSprites = {
@@ -79,13 +79,34 @@ export function updateAdventureContext(user) {
     currentUser = user;
 }
 
-// 接收來自整裝畫面的技能卡片資料
+// 接收來自整裝畫面的技能卡片資料 (🔥 修改重點：初始化冷卻時間)
 export function setAdventureSkills(cards) {
-    gameState.skills = cards;
+    // 將純卡片資料轉換為帶有 CD 狀態的物件
+    gameState.skills = cards.map(card => {
+        if (!card) return null;
+
+        // --- 🔥 冷卻時間計算公式 ---
+        // 基礎 10 秒 (600 frames)
+        // 每 1 星減少 1 秒 (60 frames)
+        // 最低冷卻時間限制為 3 秒 (180 frames)，避免過強
+        const baseSeconds = 10;
+        const reductionPerStar = 1; 
+        const stars = card.stars || 0;
+        
+        const finalSeconds = Math.max(3, baseSeconds - (stars * reductionPerStar));
+        const maxCdFrames = finalSeconds * 60; // 假設 60 FPS
+
+        return {
+            ...card,
+            maxCd: maxCdFrames,
+            currentCd: 0 // 初始為 0，可以直接使用
+        };
+    });
+
     renderSkillBar();
 }
 
-// 渲染技能欄
+// 渲染技能欄 (🔥 修改重點：加入冷卻遮罩 ID 與點擊邏輯)
 function renderSkillBar() {
     const container = document.getElementById('adv-skill-bar-container');
     if (!container) return;
@@ -96,69 +117,117 @@ function renderSkillBar() {
     container.style.justifyContent = 'center';
     container.style.pointerEvents = 'auto'; 
 
-    gameState.skills.forEach((card, index) => {
+    gameState.skills.forEach((skill, index) => {
         const skillBtn = document.createElement('div');
-        skillBtn.className = 'adv-skill-btn';
-        
-        skillBtn.style.cssText = `
-            width: 50px; height: 50px; 
-            border: 2px solid #555; 
-            border-radius: 8px; 
-            overflow: hidden; 
-            background: #222;
-            position: relative;
-            cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-            transition: transform 0.1s;
-        `;
+        skillBtn.className = 'adv-skill-slot'; // 使用 style.css 定義的 class
+        // 這裡不需要再寫 inline style，因為 style.css 已經定義了 .adv-skill-slot
 
-        if (card) {
+        if (skill) {
              const img = document.createElement('img');
-             img.src = `assets/cards/${card.id}.webp`;
-             // 🔥 修改：加入 object-position: top; 讓圖片靠上對齊 (顯示頭像)
-             img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; object-position: top;';
+             img.src = `assets/cards/${skill.id}.webp`;
+             img.className = 'adv-skill-img'; // 使用 CSS class
+             img.style.objectPosition = 'top'; // 讓頭像靠上
              img.onerror = () => { img.src = 'https://placehold.co/50x50?text=?'; };
              skillBtn.appendChild(img);
              
-             if(card.rarity === 'SSR') skillBtn.style.borderColor = '#f1c40f';
-             else if(card.rarity === 'SR') skillBtn.style.borderColor = '#9b59b6';
-             else if(card.rarity === 'R') skillBtn.style.borderColor = '#3498db';
+             // 稀有度邊框顏色
+             if(skill.rarity === 'SSR') skillBtn.style.borderColor = '#f1c40f';
+             else if(skill.rarity === 'SR') skillBtn.style.borderColor = '#9b59b6';
+             else if(skill.rarity === 'R') skillBtn.style.borderColor = '#3498db';
 
+             // 按鍵提示 (1, 2, 3...)
              const keyHint = document.createElement('span');
              keyHint.innerText = index + 1;
              keyHint.style.cssText = `
                 position: absolute; bottom: 2px; right: 4px; 
                 font-size: 10px; color: #fff; font-weight: bold;
-                text-shadow: 1px 1px 0 #000; pointer-events: none;
+                text-shadow: 1px 1px 0 #000; pointer-events: none; z-index: 5;
              `;
              skillBtn.appendChild(keyHint);
 
+             // 🔥 冷卻遮罩 (初始高度 0%)
+             const cooldownOverlay = document.createElement('div');
+             cooldownOverlay.id = `skill-cd-${index}`;
+             cooldownOverlay.className = 'adv-skill-cooldown';
+             cooldownOverlay.style.height = '0%'; 
+             cooldownOverlay.innerHTML = ''; // 可以放倒數秒數，目前先留空
+             skillBtn.appendChild(cooldownOverlay);
+
+             // 點擊事件
              skillBtn.addEventListener('mousedown', () => {
-                 skillBtn.style.transform = 'scale(0.9)';
-                 skillBtn.style.filter = 'brightness(1.5)';
-             });
-             skillBtn.addEventListener('mouseup', () => {
-                 skillBtn.style.transform = 'scale(1)';
-                 skillBtn.style.filter = 'brightness(1)';
+                 if (skill.currentCd <= 0) {
+                     skillBtn.style.transform = 'scale(0.9)';
+                 }
              });
              
-             // 這裡預留給之後的技能觸發邏輯
-             skillBtn.addEventListener('click', () => {
-                 // handleSkillUse(index, card); 
-                 console.log(`使用了技能: ${card.name}`);
+             skillBtn.addEventListener('mouseup', () => {
+                 skillBtn.style.transform = 'scale(1)';
+             });
+             
+             // 觸發技能
+             skillBtn.addEventListener('click', (e) => {
+                 e.stopPropagation(); // 防止點擊穿透
+                 handleSkillUse(index); 
              });
 
+             // 增加 "ready" 樣式提示
+             if (skill.currentCd <= 0) {
+                 skillBtn.classList.add('ready');
+             }
+
         } else {
+            // 空格子
             skillBtn.innerText = "+";
             skillBtn.style.color = "#555";
             skillBtn.style.display = "flex";
             skillBtn.style.alignItems = "center";
             skillBtn.style.justifyContent = "center";
             skillBtn.style.fontSize = "24px";
+            skillBtn.style.cursor = "default";
         }
 
         container.appendChild(skillBtn);
     });
+}
+
+// 🔥 新增：處理技能使用邏輯
+function handleSkillUse(index) {
+    const skill = gameState.skills[index];
+    if (!skill) return;
+
+    // 檢查冷卻
+    if (skill.currentCd > 0) {
+        createFloatingText(gameState.player.x, gameState.player.y - 80, "冷卻中...", "#ccc");
+        return;
+    }
+
+    // --- 這裡執行技能邏輯 ---
+    // 目前冒險模式尚未實裝複雜技能效果，先以特效和文字代替
+    // 未來可以在這裡呼叫 skills.js 的邏輯 (需傳入 adventure context)
+    
+    // 1. 重置冷卻時間
+    skill.currentCd = skill.maxCd;
+    
+    // 2. 播放音效與特效
+    playSound('magic'); // 假設有這個音效
+    createFloatingText(gameState.player.x, gameState.player.y - 80, `${skill.name}!`, "#f1c40f");
+    
+    // 3. 簡單的範圍傷害 (暫時邏輯)
+    const p = gameState.player;
+    spawnVfx(p.x, p.y, 'explosion', 1);
+    
+    gameState.enemies.forEach(e => {
+        const dist = Math.hypot(e.x - p.x, e.y - p.y);
+        if (dist < 200) { // 半徑 200 範圍
+            const dmg = (p.weapon.atk * 2) + (skill.atk || 0);
+            damageEnemy(e, dmg);
+            spawnVfx(e.x, e.y, 'hit', 1);
+        }
+    });
+
+    // 4. 更新 UI 狀態 (移除 ready 高亮)
+    const btn = document.querySelectorAll('.adv-skill-slot')[index];
+    if (btn) btn.classList.remove('ready');
 }
 
 export function updatePlayerStats(stats, weaponData) {
@@ -307,6 +376,13 @@ function resizeCanvas() {
 
 function handleKey(e, isDown) {
     const k = e.key.toLowerCase();
+    
+    // 鍵盤施放技能快捷鍵 (1-6)
+    if (isDown && !e.repeat && ['1','2','3','4','5','6'].includes(k)) {
+        const index = parseInt(k) - 1;
+        handleSkillUse(index);
+    }
+
     if (isDown) {
         if (k === 'tab' || k === 'q') { 
             e.preventDefault();
@@ -390,6 +466,9 @@ function update() {
         gameState.portal.x -= dx;
     }
 
+    // 3. 🔥 更新技能冷卻時間
+    updateSkillCooldowns();
+
     updateGameLogic();
     updateAutoAttack();
     updateEnemies();
@@ -407,6 +486,38 @@ function update() {
         alert(`你倒在了第 ${gameState.level} 關...`);
         stopAdventure(); 
     }
+}
+
+// 🔥 新增：技能冷卻更新邏輯
+function updateSkillCooldowns() {
+    gameState.skills.forEach((skill, index) => {
+        if (!skill) return;
+
+        if (skill.currentCd > 0) {
+            skill.currentCd--;
+            
+            // 更新 UI 遮罩高度
+            const overlay = document.getElementById(`skill-cd-${index}`);
+            if (overlay) {
+                const percent = (skill.currentCd / skill.maxCd) * 100;
+                overlay.style.height = `${percent}%`;
+                
+                // 顯示倒數秒數 (可選)
+                const secondsLeft = Math.ceil(skill.currentCd / 60);
+                overlay.innerText = secondsLeft > 0 ? secondsLeft : '';
+            }
+        } else {
+            // 冷卻結束，確保 UI 歸零
+            const overlay = document.getElementById(`skill-cd-${index}`);
+            if (overlay && overlay.style.height !== '0%') {
+                overlay.style.height = '0%';
+                overlay.innerText = '';
+                // 增加發光提示
+                const slot = overlay.parentElement;
+                if (slot) slot.classList.add('ready');
+            }
+        }
+    });
 }
 
 function updateGameLogic() {
