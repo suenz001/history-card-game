@@ -10,7 +10,7 @@ let animationFrameId;
 
 // 遊戲狀態
 const gameState = {
-    player: { x: 0, y: 0, hp: 1000, maxHp: 1000, speed: 4, direction: 1, width: 40, height: 60, attacking: false },
+    player: { x: 0, y: 0, hp: 1000, maxHp: 1000, speed: 4, direction: 1, width: 50, height: 50, attacking: false },
     keys: { w: false, a: false, s: false, d: false },
     enemies: [],
     projectiles: [], // 子彈陣列
@@ -18,17 +18,22 @@ const gameState = {
     camera: { x: 0, y: 0 }
 };
 
-// 圖片資源
+// --- 🔥 資源載入區 (恢復圖片) ---
 const heroSprites = {
     unarmed: new Image(),
     sword: new Image(),
     bow: new Image(),
     staff: new Image()
 };
+// 設定圖片路徑
 heroSprites.unarmed.src = 'assets/hero/hero_unarmed.png';
 heroSprites.sword.src = 'assets/hero/hero_sword.png';
 heroSprites.bow.src = 'assets/hero/hero_bow.png';
 heroSprites.staff.src = 'assets/hero/hero_staff.png';
+
+// 嘗試載入地圖背景 (如果有)
+const mapBg = new Image();
+mapBg.src = 'assets/map_bg.jpg'; 
 
 // --- 初始化 ---
 export function initAdventure(database, user) {
@@ -51,10 +56,9 @@ export function initAdventure(database, user) {
     window.addEventListener('keyup', (e) => handleKey(e, false));
 }
 
-// 🔥 修正：補回這個函式，解決 main.js 的報錯
+// 修正 Main.js 報錯的關鍵函式
 export function updateAdventureContext(user) {
     currentUser = user;
-    // 如果未來需要在這裡更新 UI 或其他狀態，可以寫在這裡
     console.log("Adventure context updated");
 }
 
@@ -74,13 +78,14 @@ export function startAdventure() {
     const screen = document.getElementById('adventure-screen');
     screen.classList.remove('hidden');
 
-    // 重置狀態
+    // 確保 Canvas 尺寸正確
     if (!canvas) {
         canvas = document.getElementById('adv-canvas');
         ctx = canvas.getContext('2d');
-        resizeCanvas();
     }
+    resizeCanvas();
     
+    // 重置玩家位置與狀態
     gameState.player.x = canvas.width / 2;
     gameState.player.y = canvas.height / 2;
     gameState.player.hp = gameState.player.maxHp;
@@ -88,10 +93,10 @@ export function startAdventure() {
     gameState.projectiles = [];
     gameState.floatingTexts = [];
 
-    // 生成敵人 (測試用)
-    spawnEnemy(100, 100, 'melee');
+    // 生成敵人 (測試用：左近戰、右遠程、上魔王)
+    spawnEnemy(100, canvas.height - 100, 'melee');
     spawnEnemy(canvas.width - 100, canvas.height - 100, 'ranged');
-    spawnEnemy(canvas.width - 100, 100, 'boss');
+    spawnEnemy(canvas.width / 2, 100, 'boss');
 
     // 啟動搖桿
     initJoystick(gameState);
@@ -166,7 +171,7 @@ function draw() {
     // 清空畫布
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. 繪製地板 (簡單網格)
+    // 1. 繪製地板 (恢復舊版風格)
     drawFloor();
 
     // 2. 排序渲染順序 (Y軸排序，製造偽 3D 遮擋關係)
@@ -187,12 +192,15 @@ function draw() {
         ctx.translate(proj.x, proj.y);
         ctx.rotate(proj.angle);
         
+        // 子彈樣式
         ctx.fillStyle = proj.color || '#f1c40f';
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = proj.color || '#f1c40f';
+        
         ctx.beginPath();
-        // 簡單的箭頭形狀
         ctx.moveTo(10, 0);
-        ctx.lineTo(-10, 5);
-        ctx.lineTo(-10, -5);
+        ctx.lineTo(-5, 5);
+        ctx.lineTo(-5, -5);
         ctx.fill();
         
         ctx.restore();
@@ -201,42 +209,65 @@ function draw() {
     // 4. 繪製飄字
     gameState.floatingTexts.forEach(txt => {
         ctx.fillStyle = txt.color;
-        ctx.font = "bold 20px Arial";
+        ctx.font = "bold 24px Arial";
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 2;
         ctx.fillText(txt.text, txt.x, txt.y);
     });
 }
 
-// --- 繪圖輔助 ---
+// --- 🎨 繪圖輔助 (Visuals) ---
+
 function drawFloor() {
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    const gridSize = 50;
-    for (let x = 0; x < canvas.width; x += gridSize) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-    }
-    for (let y = 0; y < canvas.height; y += gridSize) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    // 如果有 map_bg.jpg 且載入成功，就畫圖
+    if (mapBg.complete && mapBg.naturalHeight !== 0) {
+        // 簡單平鋪或拉伸，這裡示範填滿
+        ctx.drawImage(mapBg, 0, 0, canvas.width, canvas.height);
+    } else {
+        // 否則畫深色網格 (比原本的白色好看)
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        const gridSize = 50;
+        ctx.beginPath();
+        for (let x = 0; x < canvas.width; x += gridSize) {
+            ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+        }
+        for (let y = 0; y < canvas.height; y += gridSize) {
+            ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
     }
 }
 
 function drawPlayer(p) {
     ctx.save();
     ctx.translate(p.x, p.y);
-    if (p.direction === -1) ctx.scale(-1, 1);
+    if (p.direction === -1) ctx.scale(-1, 1); // 左右翻轉
 
-    // 陰影
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    // 陰影 (腳下)
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.beginPath();
-    ctx.ellipse(0, 0, 15, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 5, 20, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 簡單人物 (之後換圖片)
-    ctx.fillStyle = '#3498db';
-    ctx.fillRect(-15, -50, 30, 50);
+    // 🔥 恢復：使用圖片繪製
+    // 預設使用劍，未來可根據裝備切換 heroSprites.bow 等
+    const sprite = heroSprites.sword.complete ? heroSprites.sword : heroSprites.unarmed;
     
-    // 頭
-    ctx.fillStyle = '#f1c40f';
-    ctx.beginPath(); ctx.arc(0, -60, 15, 0, Math.PI*2); ctx.fill();
+    // 假設圖片大約 64x64，稍微調整繪製位置讓腳對齊中心
+    const size = 80; 
+    ctx.drawImage(sprite, -size/2, -size + 10, size, size);
+
+    // 如果圖片還沒載入，畫個替代方塊避免隱形
+    if (!sprite.complete || sprite.naturalHeight === 0) {
+        ctx.fillStyle = '#3498db';
+        ctx.fillRect(-20, -50, 40, 50);
+        ctx.fillStyle = '#f1c40f'; // 頭
+        ctx.beginPath(); ctx.arc(0, -60, 15, 0, Math.PI*2); ctx.fill();
+    }
 
     ctx.restore();
 }
@@ -248,27 +279,35 @@ function drawEnemy(e) {
 
     // 陰影
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath(); ctx.ellipse(0, 0, e.radius, e.radius * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 5, e.radius, e.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
 
-    // 身體 (根據類型變色)
-    ctx.fillStyle = e.color;
-    // 受到攻擊閃爍
+    // 受傷閃爍
     if (e.hitFlash > 0) {
+        ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = 'white';
         e.hitFlash--;
-    }
-    
-    if (e.type === 'boss') {
-        ctx.fillRect(-30, -80, 60, 80); // Boss 比較大
     } else {
-        ctx.fillRect(-20, -50, 40, 50);
+        ctx.fillStyle = e.color;
     }
 
-    // 血條
-    ctx.fillStyle = 'red';
-    ctx.fillRect(-20, -65, 40, 5);
-    ctx.fillStyle = '#2ecc71';
-    ctx.fillRect(-20, -65, 40 * (e.hp / e.maxHp), 5);
+    // 繪製本體 (這裡暫時用形狀，如果你有敵人圖片也可以換)
+    if (e.type === 'boss') {
+        // Boss 比較大
+        ctx.fillRect(-40, -90, 80, 90); 
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; // 眼睛裝飾
+        ctx.fillRect(10, -70, 10, 10);
+    } else {
+        // 小怪
+        ctx.beginPath();
+        ctx.arc(0, -25, 25, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    // 血條 (回復正常顏色)
+    ctx.fillStyle = '#555';
+    ctx.fillRect(-20, -e.radius * 2 - 15, 40, 6);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(-20, -e.radius * 2 - 15, 40 * (e.hp / e.maxHp), 6);
 
     ctx.restore();
 }
@@ -281,10 +320,10 @@ function spawnEnemy(x, y, type = 'melee') {
         hp: type === 'boss' ? 2000 : 100,
         maxHp: type === 'boss' ? 2000 : 100,
         type: type, // 'melee', 'ranged', 'boss'
-        speed: type === 'boss' ? 1.5 : (type === 'ranged' ? 2 : 2.5),
-        color: type === 'melee' ? '#e74c3c' : (type === 'ranged' ? '#9b59b6' : '#2c3e50'),
-        radius: type === 'boss' ? 30 : 20,
-        attackRange: type === 'melee' ? 50 : 300,
+        speed: type === 'boss' ? 1.0 : (type === 'ranged' ? 1.8 : 2.2),
+        color: type === 'melee' ? '#c0392b' : (type === 'ranged' ? '#8e44ad' : '#2c3e50'),
+        radius: type === 'boss' ? 40 : 25,
+        attackRange: type === 'melee' ? 60 : 300,
         attackCooldown: 0,
         attackMaxCooldown: type === 'ranged' ? 120 : 60, // 幀數
         direction: 1,
@@ -345,21 +384,21 @@ function updateEnemies() {
             }
         }
         else if (e.type === 'boss') {
-            // --- 魔王 AI (簡單版) ---
+            // --- 魔王 AI ---
             const angle = Math.atan2(dy, dx);
-            if (dist > 50) {
+            if (dist > 60) {
                 e.x += Math.cos(angle) * e.speed;
                 e.y += Math.sin(angle) * e.speed;
             }
             
             // 普攻
-            if (dist <= 60 && e.attackCooldown <= 0) {
+            if (dist <= 70 && e.attackCooldown <= 0) {
                 performEnemyAttack(e, p);
                 e.attackCooldown = e.attackMaxCooldown;
             }
 
-            // 特殊技能：每 3 秒額外發射一次
-            if (Math.random() < 0.01) {
+            // 特殊技能：隨機發射
+            if (Math.random() < 0.015) {
                 fireEnemyProjectile(e, p);
             }
         }
@@ -368,10 +407,13 @@ function updateEnemies() {
 
 function performEnemyAttack(enemy, target) {
     // 近戰攻擊判定
-    ctx.fillStyle = 'rgba(255,0,0,0.5)';
+    // 簡單閃爍特效
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,0,0,0.3)';
     ctx.beginPath();
     ctx.arc(target.x, target.y, 30, 0, Math.PI*2);
     ctx.fill();
+    ctx.restore();
     
     // 扣血
     const dmg = enemy.type === 'boss' ? 50 : 10;
@@ -384,13 +426,13 @@ function fireEnemyProjectile(enemy, target) {
     const angle = Math.atan2(target.y - enemy.y, target.x - enemy.x);
     gameState.projectiles.push({
         x: enemy.x,
-        y: enemy.y,
-        vx: Math.cos(angle) * 6,
-        vy: Math.sin(angle) * 6,
+        y: enemy.y - 20, // 從身體發射
+        vx: Math.cos(angle) * 5,
+        vy: Math.sin(angle) * 5,
         angle: angle,
-        life: 100, // 存活時間
+        life: 120, // 存活時間
         owner: 'enemy',
-        color: '#9b59b6',
+        color: enemy.type === 'boss' ? '#e67e22' : '#9b59b6',
         dmg: 15
     });
 }
@@ -408,10 +450,12 @@ function updateProjectiles() {
         // 碰撞檢測 (簡單圓形)
         if (p.owner === 'enemy') {
             const dist = Math.hypot(p.x - gameState.player.x, p.y - gameState.player.y);
-            if (dist < 20) {
+            // 玩家半徑約 20
+            if (dist < 25) {
                 gameState.player.hp -= p.dmg;
                 createFloatingText(gameState.player.x, gameState.player.y - 30, `-${p.dmg}`, '#e74c3c');
                 hit = true;
+                playSound('hit');
             }
         }
 
