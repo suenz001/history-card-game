@@ -33,7 +33,10 @@ const gameState = {
     maxWaves: 3,
     waveTimer: 0,
     isPortalOpen: false,
-    portal: { x: 0, y: 0, radius: 40, angle: 0 } 
+    portal: { x: 0, y: 0, radius: 40, angle: 0 },
+    
+    // 🔥 新增：技能欄狀態
+    skills: []
 };
 
 const heroSprites = {
@@ -74,6 +77,88 @@ export function initAdventure(database, user) {
 
 export function updateAdventureContext(user) {
     currentUser = user;
+}
+
+// 🔥 新增：接收來自整裝畫面的技能卡片資料
+export function setAdventureSkills(cards) {
+    gameState.skills = cards;
+    renderSkillBar();
+}
+
+// 🔥 新增：渲染技能欄
+function renderSkillBar() {
+    const container = document.getElementById('adv-skill-bar-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // 簡單的 CSS 樣式，確保按鈕排列整齊
+    container.style.display = 'flex';
+    container.style.gap = '10px';
+    container.style.justifyContent = 'center';
+    container.style.pointerEvents = 'auto'; // 確保可點擊
+
+    gameState.skills.forEach((card, index) => {
+        const skillBtn = document.createElement('div');
+        skillBtn.className = 'adv-skill-btn';
+        
+        // 基本樣式
+        skillBtn.style.cssText = `
+            width: 50px; height: 50px; 
+            border: 2px solid #555; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            background: #222;
+            position: relative;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+        `;
+
+        // 如果該格子有裝備技能卡
+        if (card) {
+             const img = document.createElement('img');
+             img.src = `assets/cards/${card.id}.webp`;
+             img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
+             img.onerror = () => { img.src = 'https://placehold.co/50x50?text=?'; };
+             skillBtn.appendChild(img);
+             
+             // 稀有度邊框顏色
+             if(card.rarity === 'SSR') skillBtn.style.borderColor = '#f1c40f';
+             else if(card.rarity === 'SR') skillBtn.style.borderColor = '#9b59b6';
+             else if(card.rarity === 'R') skillBtn.style.borderColor = '#3498db';
+
+             // 鍵盤熱鍵提示 (1-6)
+             const keyHint = document.createElement('span');
+             keyHint.innerText = index + 1;
+             keyHint.style.cssText = `
+                position: absolute; bottom: 2px; right: 4px; 
+                font-size: 10px; color: #fff; font-weight: bold;
+                text-shadow: 1px 1px 0 #000; pointer-events: none;
+             `;
+             skillBtn.appendChild(keyHint);
+
+             // 簡單的點擊事件 (目前只是視覺回饋)
+             skillBtn.addEventListener('mousedown', () => {
+                 skillBtn.style.transform = 'scale(0.9)';
+                 skillBtn.style.filter = 'brightness(1.5)';
+             });
+             skillBtn.addEventListener('mouseup', () => {
+                 skillBtn.style.transform = 'scale(1)';
+                 skillBtn.style.filter = 'brightness(1)';
+             });
+             // 這裡等你後續告知技能效果後，再加入實際邏輯
+        } else {
+            // 空格子
+            skillBtn.innerText = "+";
+            skillBtn.style.color = "#555";
+            skillBtn.style.display = "flex";
+            skillBtn.style.alignItems = "center";
+            skillBtn.style.justifyContent = "center";
+            skillBtn.style.fontSize = "24px";
+        }
+
+        container.appendChild(skillBtn);
+    });
 }
 
 export function updatePlayerStats(stats, weaponData) {

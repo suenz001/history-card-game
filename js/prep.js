@@ -1,7 +1,8 @@
 // js/prep.js
 import { playSound } from './audio.js';
 import * as Inventory from './inventory.js';
-import { updatePlayerStats } from './adventure.js';
+// 🔥 修改：引入 setAdventureSkills
+import { updatePlayerStats, setAdventureSkills } from './adventure.js';
 import { generateItemInstance, getAllItems, EQUIP_TYPES } from './items.js';
 
 let db = null;
@@ -34,17 +35,23 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
         if(adventureData && adventureData.stats) {
             updatePlayerStats(adventureData.stats, adventureData.equipment?.weapon?.subType || 'unarmed');
         }
+        
+        // 🔥 新增：將目前顯示的 6 張卡片同步到冒險模式的技能欄
+        // 注意：這裡直接抓取 Inventory.getAllCards() 的前 6 張，確保與 renderPrepCards 邏輯一致
+        const battleCards = Inventory.getAllCards().slice(0, 6);
+        setAdventureSkills(battleCards);
+
         document.getElementById('adventure-prep-modal').classList.add('hidden');
-// 🔥 新增：解除背景鎖定
+        // 🔥 新增：解除背景鎖定
         document.body.classList.remove('no-scroll');    
 
-    if(startBattleCallback) startBattleCallback();
+        if(startBattleCallback) startBattleCallback();
     });
 
     document.getElementById('close-prep-btn').addEventListener('click', () => {
         playSound('click');
         document.getElementById('adventure-prep-modal').classList.add('hidden');
-// 🔥 新增：解除背景鎖定
+        // 🔥 新增：解除背景鎖定
         document.body.classList.remove('no-scroll');
 
     });
@@ -176,8 +183,6 @@ function unequipItem(slotType) {
     if(onSave) onSave(adventureData);
 }
 
-// js/prep.js
-
 function renderEquippedSlots() {
     if (!adventureData) return;
 
@@ -274,11 +279,6 @@ function renderEquippedSlots() {
         document.querySelector(`.equip-slot[data-type="${currentSelectedSlot}"]`)?.classList.add('selected');
     }
 }
-
-// js/prep.js
-
-// 替換原本的 renderInventoryList
-// js/prep.js
 
 function renderInventoryList() {
     const list = document.getElementById('prep-equip-list');
@@ -456,10 +456,16 @@ function renderShop() {
     container.innerHTML = "";
 
     shopItems.forEach((item, index) => {
+        // 🔥 新增：修復雜貨店圖片連結 (.png -> .webp)
+        let imgSrc = item.img;
+        if (imgSrc && imgSrc.endsWith('.png')) {
+             imgSrc = imgSrc.replace('.png', '.webp');
+        }
+
         const div = document.createElement('div');
         div.className = 'shop-item';
         div.innerHTML = `
-            <img src="${item.img}" style="width:50px; height:50px; object-fit:contain;">
+            <img src="${imgSrc}" style="width:50px; height:50px; object-fit:contain;" onerror="this.src='https://placehold.co/50x50?text=Item'">
             <div class="shop-name" style="font-size:0.9em; margin:5px 0;">${item.name}</div>
             <button class="btn-mini" style="width:100%;">${item.price} G</button>
         `;
