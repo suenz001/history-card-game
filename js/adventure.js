@@ -35,7 +35,7 @@ const gameState = {
     isPortalOpen: false,
     portal: { x: 0, y: 0, radius: 40, angle: 0 },
     
-    // 🔥 新增：技能欄狀態
+    // 技能欄狀態
     skills: []
 };
 
@@ -67,7 +67,7 @@ export function initAdventure(database, user) {
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
     
-    // 🔥 禁止雙擊縮放 (解決手機跳動問題)
+    // 禁止雙擊縮放
     document.addEventListener('dblclick', function(event) {
         event.preventDefault();
     }, { passive: false });
@@ -79,29 +79,27 @@ export function updateAdventureContext(user) {
     currentUser = user;
 }
 
-// 🔥 新增：接收來自整裝畫面的技能卡片資料
+// 接收來自整裝畫面的技能卡片資料
 export function setAdventureSkills(cards) {
     gameState.skills = cards;
     renderSkillBar();
 }
 
-// 🔥 新增：渲染技能欄
+// 渲染技能欄
 function renderSkillBar() {
     const container = document.getElementById('adv-skill-bar-container');
     if (!container) return;
     container.innerHTML = '';
 
-    // 簡單的 CSS 樣式，確保按鈕排列整齊
     container.style.display = 'flex';
     container.style.gap = '10px';
     container.style.justifyContent = 'center';
-    container.style.pointerEvents = 'auto'; // 確保可點擊
+    container.style.pointerEvents = 'auto'; 
 
     gameState.skills.forEach((card, index) => {
         const skillBtn = document.createElement('div');
         skillBtn.className = 'adv-skill-btn';
         
-        // 基本樣式
         skillBtn.style.cssText = `
             width: 50px; height: 50px; 
             border: 2px solid #555; 
@@ -114,20 +112,18 @@ function renderSkillBar() {
             transition: transform 0.1s;
         `;
 
-        // 如果該格子有裝備技能卡
         if (card) {
              const img = document.createElement('img');
              img.src = `assets/cards/${card.id}.webp`;
-             img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
+             // 🔥 修改：加入 object-position: top; 讓圖片靠上對齊 (顯示頭像)
+             img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; object-position: top;';
              img.onerror = () => { img.src = 'https://placehold.co/50x50?text=?'; };
              skillBtn.appendChild(img);
              
-             // 稀有度邊框顏色
              if(card.rarity === 'SSR') skillBtn.style.borderColor = '#f1c40f';
              else if(card.rarity === 'SR') skillBtn.style.borderColor = '#9b59b6';
              else if(card.rarity === 'R') skillBtn.style.borderColor = '#3498db';
 
-             // 鍵盤熱鍵提示 (1-6)
              const keyHint = document.createElement('span');
              keyHint.innerText = index + 1;
              keyHint.style.cssText = `
@@ -137,7 +133,6 @@ function renderSkillBar() {
              `;
              skillBtn.appendChild(keyHint);
 
-             // 簡單的點擊事件 (目前只是視覺回饋)
              skillBtn.addEventListener('mousedown', () => {
                  skillBtn.style.transform = 'scale(0.9)';
                  skillBtn.style.filter = 'brightness(1.5)';
@@ -146,9 +141,14 @@ function renderSkillBar() {
                  skillBtn.style.transform = 'scale(1)';
                  skillBtn.style.filter = 'brightness(1)';
              });
-             // 這裡等你後續告知技能效果後，再加入實際邏輯
+             
+             // 這裡預留給之後的技能觸發邏輯
+             skillBtn.addEventListener('click', () => {
+                 // handleSkillUse(index, card); 
+                 console.log(`使用了技能: ${card.name}`);
+             });
+
         } else {
-            // 空格子
             skillBtn.innerText = "+";
             skillBtn.style.color = "#555";
             skillBtn.style.display = "flex";
@@ -221,7 +221,6 @@ function initBackgrounds() {
     }
 }
 
-// 🔥 優化：使用 pointerdown 統一處理滑鼠與觸控
 function createTargetSwitchButton() {
     if (document.getElementById('adv-target-btn')) return;
 
@@ -229,7 +228,7 @@ function createTargetSwitchButton() {
     btn.id = 'adv-target-btn';
     Object.assign(btn.style, {
         position: 'absolute',
-        bottom: '80px', // 稍微往上移一點，避免誤觸邊緣
+        bottom: '80px', 
         right: '30px',
         width: '70px',
         height: '70px',
@@ -244,20 +243,18 @@ function createTargetSwitchButton() {
         color: 'white',
         userSelect: 'none',
         cursor: 'pointer',
-        zIndex: '20000', // 確保在最上層
-        touchAction: 'none' // 禁止瀏覽器預設手勢
+        zIndex: '20000', 
+        touchAction: 'none' 
     });
     btn.innerHTML = '🎯'; 
     
-    // 使用 pointerdown 來確保即時反應 (比 click 快，且支援手機)
     btn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         e.stopPropagation();
         
-        console.log("切換按鈕被按下"); // Debug 用
+        console.log("切換按鈕被按下"); 
         const found = switchTarget(); 
         
-        // 視覺回饋
         btn.style.transform = 'scale(0.8)';
         btn.style.backgroundColor = found ? '#2ecc71' : '#e74c3c'; 
         setTimeout(() => {
@@ -388,14 +385,9 @@ function update() {
 
     if (dx !== 0 && !p.target) p.direction = dx > 0 ? 1 : -1;
 
-    // 🔥 2. 更新傳送門位置 (讓它看起來像是在地上)
+    // 2. 更新傳送門位置
     if (gameState.isPortalOpen) {
-        // 如果玩家向右移(dx>0)，傳送門就向左移，反之亦然
-        // 這樣就能模擬「傳送門固定在世界某處」的視差效果
         gameState.portal.x -= dx;
-        
-        // (可選) 如果想讓傳送門也會上下移動 (Y軸視差)，也可以加上:
-        // gameState.portal.y -= dy;
     }
 
     updateGameLogic();
@@ -451,7 +443,7 @@ function spawnWaveEnemies() {
     const difficultyMult = 1 + (gameState.level - 1) * 0.2;
     const count = 2 + Math.floor(gameState.level / 2) + gameState.wave; 
 
-    if (gameState.wave === gameState.maxWaves + 1) { // 修正邏輯: wave已經+1了
+    if (gameState.wave === gameState.maxWaves + 1) { 
         spawnEnemy(canvas.width / 2, canvas.height / 2, 'boss', difficultyMult);
         spawnEnemy(100, canvas.height - 100, 'ranged', difficultyMult); 
         spawnEnemy(canvas.width - 100, canvas.height - 100, 'ranged', difficultyMult);
@@ -468,7 +460,7 @@ function spawnWaveEnemies() {
 function openPortal() {
     gameState.isPortalOpen = true;
     gameState.portal = {
-        x: canvas.width - 100, // 預設出現在畫面右側
+        x: canvas.width - 100, 
         y: canvas.height / 2 + 50,
         radius: 50,
         angle: 0
