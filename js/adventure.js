@@ -13,7 +13,7 @@ const gameState = {
     player: { x: 0, y: 0, hp: 1000, maxHp: 1000, speed: 4, direction: 1, width: 40, height: 60, attacking: false },
     keys: { w: false, a: false, s: false, d: false },
     enemies: [],
-    projectiles: [], // 🔥 新增：子彈陣列
+    projectiles: [], // 子彈陣列
     floatingTexts: [], // 傷害飄字
     camera: { x: 0, y: 0 }
 };
@@ -51,7 +51,15 @@ export function initAdventure(database, user) {
     window.addEventListener('keyup', (e) => handleKey(e, false));
 }
 
+// 🔥 修正：補回這個函式，解決 main.js 的報錯
+export function updateAdventureContext(user) {
+    currentUser = user;
+    // 如果未來需要在這裡更新 UI 或其他狀態，可以寫在這裡
+    console.log("Adventure context updated");
+}
+
 function resizeCanvas() {
+    if (!canvas) return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
@@ -67,6 +75,12 @@ export function startAdventure() {
     screen.classList.remove('hidden');
 
     // 重置狀態
+    if (!canvas) {
+        canvas = document.getElementById('adv-canvas');
+        ctx = canvas.getContext('2d');
+        resizeCanvas();
+    }
+    
     gameState.player.x = canvas.width / 2;
     gameState.player.y = canvas.height / 2;
     gameState.player.hp = gameState.player.maxHp;
@@ -122,18 +136,21 @@ function update() {
     // 面向判斷
     if (dx !== 0) p.direction = dx > 0 ? 1 : -1;
 
-    // 2. 敵人 AI 更新 🔥
+    // 2. 敵人 AI 更新
     updateEnemies();
 
-    // 3. 子彈更新 🔥
+    // 3. 子彈更新
     updateProjectiles();
 
     // 4. 飄字更新
     updateFloatingTexts();
 
     // UI 更新 (血條)
-    const hpPercent = Math.max(0, (p.hp / p.maxHp) * 100);
-    document.getElementById('adv-hp-fill').style.width = `${hpPercent}%`;
+    const hpBar = document.getElementById('adv-hp-fill');
+    if (hpBar) {
+        const hpPercent = Math.max(0, (p.hp / p.maxHp) * 100);
+        hpBar.style.width = `${hpPercent}%`;
+    }
 
     // 死亡檢查
     if (p.hp <= 0) {
@@ -144,6 +161,8 @@ function update() {
 
 // --- 繪製渲染 (Draw) ---
 function draw() {
+    if (!ctx) return;
+    
     // 清空畫布
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -254,7 +273,7 @@ function drawEnemy(e) {
     ctx.restore();
 }
 
-// --- 🔥 敵人 AI 系統 (核心修改) ---
+// --- 敵人 AI 系統 ---
 
 function spawnEnemy(x, y, type = 'melee') {
     const enemy = {
@@ -327,7 +346,6 @@ function updateEnemies() {
         }
         else if (e.type === 'boss') {
             // --- 魔王 AI (簡單版) ---
-            // 魔王會一直追，且定時發射環狀彈幕
             const angle = Math.atan2(dy, dx);
             if (dist > 50) {
                 e.x += Math.cos(angle) * e.speed;
@@ -340,21 +358,16 @@ function updateEnemies() {
                 e.attackCooldown = e.attackMaxCooldown;
             }
 
-            // 特殊技能：每 3 秒 (約 180 幀) 額外發射一次
+            // 特殊技能：每 3 秒額外發射一次
             if (Math.random() < 0.01) {
                 fireEnemyProjectile(e, p);
             }
         }
     });
-
-    // 移除死亡敵人
-    // (這裡先不做移除，或是可以加上判斷 e.hp <= 0 移除)
-    // gameState.enemies = gameState.enemies.filter(e => e.hp > 0);
 }
 
 function performEnemyAttack(enemy, target) {
     // 近戰攻擊判定
-    // 簡單閃爍特效
     ctx.fillStyle = 'rgba(255,0,0,0.5)';
     ctx.beginPath();
     ctx.arc(target.x, target.y, 30, 0, Math.PI*2);
@@ -364,7 +377,7 @@ function performEnemyAttack(enemy, target) {
     const dmg = enemy.type === 'boss' ? 50 : 10;
     target.hp -= dmg;
     createFloatingText(target.x, target.y - 40, `-${dmg}`, '#e74c3c');
-    playSound('hit'); // 假設 audio.js 有這個
+    playSound('hit'); 
 }
 
 function fireEnemyProjectile(enemy, target) {
@@ -382,7 +395,7 @@ function fireEnemyProjectile(enemy, target) {
     });
 }
 
-// --- 🔥 子彈系統 ---
+// --- 子彈系統 ---
 function updateProjectiles() {
     for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
         const p = gameState.projectiles[i];
@@ -425,9 +438,8 @@ function updateFloatingTexts() {
     }
 }
 
-// 🔥 匯出給技能系統調用
+// 匯出給技能系統調用
 export function updatePlayerStats(stats, weaponType) {
-    // 這裡可以接收 Prep 介面傳來的裝備數值
     gameState.player.maxHp = stats.hp || 1000;
     gameState.player.hp = stats.hp || 1000;
     // gameState.player.atk = stats.atk;
