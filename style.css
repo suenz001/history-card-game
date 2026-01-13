@@ -106,6 +106,10 @@ img[src=""], img:not([src]) { display: none; }
 
 /* 彈窗 */
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+
+/* 🔥 修正：讓背包彈窗層級高於冒險準備畫面 (2500) */
+#inventory-modal { z-index: 2600; }
+
 .modal-content { background: #2c3e50; width: 90%; max-width: 1000px; height: 80%; border-radius: 10px; border: 2px solid #f1c40f; display: flex; flex-direction: column; padding: 20px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #555; padding-bottom: 10px; }
 #inventory-grid { flex: 1; overflow-y: auto; padding: 10px; }
