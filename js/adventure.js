@@ -25,7 +25,15 @@ const gameState = {
     vfx: [], 
     floatingTexts: [], 
     gameTime: 0,
-    bgElements: { clouds: [], mountains: [], trees: [], groundDetails: [] }
+    bgElements: { clouds: [], mountains: [], trees: [], groundDetails: [] },
+    
+    // 🔥 新增：關卡與波數狀態
+    level: 1,           // 目前關卡 (第幾層)
+    wave: 1,            // 目前波數
+    maxWaves: 3,        // 每關幾波
+    waveTimer: 0,       // 波數切換倒數
+    isPortalOpen: false,// 傳送門是否開啟
+    portal: { x: 0, y: 0, radius: 40, angle: 0 } // 傳送門位置
 };
 
 // 圖片資源
@@ -94,6 +102,7 @@ function initBackgrounds() {
     const h = canvas.height;
     const horizon = h / 3;
 
+    // 隨機生成稍微不同的色調或數量，讓每一關感覺不同
     for(let i=0; i<5; i++) {
         gameState.bgElements.clouds.push({
             x: Math.random() * w,
@@ -102,70 +111,46 @@ function initBackgrounds() {
             speed: 0.2 + Math.random() * 0.3
         });
     }
-
     for(let i=0; i<10; i++) {
         gameState.bgElements.mountains.push({
-            x: i * (w / 8),
-            y: horizon,
-            width: 150 + Math.random() * 100,
-            height: 100 + Math.random() * 80,
-            color: `rgb(${90+Math.random()*20}, ${60+Math.random()*20}, ${50+Math.random()*20})`
+            x: i * (w / 8), y: horizon,
+            width: 150 + Math.random() * 100, height: 100 + Math.random() * 80,
+            color: `rgb(${80+Math.random()*40}, ${60+Math.random()*40}, ${50+Math.random()*40})`
         });
     }
-
     for(let i=0; i<20; i++) {
         gameState.bgElements.trees.push({
-            x: Math.random() * w,
-            y: horizon,
-            height: 40 + Math.random() * 40,
-            width: 20 + Math.random() * 10,
+            x: Math.random() * w, y: horizon,
+            height: 40 + Math.random() * 40, width: 20 + Math.random() * 10,
             type: Math.random() > 0.5 ? 'pine' : 'round'
         });
     }
-
     for(let i=0; i<30; i++) {
         gameState.bgElements.groundDetails.push({
-            x: Math.random() * w,
-            y: horizon + Math.random() * (h - horizon),
-            type: Math.random() > 0.7 ? 'stone' : 'grass',
-            size: 5 + Math.random() * 10
+            x: Math.random() * w, y: horizon + Math.random() * (h - horizon),
+            type: Math.random() > 0.7 ? 'stone' : 'grass', size: 5 + Math.random() * 10
         });
     }
 }
 
 function createTargetSwitchButton() {
     if (document.getElementById('adv-target-btn')) return;
-
     const btn = document.createElement('div');
     btn.id = 'adv-target-btn';
     Object.assign(btn.style, {
-        position: 'absolute',
-        bottom: '60px',
-        right: '40px',
-        width: '70px',
-        height: '70px',
-        borderRadius: '50%',
+        position: 'absolute', bottom: '60px', right: '40px',
+        width: '70px', height: '70px', borderRadius: '50%',
         backgroundColor: 'rgba(52, 152, 219, 0.9)', 
-        border: '3px solid white',
-        boxShadow: '0 0 15px rgba(0,0,0,0.6)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        fontSize: '32px',
-        color: 'white',
-        userSelect: 'none',
-        cursor: 'pointer',
-        zIndex: '10000', 
-        touchAction: 'manipulation'
+        border: '3px solid white', boxShadow: '0 0 15px rgba(0,0,0,0.6)',
+        display: 'flex', justifyContent: 'center', alignItems: 'center',
+        fontSize: '32px', color: 'white', userSelect: 'none', cursor: 'pointer',
+        zIndex: '10000', touchAction: 'manipulation'
     });
     btn.innerHTML = '🎯'; 
-    
     const handleSwitch = (e) => {
         if (e.cancelable) e.preventDefault();
         e.stopPropagation();
-        
         const found = switchTarget(); 
-        
         btn.style.transform = 'scale(0.8)';
         btn.style.backgroundColor = found ? '#2ecc71' : '#e74c3c'; 
         setTimeout(() => {
@@ -173,17 +158,14 @@ function createTargetSwitchButton() {
             btn.style.backgroundColor = 'rgba(52, 152, 219, 0.9)';
         }, 150);
     };
-
     btn.addEventListener('click', handleSwitch);
     btn.addEventListener('touchstart', handleSwitch, { passive: false });
-
     document.getElementById('adv-ui-layer').appendChild(btn);
 }
 
 function switchTarget() {
     const p = gameState.player;
     const searchRange = 800; 
-
     const targets = gameState.enemies.filter(e => {
         const dist = Math.hypot(e.x - p.x, e.y - p.y);
         return dist <= searchRange && e.hp > 0;
@@ -193,21 +175,16 @@ function switchTarget() {
         createFloatingText(p.x, p.y - 60, "附近無敵人", "#ccc");
         return false;
     }
-
     targets.sort((a, b) => {
         const distA = Math.hypot(a.x - p.x, a.y - p.y);
         const distB = Math.hypot(b.x - p.x, b.y - p.y);
         return distA - distB;
     });
-
     let nextIndex = 0;
     if (p.target) {
         const currentIndex = targets.indexOf(p.target);
-        if (currentIndex !== -1) {
-            nextIndex = (currentIndex + 1) % targets.length;
-        }
+        if (currentIndex !== -1) nextIndex = (currentIndex + 1) % targets.length;
     }
-
     p.target = targets[nextIndex];
     createFloatingText(p.target.x, p.target.y - 60, "鎖定!", "#f1c40f");
     return true;
@@ -222,7 +199,6 @@ function resizeCanvas() {
 
 function handleKey(e, isDown) {
     const k = e.key.toLowerCase();
-    
     if (isDown) {
         if (k === 'tab' || k === 'q') { 
             e.preventDefault();
@@ -230,7 +206,6 @@ function handleKey(e, isDown) {
             return; 
         }
     }
-
     if (gameState.keys.hasOwnProperty(k)) gameState.keys[k] = isDown;
 }
 
@@ -240,12 +215,19 @@ export function startAdventure() {
     screen.classList.remove('hidden');
     if (!canvas) resizeCanvas();
 
+    // 重置玩家
     gameState.player.x = canvas.width / 2;
     const playableTop = canvas.height / 3;
     gameState.player.y = playableTop + (canvas.height - playableTop) / 2;
     gameState.player.hp = gameState.player.maxHp;
     gameState.player.target = null; 
     
+    // 重置遊戲進度
+    gameState.level = 1;
+    gameState.wave = 1;
+    gameState.isPortalOpen = false;
+    gameState.waveTimer = 60; // 延遲一下再出怪
+
     gameState.enemies = [];
     gameState.projectiles = [];
     gameState.vfx = [];
@@ -253,22 +235,17 @@ export function startAdventure() {
     gameState.gameTime = 0;
 
     initBackgrounds();
-
-    spawnEnemy(100, canvas.height - 100, 'melee');
-    spawnEnemy(canvas.width - 100, canvas.height - 100, 'ranged');
-    spawnEnemy(canvas.width / 2, canvas.height/2, 'boss');
-
     initJoystick(gameState);
     isRunning = true;
     gameLoop();
+    
+    createFloatingText(canvas.width/2, canvas.height/2, "Stage 1 Start!", "#fff");
 }
 
 function stopAdventure() {
     isRunning = false;
     cancelAnimationFrame(animationFrameId);
-    
     document.getElementById('adventure-screen').classList.add('hidden');
-    
     const prepModal = document.getElementById('adventure-prep-modal');
     if (prepModal) {
         prepModal.classList.remove('hidden');
@@ -288,31 +265,31 @@ function update() {
     gameState.gameTime++;
     const p = gameState.player;
 
-    // 移動
+    // 1. 移動
     let dx = 0, dy = 0;
     if (gameState.keys.w) dy -= p.speed;
     if (gameState.keys.s) dy += p.speed;
     if (gameState.keys.a) dx -= p.speed;
     if (gameState.keys.d) dx += p.speed;
+    p.x += dx; p.y += dy;
 
-    p.x += dx;
-    p.y += dy;
-
-    // 邊界限制
     const horizonY = canvas.height / 3;
     p.x = Math.max(20, Math.min(canvas.width - 20, p.x));
     p.y = Math.max(horizonY + 20, Math.min(canvas.height - 20, p.y));
 
-    // 自動面向
     if (dx !== 0 && !p.target) p.direction = dx > 0 ? 1 : -1;
 
+    // 2. 🔥 關卡流程控制 (Wave Logic)
+    updateGameLogic();
+
+    // 3. 其他系統
     updateAutoAttack();
     updateEnemies();
     updateProjectiles();
     updateVfx();
     updateFloatingTexts();
 
-    // UI
+    // UI 更新
     const hpBar = document.getElementById('adv-hp-fill');
     if (hpBar) {
         const hpPercent = Math.max(0, (p.hp / p.maxHp) * 100);
@@ -320,22 +297,125 @@ function update() {
     }
 
     if (p.hp <= 0) {
-        alert("你已經力盡倒下...");
+        alert(`你倒在了第 ${gameState.level} 關...`);
         stopAdventure(); 
     }
 }
+
+// 🔥 新增：波數與關卡邏輯
+function updateGameLogic() {
+    // 檢查敵人是否全滅
+    if (gameState.enemies.length === 0) {
+        if (gameState.isPortalOpen) {
+            // 已經通關，等待進入傳送門
+            checkPortalEntry();
+        } else {
+            // 敵人清空，準備下一波
+            if (gameState.waveTimer > 0) {
+                gameState.waveTimer--;
+            } else {
+                startNextWave();
+            }
+        }
+    }
+
+    // 傳送門旋轉動畫
+    if (gameState.isPortalOpen) {
+        gameState.portal.angle += 0.05;
+        checkPortalEntry();
+    }
+}
+
+function startNextWave() {
+    // 如果波數還沒滿，繼續出怪
+    if (gameState.wave <= gameState.maxWaves) {
+        spawnWaveEnemies();
+        createFloatingText(gameState.player.x, gameState.player.y - 80, `Wave ${gameState.wave}/${gameState.maxWaves}`, "#f1c40f");
+        gameState.wave++;
+        gameState.waveTimer = 180; // 下一波間隔較長 (如果是無限出怪模式)
+    } else {
+        // 波數已滿，開啟傳送門
+        openPortal();
+    }
+}
+
+function spawnWaveEnemies() {
+    // 難度係數：每關增加 20% 強度
+    const difficultyMult = 1 + (gameState.level - 1) * 0.2;
+    const isBossWave = (gameState.wave === gameState.maxWaves + 1); // 修正邏輯：實際上 wave 已經++過了，所以如果是最後一波
+
+    // 根據波數決定數量
+    const count = 2 + Math.floor(gameState.level / 2) + gameState.wave; 
+
+    // 最後一波出 BOSS
+    if (gameState.wave === gameState.maxWaves) {
+        spawnEnemy(canvas.width / 2, canvas.height / 2, 'boss', difficultyMult);
+        spawnEnemy(100, canvas.height - 100, 'ranged', difficultyMult); // 帶小弟
+        spawnEnemy(canvas.width - 100, canvas.height - 100, 'ranged', difficultyMult);
+    } else {
+        // 普通波
+        for (let i = 0; i < count; i++) {
+            const type = Math.random() > 0.3 ? 'melee' : 'ranged';
+            const x = Math.random() * (canvas.width - 100) + 50;
+            const y = (canvas.height/3) + Math.random() * (canvas.height*2/3 - 50);
+            spawnEnemy(x, y, type, difficultyMult);
+        }
+    }
+}
+
+function openPortal() {
+    gameState.isPortalOpen = true;
+    gameState.portal = {
+        x: canvas.width / 2,
+        y: canvas.height / 3 + 80, // 地平線附近
+        radius: 50,
+        angle: 0
+    };
+    playSound('magic');
+    createFloatingText(canvas.width / 2, canvas.height / 2, "傳送門已開啟!", "#00ffff");
+}
+
+function checkPortalEntry() {
+    if (!gameState.isPortalOpen) return;
+    const p = gameState.player;
+    const dist = Math.hypot(p.x - gameState.portal.x, p.y - gameState.portal.y);
+    
+    if (dist < gameState.portal.radius) {
+        goToNextLevel();
+    }
+}
+
+function goToNextLevel() {
+    gameState.level++;
+    gameState.wave = 1;
+    gameState.isPortalOpen = false;
+    gameState.waveTimer = 120; // 進入新關卡的準備時間
+    
+    // 獎勵：回血 20%
+    const heal = Math.floor(gameState.player.maxHp * 0.2);
+    gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + heal);
+    createFloatingText(gameState.player.x, gameState.player.y, `HP +${heal}`, "#2ecc71");
+    
+    // 重置位置
+    gameState.player.x = canvas.width / 2;
+    gameState.player.y = canvas.height - 100;
+    
+    // 刷新背景
+    initBackgrounds();
+    
+    playSound('success'); // 假設有升級音效
+    createFloatingText(canvas.width/2, canvas.height/2, `進入 Stage ${gameState.level}`, "#fff");
+}
+
+// --- 戰鬥系統 ---
 
 function updateAutoAttack() {
     const p = gameState.player;
     if (p.attackCooldown > 0) p.attackCooldown--;
 
     if (p.target) {
-        if (!gameState.enemies.includes(p.target) || p.target.hp <= 0) {
-            p.target = null;
-        } else {
-            const dist = Math.hypot(p.target.x - p.x, p.target.y - p.y);
-            if (dist > 600) p.target = null; 
-        }
+        if (!gameState.enemies.includes(p.target) || p.target.hp <= 0) p.target = null;
+        else if (Math.hypot(p.target.x - p.x, p.target.y - p.y) > 600) p.target = null;
     }
 
     if (!p.target) {
@@ -343,11 +423,9 @@ function updateAutoAttack() {
         let minInfo = Infinity;
         gameState.enemies.forEach(e => {
             const dist = Math.hypot(e.x - p.x, e.y - p.y);
-            if (dist <= p.weapon.range) {
-                if (dist < minInfo) {
-                    minInfo = dist;
-                    nearest = e;
-                }
+            if (dist <= p.weapon.range && dist < minInfo) {
+                minInfo = dist;
+                nearest = e;
             }
         });
         p.target = nearest; 
@@ -367,7 +445,6 @@ function performPlayerAttack(target) {
     const p = gameState.player;
     const w = p.weapon;
     p.attackCooldown = w.atkSpeed;
-    
     const angle = Math.atan2(target.y - p.y, target.x - p.x);
 
     if (w.type === 'bow') {
@@ -381,13 +458,10 @@ function performPlayerAttack(target) {
     else {
         playSound('slash');
         spawnVfx(p.x + (30 * p.direction), p.y - 20, 'slash', p.direction);
-        
         gameState.enemies.forEach(e => {
             const d = Math.hypot(e.x - p.x, e.y - p.y);
             const dirToEnemy = e.x > p.x ? 1 : -1;
-            if (d < 80 && dirToEnemy === p.direction) {
-                damageEnemy(e, w.atk);
-            }
+            if (d < 80 && dirToEnemy === p.direction) damageEnemy(e, w.atk);
         });
     }
 }
@@ -398,6 +472,9 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     drawParallaxBackground();
+    
+    // 🔥 繪製傳送門 (如果在地板層，要在角色之下)
+    if (gameState.isPortalOpen) drawPortal();
 
     const renderList = [
         { type: 'player', y: gameState.player.y, obj: gameState.player },
@@ -413,12 +490,72 @@ function draw() {
     drawVfx(); 
     drawProjectiles();
     drawFloatingTexts();
+    
+    // 🔥 繪製 HUD (關卡資訊)
+    drawHUD();
+}
+
+function drawHUD() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.roundRect(10, 10, 160, 40, 5);
+    ctx.fill();
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Stage ${gameState.level}`, 20, 35);
+    
+    // 顯示波數
+    let waveText = `Wave ${Math.min(gameState.wave, gameState.maxWaves)}/${gameState.maxWaves}`;
+    if (gameState.isPortalOpen) waveText = "Clear!";
+    
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillText(waveText, 90, 35);
+    ctx.restore();
+}
+
+function drawPortal() {
+    const { x, y, radius, angle } = gameState.portal;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    
+    // 外圈
+    ctx.strokeStyle = '#00ffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI*2);
+    ctx.stroke();
+    
+    // 內圈漩渦
+    ctx.fillStyle = 'rgba(50, 0, 255, 0.3)';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI*2);
+    ctx.fill();
+    
+    // 粒子裝飾
+    ctx.fillStyle = '#fff';
+    for(let i=0; i<4; i++) {
+        const rad = radius * 0.7;
+        const a = (angle * 2 + i * Math.PI/2) % (Math.PI*2);
+        ctx.beginPath();
+        ctx.arc(Math.cos(a)*rad, Math.sin(a)*rad, 5, 0, Math.PI*2);
+        ctx.fill();
+    }
+    
+    ctx.restore();
+    
+    // 文字提示
+    ctx.fillStyle = '#00ffff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText("傳送門", x, y - radius - 10);
 }
 
 function drawParallaxBackground() {
     const horizonY = canvas.height / 3;
     const pX = gameState.player.x;
-
     const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
     skyGrad.addColorStop(0, '#87CEEB'); 
     skyGrad.addColorStop(1, '#E0F7FA'); 
@@ -429,68 +566,34 @@ function drawParallaxBackground() {
     gameState.bgElements.clouds.forEach(c => {
         const moveX = (c.x + gameState.gameTime * c.speed - pX * 0.05) % (canvas.width + 100);
         const drawX = moveX < -100 ? moveX + canvas.width + 100 : moveX;
-        
-        ctx.beginPath();
-        ctx.arc(drawX, c.y, c.size, 0, Math.PI*2);
-        ctx.arc(drawX + c.size*0.8, c.y + 10, c.size*0.7, 0, Math.PI*2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(drawX, c.y, c.size, 0, Math.PI*2); ctx.arc(drawX + c.size*0.8, c.y + 10, c.size*0.7, 0, Math.PI*2); ctx.fill();
     });
 
     gameState.bgElements.mountains.forEach(m => {
         const moveX = (m.x - pX * 0.1) % (canvas.width + m.width);
         const drawX = moveX < -m.width ? moveX + canvas.width + m.width : moveX;
-
-        ctx.fillStyle = m.color;
-        ctx.beginPath();
-        ctx.moveTo(drawX, m.y);
-        ctx.lineTo(drawX + m.width/2, m.y - m.height);
-        ctx.lineTo(drawX + m.width, m.y);
-        ctx.fill();
+        ctx.fillStyle = m.color; ctx.beginPath(); ctx.moveTo(drawX, m.y); ctx.lineTo(drawX + m.width/2, m.y - m.height); ctx.lineTo(drawX + m.width, m.y); ctx.fill();
     });
 
     const groundGrad = ctx.createLinearGradient(0, horizonY, 0, canvas.height);
-    groundGrad.addColorStop(0, '#7CB342'); 
-    groundGrad.addColorStop(1, '#558B2F'); 
-    ctx.fillStyle = groundGrad;
-    ctx.fillRect(0, horizonY, canvas.width, canvas.height - horizonY);
+    groundGrad.addColorStop(0, '#7CB342'); groundGrad.addColorStop(1, '#558B2F'); 
+    ctx.fillStyle = groundGrad; ctx.fillRect(0, horizonY, canvas.width, canvas.height - horizonY);
 
     gameState.bgElements.trees.forEach(t => {
         const cycleW = canvas.width + 200;
         let drawX = (t.x - pX * 0.3) % cycleW;
         if (drawX < -50) drawX += cycleW;
-        
         ctx.fillStyle = '#2E7D32';
-        if (t.type === 'pine') {
-            ctx.beginPath();
-            ctx.moveTo(drawX, t.y);
-            ctx.lineTo(drawX + t.width/2, t.y - t.height);
-            ctx.lineTo(drawX + t.width, t.y);
-            ctx.fill();
-        } else {
-            ctx.beginPath();
-            ctx.arc(drawX, t.y - t.height/2, t.height/2, 0, Math.PI*2);
-            ctx.fill();
-            ctx.fillStyle = '#5D4037'; 
-            ctx.fillRect(drawX - 5, t.y - t.height/2, 10, t.height/2);
-        }
+        if (t.type === 'pine') { ctx.beginPath(); ctx.moveTo(drawX, t.y); ctx.lineTo(drawX + t.width/2, t.y - t.height); ctx.lineTo(drawX + t.width, t.y); ctx.fill(); } 
+        else { ctx.beginPath(); ctx.arc(drawX, t.y - t.height/2, t.height/2, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#5D4037'; ctx.fillRect(drawX - 5, t.y - t.height/2, 10, t.height/2); }
     });
 
     gameState.bgElements.groundDetails.forEach(g => {
         const cycleW = canvas.width;
         let drawX = (g.x - pX) % cycleW;
         if (drawX < 0) drawX += cycleW;
-
-        if (g.type === 'grass') {
-            ctx.fillStyle = '#4CAF50';
-            ctx.beginPath();
-            ctx.arc(drawX, g.y, g.size, 0, Math.PI, true);
-            ctx.fill();
-        } else {
-            ctx.fillStyle = 'rgba(0,0,0,0.15)'; 
-            ctx.beginPath();
-            ctx.ellipse(drawX, g.y, g.size, g.size/2, 0, 0, Math.PI*2);
-            ctx.fill();
-        }
+        if (g.type === 'grass') { ctx.fillStyle = '#4CAF50'; ctx.beginPath(); ctx.arc(drawX, g.y, g.size, 0, Math.PI, true); ctx.fill(); } 
+        else { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(drawX, g.y, g.size, g.size/2, 0, 0, Math.PI*2); ctx.fill(); }
     });
 }
 
@@ -511,78 +614,43 @@ function drawPlayer(p) {
         const size = 80;
         ctx.drawImage(sprite, -size/2, -size + 15, size, size);
     } else {
-        ctx.fillStyle = '#3498db';
-        ctx.fillRect(-20, -50, 40, 50);
+        ctx.fillStyle = '#3498db'; ctx.fillRect(-20, -50, 40, 50);
     }
     ctx.restore();
 }
 
-// 🔥 修正：敵人繪製 (解決文字翻轉問題)
 function drawEnemy(e) {
-    // 1. 先移動到位置 (共用座標)
     ctx.save();
     ctx.translate(e.x, e.y);
     
-    // --- 光圈與陰影 (不需翻轉) ---
-    // 鎖定光圈
     if (gameState.player.target === e) {
         ctx.save();
-        ctx.strokeStyle = '#e74c3c'; 
-        ctx.lineWidth = 3;
-        ctx.setLineDash([10, 5]);
+        ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3; ctx.setLineDash([10, 5]);
         const rotate = (gameState.gameTime * 0.05) % (Math.PI * 2);
         ctx.rotate(rotate);
-        ctx.beginPath();
-        ctx.arc(0, 0, e.radius + 15, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, e.radius + 15, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
     }
 
-    // 陰影
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath(); ctx.ellipse(0, 0, e.radius, e.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
 
-    // --- 身體 (需要根據方向翻轉) ---
     ctx.save();
     if (e.direction === -1) ctx.scale(-1, 1);
-    
-    // 繪製身體
-    if (e.hitFlash > 0) {
-        ctx.fillStyle = 'white';
-        e.hitFlash--;
-    } else {
-        ctx.fillStyle = e.color;
-    }
+    if (e.hitFlash > 0) { ctx.fillStyle = 'white'; e.hitFlash--; } else { ctx.fillStyle = e.color; }
+
+    if (e.type === 'boss') ctx.fillRect(-40, -90, 80, 90);
+    else { ctx.beginPath(); ctx.arc(0, -25, 25, 0, Math.PI*2); ctx.fill(); }
+    ctx.restore();
 
     if (e.type === 'boss') {
-        ctx.fillRect(-40, -90, 80, 90);
-    } else {
-        ctx.beginPath(); ctx.arc(0, -25, 25, 0, Math.PI*2); ctx.fill();
-    }
-    ctx.restore(); // 結束翻轉
-
-    // --- UI 文字與血條 (絕對不翻轉！) ---
-    
-    // BOSS 字樣
-    if (e.type === 'boss') {
-        ctx.fillStyle = 'yellow'; 
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 20px Arial';
-        ctx.fillText("BOSS", 0, -100);
+        ctx.fillStyle = 'yellow'; ctx.textAlign = 'center'; ctx.font = 'bold 20px Arial'; ctx.fillText("BOSS", 0, -100);
     }
 
-    // 血條
-    const barW = 40;
-    const barH = 6;
-    const barY = -e.radius * 2 - 15;
-    
-    ctx.fillStyle = '#555'; 
-    ctx.fillRect(-barW/2, barY, barW, barH);
-    
-    ctx.fillStyle = '#e74c3c'; 
-    ctx.fillRect(-barW/2, barY, barW * (e.hp/e.maxHp), barH);
-
-    ctx.restore(); // 結束 translate
+    const barW = 40; const barH = 6; const barY = -e.radius * 2 - 15;
+    ctx.fillStyle = '#555'; ctx.fillRect(-barW/2, barY, barW, barH);
+    ctx.fillStyle = '#e74c3c'; ctx.fillRect(-barW/2, barY, barW * (e.hp/e.maxHp), barH);
+    ctx.restore();
 }
 
 function explodeProjectile(p) {
@@ -598,10 +666,7 @@ function explodeProjectile(p) {
 function updateProjectiles() {
     for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
         const p = gameState.projectiles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life--;
-
+        p.x += p.vx; p.y += p.vy; p.life--;
         let hit = false;
         if (p.owner === 'player') {
             for (let e of gameState.enemies) {
@@ -609,24 +674,18 @@ function updateProjectiles() {
                 if (dist < e.radius + 10) {
                     hit = true;
                     if (p.type === 'orb') explodeProjectile(p);
-                    else {
-                        damageEnemy(e, p.dmg);
-                        spawnVfx(p.x, p.y, 'hit', 1);
-                    }
+                    else { damageEnemy(e, p.dmg); spawnVfx(p.x, p.y, 'hit', 1); }
                     break; 
                 }
             }
-        } 
-        else if (p.owner === 'enemy') {
+        } else if (p.owner === 'enemy') {
             const dist = Math.hypot(p.x - gameState.player.x, p.y - gameState.player.y);
             if (dist < 30) {
                 gameState.player.hp -= p.dmg;
                 createFloatingText(gameState.player.x, gameState.player.y - 40, `-${p.dmg}`, 'red');
-                hit = true;
-                playSound('hit');
+                hit = true; playSound('hit');
             }
         }
-
         if (p.life <= 0 || hit) gameState.projectiles.splice(i, 1);
     }
 }
@@ -644,35 +703,20 @@ function updateVfx() {
 
 function drawVfx() {
     gameState.vfx.forEach(v => {
-        ctx.save();
-        ctx.translate(v.x, v.y);
-        
+        ctx.save(); ctx.translate(v.x, v.y);
         if (v.type === 'slash') {
             if (v.dir === -1) ctx.scale(-1, 1);
             ctx.fillStyle = `rgba(255, 255, 255, ${v.life / 10})`;
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = 'cyan';
-            ctx.beginPath();
-            ctx.arc(0, 0, 50, -Math.PI/3, Math.PI/3); 
-            ctx.arc(-10, 0, 40, Math.PI/3, -Math.PI/3, true);
-            ctx.fill();
-        } 
-        else if (v.type === 'explosion') {
+            ctx.shadowBlur = 10; ctx.shadowColor = 'cyan';
+            ctx.beginPath(); ctx.arc(0, 0, 50, -Math.PI/3, Math.PI/3); ctx.arc(-10, 0, 40, Math.PI/3, -Math.PI/3, true); ctx.fill();
+        } else if (v.type === 'explosion') {
             const progress = 1 - (v.life / v.maxLife); 
             const radius = 10 + progress * 80; 
             ctx.fillStyle = `rgba(52, 152, 219, ${1 - progress})`; 
-            ctx.beginPath();
-            ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = `rgba(255, 255, 255, ${1 - progress})`;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
-        else if (v.type === 'hit') {
-            ctx.fillStyle = 'rgba(255,255,0,0.8)';
-            ctx.beginPath();
-            ctx.arc(0, 0, 15, 0, Math.PI*2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = `rgba(255, 255, 255, ${1 - progress})`; ctx.lineWidth = 2; ctx.stroke();
+        } else if (v.type === 'hit') {
+            ctx.fillStyle = 'rgba(255,255,0,0.8)'; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fill();
         }
         ctx.restore();
     });
@@ -680,44 +724,35 @@ function drawVfx() {
 
 function drawProjectiles() {
     gameState.projectiles.forEach(p => {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.angle);
-        ctx.fillStyle = p.color;
-        if (p.type === 'arrow') {
-            ctx.fillRect(-10, -2, 20, 4); 
-            ctx.fillStyle = 'brown'; ctx.fillRect(10, -3, 5, 6); 
-        } else {
-            ctx.shadowBlur = 5;
-            ctx.shadowColor = p.color;
-            ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fill(); 
-        }
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle); ctx.fillStyle = p.color;
+        if (p.type === 'arrow') { ctx.fillRect(-10, -2, 20, 4); ctx.fillStyle = 'brown'; ctx.fillRect(10, -3, 5, 6); } 
+        else { ctx.shadowBlur = 5; ctx.shadowColor = p.color; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fill(); }
         ctx.restore();
     });
 }
 
 function spawnProjectile(x, y, angle, speed, owner, dmg, color, type) {
-    gameState.projectiles.push({
-        x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-        angle, speed, owner, dmg, color, type, life: 60
-    });
+    gameState.projectiles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, angle, speed, owner, dmg, color, type, life: 60 });
 }
 
 function damageEnemy(e, dmg) {
-    e.hp -= dmg;
-    e.hitFlash = 5;
+    e.hp -= dmg; e.hitFlash = 5;
     createFloatingText(e.x, e.y - 50, `-${Math.floor(dmg)}`, '#fff');
-    const pushDir = e.x > gameState.player.x ? 1 : -1;
-    e.x += pushDir * 5; 
+    const pushDir = e.x > gameState.player.x ? 1 : -1; e.x += pushDir * 5; 
 }
 
-function spawnEnemy(x, y, type) {
+// 🔥 修正：根據難度生成敵人
+function spawnEnemy(x, y, type, difficultyMult = 1) {
+    const baseHp = type === 'boss' ? 2000 : 100;
+    const baseColor = type === 'melee' ? '#c0392b' : (type === 'ranged' ? '#8e44ad' : '#2c3e50');
+    
     gameState.enemies.push({
         x, y, type,
-        hp: type==='boss'?2000:100, maxHp: type==='boss'?2000:100,
-        speed: type==='boss'?1:2,
-        color: type==='melee'?'#c0392b':(type==='ranged'?'#8e44ad':'#2c3e50'),
-        radius: type==='boss'?40:25,
+        hp: baseHp * difficultyMult, 
+        maxHp: baseHp * difficultyMult,
+        speed: type === 'boss' ? 1 : 2,
+        color: baseColor,
+        radius: type === 'boss' ? 40 : 25,
         attackCooldown: 0, hitFlash: 0, direction: 1
     });
 }
@@ -725,33 +760,15 @@ function spawnEnemy(x, y, type) {
 function updateEnemies() {
     const p = gameState.player;
     gameState.enemies.forEach(e => {
-        const dx = p.x - e.x;
-        const dy = p.y - e.y;
-        const dist = Math.hypot(dx, dy);
+        const dx = p.x - e.x; const dy = p.y - e.y; const dist = Math.hypot(dx, dy);
         e.direction = dx > 0 ? 1 : -1;
-
         if (e.attackCooldown > 0) e.attackCooldown--;
-
         if (e.type === 'melee' || e.type === 'boss') {
-            if (dist > 60) {
-                const angle = Math.atan2(dy, dx);
-                e.x += Math.cos(angle) * e.speed;
-                e.y += Math.sin(angle) * e.speed;
-            } else if (e.attackCooldown <= 0) {
-                p.hp -= 10;
-                createFloatingText(p.x, p.y-40, "-10", "red");
-                e.attackCooldown = 60;
-            }
+            if (dist > 60) { const angle = Math.atan2(dy, dx); e.x += Math.cos(angle) * e.speed; e.y += Math.sin(angle) * e.speed; } 
+            else if (e.attackCooldown <= 0) { p.hp -= 10; createFloatingText(p.x, p.y-40, "-10", "red"); e.attackCooldown = 60; }
         } else if (e.type === 'ranged') {
-             if (dist > 300) {
-                const angle = Math.atan2(dy, dx);
-                e.x += Math.cos(angle) * e.speed;
-                e.y += Math.sin(angle) * e.speed;
-             } else if (e.attackCooldown <= 0) {
-                 const angle = Math.atan2(dy, dx);
-                 spawnProjectile(e.x, e.y, angle, 5, 'enemy', 15, '#8e44ad', 'orb');
-                 e.attackCooldown = 120;
-             }
+             if (dist > 300) { const angle = Math.atan2(dy, dx); e.x += Math.cos(angle) * e.speed; e.y += Math.sin(angle) * e.speed; } 
+             else if (e.attackCooldown <= 0) { const angle = Math.atan2(dy, dx); spawnProjectile(e.x, e.y, angle, 5, 'enemy', 15, '#8e44ad', 'orb'); e.attackCooldown = 120; }
         }
     });
     for (let i = gameState.enemies.length - 1; i >= 0; i--) {
@@ -767,17 +784,12 @@ export function createFloatingText(x, y, text, color) {
 }
 
 function drawFloatingTexts() {
-    gameState.floatingTexts.forEach(t => {
-        ctx.fillStyle = t.color;
-        ctx.font = "bold 24px Arial";
-        ctx.fillText(t.text, t.x, t.y);
-    });
+    gameState.floatingTexts.forEach(t => { ctx.fillStyle = t.color; ctx.font = "bold 24px Arial"; ctx.fillText(t.text, t.x, t.y); });
 }
 
 function updateFloatingTexts() {
     for (let i = gameState.floatingTexts.length - 1; i >= 0; i--) {
-        const t = gameState.floatingTexts[i];
-        t.y -= 1; t.life--;
+        const t = gameState.floatingTexts[i]; t.y -= 1; t.life--;
         if (t.life <= 0) gameState.floatingTexts.splice(i, 1);
     }
 }
