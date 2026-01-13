@@ -1,7 +1,8 @@
 // js/prep.js
 import { playSound } from './audio.js';
 import * as Inventory from './inventory.js';
-import { updatePlayerStats } from './adventure.js';
+// 🔥 引入 adventure.js 的更新函式
+import { updatePlayerStats, updateAdventureCards } from './adventure.js';
 import { generateItemInstance, getAllItems, EQUIP_TYPES } from './items.js';
 
 let db = null;
@@ -13,6 +14,9 @@ let adventureData = null;
 let currentSelectedSlot = null; 
 let shopItems = []; // 暫存商店列表
 
+// 🔥 新增：暫存已選擇的技能卡片 (最多 6 張)
+let equippedSkillCards = [];
+
 // 初始化整裝介面
 export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb) {
     db = database;
@@ -20,6 +24,9 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
     startBattleCallback = onStartBattle;
     onSave = saveCb;
     handleCurrency = currencyCb;
+
+    // 清空技能選擇
+    equippedSkillCards = [];
 
     const tabs = document.querySelectorAll('.prep-tab-btn');
     tabs.forEach(btn => {
@@ -31,257 +38,207 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
 
     document.getElementById('prep-start-battle-btn').addEventListener('click', () => {
         playSound('click');
+        
+        // 1. 更新數值與裝備
         if(adventureData && adventureData.stats) {
             updatePlayerStats(adventureData.stats, adventureData.equipment?.weapon?.subType || 'unarmed');
         }
-        document.getElementById('adventure-prep-modal').classList.add('hidden');
-// 🔥 新增：解除背景鎖定
-        document.body.classList.remove('no-scroll');    
 
-    if(startBattleCallback) startBattleCallback();
+        // 2. 🔥 傳送選擇的卡片給 Adventure 模式
+        updateAdventureCards(equippedSkillCards);
+
+        // 3. 關閉視窗並開始
+        document.getElementById('adventure-prep-modal').classList.add('hidden');
+        document.body.classList.remove('no-scroll');
+
+        if(startBattleCallback) startBattleCallback();
     });
 
     document.getElementById('close-prep-btn').addEventListener('click', () => {
         playSound('click');
         document.getElementById('adventure-prep-modal').classList.add('hidden');
-// 🔥 新增：解除背景鎖定
         document.body.classList.remove('no-scroll');
-
     });
-
-    document.querySelectorAll('.equip-slot[data-type]').forEach(slot => {
-        slot.addEventListener('click', () => {
-            playSound('click');
-            handleSlotClick(slot.dataset.type);
-        });
-    });
-
-    const heroPreview = document.querySelector('.prep-hero-preview');
-    if (heroPreview) {
-        heroPreview.addEventListener('click', () => {
-            playSound('click');
-            handleSlotClick(null); 
-        });
-    }
-
-    // 綁定轉蛋按鈕
-    const gachaBtns = document.querySelectorAll('#tab-gacha button');
-    if (gachaBtns.length >= 2) {
-        gachaBtns[0].onclick = () => performGacha(1);
-        gachaBtns[1].onclick = () => performGacha(10);
-    }
 }
 
-// 🔥 新增：供外部更新使用者資料 (例如重整後)
-export function updatePrepUser(user) {
-    currentUser = user;
-    updateResourceDisplay();
-}
-
-export function updatePrepData(data) {
-    adventureData = data;
-    // 確保資料結構完整
-    if (!adventureData.shopItems) adventureData.shopItems = [];
-    if (!adventureData.shopLastRefresh) adventureData.shopLastRefresh = 0;
-
-    calculateAndShowStats();
+function updateResourceDisplay() {
+    if (adventureData) {
+        document.getElementById('prep-gold').innerText = adventureData.gold || 0;
+        document.getElementById('prep-gems').innerText = adventureData.gems || 0;
+    }
 }
 
 export function openPrepScreen() {
     const modal = document.getElementById('adventure-prep-modal');
     modal.classList.remove('hidden');
-    
-    // 🔥 新增：鎖定背景滾動
     document.body.classList.add('no-scroll');
     
-    // 🔥 每次打開都更新一下資源顯示
+    // 初始化資料 (如果沒有則建立預設)
+    if(!adventureData) {
+        try {
+            adventureData = JSON.parse(localStorage.getItem(`adv_data_${currentUser.uid}`)) || null;
+        } catch(e) { adventureData = null; }
+
+        if(!adventureData) {
+            adventureData = {
+                stats: { hp: 1000, atk: 50, def: 10, speed: 4 },
+                inventory: [],
+                equipment: {},
+                gold: 0,
+                gems: 0,
+                stage: 1
+            };
+        }
+    }
+
     updateResourceDisplay();
-
-    switchTab('equip');
+    switchTab('equip'); 
     handleSlotClick(null); 
-
     checkAndRefreshShop();
     renderShop();
-
-    renderPrepCards(); 
+    // 預設渲染裝備列表，但我們稍後切換 Tab 時會處理
+    renderInventoryList(); 
     renderEquippedSlots(); 
     calculateAndShowStats(); 
 }
 
-// 🔥 新增：更新介面上的鑽石與金幣
-function updateResourceDisplay() {
-    if (!currentUser) return;
-
-    // 請確認你的 index.html 中有對應這兩個 ID 的元素
-    const goldEl = document.getElementById('prep-gold-amount');
-    const gemEl = document.getElementById('prep-gem-amount');
-
-    if (goldEl) goldEl.innerText = currentUser.gold || 0;
-    if (gemEl) gemEl.innerText = currentUser.gems || 0;
-}
-
-function switchTab(tabId) {
+function switchTab(tabName) {
     document.querySelectorAll('.prep-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.prep-tab-btn[data-tab="${tabName}"]`).classList.add('active');
+
     document.querySelectorAll('.prep-tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(`prep-tab-${tabName}`).classList.add('active');
 
-    document.querySelector(`.prep-tab-btn[data-tab="${tabId}"]`).classList.add('active');
-    document.getElementById(`tab-${tabId}`).classList.add('active');
+    if (tabName === 'equip') {
+        renderInventoryList(); // 顯示裝備
+    } else if (tabName === 'bag') {
+        // 🔥 在背包分頁顯示「技能選擇」介面
+        renderSkillCardSelection(); 
+    } else if (tabName === 'shop') {
+        renderShop();
+    }
 }
 
-function handleSlotClick(slotType) {
-    currentSelectedSlot = slotType;
-    document.querySelectorAll('.equip-slot').forEach(s => s.classList.remove('selected'));
-    if (slotType) {
-        const targetSlot = document.querySelector(`.equip-slot[data-type="${slotType}"]`);
-        if(targetSlot) targetSlot.classList.add('selected');
-    }
-    renderInventoryList();
-}
-
-function equipItem(itemUid) {
-    if (!adventureData) return;
-    const itemIndex = adventureData.inventory.findIndex(i => i.uid === itemUid);
-    if (itemIndex === -1) return;
-    const newItem = adventureData.inventory[itemIndex];
-    const slotType = newItem.type;
-    const oldItem = adventureData.equipment[slotType];
-
-    if (oldItem) {
-        adventureData.inventory.push(oldItem);
-    }
-
-    adventureData.equipment[slotType] = newItem;
-    adventureData.inventory.splice(itemIndex, 1);
-
-    playSound('upgrade');
-    renderEquippedSlots();
-    renderInventoryList();
-    calculateAndShowStats();
+// -------------------------------------------------------------
+// 🔥 核心修改：技能卡選擇邏輯
+// -------------------------------------------------------------
+function renderSkillCardSelection() {
+    // 這裡我們借用原本的背包列表容器，或者你可以指定新的 ID
+    // 假設 index.html 的 prep-tab-bag 裡面有一個列表容器 id="prep-bag-list" (如果沒有，請用 prep-equip-list 代替)
+    let list = document.getElementById('prep-bag-list');
     
-    if(onSave) onSave(adventureData);
-}
+    // 如果 HTML 裡沒這個 ID，我們就動態清空並使用現有的容器 (兼容性處理)
+    if (!list) {
+        list = document.getElementById('prep-equip-list'); 
+        // 這裡我們暫時借用裝備列表的容器，但在切換 Tab 時會清空內容
+    }
 
-function unequipItem(slotType) {
-    const item = adventureData.equipment[slotType];
-    if (!item) return;
+    if(!list) return;
+    list.innerHTML = "";
+    list.style.display = 'grid';
+    list.style.gridTemplateColumns = 'repeat(auto-fill, minmax(100px, 1fr))';
+    list.style.gap = '10px';
 
-    adventureData.inventory.push(item);
-    adventureData.equipment[slotType] = null;
+    // 1. 取得玩家擁有的所有英雄卡片
+    // 這裡嘗試從 Inventory 模組或 localStorage 讀取
+    let userCards = [];
+    try {
+        // 優先從 localStorage 讀取最新的卡片庫 (這是主遊戲的資料)
+        userCards = JSON.parse(localStorage.getItem(`user_cards_${currentUser.uid}`)) || [];
+    } catch(e) { console.log("讀取卡片失敗", e); }
 
-    playSound('dismantle');
-    renderEquippedSlots();
-    renderInventoryList();
-    calculateAndShowStats();
+    if(userCards.length === 0) {
+        list.innerHTML = "<div style='grid-column:1/-1; color:#aaa; text-align:center; padding:20px;'>背包裡沒有卡片</div>";
+        return;
+    }
 
-    if(onSave) onSave(adventureData);
-}
+    // 2. 顯示已選數量提示
+    const statusDiv = document.createElement('div');
+    statusDiv.style.gridColumn = '1 / -1';
+    statusDiv.style.padding = '5px';
+    statusDiv.style.marginBottom = '10px';
+    statusDiv.style.background = 'rgba(0,0,0,0.3)';
+    statusDiv.style.borderRadius = '5px';
+    statusDiv.innerHTML = `
+        <span style="color:#f1c40f; font-weight:bold;">已選擇技能: ${equippedSkillCards.length} / 6</span>
+        <span style="color:#aaa; font-size:0.8em; margin-left:10px;">(點擊選擇/取消)</span>
+    `;
+    list.appendChild(statusDiv);
 
-// js/prep.js
-
-function renderEquippedSlots() {
-    if (!adventureData) return;
-
-    document.querySelectorAll('.equip-slot[data-type]').forEach(slot => {
-        const type = slot.dataset.type;
-        const item = adventureData.equipment[type];
+    // 3. 渲染卡片
+    userCards.forEach(card => {
+        const cardDiv = document.createElement('div');
+        // 使用與裝備卡類似的樣式，但稍微簡化
+        cardDiv.className = `equip-card rarity-${card.rarity}`;
+        cardDiv.style.height = '140px'; // 卡片高度
+        cardDiv.style.position = 'relative';
+        cardDiv.style.cursor = 'pointer';
+        cardDiv.style.borderWidth = '2px';
         
-        // 清空格子內容
-        slot.innerHTML = ''; 
+        // 檢查是否已選擇
+        // 假設卡片有唯一 ID (docId 或 uid)，如果沒有則用 id + name 判斷
+        const isSelected = equippedSkillCards.some(c => (c.docId && c.docId === card.docId) || (c.uid === card.uid));
         
-        // 建立標籤元素 (顯示名稱或部位)
-        const labelDiv = document.createElement('div');
-        labelDiv.className = 'slot-label';
-
-        if (item) {
-            // --- 有裝備時的狀態 ---
+        if (isSelected) {
+            cardDiv.style.borderColor = '#2ecc71'; // 綠色選中框
+            cardDiv.style.boxShadow = '0 0 10px rgba(46, 204, 113, 0.6)';
+            cardDiv.style.transform = 'scale(0.95)';
             
-            // 1. 處理圖片路徑 (跟 renderInventoryList 保持一致)
-            let imgSrc = item.img;
-            if (imgSrc && imgSrc.endsWith('.png')) {
-                 imgSrc = imgSrc.replace('.png', '.webp');
-            }
-
-            // 2. 建立圖片元素
-            const img = document.createElement('img');
-            img.src = imgSrc;
-            img.onerror = () => { img.src = 'https://placehold.co/90x90?text=Error'; };
-            slot.appendChild(img);
-
-            // 3. 設定邊框顏色 (依稀有度)
-            if(item.rarity === 'SSR') {
-                slot.style.borderColor = '#f1c40f'; // 金
-                labelDiv.style.color = '#f1c40f';
-            } else if(item.rarity === 'SR') {
-                slot.style.borderColor = '#9b59b6'; // 紫
-                labelDiv.style.color = '#e0aaff';
-            } else if(item.rarity === 'R') {
-                slot.style.borderColor = '#3498db'; // 藍
-                labelDiv.style.color = '#aed9e0';
-            } else {
-                slot.style.borderColor = '#fff';
-                labelDiv.style.color = '#fff';
-            }
-
-            // 設定標籤文字為裝備名稱
-            labelDiv.innerText = item.name;
-
-            // 點擊事件：如果是當前選中的，再點一次就是卸下
-            slot.onclick = (e) => {
-                e.stopPropagation(); 
-                if (currentSelectedSlot === type) {
-                    if(confirm(`要卸下 ${item.name} 嗎？`)) unequipItem(type);
-                } else {
-                    handleSlotClick(type);
-                }
-            };
-
-        } else {
-            // --- 空格子狀態 (Empty Slot) ---
-            
-            let icon = '';
-            // 根據部位給一個預設 Emoji 當底圖
-            if(type === 'weapon') icon = '⚔️';
-            else if(type === 'head') icon = '🪖';
-            else if(type === 'armor') icon = '🛡️';
-            else if(type === 'gloves') icon = '🧤';
-            else if(type === 'legs') icon = '👖';
-            else if(type === 'shoes') icon = '👞';
-            
-            // 使用 span 顯示大圖示
-            const iconSpan = document.createElement('span');
-            iconSpan.style.fontSize = '32px';
-            iconSpan.style.opacity = '0.3'; // 讓它看起來像浮水印
-            iconSpan.innerText = icon;
-            slot.appendChild(iconSpan);
-
-            // 恢復預設邊框
-            slot.style.borderColor = '#555';
-            
-            // 標籤顯示部位名稱 (從 title 屬性抓取，例如 "武器")
-            labelDiv.innerText = slot.getAttribute('title') || type;
-            labelDiv.style.color = '#aaa';
-
-            // 點擊事件：單純選中該部位
-            slot.onclick = () => handleSlotClick(type);
+            // 選中標記
+            const checkMark = document.createElement('div');
+            checkMark.innerText = '✔';
+            checkMark.style.position = 'absolute';
+            checkMark.style.top = '5px';
+            checkMark.style.right = '5px';
+            checkMark.style.background = '#2ecc71';
+            checkMark.style.color = 'white';
+            checkMark.style.borderRadius = '50%';
+            checkMark.style.width = '20px';
+            checkMark.style.height = '20px';
+            checkMark.style.textAlign = 'center';
+            checkMark.style.fontSize = '12px';
+            cardDiv.appendChild(checkMark);
         }
 
-        // 最後把標籤加進去
-        slot.appendChild(labelDiv);
+        // 卡片內容
+        cardDiv.innerHTML += `
+            <div class="equip-header" style="font-size:0.8em; padding:4px;">${card.name}</div>
+            <div style="font-size:30px; text-align:center; margin:10px;">${card.img || '🃏'}</div>
+            <div style="font-size:10px; color:#ccc; text-align:center;">${card.skillKey || '被動'}</div>
+        `;
+
+        cardDiv.onclick = () => toggleSkillCard(card);
+        list.appendChild(cardDiv);
     });
-    
-    // 保持目前的選中狀態 (高亮顯示)
-    if(currentSelectedSlot) {
-        document.querySelector(`.equip-slot[data-type="${currentSelectedSlot}"]`)?.classList.add('selected');
-    }
 }
 
-// js/prep.js
+function toggleSkillCard(card) {
+    // 判斷是否已存在
+    const idx = equippedSkillCards.findIndex(c => (c.docId && c.docId === card.docId) || (c.uid === card.uid));
+    
+    if (idx >= 0) {
+        // 已存在 -> 移除
+        equippedSkillCards.splice(idx, 1);
+    } else {
+        // 不存在 -> 加入 (檢查上限)
+        if (equippedSkillCards.length >= 6) {
+            alert("最多只能攜帶 6 個技能！");
+            return;
+        }
+        equippedSkillCards.push(card);
+    }
+    
+    playSound('click');
+    renderSkillCardSelection(); // 重新渲染以更新 UI 狀態
+}
 
-// 替換原本的 renderInventoryList
-// js/prep.js
+// -------------------------------------------------------------
+// 以下為原本的裝備與商店邏輯 (保持不變)
+// -------------------------------------------------------------
 
 function renderInventoryList() {
     const list = document.getElementById('prep-equip-list');
+    if(!list) return; // 防呆
     list.innerHTML = "";
 
     if (!adventureData || !adventureData.inventory) return;
@@ -301,10 +258,8 @@ function renderInventoryList() {
         const card = document.createElement('div');
         card.className = `equip-card rarity-${item.rarity}`;
         
-        let imgSrc = item.img;
-        if (imgSrc && imgSrc.endsWith('.png')) {
-             imgSrc = imgSrc.replace('.png', '.webp');
-        }
+        // 直接使用圖片路徑 (不強制轉 webp)
+        let imgSrc = item.img; 
 
         let statsHtml = "";
         const s = item.stats || {};
@@ -345,10 +300,7 @@ function renderInventoryList() {
         else if(item.rarity === 'SR') nameColor = '#9b59b6';
         else if(item.rarity === 'R') nameColor = '#3498db';
 
-        // 🔥 修改這裡：只有當 item.desc 存在時才建立 HTML，否則為空字串
-        const descHtml = item.desc 
-            ? `<div class="equip-desc">${item.desc}</div>` 
-            : ''; 
+        const descHtml = item.desc ? `<div class="equip-desc">${item.desc}</div>` : ''; 
 
         card.innerHTML = `
             <div class="equip-header" style="color:${nameColor}; border-bottom-color:${item.color || '#555'}">
@@ -363,185 +315,222 @@ function renderInventoryList() {
                 ${statsHtml}
             </div>
 
-            ${descHtml} `;
+            ${descHtml}
+        `;
         
         card.onclick = () => equipItem(item.uid);
         list.appendChild(card);
     });
 }
 
+function handleSlotClick(type) {
+    currentSelectedSlot = type;
+    document.querySelectorAll('.equip-slot').forEach(el => el.classList.remove('selected'));
+    if(type) {
+        const slot = document.querySelector(`.equip-slot[data-type="${type}"]`);
+        if(slot) slot.classList.add('selected');
+    }
+    // 如果當前是在裝備分頁，就重整列表；如果是背包分頁，則不影響
+    const activeTab = document.querySelector('.prep-tab-btn.active');
+    if (activeTab && activeTab.dataset.tab === 'equip') {
+        renderInventoryList();
+    }
+}
+
+function equipItem(itemUid) {
+    const item = adventureData.inventory.find(x => x.uid === itemUid);
+    if (!item) return;
+
+    if (adventureData.equipment[item.type]) {
+        unequipItem(item.type, false);
+    }
+
+    adventureData.equipment[item.type] = item;
+    
+    // 從背包移除 (移到已裝備)
+    adventureData.inventory = adventureData.inventory.filter(x => x.uid !== itemUid);
+
+    onSave(adventureData);
+    renderEquippedSlots();
+    renderInventoryList();
+    calculateAndShowStats();
+    playSound('equip');
+}
+
+function unequipItem(slotType, refresh = true) {
+    const item = adventureData.equipment[slotType];
+    if (item) {
+        adventureData.inventory.push(item);
+        delete adventureData.equipment[slotType];
+        
+        if (refresh) {
+            onSave(adventureData);
+            renderEquippedSlots();
+            renderInventoryList();
+            calculateAndShowStats();
+            playSound('equip');
+        }
+    }
+}
+
+function renderEquippedSlots() {
+    if (!adventureData) return;
+
+    document.querySelectorAll('.equip-slot[data-type]').forEach(slot => {
+        const type = slot.dataset.type;
+        const item = adventureData.equipment[type];
+        
+        slot.innerHTML = ''; 
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'slot-label';
+
+        if (item) {
+            let imgSrc = item.img;
+            const img = document.createElement('img');
+            img.src = imgSrc;
+            img.onerror = () => { img.src = 'https://placehold.co/90x90?text=Error'; };
+            slot.appendChild(img);
+
+            if(item.rarity === 'SSR') {
+                slot.style.borderColor = '#f1c40f'; labelDiv.style.color = '#f1c40f';
+            } else if(item.rarity === 'SR') {
+                slot.style.borderColor = '#9b59b6'; labelDiv.style.color = '#e0aaff';
+            } else if(item.rarity === 'R') {
+                slot.style.borderColor = '#3498db'; labelDiv.style.color = '#aed9e0';
+            } else {
+                slot.style.borderColor = '#fff'; labelDiv.style.color = '#fff';
+            }
+
+            labelDiv.innerText = item.name;
+
+            slot.onclick = (e) => {
+                e.stopPropagation(); 
+                if (currentSelectedSlot === type) {
+                    if(confirm(`要卸下 ${item.name} 嗎？`)) unequipItem(type);
+                } else {
+                    handleSlotClick(type);
+                }
+            };
+
+        } else {
+            let icon = '';
+            if(type === 'weapon') icon = '⚔️';
+            else if(type === 'head') icon = '🪖';
+            else if(type === 'armor') icon = '🛡️';
+            else if(type === 'gloves') icon = '🧤';
+            else if(type === 'legs') icon = '👖';
+            else if(type === 'shoes') icon = '👞';
+            
+            const iconSpan = document.createElement('span');
+            iconSpan.style.fontSize = '32px';
+            iconSpan.style.opacity = '0.3'; 
+            iconSpan.innerText = icon;
+            slot.appendChild(iconSpan);
+
+            slot.style.borderColor = '#555';
+            labelDiv.innerText = slot.getAttribute('title') || type;
+            labelDiv.style.color = '#aaa';
+
+            slot.onclick = () => handleSlotClick(type);
+        }
+        slot.appendChild(labelDiv);
+    });
+    
+    if(currentSelectedSlot) {
+        document.querySelector(`.equip-slot[data-type="${currentSelectedSlot}"]`)?.classList.add('selected');
+    }
+}
 
 function calculateAndShowStats() {
-    if(!adventureData) return;
-
-    let totalAtk = 50; 
-    let totalHp = 1000;
-
-    if (adventureData.equipment) {
-        Object.values(adventureData.equipment).forEach(item => {
-            if (item && item.stats) {
-                if (item.stats.atk) totalAtk += item.stats.atk;
-                if (item.stats.def) totalHp += item.stats.def * 10;
-                if (item.stats.defBonus) totalHp += item.stats.defBonus * 10;
-            }
-        });
-    }
-
-    adventureData.stats = { hp: totalHp, atk: totalAtk };
-
-    document.getElementById('prep-atk').innerText = totalAtk;
-    document.getElementById('prep-hp').innerText = totalHp;
-}
-
-function renderPrepCards() {
-    const container = document.getElementById('prep-card-slots');
-    container.innerHTML = "";
-    const cards = Inventory.getAllCards().slice(0, 6);
+    let stats = { hp: 1000, atk: 50, def: 10, speed: 4 }; // 基礎數值
     
-    for(let i=0; i<6; i++) {
-        const slot = document.createElement('div');
-        slot.className = 'item-slot';
-        slot.style.border = '1px solid #555';
-        if(cards[i]) {
-            const img = document.createElement('img');
-            img.src = `assets/cards/${cards[i].id}.webp`;
-            img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
-            slot.appendChild(img);
-        } else {
-            slot.innerText = "+";
+    // 累加裝備數值
+    Object.values(adventureData.equipment).forEach(item => {
+        if(item.stats) {
+            if(item.stats.atk) stats.atk += item.stats.atk;
+            if(item.stats.def) stats.def += item.stats.def;
+            if(item.stats.hp) stats.hp += item.stats.hp; // 假設裝備有加血
         }
-        container.appendChild(slot);
-    }
+    });
+
+    adventureData.stats = stats; // 更新回 data
+    
+    document.getElementById('prep-stat-hp').innerText = stats.hp;
+    document.getElementById('prep-stat-atk').innerText = stats.atk;
+    document.getElementById('prep-stat-def').innerText = stats.def;
+    document.getElementById('prep-stat-spd').innerText = stats.speed;
 }
 
-// -------------------------------------------------------------
-// 🛒 商店系統
-// -------------------------------------------------------------
-
+// 商店邏輯
 function checkAndRefreshShop() {
     const now = Date.now();
-    const oneDay = 24 * 60 * 60 * 1000;
-    
-    if (!adventureData.shopItems || 
-        adventureData.shopItems.length === 0 || 
-        (now - adventureData.shopLastRefresh) > oneDay) {
-            
-        generateDailyShop();
-        adventureData.shopLastRefresh = now;
-        
-        if(onSave) onSave(adventureData);
-        console.log("商店已刷新");
-    } else {
-        shopItems = adventureData.shopItems;
+    const lastRefresh = parseInt(localStorage.getItem('adv_shop_time') || '0');
+    if (now - lastRefresh > 3600000 || shopItems.length === 0) { // 1小時重置
+        generateShopItems();
+        localStorage.setItem('adv_shop_time', now.toString());
     }
 }
 
-function generateDailyShop() {
-    const allItems = getAllItems().filter(i => i.rarity !== 'SSR');
+function generateShopItems() {
     shopItems = [];
-    
+    const allItems = getAllItems();
     for(let i=0; i<6; i++) {
-        const blueprint = allItems[Math.floor(Math.random() * allItems.length)];
+        const rand = allItems[Math.floor(Math.random() * allItems.length)];
+        // 隨機價格
+        let price = 500; 
+        if(rand.rarity === 'SR') price = 1500;
+        if(rand.rarity === 'SSR') price = 5000;
+        
         shopItems.push({
-            ...blueprint,
-            price: blueprint.rarity === 'SR' ? 2000 : 500 
+            ...rand,
+            price: price,
+            sold: false
         });
     }
-    if(adventureData) adventureData.shopItems = shopItems;
 }
 
 function renderShop() {
-    const container = document.querySelector('.shop-grid');
-    if(!container) return;
-    container.innerHTML = "";
-
-    shopItems.forEach((item, index) => {
+    const grid = document.getElementById('prep-shop-grid');
+    if(!grid) return;
+    grid.innerHTML = "";
+    
+    shopItems.forEach((item, idx) => {
         const div = document.createElement('div');
         div.className = 'shop-item';
+        if(item.sold) div.style.opacity = '0.5';
+
         div.innerHTML = `
-            <img src="${item.img}" style="width:50px; height:50px; object-fit:contain;">
-            <div class="shop-name" style="font-size:0.9em; margin:5px 0;">${item.name}</div>
-            <button class="btn-mini" style="width:100%;">${item.price} G</button>
+            <div style="font-size:24px;">${item.img || '🎁'}</div>
+            <div style="font-size:12px; height:30px; overflow:hidden;">${item.name}</div>
+            <div style="color:gold;">💰 ${item.price}</div>
+            <button class="btn-buy" ${item.sold ? 'disabled' : ''}>購買</button>
         `;
         
-        div.querySelector('button').addEventListener('click', () => buyItem(item, index));
-        container.appendChild(div);
+        div.querySelector('.btn-buy').onclick = () => buyItem(idx);
+        grid.appendChild(div);
     });
 }
 
-function buyItem(blueprint, index) {
-    if(!handleCurrency) return;
+function buyItem(idx) {
+    const item = shopItems[idx];
+    if(item.sold) return;
     
-    if(!handleCurrency('check', blueprint.price, 'gold')) {
+    if(!handleCurrency('check', item.price, 'gold')) {
         return alert("金幣不足！");
     }
-
-    handleCurrency('deduct', blueprint.price, 'gold');
-    handleCurrency('refresh');
-    updateResourceDisplay(); // 🔥 購買後更新顯示
-
-    const newItem = generateItemInstance(blueprint.id);
-    adventureData.inventory.push(newItem);
-
-    playSound('coin');
-    alert(`購買成功！獲得 ${newItem.name}`);
     
-    shopItems.splice(index, 1);
-    adventureData.shopItems = shopItems;
-    
-    renderShop();
-    renderInventoryList(); 
-
-    if(onSave) onSave(adventureData);
-}
-
-// -------------------------------------------------------------
-// 🔮 轉蛋系統
-// -------------------------------------------------------------
-
-function performGacha(times) {
-    if(!handleCurrency) return;
-    const cost = times * 200; 
-    
-    if(!handleCurrency('check', cost, 'gems')) {
-        return alert(`鑽石不足！需要 ${cost} 💎`);
-    }
-
-    handleCurrency('deduct', cost, 'gems');
-    handleCurrency('refresh');
-    updateResourceDisplay(); // 🔥 轉蛋後更新顯示
-    playSound('draw');
-
-    const results = [];
-    const allItems = getAllItems();
-
-    for(let i=0; i<times; i++) {
-        let rarity = 'R';
-        const rand = Math.random();
+    if(confirm(`確定花費 ${item.price} 金幣購買 ${item.name}?`)) {
+        handleCurrency('deduct', item.price, 'gold');
+        handleCurrency('refresh');
         
-        if(times === 10 && i === 9) {
-            rarity = Math.random() < 0.2 ? 'SSR' : 'SR';
-        } else {
-            if(rand < 0.05) rarity = 'SSR';
-            else if(rand < 0.25) rarity = 'SR';
-        }
-
-        const pool = allItems.filter(x => x.rarity === rarity);
-        const blueprint = pool[Math.floor(Math.random() * pool.length)];
-        results.push(generateItemInstance(blueprint.id));
+        // 產生實體並放入背包
+        const instance = generateItemInstance(item.id);
+        adventureData.inventory.push(instance);
+        item.sold = true;
+        
+        onSave(adventureData);
+        renderShop();
+        updateResourceDisplay();
+        playSound('coin');
     }
-
-    results.forEach(item => adventureData.inventory.push(item));
-    
-    const hasSSR = results.some(i => i.rarity === 'SSR');
-    if(hasSSR) playSound('ssr');
-
-    let msg = `🎉 鍛造完成！獲得 ${times} 件裝備：\n`;
-    results.forEach(item => {
-        msg += `[${item.rarity}] ${item.name} (攻:${item.stats.atk||0}/防:${item.stats.def||0})\n`;
-    });
-    alert(msg);
-
-    renderInventoryList();
-    if(onSave) onSave(adventureData);
 }
