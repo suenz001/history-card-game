@@ -61,11 +61,33 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
     });
 }
 
-function updateResourceDisplay() {
+// 🔥 新增：供 main.js 呼叫，更新冒險存檔資料
+export function updatePrepData(data) {
+    adventureData = data;
+    updateResourceDisplay(); // 資料更新後同步刷新 UI
+}
+
+// 🔥 新增：供 main.js 呼叫，更新使用者資料 (含金幣/鑽石)
+export function updatePrepUser(user) {
+    currentUser = user;
+    // 如果 adventureData 存在，嘗試同步金幣顯示
     if (adventureData) {
-        document.getElementById('prep-gold').innerText = adventureData.gold || 0;
-        document.getElementById('prep-gems').innerText = adventureData.gems || 0;
+        adventureData.gold = user.gold || 0;
+        adventureData.gems = user.gems || 0;
     }
+    updateResourceDisplay();
+}
+
+function updateResourceDisplay() {
+    // 優先顯示 currentUser 的即時金幣，如果沒有則顯示 adventureData 的
+    const currentGold = currentUser ? (currentUser.gold || 0) : (adventureData ? adventureData.gold : 0);
+    const currentGems = currentUser ? (currentUser.gems || 0) : (adventureData ? adventureData.gems : 0);
+
+    const goldEl = document.getElementById('prep-gold');
+    const gemsEl = document.getElementById('prep-gems');
+    
+    if (goldEl) goldEl.innerText = currentGold;
+    if (gemsEl) gemsEl.innerText = currentGems;
 }
 
 export function openPrepScreen() {
@@ -96,7 +118,6 @@ export function openPrepScreen() {
     handleSlotClick(null); 
     checkAndRefreshShop();
     renderShop();
-    // 預設渲染裝備列表，但我們稍後切換 Tab 時會處理
     renderInventoryList(); 
     renderEquippedSlots(); 
     calculateAndShowStats(); 
@@ -123,14 +144,10 @@ function switchTab(tabName) {
 // 🔥 核心修改：技能卡選擇邏輯
 // -------------------------------------------------------------
 function renderSkillCardSelection() {
-    // 這裡我們借用原本的背包列表容器，或者你可以指定新的 ID
-    // 假設 index.html 的 prep-tab-bag 裡面有一個列表容器 id="prep-bag-list" (如果沒有，請用 prep-equip-list 代替)
     let list = document.getElementById('prep-bag-list');
     
-    // 如果 HTML 裡沒這個 ID，我們就動態清空並使用現有的容器 (兼容性處理)
     if (!list) {
         list = document.getElementById('prep-equip-list'); 
-        // 這裡我們暫時借用裝備列表的容器，但在切換 Tab 時會清空內容
     }
 
     if(!list) return;
@@ -140,10 +157,8 @@ function renderSkillCardSelection() {
     list.style.gap = '10px';
 
     // 1. 取得玩家擁有的所有英雄卡片
-    // 這裡嘗試從 Inventory 模組或 localStorage 讀取
     let userCards = [];
     try {
-        // 優先從 localStorage 讀取最新的卡片庫 (這是主遊戲的資料)
         userCards = JSON.parse(localStorage.getItem(`user_cards_${currentUser.uid}`)) || [];
     } catch(e) { console.log("讀取卡片失敗", e); }
 
@@ -168,23 +183,20 @@ function renderSkillCardSelection() {
     // 3. 渲染卡片
     userCards.forEach(card => {
         const cardDiv = document.createElement('div');
-        // 使用與裝備卡類似的樣式，但稍微簡化
         cardDiv.className = `equip-card rarity-${card.rarity}`;
-        cardDiv.style.height = '140px'; // 卡片高度
+        cardDiv.style.height = '140px'; 
         cardDiv.style.position = 'relative';
         cardDiv.style.cursor = 'pointer';
         cardDiv.style.borderWidth = '2px';
         
         // 檢查是否已選擇
-        // 假設卡片有唯一 ID (docId 或 uid)，如果沒有則用 id + name 判斷
         const isSelected = equippedSkillCards.some(c => (c.docId && c.docId === card.docId) || (c.uid === card.uid));
         
         if (isSelected) {
-            cardDiv.style.borderColor = '#2ecc71'; // 綠色選中框
+            cardDiv.style.borderColor = '#2ecc71'; 
             cardDiv.style.boxShadow = '0 0 10px rgba(46, 204, 113, 0.6)';
             cardDiv.style.transform = 'scale(0.95)';
             
-            // 選中標記
             const checkMark = document.createElement('div');
             checkMark.innerText = '✔';
             checkMark.style.position = 'absolute';
@@ -200,7 +212,6 @@ function renderSkillCardSelection() {
             cardDiv.appendChild(checkMark);
         }
 
-        // 卡片內容
         cardDiv.innerHTML += `
             <div class="equip-header" style="font-size:0.8em; padding:4px;">${card.name}</div>
             <div style="font-size:30px; text-align:center; margin:10px;">${card.img || '🃏'}</div>
@@ -213,14 +224,11 @@ function renderSkillCardSelection() {
 }
 
 function toggleSkillCard(card) {
-    // 判斷是否已存在
     const idx = equippedSkillCards.findIndex(c => (c.docId && c.docId === card.docId) || (c.uid === card.uid));
     
     if (idx >= 0) {
-        // 已存在 -> 移除
         equippedSkillCards.splice(idx, 1);
     } else {
-        // 不存在 -> 加入 (檢查上限)
         if (equippedSkillCards.length >= 6) {
             alert("最多只能攜帶 6 個技能！");
             return;
@@ -229,16 +237,16 @@ function toggleSkillCard(card) {
     }
     
     playSound('click');
-    renderSkillCardSelection(); // 重新渲染以更新 UI 狀態
+    renderSkillCardSelection(); 
 }
 
 // -------------------------------------------------------------
-// 以下為原本的裝備與商店邏輯 (保持不變)
+// 以下為原本的裝備與商店邏輯
 // -------------------------------------------------------------
 
 function renderInventoryList() {
     const list = document.getElementById('prep-equip-list');
-    if(!list) return; // 防呆
+    if(!list) return; 
     list.innerHTML = "";
 
     if (!adventureData || !adventureData.inventory) return;
@@ -258,7 +266,6 @@ function renderInventoryList() {
         const card = document.createElement('div');
         card.className = `equip-card rarity-${item.rarity}`;
         
-        // 直接使用圖片路徑 (不強制轉 webp)
         let imgSrc = item.img; 
 
         let statsHtml = "";
@@ -330,7 +337,6 @@ function handleSlotClick(type) {
         const slot = document.querySelector(`.equip-slot[data-type="${type}"]`);
         if(slot) slot.classList.add('selected');
     }
-    // 如果當前是在裝備分頁，就重整列表；如果是背包分頁，則不影響
     const activeTab = document.querySelector('.prep-tab-btn.active');
     if (activeTab && activeTab.dataset.tab === 'equip') {
         renderInventoryList();
@@ -346,8 +352,6 @@ function equipItem(itemUid) {
     }
 
     adventureData.equipment[item.type] = item;
-    
-    // 從背包移除 (移到已裝備)
     adventureData.inventory = adventureData.inventory.filter(x => x.uid !== itemUid);
 
     onSave(adventureData);
@@ -442,18 +446,17 @@ function renderEquippedSlots() {
 }
 
 function calculateAndShowStats() {
-    let stats = { hp: 1000, atk: 50, def: 10, speed: 4 }; // 基礎數值
+    let stats = { hp: 1000, atk: 50, def: 10, speed: 4 }; 
     
-    // 累加裝備數值
     Object.values(adventureData.equipment).forEach(item => {
         if(item.stats) {
             if(item.stats.atk) stats.atk += item.stats.atk;
             if(item.stats.def) stats.def += item.stats.def;
-            if(item.stats.hp) stats.hp += item.stats.hp; // 假設裝備有加血
+            if(item.stats.hp) stats.hp += item.stats.hp; 
         }
     });
 
-    adventureData.stats = stats; // 更新回 data
+    adventureData.stats = stats; 
     
     document.getElementById('prep-stat-hp').innerText = stats.hp;
     document.getElementById('prep-stat-atk').innerText = stats.atk;
@@ -461,11 +464,10 @@ function calculateAndShowStats() {
     document.getElementById('prep-stat-spd').innerText = stats.speed;
 }
 
-// 商店邏輯
 function checkAndRefreshShop() {
     const now = Date.now();
     const lastRefresh = parseInt(localStorage.getItem('adv_shop_time') || '0');
-    if (now - lastRefresh > 3600000 || shopItems.length === 0) { // 1小時重置
+    if (now - lastRefresh > 3600000 || shopItems.length === 0) { 
         generateShopItems();
         localStorage.setItem('adv_shop_time', now.toString());
     }
@@ -476,7 +478,6 @@ function generateShopItems() {
     const allItems = getAllItems();
     for(let i=0; i<6; i++) {
         const rand = allItems[Math.floor(Math.random() * allItems.length)];
-        // 隨機價格
         let price = 500; 
         if(rand.rarity === 'SR') price = 1500;
         if(rand.rarity === 'SSR') price = 5000;
@@ -523,7 +524,6 @@ function buyItem(idx) {
         handleCurrency('deduct', item.price, 'gold');
         handleCurrency('refresh');
         
-        // 產生實體並放入背包
         const instance = generateItemInstance(item.id);
         adventureData.inventory.push(instance);
         item.sold = true;
