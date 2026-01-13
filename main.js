@@ -23,9 +23,9 @@ import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/p
 import * as Inventory from './js/inventory.js';
 import * as Territory from './js/territory.js';
 
-// 🔥 冒險模式相關引入
+// 🔥 冒險模式相關引入 (新增 setAdventureCardSlot)
 import { initAdventure, updateAdventureContext, startAdventure } from './js/adventure.js';
-import { initPrepScreen, openPrepScreen, updatePrepData, updatePrepUser } from './js/prep.js';
+import { initPrepScreen, openPrepScreen, updatePrepData, updatePrepUser, setAdventureCardSlot } from './js/prep.js';
 import { generateItemInstance } from './js/items.js';
 
 function updateLatestCardsUI() {
@@ -162,8 +162,7 @@ setTimeout(() => {
             playSound('click');
             if (!currentUser) return alert("請先登入");
             
-            // 🔥【關鍵修正 1】：手動組合包含金幣/鑽石的資料傳給 prep.js
-            // 因為 currentUser 本身不包含 gold/gems
+            // 🔥【關鍵修正】：手動組合包含金幣/鑽石的資料傳給 prep.js
             updatePrepUser({
                 ...currentUser,
                 gold: gold,
@@ -671,11 +670,17 @@ async function loadUserData(user) {
                 stats: {
                     hp: 1000,
                     atk: 50
-                }
+                },
+                selectedCards: new Array(6).fill(null) // 🔥 預設技能欄位
             };
             
             // 寫入資料庫
             await updateDoc(userRef, { adventure: adventureData });
+        } 
+        
+        // 🔥 老玩家資料遷移：如果沒有 selectedCards，補上
+        if (adventureData && !adventureData.selectedCards) {
+            adventureData.selectedCards = new Array(6).fill(null);
         }
         
         // 將冒險資料傳遞給 prep.js，讓 UI 可以顯示
@@ -695,7 +700,8 @@ async function loadUserData(user) {
         const adventureData = {
             inventory: [starterSword, starterShoes],
             equipment: { weapon: null, head: null, armor: null, gloves: null, legs: null, shoes: null },
-            stats: { hp: 1000, atk: 50 }
+            stats: { hp: 1000, atk: 50 },
+            selectedCards: new Array(6).fill(null) // 🔥 預設技能欄位
         };
 
         await setDoc(userRef, { 
@@ -717,6 +723,7 @@ async function loadUserData(user) {
 
     Inventory.initInventory(db, user, currencyHandler, (index, card, type) => {
         if (type === 'pve_deploy') { return deployHeroToSlot(index, card); } 
+        else if (type === 'adventure_skill') { return setAdventureCardSlot(index, card); } // 🔥 處理冒險選卡
         else { return setPvpHero(index, card, type); }
     });
 
