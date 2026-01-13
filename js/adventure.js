@@ -27,16 +27,15 @@ const gameState = {
     gameTime: 0,
     bgElements: { clouds: [], mountains: [], trees: [], groundDetails: [] },
     
-    // 🔥 新增：關卡與波數狀態
-    level: 1,           // 目前關卡 (第幾層)
-    wave: 1,            // 目前波數
-    maxWaves: 3,        // 每關幾波
-    waveTimer: 0,       // 波數切換倒數
-    isPortalOpen: false,// 傳送門是否開啟
-    portal: { x: 0, y: 0, radius: 40, angle: 0 } // 傳送門位置
+    // 關卡與波數狀態
+    level: 1,
+    wave: 1,
+    maxWaves: 3,
+    waveTimer: 0,
+    isPortalOpen: false,
+    portal: { x: 0, y: 0, radius: 40, angle: 0 } 
 };
 
-// 圖片資源
 const heroSprites = {
     unarmed: new Image(),
     sword: new Image(),
@@ -65,6 +64,11 @@ export function initAdventure(database, user) {
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
     
+    // 🔥 禁止雙擊縮放 (解決手機跳動問題)
+    document.addEventListener('dblclick', function(event) {
+        event.preventDefault();
+    }, { passive: false });
+
     createTargetSwitchButton();
 }
 
@@ -102,7 +106,6 @@ function initBackgrounds() {
     const h = canvas.height;
     const horizon = h / 3;
 
-    // 隨機生成稍微不同的色調或數量，讓每一關感覺不同
     for(let i=0; i<5; i++) {
         gameState.bgElements.clouds.push({
             x: Math.random() * w,
@@ -133,33 +136,51 @@ function initBackgrounds() {
     }
 }
 
+// 🔥 優化：使用 pointerdown 統一處理滑鼠與觸控
 function createTargetSwitchButton() {
     if (document.getElementById('adv-target-btn')) return;
+
     const btn = document.createElement('div');
     btn.id = 'adv-target-btn';
     Object.assign(btn.style, {
-        position: 'absolute', bottom: '60px', right: '40px',
-        width: '70px', height: '70px', borderRadius: '50%',
+        position: 'absolute',
+        bottom: '80px', // 稍微往上移一點，避免誤觸邊緣
+        right: '30px',
+        width: '70px',
+        height: '70px',
+        borderRadius: '50%',
         backgroundColor: 'rgba(52, 152, 219, 0.9)', 
-        border: '3px solid white', boxShadow: '0 0 15px rgba(0,0,0,0.6)',
-        display: 'flex', justifyContent: 'center', alignItems: 'center',
-        fontSize: '32px', color: 'white', userSelect: 'none', cursor: 'pointer',
-        zIndex: '10000', touchAction: 'manipulation'
+        border: '3px solid white',
+        boxShadow: '0 0 15px rgba(0,0,0,0.6)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        fontSize: '32px',
+        color: 'white',
+        userSelect: 'none',
+        cursor: 'pointer',
+        zIndex: '20000', // 確保在最上層
+        touchAction: 'none' // 禁止瀏覽器預設手勢
     });
     btn.innerHTML = '🎯'; 
-    const handleSwitch = (e) => {
-        if (e.cancelable) e.preventDefault();
+    
+    // 使用 pointerdown 來確保即時反應 (比 click 快，且支援手機)
+    btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
         e.stopPropagation();
+        
+        console.log("切換按鈕被按下"); // Debug 用
         const found = switchTarget(); 
+        
+        // 視覺回饋
         btn.style.transform = 'scale(0.8)';
         btn.style.backgroundColor = found ? '#2ecc71' : '#e74c3c'; 
         setTimeout(() => {
             btn.style.transform = 'scale(1)';
             btn.style.backgroundColor = 'rgba(52, 152, 219, 0.9)';
         }, 150);
-    };
-    btn.addEventListener('click', handleSwitch);
-    btn.addEventListener('touchstart', handleSwitch, { passive: false });
+    });
+
     document.getElementById('adv-ui-layer').appendChild(btn);
 }
 
@@ -172,19 +193,24 @@ function switchTarget() {
     });
 
     if (targets.length === 0) {
-        createFloatingText(p.x, p.y - 60, "附近無敵人", "#ccc");
+        createFloatingText(p.x, p.y - 60, "無目標", "#ccc");
         return false;
     }
+
     targets.sort((a, b) => {
         const distA = Math.hypot(a.x - p.x, a.y - p.y);
         const distB = Math.hypot(b.x - p.x, b.y - p.y);
         return distA - distB;
     });
+
     let nextIndex = 0;
     if (p.target) {
         const currentIndex = targets.indexOf(p.target);
-        if (currentIndex !== -1) nextIndex = (currentIndex + 1) % targets.length;
+        if (currentIndex !== -1) {
+            nextIndex = (currentIndex + 1) % targets.length;
+        }
     }
+
     p.target = targets[nextIndex];
     createFloatingText(p.target.x, p.target.y - 60, "鎖定!", "#f1c40f");
     return true;
@@ -209,24 +235,21 @@ function handleKey(e, isDown) {
     if (gameState.keys.hasOwnProperty(k)) gameState.keys[k] = isDown;
 }
 
-// --- 核心流程 ---
 export function startAdventure() {
     const screen = document.getElementById('adventure-screen');
     screen.classList.remove('hidden');
     if (!canvas) resizeCanvas();
 
-    // 重置玩家
     gameState.player.x = canvas.width / 2;
     const playableTop = canvas.height / 3;
     gameState.player.y = playableTop + (canvas.height - playableTop) / 2;
     gameState.player.hp = gameState.player.maxHp;
     gameState.player.target = null; 
     
-    // 重置遊戲進度
     gameState.level = 1;
     gameState.wave = 1;
     gameState.isPortalOpen = false;
-    gameState.waveTimer = 60; // 延遲一下再出怪
+    gameState.waveTimer = 60; 
 
     gameState.enemies = [];
     gameState.projectiles = [];
@@ -265,7 +288,7 @@ function update() {
     gameState.gameTime++;
     const p = gameState.player;
 
-    // 1. 移動
+    // 1. 移動邏輯
     let dx = 0, dy = 0;
     if (gameState.keys.w) dy -= p.speed;
     if (gameState.keys.s) dy += p.speed;
@@ -273,23 +296,30 @@ function update() {
     if (gameState.keys.d) dx += p.speed;
     p.x += dx; p.y += dy;
 
+    // 邊界限制
     const horizonY = canvas.height / 3;
     p.x = Math.max(20, Math.min(canvas.width - 20, p.x));
     p.y = Math.max(horizonY + 20, Math.min(canvas.height - 20, p.y));
 
     if (dx !== 0 && !p.target) p.direction = dx > 0 ? 1 : -1;
 
-    // 2. 🔥 關卡流程控制 (Wave Logic)
-    updateGameLogic();
+    // 🔥 2. 更新傳送門位置 (讓它看起來像是在地上)
+    if (gameState.isPortalOpen) {
+        // 如果玩家向右移(dx>0)，傳送門就向左移，反之亦然
+        // 這樣就能模擬「傳送門固定在世界某處」的視差效果
+        gameState.portal.x -= dx;
+        
+        // (可選) 如果想讓傳送門也會上下移動 (Y軸視差)，也可以加上:
+        // gameState.portal.y -= dy;
+    }
 
-    // 3. 其他系統
+    updateGameLogic();
     updateAutoAttack();
     updateEnemies();
     updateProjectiles();
     updateVfx();
     updateFloatingTexts();
 
-    // UI 更新
     const hpBar = document.getElementById('adv-hp-fill');
     if (hpBar) {
         const hpPercent = Math.max(0, (p.hp / p.maxHp) * 100);
@@ -302,15 +332,11 @@ function update() {
     }
 }
 
-// 🔥 新增：波數與關卡邏輯
 function updateGameLogic() {
-    // 檢查敵人是否全滅
     if (gameState.enemies.length === 0) {
         if (gameState.isPortalOpen) {
-            // 已經通關，等待進入傳送門
             checkPortalEntry();
         } else {
-            // 敵人清空，準備下一波
             if (gameState.waveTimer > 0) {
                 gameState.waveTimer--;
             } else {
@@ -319,7 +345,6 @@ function updateGameLogic() {
         }
     }
 
-    // 傳送門旋轉動畫
     if (gameState.isPortalOpen) {
         gameState.portal.angle += 0.05;
         checkPortalEntry();
@@ -327,33 +352,25 @@ function updateGameLogic() {
 }
 
 function startNextWave() {
-    // 如果波數還沒滿，繼續出怪
     if (gameState.wave <= gameState.maxWaves) {
         spawnWaveEnemies();
         createFloatingText(gameState.player.x, gameState.player.y - 80, `Wave ${gameState.wave}/${gameState.maxWaves}`, "#f1c40f");
         gameState.wave++;
-        gameState.waveTimer = 180; // 下一波間隔較長 (如果是無限出怪模式)
+        gameState.waveTimer = 180; 
     } else {
-        // 波數已滿，開啟傳送門
         openPortal();
     }
 }
 
 function spawnWaveEnemies() {
-    // 難度係數：每關增加 20% 強度
     const difficultyMult = 1 + (gameState.level - 1) * 0.2;
-    const isBossWave = (gameState.wave === gameState.maxWaves + 1); // 修正邏輯：實際上 wave 已經++過了，所以如果是最後一波
-
-    // 根據波數決定數量
     const count = 2 + Math.floor(gameState.level / 2) + gameState.wave; 
 
-    // 最後一波出 BOSS
-    if (gameState.wave === gameState.maxWaves) {
+    if (gameState.wave === gameState.maxWaves + 1) { // 修正邏輯: wave已經+1了
         spawnEnemy(canvas.width / 2, canvas.height / 2, 'boss', difficultyMult);
-        spawnEnemy(100, canvas.height - 100, 'ranged', difficultyMult); // 帶小弟
+        spawnEnemy(100, canvas.height - 100, 'ranged', difficultyMult); 
         spawnEnemy(canvas.width - 100, canvas.height - 100, 'ranged', difficultyMult);
     } else {
-        // 普通波
         for (let i = 0; i < count; i++) {
             const type = Math.random() > 0.3 ? 'melee' : 'ranged';
             const x = Math.random() * (canvas.width - 100) + 50;
@@ -366,8 +383,8 @@ function spawnWaveEnemies() {
 function openPortal() {
     gameState.isPortalOpen = true;
     gameState.portal = {
-        x: canvas.width / 2,
-        y: canvas.height / 3 + 80, // 地平線附近
+        x: canvas.width - 100, // 預設出現在畫面右側
+        y: canvas.height / 2 + 50,
         radius: 50,
         angle: 0
     };
@@ -389,25 +406,20 @@ function goToNextLevel() {
     gameState.level++;
     gameState.wave = 1;
     gameState.isPortalOpen = false;
-    gameState.waveTimer = 120; // 進入新關卡的準備時間
+    gameState.waveTimer = 120; 
     
-    // 獎勵：回血 20%
     const heal = Math.floor(gameState.player.maxHp * 0.2);
     gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + heal);
     createFloatingText(gameState.player.x, gameState.player.y, `HP +${heal}`, "#2ecc71");
     
-    // 重置位置
-    gameState.player.x = canvas.width / 2;
-    gameState.player.y = canvas.height - 100;
+    gameState.player.x = 100; // 重置到左側
+    gameState.player.y = canvas.height / 2;
     
-    // 刷新背景
     initBackgrounds();
     
-    playSound('success'); // 假設有升級音效
+    playSound('success'); 
     createFloatingText(canvas.width/2, canvas.height/2, `進入 Stage ${gameState.level}`, "#fff");
 }
-
-// --- 戰鬥系統 ---
 
 function updateAutoAttack() {
     const p = gameState.player;
@@ -466,14 +478,11 @@ function performPlayerAttack(target) {
     }
 }
 
-// --- 繪製系統 ---
 function draw() {
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     drawParallaxBackground();
-    
-    // 🔥 繪製傳送門 (如果在地板層，要在角色之下)
     if (gameState.isPortalOpen) drawPortal();
 
     const renderList = [
@@ -490,8 +499,6 @@ function draw() {
     drawVfx(); 
     drawProjectiles();
     drawFloatingTexts();
-    
-    // 🔥 繪製 HUD (關卡資訊)
     drawHUD();
 }
 
@@ -506,7 +513,6 @@ function drawHUD() {
     ctx.textAlign = 'left';
     ctx.fillText(`Stage ${gameState.level}`, 20, 35);
     
-    // 顯示波數
     let waveText = `Wave ${Math.min(gameState.wave, gameState.maxWaves)}/${gameState.maxWaves}`;
     if (gameState.isPortalOpen) waveText = "Clear!";
     
@@ -521,20 +527,17 @@ function drawPortal() {
     ctx.translate(x, y);
     ctx.rotate(angle);
     
-    // 外圈
     ctx.strokeStyle = '#00ffff';
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI*2);
     ctx.stroke();
     
-    // 內圈漩渦
     ctx.fillStyle = 'rgba(50, 0, 255, 0.3)';
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI*2);
     ctx.fill();
     
-    // 粒子裝飾
     ctx.fillStyle = '#fff';
     for(let i=0; i<4; i++) {
         const rad = radius * 0.7;
@@ -546,7 +549,6 @@ function drawPortal() {
     
     ctx.restore();
     
-    // 文字提示
     ctx.fillStyle = '#00ffff';
     ctx.font = 'bold 16px Arial';
     ctx.textAlign = 'center';
@@ -741,17 +743,13 @@ function damageEnemy(e, dmg) {
     const pushDir = e.x > gameState.player.x ? 1 : -1; e.x += pushDir * 5; 
 }
 
-// 🔥 修正：根據難度生成敵人
 function spawnEnemy(x, y, type, difficultyMult = 1) {
     const baseHp = type === 'boss' ? 2000 : 100;
     const baseColor = type === 'melee' ? '#c0392b' : (type === 'ranged' ? '#8e44ad' : '#2c3e50');
-    
     gameState.enemies.push({
         x, y, type,
-        hp: baseHp * difficultyMult, 
-        maxHp: baseHp * difficultyMult,
-        speed: type === 'boss' ? 1 : 2,
-        color: baseColor,
+        hp: baseHp * difficultyMult, maxHp: baseHp * difficultyMult,
+        speed: type === 'boss' ? 1 : 2, color: baseColor,
         radius: type === 'boss' ? 40 : 25,
         attackCooldown: 0, hitFlash: 0, direction: 1
     });
