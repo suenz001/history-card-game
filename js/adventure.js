@@ -25,13 +25,7 @@ const gameState = {
     vfx: [], 
     floatingTexts: [], 
     gameTime: 0,
-    // 🔥 新增：背景物件陣列 (用於視差滾動)
-    bgElements: {
-        clouds: [],
-        mountains: [],
-        trees: [],
-        groundDetails: []
-    }
+    bgElements: { clouds: [], mountains: [], trees: [], groundDetails: [] }
 };
 
 // 圖片資源
@@ -60,9 +54,11 @@ export function initAdventure(database, user) {
 
     document.getElementById('adv-exit-btn').addEventListener('click', stopAdventure);
 
+    // 鍵盤控制
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
     
+    // 建立切換按鈕
     createTargetSwitchButton();
 }
 
@@ -94,14 +90,13 @@ export function updatePlayerStats(stats, weaponData) {
     }
 }
 
-// --- 🔥 背景初始化 (隨機生成風景) ---
+// --- 背景初始化 ---
 function initBackgrounds() {
     gameState.bgElements = { clouds: [], mountains: [], trees: [], groundDetails: [] };
     const w = canvas.width;
     const h = canvas.height;
     const horizon = h / 3;
 
-    // 1. 雲朵 (天空)
     for(let i=0; i<5; i++) {
         gameState.bgElements.clouds.push({
             x: Math.random() * w,
@@ -111,10 +106,9 @@ function initBackgrounds() {
         });
     }
 
-    // 2. 山脈 (遠景) - 產生地形起伏
     for(let i=0; i<10; i++) {
         gameState.bgElements.mountains.push({
-            x: i * (w / 8), // 平均分佈但稍微重疊
+            x: i * (w / 8),
             y: horizon,
             width: 150 + Math.random() * 100,
             height: 100 + Math.random() * 80,
@@ -122,7 +116,6 @@ function initBackgrounds() {
         });
     }
 
-    // 3. 樹林 (中景)
     for(let i=0; i<20; i++) {
         gameState.bgElements.trees.push({
             x: Math.random() * w,
@@ -133,7 +126,6 @@ function initBackgrounds() {
         });
     }
 
-    // 4. 地面細節 (草叢、石頭)
     for(let i=0; i<30; i++) {
         gameState.bgElements.groundDetails.push({
             x: Math.random() * w,
@@ -144,6 +136,7 @@ function initBackgrounds() {
     }
 }
 
+// 🔥 優化：切換按鈕 (確保點擊與觸控都有效)
 function createTargetSwitchButton() {
     if (document.getElementById('adv-target-btn')) return;
 
@@ -171,8 +164,9 @@ function createTargetSwitchButton() {
     });
     btn.innerHTML = '🎯'; 
     
+    // 獨立出來的處理函式
     const handleSwitch = (e) => {
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         e.stopPropagation();
         
         const found = switchTarget(); 
@@ -185,15 +179,17 @@ function createTargetSwitchButton() {
         }, 150);
     };
 
-    btn.addEventListener('touchstart', handleSwitch);
-    btn.addEventListener('mousedown', handleSwitch);
+    // 同時綁定 click, mousedown, touchstart 確保萬無一失
+    btn.addEventListener('click', handleSwitch);
+    btn.addEventListener('touchstart', handleSwitch, { passive: false });
 
     document.getElementById('adv-ui-layer').appendChild(btn);
 }
 
 function switchTarget() {
     const p = gameState.player;
-    const searchRange = 500; 
+    const searchRange = 800; // 🔥 加大範圍，確保全螢幕都能抓到
+
     const targets = gameState.enemies.filter(e => {
         const dist = Math.hypot(e.x - p.x, e.y - p.y);
         return dist <= searchRange && e.hp > 0;
@@ -227,17 +223,23 @@ function resizeCanvas() {
     if (!canvas) return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    // 重新生成背景以適應新尺寸
     if(isRunning) initBackgrounds();
 }
 
 function handleKey(e, isDown) {
     const k = e.key.toLowerCase();
-    if (gameState.keys.hasOwnProperty(k)) gameState.keys[k] = isDown;
-    if (isDown && k === 'tab') { 
-        e.preventDefault();
-        switchTarget();
+    
+    // 僅在按下時觸發一次
+    if (isDown) {
+        // 🔥 新增 Q 鍵切換
+        if (k === 'tab' || k === 'q') { 
+            e.preventDefault();
+            switchTarget();
+            return; // 切換完就結束，不進入移動判斷
+        }
     }
+
+    if (gameState.keys.hasOwnProperty(k)) gameState.keys[k] = isDown;
 }
 
 // --- 核心流程 ---
@@ -258,7 +260,6 @@ export function startAdventure() {
     gameState.floatingTexts = [];
     gameState.gameTime = 0;
 
-    // 🔥 初始化背景元素
     initBackgrounds();
 
     spawnEnemy(100, canvas.height - 100, 'melee');
@@ -270,10 +271,21 @@ export function startAdventure() {
     gameLoop();
 }
 
+// 🔥 修改：退出回到營地 (Prep Modal)
 function stopAdventure() {
     isRunning = false;
     cancelAnimationFrame(animationFrameId);
+    
+    // 1. 隱藏冒險畫面
     document.getElementById('adventure-screen').classList.add('hidden');
+    
+    // 2. 顯示冒險者營地
+    const prepModal = document.getElementById('adventure-prep-modal');
+    if (prepModal) {
+        prepModal.classList.remove('hidden');
+        // 確保手機版背景鎖定
+        document.body.classList.add('no-scroll');
+    }
 }
 
 function gameLoop() {
@@ -306,10 +318,7 @@ function update() {
     // 自動面向
     if (dx !== 0 && !p.target) p.direction = dx > 0 ? 1 : -1;
 
-    // 自動攻擊
     updateAutoAttack();
-
-    // 系統更新
     updateEnemies();
     updateProjectiles();
     updateVfx();
@@ -324,7 +333,7 @@ function update() {
 
     if (p.hp <= 0) {
         alert("你已經力盡倒下...");
-        stopAdventure();
+        stopAdventure(); // 這會觸發回到營地
     }
 }
 
@@ -400,7 +409,6 @@ function draw() {
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 🔥 繪製視差滾動背景
     drawParallaxBackground();
 
     const renderList = [
@@ -419,22 +427,18 @@ function draw() {
     drawFloatingTexts();
 }
 
-// 🔥 新增：視差滾動背景繪製
 function drawParallaxBackground() {
     const horizonY = canvas.height / 3;
     const pX = gameState.player.x;
 
-    // 0. 天空背景 (漸層)
     const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
     skyGrad.addColorStop(0, '#87CEEB'); 
     skyGrad.addColorStop(1, '#E0F7FA'); 
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, canvas.width, horizonY);
 
-    // 1. 雲朵 (移動最慢，係數 0.05)
     ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
     gameState.bgElements.clouds.forEach(c => {
-        // 計算視差位置 (加上時間移動)
         const moveX = (c.x + gameState.gameTime * c.speed - pX * 0.05) % (canvas.width + 100);
         const drawX = moveX < -100 ? moveX + canvas.width + 100 : moveX;
         
@@ -444,7 +448,6 @@ function drawParallaxBackground() {
         ctx.fill();
     });
 
-    // 2. 山脈 (遠景，係數 0.1)
     gameState.bgElements.mountains.forEach(m => {
         const moveX = (m.x - pX * 0.1) % (canvas.width + m.width);
         const drawX = moveX < -m.width ? moveX + canvas.width + m.width : moveX;
@@ -457,16 +460,13 @@ function drawParallaxBackground() {
         ctx.fill();
     });
 
-    // 3. 地板 (中景)
     const groundGrad = ctx.createLinearGradient(0, horizonY, 0, canvas.height);
     groundGrad.addColorStop(0, '#7CB342'); 
     groundGrad.addColorStop(1, '#558B2F'); 
     ctx.fillStyle = groundGrad;
     ctx.fillRect(0, horizonY, canvas.width, canvas.height - horizonY);
 
-    // 4. 樹林 (位於地平線上，係數 0.3)
     gameState.bgElements.trees.forEach(t => {
-        // 樹比較多，讓循環寬度寬一點以免重複感太重
         const cycleW = canvas.width + 200;
         let drawX = (t.x - pX * 0.3) % cycleW;
         if (drawX < -50) drawX += cycleW;
@@ -482,15 +482,13 @@ function drawParallaxBackground() {
             ctx.beginPath();
             ctx.arc(drawX, t.y - t.height/2, t.height/2, 0, Math.PI*2);
             ctx.fill();
-            ctx.fillStyle = '#5D4037'; // 樹幹
+            ctx.fillStyle = '#5D4037'; 
             ctx.fillRect(drawX - 5, t.y - t.height/2, 10, t.height/2);
         }
     });
 
-    // 5. 🔥 地面細節 (草叢、土塊) - 係數 1.0 (跟著地板動，產生移動感)
     gameState.bgElements.groundDetails.forEach(g => {
         const cycleW = canvas.width;
-        // Y 軸不變，X 軸隨玩家移動
         let drawX = (g.x - pX) % cycleW;
         if (drawX < 0) drawX += cycleW;
 
@@ -500,7 +498,7 @@ function drawParallaxBackground() {
             ctx.arc(drawX, g.y, g.size, 0, Math.PI, true);
             ctx.fill();
         } else {
-            ctx.fillStyle = 'rgba(0,0,0,0.15)'; // 石頭/土塊陰影
+            ctx.fillStyle = 'rgba(0,0,0,0.15)'; 
             ctx.beginPath();
             ctx.ellipse(drawX, g.y, g.size, g.size/2, 0, 0, Math.PI*2);
             ctx.fill();
@@ -535,7 +533,6 @@ function drawEnemy(e) {
     ctx.save();
     ctx.translate(e.x, e.y);
     
-    // 鎖定光圈
     if (gameState.player.target === e) {
         ctx.save();
         ctx.strokeStyle = '#e74c3c'; 
@@ -574,18 +571,13 @@ function drawEnemy(e) {
     ctx.restore();
 }
 
-// --- 特效與子彈 ---
-
 function explodeProjectile(p) {
     spawnVfx(p.x, p.y, 'explosion', 1);
     playSound('hit'); 
-
     const aoeRadius = 100; 
     gameState.enemies.forEach(e => {
         const dist = Math.hypot(e.x - p.x, e.y - p.y);
-        if (dist <= aoeRadius) {
-            damageEnemy(e, p.dmg); 
-        }
+        if (dist <= aoeRadius) damageEnemy(e, p.dmg); 
     });
 }
 
@@ -602,9 +594,8 @@ function updateProjectiles() {
                 const dist = Math.hypot(p.x - e.x, p.y - e.y);
                 if (dist < e.radius + 10) {
                     hit = true;
-                    if (p.type === 'orb') {
-                        explodeProjectile(p);
-                    } else {
+                    if (p.type === 'orb') explodeProjectile(p);
+                    else {
                         damageEnemy(e, p.dmg);
                         spawnVfx(p.x, p.y, 'hit', 1);
                     }
@@ -647,7 +638,6 @@ function drawVfx() {
             ctx.fillStyle = `rgba(255, 255, 255, ${v.life / 10})`;
             ctx.shadowBlur = 10;
             ctx.shadowColor = 'cyan';
-            
             ctx.beginPath();
             ctx.arc(0, 0, 50, -Math.PI/3, Math.PI/3); 
             ctx.arc(-10, 0, 40, Math.PI/3, -Math.PI/3, true);
@@ -656,12 +646,10 @@ function drawVfx() {
         else if (v.type === 'explosion') {
             const progress = 1 - (v.life / v.maxLife); 
             const radius = 10 + progress * 80; 
-            
             ctx.fillStyle = `rgba(52, 152, 219, ${1 - progress})`; 
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
             ctx.fill();
-            
             ctx.strokeStyle = `rgba(255, 255, 255, ${1 - progress})`;
             ctx.lineWidth = 2;
             ctx.stroke();
@@ -672,7 +660,6 @@ function drawVfx() {
             ctx.arc(0, 0, 15, 0, Math.PI*2);
             ctx.fill();
         }
-
         ctx.restore();
     });
 }
@@ -683,7 +670,6 @@ function drawProjectiles() {
         ctx.translate(p.x, p.y);
         ctx.rotate(p.angle);
         ctx.fillStyle = p.color;
-
         if (p.type === 'arrow') {
             ctx.fillRect(-10, -2, 20, 4); 
             ctx.fillStyle = 'brown'; ctx.fillRect(10, -3, 5, 6); 
@@ -696,7 +682,6 @@ function drawProjectiles() {
     });
 }
 
-// --- 輔助 ---
 function spawnProjectile(x, y, angle, speed, owner, dmg, color, type) {
     gameState.projectiles.push({
         x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
