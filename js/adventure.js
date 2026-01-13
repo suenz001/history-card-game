@@ -33,13 +33,9 @@ const gameState = {
     maxWaves: 3,
     waveTimer: 0,
     isPortalOpen: false,
-    portal: { x: 0, y: 0, radius: 40, angle: 0 },
-
-    // 🔥 新增：攜帶的技能卡片
-    equippedSkills: [] 
+    portal: { x: 0, y: 0, radius: 40, angle: 0 } 
 };
 
-// 圖片資源
 const heroSprites = {
     unarmed: new Image(),
     sword: new Image(),
@@ -68,8 +64,10 @@ export function initAdventure(database, user) {
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
     
-    // 禁止手機雙擊縮放
-    document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+    // 🔥 禁止雙擊縮放 (解決手機跳動問題)
+    document.addEventListener('dblclick', function(event) {
+        event.preventDefault();
+    }, { passive: false });
 
     createTargetSwitchButton();
 }
@@ -102,187 +100,6 @@ export function updatePlayerStats(stats, weaponData) {
     }
 }
 
-// -------------------------------------------------------------
-// 🔥 技能系統 (Skill System)
-// -------------------------------------------------------------
-
-// 1. 接收並初始化技能卡片
-export function updateAdventureCards(cards) {
-    console.log("收到技能卡:", cards);
-    
-    // 轉換卡片格式，加上冷卻時間狀態
-    gameState.equippedSkills = cards.map(card => ({
-        ...card,
-        currentCd: 0,
-        maxCd: 300 // 預設冷卻 (5秒 = 300幀)，稍後根據技能類型調整
-    }));
-
-    renderSkillButtons(); 
-}
-
-// 2. 渲染技能按鈕
-function renderSkillButtons() {
-    const container = document.getElementById('adv-skill-bar-container');
-    if(!container) return;
-    container.innerHTML = ""; 
-
-    gameState.equippedSkills.forEach((skill, index) => {
-        const btn = document.createElement('div');
-        btn.className = `adv-skill-btn rarity-${skill.rarity}`;
-        
-        // 嘗試使用卡片圖片，如果沒有則用文字
-        if(skill.img && !skill.img.includes('undefined')) {
-            // 注意：這裡假設 img 是 emoji 或是 url。如果是 url 要用 backgroundImage
-            // 你的 data.js 好像是用 emoji 當 img，所以直接 innerText
-            btn.innerHTML = skill.img; 
-            btn.style.display = 'flex';
-            btn.style.justifyContent = 'center';
-            btn.style.alignItems = 'center';
-            btn.style.fontSize = '30px';
-        } else {
-            btn.innerText = skill.name[0]; 
-            btn.style.display = 'flex';
-            btn.style.justifyContent = 'center';
-            btn.style.alignItems = 'center';
-            btn.style.color = '#fff';
-            btn.style.fontSize = '24px';
-        }
-
-        // CD 遮罩
-        const cdOverlay = document.createElement('div');
-        cdOverlay.className = 'skill-cd-overlay';
-        cdOverlay.id = `skill-cd-${index}`;
-        btn.appendChild(cdOverlay);
-
-        // 點擊觸發技能
-        const trigger = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            useSkill(index);
-            
-            // 按下特效
-            btn.style.transform = 'scale(0.9)';
-            setTimeout(() => btn.style.transform = 'scale(1)', 100);
-        };
-
-        btn.addEventListener('touchstart', trigger, { passive: false });
-        btn.addEventListener('mousedown', trigger);
-
-        container.appendChild(btn);
-    });
-}
-
-// 3. 技能轉譯器 (Skill Adapter)
-function useSkill(index) {
-    const skill = gameState.equippedSkills[index];
-    if (!skill || skill.currentCd > 0) return; // 冷卻中
-
-    const p = gameState.player;
-    const key = skill.skillKey;
-    const params = skill.skillParams || {}; 
-
-    console.log(`施放技能: ${key}`, params);
-    
-    // 設定冷卻時間
-    skill.maxCd = skill.rarity === 'SSR' ? 600 : (skill.rarity === 'SR' ? 450 : 300);
-    skill.currentCd = skill.maxCd;
-
-    // --- 技能邏輯映射 ---
-    let executed = false;
-
-    if (key === 'HEAL_ALLIES' || key === 'HEAL_ALL_ALLIES' || key === 'FULL_HEAL_LOWEST') {
-        // 治療類型
-        const healRate = params.healRate || 0.3; 
-        const healAmount = Math.floor(p.maxHp * healRate);
-        p.hp = Math.min(p.maxHp, p.hp + healAmount);
-        
-        createFloatingText(p.x, p.y - 50, `+${healAmount}`, '#2ecc71');
-        spawnVfx(p.x, p.y, 'explosion', 1); 
-        playSound('coin'); 
-        executed = true;
-    }
-    else if (key === 'HEAVY_STRIKE' || key === 'MULTI_TARGET_STRIKE') {
-        // 重擊類型
-        let target = p.target;
-        if (!target) {
-            const targets = gameState.enemies.filter(e => Math.hypot(e.x - p.x, e.y - p.y) < 300);
-            if (targets.length > 0) target = targets[0];
-        }
-
-        if (target) {
-            const dmgMult = params.dmgMult || 2.0;
-            const dmg = Math.floor(p.weapon.atk * dmgMult);
-            
-            const angle = Math.atan2(target.y - p.y, target.x - p.x);
-            spawnProjectile(p.x, p.y, angle, 15, 'player', dmg, '#e74c3c', 'orb'); 
-            
-            createFloatingText(p.x, p.y - 60, "重擊!", "#ff0000");
-            playSound('slash');
-            executed = true;
-        } else {
-            createFloatingText(p.x, p.y - 60, "無目標!", "#ccc");
-            skill.currentCd = 30; // 沒打到人退CD
-        }
-    }
-    else if (key === 'SELF_BUFF_ATK') {
-        // 自身強化
-        const buffRate = params.buffRate || 1.2;
-        p.weapon.atk = Math.floor(p.weapon.atk * buffRate);
-        createFloatingText(p.x, p.y - 60, "攻擊提升!", "#f1c40f");
-        spawnVfx(p.x, p.y, 'explosion', 1);
-        playSound('magic');
-        
-        setTimeout(() => {
-            p.weapon.atk = Math.floor(p.weapon.atk / buffRate);
-        }, 10000); // 10秒後恢復
-        executed = true;
-    }
-    else if (key === 'DEBUFF_GLOBAL_ATK') {
-        // 全場 Debuff
-        gameState.enemies.forEach(e => {
-            const dmg = Math.floor(p.weapon.atk * 0.5);
-            damageEnemy(e, dmg);
-            e.speed *= 0.5; 
-            setTimeout(() => { if(e) e.speed *= 2; }, 3000); 
-        });
-        spawnVfx(p.x, p.y, 'explosion', 1); 
-        createFloatingText(p.x, p.y - 80, "全場緩速!", "#3498db");
-        playSound('magic');
-        executed = true;
-    }
-    else {
-        // 預設攻擊
-        const angle = p.target ? Math.atan2(p.target.y - p.y, p.target.x - p.x) : (p.direction===1?0:Math.PI);
-        spawnProjectile(p.x, p.y, angle, 10, 'player', p.weapon.atk, '#fff', 'orb');
-        executed = true;
-    }
-}
-
-// 4. 更新技能冷卻顯示
-function updateSkillCooldowns() {
-    gameState.equippedSkills.forEach((skill, index) => {
-        if (skill.currentCd > 0) {
-            skill.currentCd--;
-            const overlay = document.getElementById(`skill-cd-${index}`);
-            if (overlay) {
-                const percent = (skill.currentCd / skill.maxCd) * 100;
-                overlay.style.height = `${percent}%`;
-                overlay.innerText = Math.ceil(skill.currentCd / 60); 
-            }
-        } else {
-            const overlay = document.getElementById(`skill-cd-${index}`);
-            if (overlay) {
-                overlay.style.height = '0%';
-                overlay.innerText = "";
-            }
-        }
-    });
-}
-
-// -------------------------------------------------------------
-// 背景與環境邏輯 (保持之前修正)
-// -------------------------------------------------------------
-
 function initBackgrounds() {
     gameState.bgElements = { clouds: [], mountains: [], trees: [], groundDetails: [] };
     const w = canvas.width;
@@ -290,38 +107,72 @@ function initBackgrounds() {
     const horizon = h / 3;
 
     for(let i=0; i<5; i++) {
-        gameState.bgElements.clouds.push({ x: Math.random() * w, y: Math.random() * (horizon - 50), size: 30 + Math.random() * 40, speed: 0.2 + Math.random() * 0.3 });
+        gameState.bgElements.clouds.push({
+            x: Math.random() * w,
+            y: Math.random() * (horizon - 50),
+            size: 30 + Math.random() * 40,
+            speed: 0.2 + Math.random() * 0.3
+        });
     }
     for(let i=0; i<10; i++) {
-        gameState.bgElements.mountains.push({ x: i * (w / 8), y: horizon, width: 150 + Math.random() * 100, height: 100 + Math.random() * 80, color: `rgb(${90+Math.random()*20}, ${60+Math.random()*20}, ${50+Math.random()*20})` });
+        gameState.bgElements.mountains.push({
+            x: i * (w / 8), y: horizon,
+            width: 150 + Math.random() * 100, height: 100 + Math.random() * 80,
+            color: `rgb(${80+Math.random()*40}, ${60+Math.random()*40}, ${50+Math.random()*40})`
+        });
     }
     for(let i=0; i<20; i++) {
-        gameState.bgElements.trees.push({ x: Math.random() * w, y: horizon, height: 40 + Math.random() * 40, width: 20 + Math.random() * 10, type: Math.random() > 0.5 ? 'pine' : 'round' });
+        gameState.bgElements.trees.push({
+            x: Math.random() * w, y: horizon,
+            height: 40 + Math.random() * 40, width: 20 + Math.random() * 10,
+            type: Math.random() > 0.5 ? 'pine' : 'round'
+        });
     }
     for(let i=0; i<30; i++) {
-        gameState.bgElements.groundDetails.push({ x: Math.random() * w, y: horizon + Math.random() * (h - horizon), type: Math.random() > 0.7 ? 'stone' : 'grass', size: 5 + Math.random() * 10 });
+        gameState.bgElements.groundDetails.push({
+            x: Math.random() * w, y: horizon + Math.random() * (h - horizon),
+            type: Math.random() > 0.7 ? 'stone' : 'grass', size: 5 + Math.random() * 10
+        });
     }
 }
 
+// 🔥 優化：使用 pointerdown 統一處理滑鼠與觸控
 function createTargetSwitchButton() {
     if (document.getElementById('adv-target-btn')) return;
 
     const btn = document.createElement('div');
     btn.id = 'adv-target-btn';
     Object.assign(btn.style, {
-        position: 'absolute', bottom: '80px', right: '30px', width: '70px', height: '70px',
-        borderRadius: '50%', backgroundColor: 'rgba(52, 152, 219, 0.9)', 
-        border: '3px solid white', boxShadow: '0 0 15px rgba(0,0,0,0.6)',
-        display: 'flex', justifyContent: 'center', alignItems: 'center',
-        fontSize: '32px', color: 'white', userSelect: 'none', cursor: 'pointer',
-        zIndex: '20000', touchAction: 'none'
+        position: 'absolute',
+        bottom: '80px', // 稍微往上移一點，避免誤觸邊緣
+        right: '30px',
+        width: '70px',
+        height: '70px',
+        borderRadius: '50%',
+        backgroundColor: 'rgba(52, 152, 219, 0.9)', 
+        border: '3px solid white',
+        boxShadow: '0 0 15px rgba(0,0,0,0.6)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        fontSize: '32px',
+        color: 'white',
+        userSelect: 'none',
+        cursor: 'pointer',
+        zIndex: '20000', // 確保在最上層
+        touchAction: 'none' // 禁止瀏覽器預設手勢
     });
     btn.innerHTML = '🎯'; 
     
-    // 使用 pointerdown 確保靈敏度
+    // 使用 pointerdown 來確保即時反應 (比 click 快，且支援手機)
     btn.addEventListener('pointerdown', (e) => {
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log("切換按鈕被按下"); // Debug 用
         const found = switchTarget(); 
+        
+        // 視覺回饋
         btn.style.transform = 'scale(0.8)';
         btn.style.backgroundColor = found ? '#2ecc71' : '#e74c3c'; 
         setTimeout(() => {
@@ -374,8 +225,12 @@ function resizeCanvas() {
 
 function handleKey(e, isDown) {
     const k = e.key.toLowerCase();
-    if (isDown && (k === 'tab' || k === 'q')) { 
-        e.preventDefault(); switchTarget(); return; 
+    if (isDown) {
+        if (k === 'tab' || k === 'q') { 
+            e.preventDefault();
+            switchTarget();
+            return; 
+        }
     }
     if (gameState.keys.hasOwnProperty(k)) gameState.keys[k] = isDown;
 }
@@ -414,8 +269,6 @@ function stopAdventure() {
     isRunning = false;
     cancelAnimationFrame(animationFrameId);
     document.getElementById('adventure-screen').classList.add('hidden');
-    
-    // 回到營地
     const prepModal = document.getElementById('adventure-prep-modal');
     if (prepModal) {
         prepModal.classList.remove('hidden');
@@ -435,7 +288,7 @@ function update() {
     gameState.gameTime++;
     const p = gameState.player;
 
-    // 移動
+    // 1. 移動邏輯
     let dx = 0, dy = 0;
     if (gameState.keys.w) dy -= p.speed;
     if (gameState.keys.s) dy += p.speed;
@@ -450,13 +303,15 @@ function update() {
 
     if (dx !== 0 && !p.target) p.direction = dx > 0 ? 1 : -1;
 
-    // 傳送門反向移動
+    // 🔥 2. 更新傳送門位置 (讓它看起來像是在地上)
     if (gameState.isPortalOpen) {
+        // 如果玩家向右移(dx>0)，傳送門就向左移，反之亦然
+        // 這樣就能模擬「傳送門固定在世界某處」的視差效果
         gameState.portal.x -= dx;
+        
+        // (可選) 如果想讓傳送門也會上下移動 (Y軸視差)，也可以加上:
+        // gameState.portal.y -= dy;
     }
-
-    // 更新技能 CD
-    updateSkillCooldowns();
 
     updateGameLogic();
     updateAutoAttack();
@@ -511,7 +366,7 @@ function spawnWaveEnemies() {
     const difficultyMult = 1 + (gameState.level - 1) * 0.2;
     const count = 2 + Math.floor(gameState.level / 2) + gameState.wave; 
 
-    if (gameState.wave === gameState.maxWaves + 1) { // 最後一波
+    if (gameState.wave === gameState.maxWaves + 1) { // 修正邏輯: wave已經+1了
         spawnEnemy(canvas.width / 2, canvas.height / 2, 'boss', difficultyMult);
         spawnEnemy(100, canvas.height - 100, 'ranged', difficultyMult); 
         spawnEnemy(canvas.width - 100, canvas.height - 100, 'ranged', difficultyMult);
@@ -528,7 +383,7 @@ function spawnWaveEnemies() {
 function openPortal() {
     gameState.isPortalOpen = true;
     gameState.portal = {
-        x: canvas.width - 100, // 初始位置在右側
+        x: canvas.width - 100, // 預設出現在畫面右側
         y: canvas.height / 2 + 50,
         radius: 50,
         angle: 0
@@ -557,8 +412,7 @@ function goToNextLevel() {
     gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + heal);
     createFloatingText(gameState.player.x, gameState.player.y, `HP +${heal}`, "#2ecc71");
     
-    // 重置到畫面左側
-    gameState.player.x = 100; 
+    gameState.player.x = 100; // 重置到左側
     gameState.player.y = canvas.height / 2;
     
     initBackgrounds();
@@ -653,12 +507,15 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.roundRect(10, 10, 160, 40, 5);
     ctx.fill();
+    
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 16px Arial';
     ctx.textAlign = 'left';
     ctx.fillText(`Stage ${gameState.level}`, 20, 35);
+    
     let waveText = `Wave ${Math.min(gameState.wave, gameState.maxWaves)}/${gameState.maxWaves}`;
     if (gameState.isPortalOpen) waveText = "Clear!";
+    
     ctx.fillStyle = '#f1c40f';
     ctx.fillText(waveText, 90, 35);
     ctx.restore();
@@ -669,23 +526,43 @@ function drawPortal() {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
-    ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI*2); ctx.stroke();
-    ctx.fillStyle = 'rgba(50, 0, 255, 0.3)'; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI*2); ctx.fill();
+    
+    ctx.strokeStyle = '#00ffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI*2);
+    ctx.stroke();
+    
+    ctx.fillStyle = 'rgba(50, 0, 255, 0.3)';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI*2);
+    ctx.fill();
+    
     ctx.fillStyle = '#fff';
     for(let i=0; i<4; i++) {
-        const rad = radius * 0.7; const a = (angle * 2 + i * Math.PI/2) % (Math.PI*2);
-        ctx.beginPath(); ctx.arc(Math.cos(a)*rad, Math.sin(a)*rad, 5, 0, Math.PI*2); ctx.fill();
+        const rad = radius * 0.7;
+        const a = (angle * 2 + i * Math.PI/2) % (Math.PI*2);
+        ctx.beginPath();
+        ctx.arc(Math.cos(a)*rad, Math.sin(a)*rad, 5, 0, Math.PI*2);
+        ctx.fill();
     }
+    
     ctx.restore();
-    ctx.fillStyle = '#00ffff'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'; ctx.fillText("傳送門", x, y - radius - 10);
+    
+    ctx.fillStyle = '#00ffff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText("傳送門", x, y - radius - 10);
 }
 
 function drawParallaxBackground() {
     const horizonY = canvas.height / 3;
     const pX = gameState.player.x;
     const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
-    skyGrad.addColorStop(0, '#87CEEB'); skyGrad.addColorStop(1, '#E0F7FA'); 
-    ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, horizonY);
+    skyGrad.addColorStop(0, '#87CEEB'); 
+    skyGrad.addColorStop(1, '#E0F7FA'); 
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, canvas.width, horizonY);
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
     gameState.bgElements.clouds.forEach(c => {
@@ -706,7 +583,8 @@ function drawParallaxBackground() {
 
     gameState.bgElements.trees.forEach(t => {
         const cycleW = canvas.width + 200;
-        let drawX = (t.x - pX * 0.3) % cycleW; if (drawX < -50) drawX += cycleW;
+        let drawX = (t.x - pX * 0.3) % cycleW;
+        if (drawX < -50) drawX += cycleW;
         ctx.fillStyle = '#2E7D32';
         if (t.type === 'pine') { ctx.beginPath(); ctx.moveTo(drawX, t.y); ctx.lineTo(drawX + t.width/2, t.y - t.height); ctx.lineTo(drawX + t.width, t.y); ctx.fill(); } 
         else { ctx.beginPath(); ctx.arc(drawX, t.y - t.height/2, t.height/2, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#5D4037'; ctx.fillRect(drawX - 5, t.y - t.height/2, 10, t.height/2); }
@@ -714,41 +592,63 @@ function drawParallaxBackground() {
 
     gameState.bgElements.groundDetails.forEach(g => {
         const cycleW = canvas.width;
-        let drawX = (g.x - pX) % cycleW; if (drawX < 0) drawX += cycleW;
+        let drawX = (g.x - pX) % cycleW;
+        if (drawX < 0) drawX += cycleW;
         if (g.type === 'grass') { ctx.fillStyle = '#4CAF50'; ctx.beginPath(); ctx.arc(drawX, g.y, g.size, 0, Math.PI, true); ctx.fill(); } 
         else { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(drawX, g.y, g.size, g.size/2, 0, 0, Math.PI*2); ctx.fill(); }
     });
 }
 
 function drawPlayer(p) {
-    ctx.save(); ctx.translate(p.x, p.y); if (p.direction === -1) ctx.scale(-1, 1);
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0, 0, 20, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    if (p.direction === -1) ctx.scale(-1, 1);
+
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(0, 0, 20, 8, 0, 0, Math.PI * 2); ctx.fill();
+
     let sprite = heroSprites.unarmed;
     if (p.weapon.type === 'sword') sprite = heroSprites.sword;
     else if (p.weapon.type === 'bow') sprite = heroSprites.bow;
     else if (p.weapon.type === 'staff') sprite = heroSprites.staff;
-    if (sprite.complete && sprite.naturalWidth > 0) { const size = 80; ctx.drawImage(sprite, -size/2, -size + 15, size, size); } 
-    else { ctx.fillStyle = '#3498db'; ctx.fillRect(-20, -50, 40, 50); }
+
+    if (sprite.complete && sprite.naturalWidth > 0) {
+        const size = 80;
+        ctx.drawImage(sprite, -size/2, -size + 15, size, size);
+    } else {
+        ctx.fillStyle = '#3498db'; ctx.fillRect(-20, -50, 40, 50);
+    }
     ctx.restore();
 }
 
 function drawEnemy(e) {
-    ctx.save(); ctx.translate(e.x, e.y);
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    
     if (gameState.player.target === e) {
-        ctx.save(); ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3; ctx.setLineDash([10, 5]);
+        ctx.save();
+        ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3; ctx.setLineDash([10, 5]);
         const rotate = (gameState.gameTime * 0.05) % (Math.PI * 2);
-        ctx.rotate(rotate); ctx.beginPath(); ctx.arc(0, 0, e.radius + 15, 0, Math.PI * 2); ctx.stroke();
+        ctx.rotate(rotate);
+        ctx.beginPath(); ctx.arc(0, 0, e.radius + 15, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
     }
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0, 0, e.radius, e.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
-    
+
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(0, 0, e.radius, e.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+
     ctx.save();
     if (e.direction === -1) ctx.scale(-1, 1);
     if (e.hitFlash > 0) { ctx.fillStyle = 'white'; e.hitFlash--; } else { ctx.fillStyle = e.color; }
-    if (e.type === 'boss') ctx.fillRect(-40, -90, 80, 90); else { ctx.beginPath(); ctx.arc(0, -25, 25, 0, Math.PI*2); ctx.fill(); }
+
+    if (e.type === 'boss') ctx.fillRect(-40, -90, 80, 90);
+    else { ctx.beginPath(); ctx.arc(0, -25, 25, 0, Math.PI*2); ctx.fill(); }
     ctx.restore();
 
-    if (e.type === 'boss') { ctx.fillStyle = 'yellow'; ctx.textAlign = 'center'; ctx.font = 'bold 20px Arial'; ctx.fillText("BOSS", 0, -100); }
+    if (e.type === 'boss') {
+        ctx.fillStyle = 'yellow'; ctx.textAlign = 'center'; ctx.font = 'bold 20px Arial'; ctx.fillText("BOSS", 0, -100);
+    }
+
     const barW = 40; const barH = 6; const barY = -e.radius * 2 - 15;
     ctx.fillStyle = '#555'; ctx.fillRect(-barW/2, barY, barW, barH);
     ctx.fillStyle = '#e74c3c'; ctx.fillRect(-barW/2, barY, barW * (e.hp/e.maxHp), barH);
@@ -756,44 +656,70 @@ function drawEnemy(e) {
 }
 
 function explodeProjectile(p) {
-    spawnVfx(p.x, p.y, 'explosion', 1); playSound('hit'); 
+    spawnVfx(p.x, p.y, 'explosion', 1);
+    playSound('hit'); 
     const aoeRadius = 100; 
-    gameState.enemies.forEach(e => { const dist = Math.hypot(e.x - p.x, e.y - p.y); if (dist <= aoeRadius) damageEnemy(e, p.dmg); });
+    gameState.enemies.forEach(e => {
+        const dist = Math.hypot(e.x - p.x, e.y - p.y);
+        if (dist <= aoeRadius) damageEnemy(e, p.dmg); 
+    });
 }
 
 function updateProjectiles() {
     for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
-        const p = gameState.projectiles[i]; p.x += p.vx; p.y += p.vy; p.life--;
+        const p = gameState.projectiles[i];
+        p.x += p.vx; p.y += p.vy; p.life--;
         let hit = false;
         if (p.owner === 'player') {
             for (let e of gameState.enemies) {
                 const dist = Math.hypot(p.x - e.x, p.y - e.y);
                 if (dist < e.radius + 10) {
-                    hit = true; if (p.type === 'orb') explodeProjectile(p); else { damageEnemy(e, p.dmg); spawnVfx(p.x, p.y, 'hit', 1); } break; 
+                    hit = true;
+                    if (p.type === 'orb') explodeProjectile(p);
+                    else { damageEnemy(e, p.dmg); spawnVfx(p.x, p.y, 'hit', 1); }
+                    break; 
                 }
             }
         } else if (p.owner === 'enemy') {
             const dist = Math.hypot(p.x - gameState.player.x, p.y - gameState.player.y);
-            if (dist < 30) { gameState.player.hp -= p.dmg; createFloatingText(gameState.player.x, gameState.player.y - 40, `-${p.dmg}`, 'red'); hit = true; playSound('hit'); }
+            if (dist < 30) {
+                gameState.player.hp -= p.dmg;
+                createFloatingText(gameState.player.x, gameState.player.y - 40, `-${p.dmg}`, 'red');
+                hit = true; playSound('hit');
+            }
         }
         if (p.life <= 0 || hit) gameState.projectiles.splice(i, 1);
     }
 }
 
-function spawnVfx(x, y, type, dir) { gameState.vfx.push({ x, y, type, dir, life: type === 'explosion' ? 20 : 10, maxLife: type === 'explosion' ? 20 : 10 }); }
-function updateVfx() { for (let i = gameState.vfx.length - 1; i >= 0; i--) { gameState.vfx[i].life--; if (gameState.vfx[i].life <= 0) gameState.vfx.splice(i, 1); } }
+function spawnVfx(x, y, type, dir) {
+    gameState.vfx.push({ x, y, type, dir, life: type === 'explosion' ? 20 : 10, maxLife: type === 'explosion' ? 20 : 10 });
+}
+
+function updateVfx() {
+    for (let i = gameState.vfx.length - 1; i >= 0; i--) {
+        gameState.vfx[i].life--;
+        if (gameState.vfx[i].life <= 0) gameState.vfx.splice(i, 1);
+    }
+}
+
 function drawVfx() {
     gameState.vfx.forEach(v => {
         ctx.save(); ctx.translate(v.x, v.y);
         if (v.type === 'slash') {
             if (v.dir === -1) ctx.scale(-1, 1);
-            ctx.fillStyle = `rgba(255, 255, 255, ${v.life / 10})`; ctx.shadowBlur = 10; ctx.shadowColor = 'cyan';
+            ctx.fillStyle = `rgba(255, 255, 255, ${v.life / 10})`;
+            ctx.shadowBlur = 10; ctx.shadowColor = 'cyan';
             ctx.beginPath(); ctx.arc(0, 0, 50, -Math.PI/3, Math.PI/3); ctx.arc(-10, 0, 40, Math.PI/3, -Math.PI/3, true); ctx.fill();
         } else if (v.type === 'explosion') {
-            const progress = 1 - (v.life / v.maxLife); const radius = 10 + progress * 80; 
-            ctx.fillStyle = `rgba(52, 152, 219, ${1 - progress})`; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
+            const progress = 1 - (v.life / v.maxLife); 
+            const radius = 10 + progress * 80; 
+            ctx.fillStyle = `rgba(52, 152, 219, ${1 - progress})`; 
+            ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = `rgba(255, 255, 255, ${1 - progress})`; ctx.lineWidth = 2; ctx.stroke();
-        } else if (v.type === 'hit') { ctx.fillStyle = 'rgba(255,255,0,0.8)'; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fill(); }
+        } else if (v.type === 'hit') {
+            ctx.fillStyle = 'rgba(255,255,0,0.8)'; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fill();
+        }
         ctx.restore();
     });
 }
@@ -807,16 +733,33 @@ function drawProjectiles() {
     });
 }
 
-function spawnProjectile(x, y, angle, speed, owner, dmg, color, type) { gameState.projectiles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, angle, speed, owner, dmg, color, type, life: 60 }); }
-function damageEnemy(e, dmg) { e.hp -= dmg; e.hitFlash = 5; createFloatingText(e.x, e.y - 50, `-${Math.floor(dmg)}`, '#fff'); const pushDir = e.x > gameState.player.x ? 1 : -1; e.x += pushDir * 5; }
-function spawnEnemy(x, y, type, difficultyMult = 1) {
-    const baseHp = type === 'boss' ? 2000 : 100; const baseColor = type === 'melee' ? '#c0392b' : (type === 'ranged' ? '#8e44ad' : '#2c3e50');
-    gameState.enemies.push({ x, y, type, hp: baseHp * difficultyMult, maxHp: baseHp * difficultyMult, speed: type === 'boss' ? 1 : 2, color: baseColor, radius: type === 'boss' ? 40 : 25, attackCooldown: 0, hitFlash: 0, direction: 1 });
+function spawnProjectile(x, y, angle, speed, owner, dmg, color, type) {
+    gameState.projectiles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, angle, speed, owner, dmg, color, type, life: 60 });
 }
+
+function damageEnemy(e, dmg) {
+    e.hp -= dmg; e.hitFlash = 5;
+    createFloatingText(e.x, e.y - 50, `-${Math.floor(dmg)}`, '#fff');
+    const pushDir = e.x > gameState.player.x ? 1 : -1; e.x += pushDir * 5; 
+}
+
+function spawnEnemy(x, y, type, difficultyMult = 1) {
+    const baseHp = type === 'boss' ? 2000 : 100;
+    const baseColor = type === 'melee' ? '#c0392b' : (type === 'ranged' ? '#8e44ad' : '#2c3e50');
+    gameState.enemies.push({
+        x, y, type,
+        hp: baseHp * difficultyMult, maxHp: baseHp * difficultyMult,
+        speed: type === 'boss' ? 1 : 2, color: baseColor,
+        radius: type === 'boss' ? 40 : 25,
+        attackCooldown: 0, hitFlash: 0, direction: 1
+    });
+}
+
 function updateEnemies() {
     const p = gameState.player;
     gameState.enemies.forEach(e => {
-        const dx = p.x - e.x; const dy = p.y - e.y; const dist = Math.hypot(dx, dy); e.direction = dx > 0 ? 1 : -1;
+        const dx = p.x - e.x; const dy = p.y - e.y; const dist = Math.hypot(dx, dy);
+        e.direction = dx > 0 ? 1 : -1;
         if (e.attackCooldown > 0) e.attackCooldown--;
         if (e.type === 'melee' || e.type === 'boss') {
             if (dist > 60) { const angle = Math.atan2(dy, dx); e.x += Math.cos(angle) * e.speed; e.y += Math.sin(angle) * e.speed; } 
@@ -826,8 +769,25 @@ function updateEnemies() {
              else if (e.attackCooldown <= 0) { const angle = Math.atan2(dy, dx); spawnProjectile(e.x, e.y, angle, 5, 'enemy', 15, '#8e44ad', 'orb'); e.attackCooldown = 120; }
         }
     });
-    for (let i = gameState.enemies.length - 1; i >= 0; i--) { if (gameState.enemies[i].hp <= 0) { if (gameState.player.target === gameState.enemies[i]) gameState.player.target = null; gameState.enemies.splice(i, 1); } }
+    for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+        if (gameState.enemies[i].hp <= 0) {
+            if (gameState.player.target === gameState.enemies[i]) gameState.player.target = null;
+            gameState.enemies.splice(i, 1);
+        }
+    }
 }
-export function createFloatingText(x, y, text, color) { gameState.floatingTexts.push({ x, y, text, color, life: 60 }); }
-function drawFloatingTexts() { gameState.floatingTexts.forEach(t => { ctx.fillStyle = t.color; ctx.font = "bold 24px Arial"; ctx.fillText(t.text, t.x, t.y); }); }
-function updateFloatingTexts() { for (let i = gameState.floatingTexts.length - 1; i >= 0; i--) { const t = gameState.floatingTexts[i]; t.y -= 1; t.life--; if (t.life <= 0) gameState.floatingTexts.splice(i, 1); } }
+
+export function createFloatingText(x, y, text, color) {
+    gameState.floatingTexts.push({ x, y, text, color, life: 60 });
+}
+
+function drawFloatingTexts() {
+    gameState.floatingTexts.forEach(t => { ctx.fillStyle = t.color; ctx.font = "bold 24px Arial"; ctx.fillText(t.text, t.x, t.y); });
+}
+
+function updateFloatingTexts() {
+    for (let i = gameState.floatingTexts.length - 1; i >= 0; i--) {
+        const t = gameState.floatingTexts[i]; t.y -= 1; t.life--;
+        if (t.life <= 0) gameState.floatingTexts.splice(i, 1);
+    }
+}
