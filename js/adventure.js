@@ -17,6 +17,9 @@ const gameState = {
         hp: 1000, maxHp: 1000, 
         speed: 4, direction: 1, 
         width: 60, height: 60, 
+        // 🔥 新增 atkMult 用於處理 Buff 技能
+        atkMult: 1.0,
+        defMult: 1.0,
         weapon: { type: 'sword', range: 100, atkSpeed: 40, atk: 50 }, 
         attackCooldown: 0,
         target: null 
@@ -173,7 +176,7 @@ function renderSkillBar() {
     });
 }
 
-// 🔥 修改：技能使用邏輯 (Adapter 核心)
+// 🔥 重大修改：技能使用邏輯 (Adapter 核心)
 function handleSkillUse(index) {
     const skill = gameState.skills[index];
     if (!skill) return;
@@ -185,23 +188,23 @@ function handleSkillUse(index) {
 
     const p = gameState.player;
     
-    // 1. 決定目標 (Targeting Strategy)
-    // 如果是 BUFF 類，目標是自己；如果是攻擊類，目標是鎖定的敵人或最近敵人
-    // 簡單判斷：看 skillKey 是否包含 "BUFF" 或 "HEAL" (除了對敵吸血)
-    let target = p.target;
-    
+    // --- 1. 決定目標 (Targeting Strategy) ---
+    // 判斷是否為自我施法 (Buff/Heal)
+    // 透過 skillKey 簡單判斷，或者預設如果沒目標就對自己放 (針對非攻擊技)
     const isBuffOrHeal = (skill.skillKey || "").includes("BUFF") || 
                          ((skill.skillKey || "").includes("HEAL") && !(skill.skillKey || "").includes("STRIKE"));
 
+    let target = p.target;
+
     if (isBuffOrHeal) {
-        target = p; // 對自己施放
+        target = p; // 強制對自己施放
     } else if (!target) {
-        // 沒有鎖定目標，找最近的
+        // 沒有鎖定目標，自動找最近的敵人
         let nearest = null;
         let minDist = Infinity;
         gameState.enemies.forEach(e => {
             const dist = Math.hypot(e.x - p.x, e.y - p.y);
-            if (dist < minDist && dist < 600) {
+            if (dist < minDist && dist < 600) { // 搜尋範圍 600
                 minDist = dist;
                 nearest = e;
             }
@@ -209,101 +212,115 @@ function handleSkillUse(index) {
         target = nearest;
     }
 
-    // 如果是攻擊技能且沒目標，往前發射或空放
-    // 為了適配 skills.js，我們造一個假目標在前方
+    // 如果是攻擊技能但還是沒找到目標，建立一個假目標在前方 (讓特效能發出去)
     if (!isBuffOrHeal && !target) {
         target = { 
-            x: p.x + (p.direction * 200), 
+            x: p.x + (p.direction * 300), 
             y: p.y, 
-            isDummy: true // 標記為假目標
+            isDummy: true, // 標記為假目標
+            hp: 1, maxHp: 1 
         };
     }
 
-    // 2. 建立適配器物件 (Wrappers)
-    // skills.js 預期物件有 .el (DOM)，這裡我們用 Proxy 或 Fake Object 騙過它
-    // 並保留 .realRef 指向真正的遊戲物件，以便在 callback 中扣血
-    const playerWrapper = {
-        ...p,
-        realRef: p,
-        el: {}, // 假 DOM
-        position: p.x, // skills.js 用於特效定位
-        y: p.y,
-        atk: p.weapon.atk + (p.stats?.atk || 0), // 總攻擊力
-        maxHp: p.maxHp,
-        hp: p.hp
-    };
+    // --- 2. 建立適配器物件 (Proxies) ---
+    // 這一步最重要！因為 skills.js 可能會直接修改 hero.atk
+    // 我們需要攔截這個修改，並應用到 gameState.player.atkMult 上
 
-    const targetWrapper = {
+    const playerProxy = new Proxy(p, {
+        get: function(obj, prop) {
+            // 當技能庫讀取 'atk' 時，計算總攻擊力
+            if (prop === 'atk') {
+                const base = obj.weapon.atk + (obj.stats?.atk || 0);
+                return base * (obj.atkMult || 1.0);
+            }
+            // 讀取 DOM 元素 (避免報錯)
+            if (prop === 'el') return {}; 
+            if (prop === 'position') return { x: obj.x, y: obj.y };
+            
+            return obj[prop];
+        },
+        set: function(obj, prop, value) {
+            // 當技能庫試圖修改 'atk' 時 (例如 Buff)，我們反推倍率
+            if (prop === 'atk') {
+                const currentAtk = (obj.weapon.atk + (obj.stats?.atk || 0)) * (obj.atkMult || 1.0);
+                if (currentAtk > 0) {
+                    // 計算新的倍率：新數值 / 舊數值
+                    // 例如原本 100，技能改成 150，那倍率就要乘 1.5
+                    const ratio = value / currentAtk;
+                    obj.atkMult = (obj.atkMult || 1.0) * ratio;
+                    createFloatingText(obj.x, obj.y - 100, "ATK UP!", "#f1c40f");
+                }
+                return true;
+            }
+            // 其他屬性直接寫入
+            obj[prop] = value;
+            return true;
+        }
+    });
+
+    // 目標也需要包裝，主要是為了處理 DOM 引用
+    const targetProxy = {
         ...target,
         realRef: target.isDummy ? null : target,
-        el: {},
-        position: target.x,
+        el: {}, // 假 DOM
+        position: target.x, // skills.js 用於特效定位
         y: target.y,
+        x: target.x,
         hp: target.hp || 100,
         maxHp: target.maxHp || 100
     };
 
-    // 3. 建立執行環境 Context (Adapter Functions)
+    // --- 3. 建立執行環境 Context (Adapter Functions) ---
     const context = {
         dealDamage: (source, targetObj, mult) => {
-            // 解析目標：如果是 wrapper，取 realRef
             const realTarget = targetObj.realRef || targetObj;
             
-            // 傷害計算
-            const baseAtk = source.atk || 50; 
-            const finalDmg = Math.floor(baseAtk * (mult || 1));
+            // 計算傷害：使用來源的當前攻擊力 (含 Buff)
+            const sourceAtk = source.atk || 50; 
+            const finalDmg = Math.floor(sourceAtk * (mult || 1));
 
-            // 處理群體傷害 (skills.js 有時會傳特殊標記，或者我們在這裡判斷 AOE)
-            // 這裡簡化：如果是特定技能造成的傷害，直接調用 damageEnemy
             if (realTarget && !realTarget.isDummy && gameState.enemies.includes(realTarget)) {
                 damageEnemy(realTarget, finalDmg);
+                // 額外特效
                 spawnVfx(realTarget.x, realTarget.y, 'hit', 1);
             }
         },
         healTarget: (source, targetObj, amount) => {
-            const realTarget = targetObj.realRef || targetObj;
+            // 如果目標是玩家 Proxy，取出原始物件
+            let realTarget = targetObj.realRef || targetObj;
+            if (targetObj === playerProxy) realTarget = p; // 特殊處理
+
             if (realTarget === gameState.player) {
                 realTarget.hp = Math.min(realTarget.maxHp, realTarget.hp + amount);
                 createFloatingText(realTarget.x, realTarget.y - 60, `+${Math.floor(amount)}`, "#2ecc71");
             }
         },
         createVfx: (x, y, type) => {
-            // skills.js 可能傳入 element position，這裡我們直接用座標
-            // 如果傳入的是物件，嘗試取 x, y
+            // 容錯處理：如果傳入的是物件，嘗試取座標
             let posX = x;
             let posY = y;
-            if (typeof x === 'object') { posX = x.position || x.x; } // 容錯
+            if (typeof x === 'object') { posX = x.x || p.x; posY = x.y || p.y; }
             
             spawnVfx(posX, posY, type, p.direction);
         },
         fireProjectile: (startEl, endEl, type, onHitCallback) => {
-            // 忽略 startEl, endEl (因為那是 DOM)
-            // 直接使用當前的 player 和 targetWrapper
+            // 忽略 DOM 元素，使用當前座標
+            const startX = p.x;
+            const startY = p.y - 30;
+            const targetX = targetProxy.x;
+            const targetY = targetProxy.y;
+
+            const angle = Math.atan2(targetY - startY, targetX - startX);
             
-            // 計算角度
-            const angle = Math.atan2(targetWrapper.y - playerWrapper.y, targetWrapper.x - playerWrapper.x);
-            
-            // 發射！並傳入 callback
             spawnProjectile(
-                playerWrapper.x, 
-                playerWrapper.y - 30, 
-                angle, 
-                12, // 速度
-                'player', 
-                0, // 傷害由 callback 處理 (dealDamage)
-                '#f1c40f', 
-                type === 'skill' ? 'orb' : 'arrow',
+                startX, startY, angle, 12, 'player', 0, 
+                '#f1c40f', type === 'skill' ? 'orb' : 'arrow',
                 (projectile, hitEnemy) => {
-                    // 當命中時，執行 skills.js 定義的 callback
-                    // 我們需要把 hitEnemy 包裝成 wrapper 傳回去給 dealDamage
-                    const hitWrapper = {
-                        ...hitEnemy,
-                        realRef: hitEnemy,
-                        el: {},
-                        position: hitEnemy.x,
-                        y: hitEnemy.y
-                    };
-                    if (onHitCallback) onHitCallback(playerWrapper, hitWrapper); 
+                    // 命中後的回調
+                    if (onHitCallback) {
+                        // 將命中的敵人包裝成簡單物件傳回
+                        onHitCallback(playerProxy, hitEnemy); 
+                    }
                 }
             );
         },
@@ -313,9 +330,13 @@ function handleSkillUse(index) {
         flashScreen: () => {}
     };
 
-    // 4. 執行技能
-    const skillFunc = SKILL_LIBRARY[skill.skillKey];
+    // --- 4. 執行技能 ---
+    // 檢查 data.js 裡面的 skillKey 是否真的存在於 SKILL_LIBRARY
+    const key = skill.skillKey;
+    const skillFunc = SKILL_LIBRARY[key];
     
+    console.log(`嘗試施放技能: ${skill.name}, Key: ${key}`);
+
     if (skillFunc) {
         // 重置 CD
         skill.currentCd = skill.maxCd;
@@ -324,19 +345,19 @@ function handleSkillUse(index) {
         const skillNameText = skill.title || skill.name;
         createFloatingText(p.x, p.y - 80, `${skillNameText}!`, "#f1c40f");
         
-        // 執行！
         try {
-            skillFunc(playerWrapper, targetWrapper, skill.skillParams || {}, context);
+            // 執行技能函式
+            skillFunc(playerProxy, targetProxy, skill.skillParams || {}, context);
         } catch (e) {
-            console.error("Skill execution failed:", e);
+            console.error("技能執行錯誤:", e);
         }
 
-        // 更新 UI
+        // 更新 UI 狀態
         const btn = document.querySelectorAll('.adv-skill-slot')[index];
         if (btn) btn.classList.remove('ready');
         
     } else {
-        console.warn("Skill not found in library:", skill.skillKey);
+        console.warn(`❌ 找不到技能 Key: ${key}。請檢查 data.js 設定。`);
         createFloatingText(p.x, p.y - 80, "技能未實裝", "#ccc");
     }
 }
@@ -344,6 +365,9 @@ function handleSkillUse(index) {
 export function updatePlayerStats(stats, weaponData) {
     gameState.player.maxHp = stats.hp || 1000;
     gameState.player.hp = stats.hp || 1000;
+    
+    // 重置 Buff
+    gameState.player.atkMult = 1.0; 
     
     if (weaponData) {
         if (typeof weaponData === 'string') {
@@ -514,6 +538,8 @@ export function startAdventure() {
     gameState.player.y = playableTop + (canvas.height - playableTop) / 2;
     gameState.player.hp = gameState.player.maxHp;
     gameState.player.target = null; 
+    // 重置 Buff
+    gameState.player.atkMult = 1.0;
     
     gameState.level = 1;
     gameState.wave = 1;
@@ -767,7 +793,9 @@ function performPlayerAttack(target) {
         gameState.enemies.forEach(e => {
             const d = Math.hypot(e.x - p.x, e.y - p.y);
             const dirToEnemy = e.x > p.x ? 1 : -1;
-            if (d < 80 && dirToEnemy === p.direction) damageEnemy(e, w.atk);
+            // 攻擊力計算加入倍率
+            const dmg = (w.atk + (p.stats?.atk||0)) * (p.atkMult || 1.0);
+            if (d < 80 && dirToEnemy === p.direction) damageEnemy(e, dmg);
         });
     }
 }
