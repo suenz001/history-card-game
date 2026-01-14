@@ -1,6 +1,8 @@
 // js/adventure.js
 import { playSound } from './audio.js';
 import { initJoystick } from './joystick.js';
+// 🔥 1. 引入技能庫
+import { SKILL_LIBRARY } from './skills.js';
 
 let db = null;
 let currentUser = null;
@@ -27,7 +29,6 @@ const gameState = {
     gameTime: 0,
     bgElements: { clouds: [], mountains: [], trees: [], groundDetails: [] },
     
-    // 關卡與波數狀態
     level: 1,
     wave: 1,
     maxWaves: 3,
@@ -35,7 +36,6 @@ const gameState = {
     isPortalOpen: false,
     portal: { x: 0, y: 0, radius: 40, angle: 0 },
     
-    // 技能欄狀態 (包含冷卻資訊)
     skills: [] 
 };
 
@@ -67,7 +67,6 @@ export function initAdventure(database, user) {
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
     
-    // 禁止雙擊縮放
     document.addEventListener('dblclick', function(event) {
         event.preventDefault();
     }, { passive: false });
@@ -79,34 +78,26 @@ export function updateAdventureContext(user) {
     currentUser = user;
 }
 
-// 接收來自整裝畫面的技能卡片資料 (🔥 修改重點：初始化冷卻時間)
 export function setAdventureSkills(cards) {
-    // 將純卡片資料轉換為帶有 CD 狀態的物件
     gameState.skills = cards.map(card => {
         if (!card) return null;
-
-        // --- 🔥 冷卻時間計算公式 ---
-        // 基礎 10 秒 (600 frames)
-        // 每 1 星減少 1 秒 (60 frames)
-        // 最低冷卻時間限制為 3 秒 (180 frames)，避免過強
         const baseSeconds = 10;
         const reductionPerStar = 1; 
         const stars = card.stars || 0;
         
         const finalSeconds = Math.max(3, baseSeconds - (stars * reductionPerStar));
-        const maxCdFrames = finalSeconds * 60; // 假設 60 FPS
+        const maxCdFrames = finalSeconds * 60; 
 
         return {
             ...card,
             maxCd: maxCdFrames,
-            currentCd: 0 // 初始為 0，可以直接使用
+            currentCd: 0 
         };
     });
 
     renderSkillBar();
 }
 
-// 渲染技能欄 (🔥 修改重點：加入冷卻遮罩 ID 與點擊邏輯)
 function renderSkillBar() {
     const container = document.getElementById('adv-skill-bar-container');
     if (!container) return;
@@ -119,23 +110,20 @@ function renderSkillBar() {
 
     gameState.skills.forEach((skill, index) => {
         const skillBtn = document.createElement('div');
-        skillBtn.className = 'adv-skill-slot'; // 使用 style.css 定義的 class
-        // 這裡不需要再寫 inline style，因為 style.css 已經定義了 .adv-skill-slot
+        skillBtn.className = 'adv-skill-slot'; 
 
         if (skill) {
              const img = document.createElement('img');
              img.src = `assets/cards/${skill.id}.webp`;
-             img.className = 'adv-skill-img'; // 使用 CSS class
-             img.style.objectPosition = 'top'; // 讓頭像靠上
+             img.className = 'adv-skill-img'; 
+             img.style.objectPosition = 'top'; 
              img.onerror = () => { img.src = 'https://placehold.co/50x50?text=?'; };
              skillBtn.appendChild(img);
              
-             // 稀有度邊框顏色
              if(skill.rarity === 'SSR') skillBtn.style.borderColor = '#f1c40f';
              else if(skill.rarity === 'SR') skillBtn.style.borderColor = '#9b59b6';
              else if(skill.rarity === 'R') skillBtn.style.borderColor = '#3498db';
 
-             // 按鍵提示 (1, 2, 3...)
              const keyHint = document.createElement('span');
              keyHint.innerText = index + 1;
              keyHint.style.cssText = `
@@ -145,15 +133,13 @@ function renderSkillBar() {
              `;
              skillBtn.appendChild(keyHint);
 
-             // 🔥 冷卻遮罩 (初始高度 0%)
              const cooldownOverlay = document.createElement('div');
              cooldownOverlay.id = `skill-cd-${index}`;
              cooldownOverlay.className = 'adv-skill-cooldown';
              cooldownOverlay.style.height = '0%'; 
-             cooldownOverlay.innerHTML = ''; // 可以放倒數秒數，目前先留空
+             cooldownOverlay.innerHTML = ''; 
              skillBtn.appendChild(cooldownOverlay);
 
-             // 點擊事件
              skillBtn.addEventListener('mousedown', () => {
                  if (skill.currentCd <= 0) {
                      skillBtn.style.transform = 'scale(0.9)';
@@ -164,19 +150,16 @@ function renderSkillBar() {
                  skillBtn.style.transform = 'scale(1)';
              });
              
-             // 觸發技能
              skillBtn.addEventListener('click', (e) => {
-                 e.stopPropagation(); // 防止點擊穿透
+                 e.stopPropagation(); 
                  handleSkillUse(index); 
              });
 
-             // 增加 "ready" 樣式提示
              if (skill.currentCd <= 0) {
                  skillBtn.classList.add('ready');
              }
 
         } else {
-            // 空格子
             skillBtn.innerText = "+";
             skillBtn.style.color = "#555";
             skillBtn.style.display = "flex";
@@ -190,44 +173,172 @@ function renderSkillBar() {
     });
 }
 
-// 🔥 新增：處理技能使用邏輯
+// 🔥 修改：技能使用邏輯 (Adapter 核心)
 function handleSkillUse(index) {
     const skill = gameState.skills[index];
     if (!skill) return;
 
-    // 檢查冷卻
     if (skill.currentCd > 0) {
         createFloatingText(gameState.player.x, gameState.player.y - 80, "冷卻中...", "#ccc");
         return;
     }
 
-    // --- 這裡執行技能邏輯 ---
-    // 目前冒險模式尚未實裝複雜技能效果，先以特效和文字代替
-    // 未來可以在這裡呼叫 skills.js 的邏輯 (需傳入 adventure context)
-    
-    // 1. 重置冷卻時間
-    skill.currentCd = skill.maxCd;
-    
-    // 2. 播放音效與特效
-    playSound('magic'); // 假設有這個音效
-    createFloatingText(gameState.player.x, gameState.player.y - 80, `${skill.name}!`, "#f1c40f");
-    
-    // 3. 簡單的範圍傷害 (暫時邏輯)
     const p = gameState.player;
-    spawnVfx(p.x, p.y, 'explosion', 1);
     
-    gameState.enemies.forEach(e => {
-        const dist = Math.hypot(e.x - p.x, e.y - p.y);
-        if (dist < 200) { // 半徑 200 範圍
-            const dmg = (p.weapon.atk * 2) + (skill.atk || 0);
-            damageEnemy(e, dmg);
-            spawnVfx(e.x, e.y, 'hit', 1);
-        }
-    });
+    // 1. 決定目標 (Targeting Strategy)
+    // 如果是 BUFF 類，目標是自己；如果是攻擊類，目標是鎖定的敵人或最近敵人
+    // 簡單判斷：看 skillKey 是否包含 "BUFF" 或 "HEAL" (除了對敵吸血)
+    let target = p.target;
+    
+    const isBuffOrHeal = (skill.skillKey || "").includes("BUFF") || 
+                         ((skill.skillKey || "").includes("HEAL") && !(skill.skillKey || "").includes("STRIKE"));
 
-    // 4. 更新 UI 狀態 (移除 ready 高亮)
-    const btn = document.querySelectorAll('.adv-skill-slot')[index];
-    if (btn) btn.classList.remove('ready');
+    if (isBuffOrHeal) {
+        target = p; // 對自己施放
+    } else if (!target) {
+        // 沒有鎖定目標，找最近的
+        let nearest = null;
+        let minDist = Infinity;
+        gameState.enemies.forEach(e => {
+            const dist = Math.hypot(e.x - p.x, e.y - p.y);
+            if (dist < minDist && dist < 600) {
+                minDist = dist;
+                nearest = e;
+            }
+        });
+        target = nearest;
+    }
+
+    // 如果是攻擊技能且沒目標，往前發射或空放
+    // 為了適配 skills.js，我們造一個假目標在前方
+    if (!isBuffOrHeal && !target) {
+        target = { 
+            x: p.x + (p.direction * 200), 
+            y: p.y, 
+            isDummy: true // 標記為假目標
+        };
+    }
+
+    // 2. 建立適配器物件 (Wrappers)
+    // skills.js 預期物件有 .el (DOM)，這裡我們用 Proxy 或 Fake Object 騙過它
+    // 並保留 .realRef 指向真正的遊戲物件，以便在 callback 中扣血
+    const playerWrapper = {
+        ...p,
+        realRef: p,
+        el: {}, // 假 DOM
+        position: p.x, // skills.js 用於特效定位
+        y: p.y,
+        atk: p.weapon.atk + (p.stats?.atk || 0), // 總攻擊力
+        maxHp: p.maxHp,
+        hp: p.hp
+    };
+
+    const targetWrapper = {
+        ...target,
+        realRef: target.isDummy ? null : target,
+        el: {},
+        position: target.x,
+        y: target.y,
+        hp: target.hp || 100,
+        maxHp: target.maxHp || 100
+    };
+
+    // 3. 建立執行環境 Context (Adapter Functions)
+    const context = {
+        dealDamage: (source, targetObj, mult) => {
+            // 解析目標：如果是 wrapper，取 realRef
+            const realTarget = targetObj.realRef || targetObj;
+            
+            // 傷害計算
+            const baseAtk = source.atk || 50; 
+            const finalDmg = Math.floor(baseAtk * (mult || 1));
+
+            // 處理群體傷害 (skills.js 有時會傳特殊標記，或者我們在這裡判斷 AOE)
+            // 這裡簡化：如果是特定技能造成的傷害，直接調用 damageEnemy
+            if (realTarget && !realTarget.isDummy && gameState.enemies.includes(realTarget)) {
+                damageEnemy(realTarget, finalDmg);
+                spawnVfx(realTarget.x, realTarget.y, 'hit', 1);
+            }
+        },
+        healTarget: (source, targetObj, amount) => {
+            const realTarget = targetObj.realRef || targetObj;
+            if (realTarget === gameState.player) {
+                realTarget.hp = Math.min(realTarget.maxHp, realTarget.hp + amount);
+                createFloatingText(realTarget.x, realTarget.y - 60, `+${Math.floor(amount)}`, "#2ecc71");
+            }
+        },
+        createVfx: (x, y, type) => {
+            // skills.js 可能傳入 element position，這裡我們直接用座標
+            // 如果傳入的是物件，嘗試取 x, y
+            let posX = x;
+            let posY = y;
+            if (typeof x === 'object') { posX = x.position || x.x; } // 容錯
+            
+            spawnVfx(posX, posY, type, p.direction);
+        },
+        fireProjectile: (startEl, endEl, type, onHitCallback) => {
+            // 忽略 startEl, endEl (因為那是 DOM)
+            // 直接使用當前的 player 和 targetWrapper
+            
+            // 計算角度
+            const angle = Math.atan2(targetWrapper.y - playerWrapper.y, targetWrapper.x - playerWrapper.x);
+            
+            // 發射！並傳入 callback
+            spawnProjectile(
+                playerWrapper.x, 
+                playerWrapper.y - 30, 
+                angle, 
+                12, // 速度
+                'player', 
+                0, // 傷害由 callback 處理 (dealDamage)
+                '#f1c40f', 
+                type === 'skill' ? 'orb' : 'arrow',
+                (projectile, hitEnemy) => {
+                    // 當命中時，執行 skills.js 定義的 callback
+                    // 我們需要把 hitEnemy 包裝成 wrapper 傳回去給 dealDamage
+                    const hitWrapper = {
+                        ...hitEnemy,
+                        realRef: hitEnemy,
+                        el: {},
+                        position: hitEnemy.x,
+                        y: hitEnemy.y
+                    };
+                    if (onHitCallback) onHitCallback(playerWrapper, hitWrapper); 
+                }
+            );
+        },
+        // 視覺效果適配 (暫時留空或簡單實作)
+        showDamageText: () => {}, 
+        shakeScreen: () => {}, 
+        flashScreen: () => {}
+    };
+
+    // 4. 執行技能
+    const skillFunc = SKILL_LIBRARY[skill.skillKey];
+    
+    if (skillFunc) {
+        // 重置 CD
+        skill.currentCd = skill.maxCd;
+        
+        // 播放施法特效
+        const skillNameText = skill.title || skill.name;
+        createFloatingText(p.x, p.y - 80, `${skillNameText}!`, "#f1c40f");
+        
+        // 執行！
+        try {
+            skillFunc(playerWrapper, targetWrapper, skill.skillParams || {}, context);
+        } catch (e) {
+            console.error("Skill execution failed:", e);
+        }
+
+        // 更新 UI
+        const btn = document.querySelectorAll('.adv-skill-slot')[index];
+        if (btn) btn.classList.remove('ready');
+        
+    } else {
+        console.warn("Skill not found in library:", skill.skillKey);
+        createFloatingText(p.x, p.y - 80, "技能未實裝", "#ccc");
+    }
 }
 
 export function updatePlayerStats(stats, weaponData) {
@@ -466,7 +577,7 @@ function update() {
         gameState.portal.x -= dx;
     }
 
-    // 3. 🔥 更新技能冷卻時間
+    // 3. 更新技能冷卻時間
     updateSkillCooldowns();
 
     updateGameLogic();
@@ -488,7 +599,6 @@ function update() {
     }
 }
 
-// 🔥 新增：技能冷卻更新邏輯
 function updateSkillCooldowns() {
     gameState.skills.forEach((skill, index) => {
         if (!skill) return;
@@ -496,23 +606,19 @@ function updateSkillCooldowns() {
         if (skill.currentCd > 0) {
             skill.currentCd--;
             
-            // 更新 UI 遮罩高度
             const overlay = document.getElementById(`skill-cd-${index}`);
             if (overlay) {
                 const percent = (skill.currentCd / skill.maxCd) * 100;
                 overlay.style.height = `${percent}%`;
                 
-                // 顯示倒數秒數 (可選)
                 const secondsLeft = Math.ceil(skill.currentCd / 60);
                 overlay.innerText = secondsLeft > 0 ? secondsLeft : '';
             }
         } else {
-            // 冷卻結束，確保 UI 歸零
             const overlay = document.getElementById(`skill-cd-${index}`);
             if (overlay && overlay.style.height !== '0%') {
                 overlay.style.height = '0%';
                 overlay.innerText = '';
-                // 增加發光提示
                 const slot = overlay.parentElement;
                 if (slot) slot.classList.add('ready');
             }
@@ -853,18 +959,29 @@ function explodeProjectile(p) {
     });
 }
 
+// 🔥 修改：處理 onHitCallback
 function updateProjectiles() {
     for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
         const p = gameState.projectiles[i];
         p.x += p.vx; p.y += p.vy; p.life--;
         let hit = false;
+        
         if (p.owner === 'player') {
             for (let e of gameState.enemies) {
                 const dist = Math.hypot(p.x - e.x, p.y - e.y);
                 if (dist < e.radius + 10) {
                     hit = true;
-                    if (p.type === 'orb') explodeProjectile(p);
-                    else { damageEnemy(e, p.dmg); spawnVfx(p.x, p.y, 'hit', 1); }
+                    // 如果有 Callback (技能觸發的)，執行 Callback
+                    if (p.onHitCallback) {
+                        p.onHitCallback(p, e);
+                    } else {
+                        // 一般普攻邏輯
+                        if (p.type === 'orb') explodeProjectile(p);
+                        else { 
+                            damageEnemy(e, p.dmg); 
+                            spawnVfx(p.x, p.y, 'hit', 1); 
+                        }
+                    }
                     break; 
                 }
             }
@@ -921,11 +1038,20 @@ function drawProjectiles() {
     });
 }
 
-function spawnProjectile(x, y, angle, speed, owner, dmg, color, type) {
-    gameState.projectiles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, angle, speed, owner, dmg, color, type, life: 60 });
+// 🔥 修改：支援 onHitCallback
+function spawnProjectile(x, y, angle, speed, owner, dmg, color, type, onHitCallback = null) {
+    gameState.projectiles.push({ 
+        x, y, 
+        vx: Math.cos(angle) * speed, 
+        vy: Math.sin(angle) * speed, 
+        angle, speed, owner, dmg, color, type, 
+        life: 60,
+        onHitCallback // 新增回調
+    });
 }
 
 function damageEnemy(e, dmg) {
+    if (!e || e.hp <= 0) return;
     e.hp -= dmg; e.hitFlash = 5;
     createFloatingText(e.x, e.y - 50, `-${Math.floor(dmg)}`, '#fff');
     const pushDir = e.x > gameState.player.x ? 1 : -1; e.x += pushDir * 5; 
