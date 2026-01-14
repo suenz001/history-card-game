@@ -1,7 +1,7 @@
 // js/adventure.js
 import { playSound } from './audio.js';
 import { initJoystick } from './joystick.js';
-// 🔥 1. 引入技能庫
+// 🔥 1. 引入技能庫，讓技能邏輯可以被呼叫
 import { SKILL_LIBRARY } from './skills.js';
 
 let db = null;
@@ -17,9 +17,10 @@ const gameState = {
         hp: 1000, maxHp: 1000, 
         speed: 4, direction: 1, 
         width: 60, height: 60, 
-        // 🔥 新增 atkMult 用於處理 Buff 技能
-        atkMult: 1.0,
-        defMult: 1.0,
+        // 🔥 新增屬性增強狀態
+        atkMult: 1.0,      // 攻擊倍率 (預設 1.0)
+        defMult: 1.0,      // 防禦倍率
+        isInvincible: false, // 無敵狀態 (預設 false)
         weapon: { type: 'sword', range: 100, atkSpeed: 40, atk: 50 }, 
         attackCooldown: 0,
         target: null 
@@ -32,6 +33,7 @@ const gameState = {
     gameTime: 0,
     bgElements: { clouds: [], mountains: [], trees: [], groundDetails: [] },
     
+    // 關卡與波數狀態
     level: 1,
     wave: 1,
     maxWaves: 3,
@@ -39,6 +41,7 @@ const gameState = {
     isPortalOpen: false,
     portal: { x: 0, y: 0, radius: 40, angle: 0 },
     
+    // 技能欄狀態
     skills: [] 
 };
 
@@ -70,6 +73,7 @@ export function initAdventure(database, user) {
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
     
+    // 禁止雙擊縮放
     document.addEventListener('dblclick', function(event) {
         event.preventDefault();
     }, { passive: false });
@@ -81,15 +85,18 @@ export function updateAdventureContext(user) {
     currentUser = user;
 }
 
+// 接收來自整裝畫面的技能卡片資料
 export function setAdventureSkills(cards) {
     gameState.skills = cards.map(card => {
         if (!card) return null;
+
+        // --- 冷卻時間計算公式 ---
         const baseSeconds = 10;
         const reductionPerStar = 1; 
         const stars = card.stars || 0;
         
         const finalSeconds = Math.max(3, baseSeconds - (stars * reductionPerStar));
-        const maxCdFrames = finalSeconds * 60; 
+        const maxCdFrames = finalSeconds * 60; // 假設 60 FPS
 
         return {
             ...card,
@@ -101,6 +108,7 @@ export function setAdventureSkills(cards) {
     renderSkillBar();
 }
 
+// 渲染技能欄
 function renderSkillBar() {
     const container = document.getElementById('adv-skill-bar-container');
     if (!container) return;
@@ -181,6 +189,7 @@ function handleSkillUse(index) {
     const skill = gameState.skills[index];
     if (!skill) return;
 
+    // 檢查冷卻
     if (skill.currentCd > 0) {
         createFloatingText(gameState.player.x, gameState.player.y - 80, "冷卻中...", "#ccc");
         return;
@@ -189,10 +198,10 @@ function handleSkillUse(index) {
     const p = gameState.player;
     
     // --- 1. 決定目標 (Targeting Strategy) ---
-    // 判斷是否為自我施法 (Buff/Heal)
-    // 透過 skillKey 簡單判斷，或者預設如果沒目標就對自己放 (針對非攻擊技)
+    // 判斷是否為自我施法 (Buff/Heal/Invincible)
     const isBuffOrHeal = (skill.skillKey || "").includes("BUFF") || 
-                         ((skill.skillKey || "").includes("HEAL") && !(skill.skillKey || "").includes("STRIKE"));
+                         ((skill.skillKey || "").includes("HEAL") && !(skill.skillKey || "").includes("STRIKE")) ||
+                         (skill.skillKey || "").includes("INVINCIBLE"); 
 
     let target = p.target;
 
@@ -204,7 +213,7 @@ function handleSkillUse(index) {
         let minDist = Infinity;
         gameState.enemies.forEach(e => {
             const dist = Math.hypot(e.x - p.x, e.y - p.y);
-            if (dist < minDist && dist < 600) { // 搜尋範圍 600
+            if (dist < minDist && dist < 600) { 
                 minDist = dist;
                 nearest = e;
             }
@@ -223,47 +232,65 @@ function handleSkillUse(index) {
     }
 
     // --- 2. 建立適配器物件 (Proxies) ---
-    // 這一步最重要！因為 skills.js 可能會直接修改 hero.atk
-    // 我們需要攔截這個修改，並應用到 gameState.player.atkMult 上
+    // 這一步最重要！我們攔截屬性修改，轉為冒險模式的邏輯
 
     const playerProxy = new Proxy(p, {
         get: function(obj, prop) {
-            // 當技能庫讀取 'atk' 時，計算總攻擊力
+            // 讓技能庫讀取到計算過後的攻擊力
             if (prop === 'atk') {
                 const base = obj.weapon.atk + (obj.stats?.atk || 0);
                 return base * (obj.atkMult || 1.0);
             }
-            // 讀取 DOM 元素 (避免報錯)
+            // 讀取 DOM 屬性 (避免報錯)
             if (prop === 'el') return {}; 
             if (prop === 'position') return { x: obj.x, y: obj.y };
-            
             return obj[prop];
         },
         set: function(obj, prop, value) {
-            // 當技能庫試圖修改 'atk' 時 (例如 Buff)，我們反推倍率
-            if (prop === 'atk') {
-                const currentAtk = (obj.weapon.atk + (obj.stats?.atk || 0)) * (obj.atkMult || 1.0);
-                if (currentAtk > 0) {
-                    // 計算新的倍率：新數值 / 舊數值
-                    // 例如原本 100，技能改成 150，那倍率就要乘 1.5
-                    const ratio = value / currentAtk;
-                    obj.atkMult = (obj.atkMult || 1.0) * ratio;
-                    createFloatingText(obj.x, obj.y - 100, "ATK UP!", "#f1c40f");
+            // 🔥 攔截無敵狀態設定
+            if (prop === 'isInvincible') {
+                obj.isInvincible = value;
+                if (value) {
+                    createFloatingText(obj.x, obj.y - 120, "INVINCIBLE!", "#f1c40f");
+                    spawnVfx(obj.x, obj.y, 'buff-shield', 1);
+                    
+                    // 確保無敵一定時間後會消失 (防呆機制)
+                    setTimeout(() => { obj.isInvincible = false; }, 5000);
                 }
                 return true;
             }
-            // 其他屬性直接寫入
+
+            // 🔥 攔截攻擊力設定 (Buff)
+            if (prop === 'atk') {
+                // 我們反推倍率：新數值 / 舊數值
+                const currentAtk = (obj.weapon.atk + (obj.stats?.atk || 0)) * (obj.atkMult || 1.0);
+                if (currentAtk > 0 && value > currentAtk) {
+                    const ratio = value / currentAtk;
+                    obj.atkMult = (obj.atkMult || 1.0) * ratio;
+                    createFloatingText(obj.x, obj.y - 100, "ATK UP!", "#e74c3c");
+                    spawnVfx(obj.x, obj.y, 'buff-atk', 1);
+                }
+                return true;
+            }
+            
+            // 直接寫入 atkMult (如果有技能這麼做)
+            if (prop === 'atkMult') {
+                obj.atkMult = value;
+                createFloatingText(obj.x, obj.y - 100, "POWER UP!", "#e74c3c");
+                return true;
+            }
+
             obj[prop] = value;
             return true;
         }
     });
 
-    // 目標也需要包裝，主要是為了處理 DOM 引用
+    // 目標也需要包裝
     const targetProxy = {
         ...target,
         realRef: target.isDummy ? null : target,
         el: {}, // 假 DOM
-        position: target.x, // skills.js 用於特效定位
+        position: target.x, 
         y: target.y,
         x: target.x,
         hp: target.hp || 100,
@@ -276,67 +303,58 @@ function handleSkillUse(index) {
             const realTarget = targetObj.realRef || targetObj;
             
             // 計算傷害：使用來源的當前攻擊力 (含 Buff)
-            const sourceAtk = source.atk || 50; 
-            const finalDmg = Math.floor(sourceAtk * (mult || 1));
+            const sourceAtk = (source.weapon?.atk || 50) + (source.stats?.atk || 0);
+            const buffedAtk = sourceAtk * (source.atkMult || 1.0); // 🔥 使用倍率
+            
+            const finalDmg = Math.floor(buffedAtk * (mult || 1));
 
             if (realTarget && !realTarget.isDummy && gameState.enemies.includes(realTarget)) {
                 damageEnemy(realTarget, finalDmg);
-                // 額外特效
                 spawnVfx(realTarget.x, realTarget.y, 'hit', 1);
             }
         },
         healTarget: (source, targetObj, amount) => {
-            // 如果目標是玩家 Proxy，取出原始物件
             let realTarget = targetObj.realRef || targetObj;
-            if (targetObj === playerProxy) realTarget = p; // 特殊處理
+            if (targetObj === playerProxy) realTarget = p; 
 
             if (realTarget === gameState.player) {
                 realTarget.hp = Math.min(realTarget.maxHp, realTarget.hp + amount);
                 createFloatingText(realTarget.x, realTarget.y - 60, `+${Math.floor(amount)}`, "#2ecc71");
+                spawnVfx(realTarget.x, realTarget.y, 'buff-heal', 1);
             }
         },
+        addBuff: (targetObj, type, value, duration) => {
+            // 這裡可以處理更複雜的 Buff 邏輯，目前先 log
+            console.log(`Buff applied: ${type}`);
+        },
         createVfx: (x, y, type) => {
-            // 容錯處理：如果傳入的是物件，嘗試取座標
             let posX = x;
             let posY = y;
             if (typeof x === 'object') { posX = x.x || p.x; posY = x.y || p.y; }
-            
             spawnVfx(posX, posY, type, p.direction);
         },
         fireProjectile: (startEl, endEl, type, onHitCallback) => {
-            // 忽略 DOM 元素，使用當前座標
             const startX = p.x;
             const startY = p.y - 30;
             const targetX = targetProxy.x;
             const targetY = targetProxy.y;
-
             const angle = Math.atan2(targetY - startY, targetX - startX);
             
-            spawnProjectile(
-                startX, startY, angle, 12, 'player', 0, 
-                '#f1c40f', type === 'skill' ? 'orb' : 'arrow',
+            spawnProjectile(startX, startY, angle, 12, 'player', 0, '#f1c40f', type === 'skill' ? 'orb' : 'arrow',
                 (projectile, hitEnemy) => {
-                    // 命中後的回調
-                    if (onHitCallback) {
-                        // 將命中的敵人包裝成簡單物件傳回
-                        onHitCallback(playerProxy, hitEnemy); 
-                    }
+                    if (onHitCallback) onHitCallback(playerProxy, hitEnemy); 
                 }
             );
         },
-        // 視覺效果適配 (暫時留空或簡單實作)
         showDamageText: () => {}, 
         shakeScreen: () => {}, 
         flashScreen: () => {}
     };
 
     // --- 4. 執行技能 ---
-    // 檢查 data.js 裡面的 skillKey 是否真的存在於 SKILL_LIBRARY
     const key = skill.skillKey;
     const skillFunc = SKILL_LIBRARY[key];
     
-    console.log(`嘗試施放技能: ${skill.name}, Key: ${key}`);
-
     if (skillFunc) {
         // 重置 CD
         skill.currentCd = skill.maxCd;
@@ -346,18 +364,15 @@ function handleSkillUse(index) {
         createFloatingText(p.x, p.y - 80, `${skillNameText}!`, "#f1c40f");
         
         try {
-            // 執行技能函式
             skillFunc(playerProxy, targetProxy, skill.skillParams || {}, context);
         } catch (e) {
             console.error("技能執行錯誤:", e);
         }
 
-        // 更新 UI 狀態
         const btn = document.querySelectorAll('.adv-skill-slot')[index];
         if (btn) btn.classList.remove('ready');
         
     } else {
-        console.warn(`❌ 找不到技能 Key: ${key}。請檢查 data.js 設定。`);
         createFloatingText(p.x, p.y - 80, "技能未實裝", "#ccc");
     }
 }
@@ -366,8 +381,9 @@ export function updatePlayerStats(stats, weaponData) {
     gameState.player.maxHp = stats.hp || 1000;
     gameState.player.hp = stats.hp || 1000;
     
-    // 重置 Buff
+    // 重置狀態
     gameState.player.atkMult = 1.0; 
+    gameState.player.isInvincible = false;
     
     if (weaponData) {
         if (typeof weaponData === 'string') {
@@ -456,7 +472,6 @@ function createTargetSwitchButton() {
         e.preventDefault();
         e.stopPropagation();
         
-        console.log("切換按鈕被按下"); 
         const found = switchTarget(); 
         
         btn.style.transform = 'scale(0.8)';
@@ -538,8 +553,8 @@ export function startAdventure() {
     gameState.player.y = playableTop + (canvas.height - playableTop) / 2;
     gameState.player.hp = gameState.player.maxHp;
     gameState.player.target = null; 
-    // 重置 Buff
-    gameState.player.atkMult = 1.0;
+    gameState.player.atkMult = 1.0; 
+    gameState.player.isInvincible = false;
     
     gameState.level = 1;
     gameState.wave = 1;
@@ -603,9 +618,8 @@ function update() {
         gameState.portal.x -= dx;
     }
 
-    // 3. 更新技能冷卻時間
+    // 3. 更新邏輯
     updateSkillCooldowns();
-
     updateGameLogic();
     updateAutoAttack();
     updateEnemies();
@@ -779,13 +793,16 @@ function performPlayerAttack(target) {
     p.attackCooldown = w.atkSpeed;
     const angle = Math.atan2(target.y - p.y, target.x - p.x);
 
+    // 🔥 攻擊力計算加入倍率 (Buff)
+    const totalAtk = (w.atk + (p.stats?.atk || 0)) * (p.atkMult || 1.0);
+
     if (w.type === 'bow') {
         playSound('shoot'); 
-        spawnProjectile(p.x, p.y - 20, angle, 12, 'player', w.atk, '#f1c40f', 'arrow');
+        spawnProjectile(p.x, p.y - 20, angle, 12, 'player', totalAtk, '#f1c40f', 'arrow');
     } 
     else if (w.type === 'staff') {
         playSound('magic');
-        spawnProjectile(p.x, p.y - 30, angle, 7, 'player', w.atk, '#3498db', 'orb');
+        spawnProjectile(p.x, p.y - 30, angle, 7, 'player', totalAtk, '#3498db', 'orb');
     } 
     else {
         playSound('slash');
@@ -793,9 +810,7 @@ function performPlayerAttack(target) {
         gameState.enemies.forEach(e => {
             const d = Math.hypot(e.x - p.x, e.y - p.y);
             const dirToEnemy = e.x > p.x ? 1 : -1;
-            // 攻擊力計算加入倍率
-            const dmg = (w.atk + (p.stats?.atk||0)) * (p.atkMult || 1.0);
-            if (d < 80 && dirToEnemy === p.direction) damageEnemy(e, dmg);
+            if (d < 80 && dirToEnemy === p.direction) damageEnemy(e, totalAtk);
         });
     }
 }
@@ -924,6 +939,32 @@ function drawParallaxBackground() {
 function drawPlayer(p) {
     ctx.save();
     ctx.translate(p.x, p.y);
+    
+    // 🔥 繪製 Buff 特效 (人物腳下的紅色光環)
+    if (p.atkMult > 1.0) {
+        ctx.save();
+        ctx.scale(1, 0.4);
+        ctx.fillStyle = 'rgba(231, 76, 60, 0.3)';
+        ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.restore();
+    }
+    
+    // 🔥 繪製無敵護盾 (人物身上的金色護罩)
+    if (p.isInvincible) {
+        ctx.save();
+        ctx.strokeStyle = '#f1c40f';
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = 'gold';
+        ctx.beginPath();
+        ctx.arc(0, -30, 45, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(241, 196, 15, 0.2)';
+        ctx.fill();
+        ctx.restore();
+    }
+
     if (p.direction === -1) ctx.scale(-1, 1);
 
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -987,7 +1028,6 @@ function explodeProjectile(p) {
     });
 }
 
-// 🔥 修改：處理 onHitCallback
 function updateProjectiles() {
     for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
         const p = gameState.projectiles[i];
@@ -1016,8 +1056,13 @@ function updateProjectiles() {
         } else if (p.owner === 'enemy') {
             const dist = Math.hypot(p.x - gameState.player.x, p.y - gameState.player.y);
             if (dist < 30) {
-                gameState.player.hp -= p.dmg;
-                createFloatingText(gameState.player.x, gameState.player.y - 40, `-${p.dmg}`, 'red');
+                // 🔥 檢查無敵狀態
+                if (gameState.player.isInvincible) {
+                    createFloatingText(gameState.player.x, gameState.player.y - 60, "BLOCK", "#ccc");
+                } else {
+                    gameState.player.hp -= p.dmg;
+                    createFloatingText(gameState.player.x, gameState.player.y - 40, `-${p.dmg}`, 'red');
+                }
                 hit = true; playSound('hit');
             }
         }
@@ -1026,7 +1071,12 @@ function updateProjectiles() {
 }
 
 function spawnVfx(x, y, type, dir) {
-    gameState.vfx.push({ x, y, type, dir, life: type === 'explosion' ? 20 : 10, maxLife: type === 'explosion' ? 20 : 10 });
+    // 根據特效類型決定持續時間
+    let life = 10;
+    if (type === 'explosion') life = 20;
+    if (type.startsWith('buff-')) life = 30; // Buff 特效久一點
+
+    gameState.vfx.push({ x, y, type, dir, life: life, maxLife: life });
 }
 
 function updateVfx() {
@@ -1039,7 +1089,25 @@ function updateVfx() {
 function drawVfx() {
     gameState.vfx.forEach(v => {
         ctx.save(); ctx.translate(v.x, v.y);
-        if (v.type === 'slash') {
+        
+        // 🔥 繪製 Buff 特效
+        if (v.type === 'buff-shield') {
+            const scale = v.life / 10;
+            ctx.strokeStyle = 'gold'; ctx.lineWidth = 3; 
+            ctx.beginPath(); ctx.arc(0, -30, 40 * scale, 0, Math.PI*2); ctx.stroke();
+        } 
+        else if (v.type === 'buff-atk') {
+            const scale = v.life / 10;
+            ctx.fillStyle = 'rgba(231, 76, 60, 0.5)'; 
+            ctx.beginPath(); ctx.arc(0, 0, 30 * scale, 0, Math.PI*2); ctx.fill();
+        } 
+        else if (v.type === 'buff-heal') {
+            const scale = v.life / 10;
+            ctx.fillStyle = 'rgba(46, 204, 113, 0.5)'; 
+            ctx.beginPath(); ctx.arc(0, -20, 30 * scale, 0, Math.PI*2); ctx.fill();
+        }
+        // 原有特效
+        else if (v.type === 'slash') {
             if (v.dir === -1) ctx.scale(-1, 1);
             ctx.fillStyle = `rgba(255, 255, 255, ${v.life / 10})`;
             ctx.shadowBlur = 10; ctx.shadowColor = 'cyan';
@@ -1066,16 +1134,9 @@ function drawProjectiles() {
     });
 }
 
-// 🔥 修改：支援 onHitCallback
+// 支援 Callback
 function spawnProjectile(x, y, angle, speed, owner, dmg, color, type, onHitCallback = null) {
-    gameState.projectiles.push({ 
-        x, y, 
-        vx: Math.cos(angle) * speed, 
-        vy: Math.sin(angle) * speed, 
-        angle, speed, owner, dmg, color, type, 
-        life: 60,
-        onHitCallback // 新增回調
-    });
+    gameState.projectiles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, angle, speed, owner, dmg, color, type, life: 60, onHitCallback });
 }
 
 function damageEnemy(e, dmg) {
@@ -1105,7 +1166,15 @@ function updateEnemies() {
         if (e.attackCooldown > 0) e.attackCooldown--;
         if (e.type === 'melee' || e.type === 'boss') {
             if (dist > 60) { const angle = Math.atan2(dy, dx); e.x += Math.cos(angle) * e.speed; e.y += Math.sin(angle) * e.speed; } 
-            else if (e.attackCooldown <= 0) { p.hp -= 10; createFloatingText(p.x, p.y-40, "-10", "red"); e.attackCooldown = 60; }
+            else if (e.attackCooldown <= 0) { 
+                // 🔥 檢查無敵狀態
+                if (gameState.player.isInvincible) {
+                    createFloatingText(p.x, p.y-60, "BLOCK", "#ccc");
+                } else {
+                    p.hp -= 10; createFloatingText(p.x, p.y-40, "-10", "red"); 
+                }
+                e.attackCooldown = 60; 
+            }
         } else if (e.type === 'ranged') {
              if (dist > 300) { const angle = Math.atan2(dy, dx); e.x += Math.cos(angle) * e.speed; e.y += Math.sin(angle) * e.speed; } 
              else if (e.attackCooldown <= 0) { const angle = Math.atan2(dy, dx); spawnProjectile(e.x, e.y, angle, 5, 'enemy', 15, '#8e44ad', 'orb'); e.attackCooldown = 120; }
