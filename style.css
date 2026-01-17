@@ -2312,3 +2312,55 @@ body.no-scroll {
 #adv-target-btn {
     z-index: 20000 !important; /* 超高層級 */
 }
+
+/* --- 抽卡結果視窗優化 (Grid 版) --- */
+
+/* 1. 調整容器佈局 */
+.gacha-result-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    gap: 15px; /* 卡片間距 */
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 10px;
+    max-height: 70vh; /* 避免超出視窗 */
+    overflow-y: auto; /* 超出則捲動 */
+}
+
+/* 2. 抽卡結果的卡片樣式調整 (使用標準 .card 但微調) */
+.gacha-result-grid .card {
+    /* 這裡繼承了標準 .card 的樣式，所以大小會是 120x180 */
+    position: relative; /* 確保內部定位正常 */
+    transform-style: preserve-3d;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.gacha-result-grid .card:hover {
+    transform: translateY(-5px) scale(1.05);
+    z-index: 10;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+}
+
+/* 3. 確保詳情視窗永遠在抽卡結果之上 */
+#detail-modal {
+    z-index: 99999 !important; /* 強制最高 */
+}
+
+#gacha-reveal-modal {
+    z-index: 2000 !important; /* 比一般彈窗高，但比詳情低 */
+}
+
+/* 4. 手機版適配 */
+@media (max-width: 600px) {
+    .gacha-result-grid {
+        gap: 8px; /* 手機上間距縮小 */
+    }
+    .gacha-result-grid .card {
+        width: 90px;  /* 稍微縮小以容納更多 */
+        height: 135px;
+    }
+}

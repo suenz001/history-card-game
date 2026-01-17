@@ -28,42 +28,6 @@ import { initAdventure, updateAdventureContext, startAdventure } from './js/adve
 import { initPrepScreen, openPrepScreen, updatePrepData, updatePrepUser, setAdventureCardSlot } from './js/prep.js';
 import { generateItemInstance } from './js/items.js';
 
-function updateLatestCardsUI() {
-    const container = document.getElementById('card-display-area');
-    if (!container) return;
-    const allCards = Inventory.getAllCards();
-    if (allCards.length === 0) {
-        container.innerHTML = '<p style="color:#7f8c8d; width:100%; text-align:center;">尚無卡片，快去召喚吧！</p>';
-        return;
-    }
-    const sortedCards = [...allCards].sort((a, b) => {
-        const getTime = (t) => {
-            if (!t) return 0;
-            if (t.seconds) return t.seconds; 
-            if (typeof t.getTime === 'function') return t.getTime() / 1000;
-            return 0;
-        };
-        return getTime(b.obtainedAt) - getTime(a.obtainedAt);
-    });
-    const latestCards = sortedCards.slice(0, 10);
-    container.innerHTML = "";
-    latestCards.forEach(card => {
-        const cardDiv = document.createElement('div');
-        const charPath = `assets/cards/${card.id}.webp`;
-        const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
-        cardDiv.className = `card ${card.rarity}`;
-        cardDiv.style.cursor = "pointer";
-        cardDiv.onclick = () => { Inventory.openCardModal(card); };
-        cardDiv.innerHTML = `
-            <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
-            <img src="${charPath}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
-            <div class="card-info-overlay"><div class="card-name">${card.name}</div></div>
-            <img src="${framePath}" class="card-frame-img">
-        `;
-        container.appendChild(cardDiv);
-    });
-}
-
 window.onerror = function(msg, url, line) { console.error("Global Error:", msg); };
 
 const firebaseConfig = {
@@ -189,27 +153,14 @@ setTimeout(() => {
     const draw10Btn = document.getElementById('draw-10-btn');
     if (draw10Btn) draw10Btn.addEventListener('click', () => { playSound('click'); performGacha(10); });
     
-    const skipBtn = document.getElementById('gacha-skip-btn');
-    if (skipBtn) {
-        skipBtn.addEventListener('click', () => {
+    // 綁定抽卡結果頁面的關閉按鈕
+    const gachaCloseBtn = document.getElementById('gacha-close-btn');
+    if (gachaCloseBtn) {
+        gachaCloseBtn.addEventListener('click', () => {
              playSound('click');
-             const nextSSRIndex = gachaQueue.findIndex(c => c.rarity === 'SSR');
-             if (nextSSRIndex !== -1) {
-                 gachaQueue.splice(0, nextSSRIndex);
-                 showNextGachaCard(); 
-             } else {
-                 const container = document.getElementById('gacha-reveal-container');
-                 container.innerHTML = "";
-                 gachaQueue.forEach(card => createGachaCardElement(card, container));
-                 gachaQueue = []; 
-                 document.getElementById('gacha-next-hint').innerText = "點擊任意處關閉";
-                 document.getElementById('gacha-reveal-modal').onclick = () => {
-                     document.getElementById('gacha-reveal-modal').classList.add('hidden');
-                     document.getElementById('gacha-reveal-modal').onclick = null;
-                     Inventory.filterInventory('ALL'); 
-                     updateLatestCardsUI(); 
-                 };
-             }
+             document.getElementById('gacha-reveal-modal').classList.add('hidden');
+             // 關閉後重新載入背包，確保資料最新
+             Inventory.filterInventory('ALL');
         });
     }
 
@@ -732,7 +683,6 @@ async function loadUserData(user) {
 
     await Inventory.loadInventory(user.uid);
     updatePvpContext(currentUser, Inventory.getAllCards());
-    updateLatestCardsUI();
 }
 
 async function updateCurrencyCloud() { 
@@ -873,8 +823,10 @@ async function performGacha(times) {
             const savedCards = await Promise.all(promises);
             await updateCurrencyCloud(); 
             if(overlay) overlay.classList.add('hidden');
+            
+            // 🔥 直接顯示所有結果 (取消逐張翻開的動畫邏輯)
             showGachaReveal(savedCards);
-            updateLatestCardsUI();
+            
         } catch (e) {
             console.error("抽卡錯誤", e);
             alert("抽卡過程發生錯誤，請聯繫管理員");
@@ -883,60 +835,55 @@ async function performGacha(times) {
     }, 2500);
 }
 
+// 🔥 新增：一次顯示所有抽卡結果
 function showGachaReveal(cards) {
     const modal = document.getElementById('gacha-reveal-modal');
     const container = document.getElementById('gacha-reveal-container');
-    modal.classList.remove('hidden');
+    
+    // 清空舊的
     container.innerHTML = "";
-    gachaQueue = [...cards];
-    gachaIndex = 0;
-    showNextGachaCard();
-    modal.onclick = (e) => {
-        if (e.target.id === 'gacha-skip-btn') return;
-        if (gachaQueue.length > 0) {
-            playSound('reveal');
-            showNextGachaCard();
-        } else {
-            modal.classList.add('hidden');
-            modal.onclick = null;
-            Inventory.filterInventory('ALL'); 
-            updateLatestCardsUI(); 
-        }
-    };
-}
-
-function showNextGachaCard() {
-    const card = gachaQueue.shift();
-    if (!card) return;
-    const container = document.getElementById('gacha-reveal-container');
-    container.innerHTML = ""; 
-    createGachaCardElement(card, container);
-    if (card.rarity === 'SSR') playSound('ssr');
-    else if (card.rarity === 'SR') playSound('reveal');
-    else playSound('draw');
-    if (gachaQueue.length === 0) document.getElementById('gacha-next-hint').innerText = "點擊任意處關閉";
-    else document.getElementById('gacha-next-hint').innerText = "點擊螢幕顯示下一張";
-}
-
-function createGachaCardElement(card, container) {
-    const cardDiv = document.createElement('div');
-    const charPath = `assets/cards/${card.id}.webp`;
-    const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
-    cardDiv.className = `large-card ${card.rarity} reveal-anim`; 
-    cardDiv.innerHTML = `
-        <div class="large-card-inner">
-            <div class="large-card-front ${card.rarity === 'SSR' ? 'ssr-effect' : ''}">
-                <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
-                <img src="${charPath}" class="card-img">
-                <div class="card-info-overlay">
-                    <div class="card-title">${card.title || ""}</div>
-                    <div class="card-name">${card.name}</div>
-                </div>
-                <img src="${framePath}" class="card-frame-img">
+    
+    // 生成所有卡片 (使用標準 Card 樣式，點擊可看詳情)
+    cards.forEach(card => {
+        // 這裡借用 inventory.js 的 renderCard 邏輯，但為了避免綁定背包專用事件，我們手動創建 HTML
+        // 並綁定 Inventory.openCardModal(card)
+        const cardDiv = document.createElement('div');
+        const charPath = `assets/cards/${card.id}.webp`;
+        const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
+        const level = 1;
+        const stars = 0;
+        
+        const baseConfig = cardDatabase.find(c => c.id == card.id);
+        const uType = baseConfig ? (baseConfig.unitType || 'INFANTRY') : 'INFANTRY';
+        let typeIcon = uType === 'CAVALRY' ? '🐴' : (uType === 'ARCHER' ? '🏹' : '⚔️');
+        
+        cardDiv.className = `card ${card.rarity} reveal-anim`; 
+        // 讓它看起來像剛翻開
+        cardDiv.style.animation = "popIn 0.5s ease-out";
+        
+        cardDiv.innerHTML = `
+            <div class="card-rarity-badge ${card.rarity}">${card.rarity}</div>
+            <img src="${charPath}" alt="${card.name}" class="card-img" onerror="this.src='https://placehold.co/120x180?text=No+Image'">
+            <div class="card-info-overlay">
+                <div class="card-title">${card.title || ""}</div>
+                <div class="card-name">${card.name}</div>
+                <div class="card-stats"><span class="type-icon">${typeIcon}</span> 👊${card.atk} ❤️${card.hp}</div>
             </div>
-        </div>
-    `;
-    container.appendChild(cardDiv);
+            <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
+        `;
+        
+        // 點擊事件：開啟詳情
+        cardDiv.addEventListener('click', () => {
+            playSound('click');
+            Inventory.openCardModal(card);
+        });
+        
+        container.appendChild(cardDiv);
+    });
+
+    // 顯示視窗
+    modal.classList.remove('hidden');
+    playSound('reveal');
 }
 
 if(document.getElementById('enter-battle-mode-btn')) document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {

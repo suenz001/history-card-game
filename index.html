@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>歷史英靈：策略對決</title>
     <meta name="google-site-verification" content="rUWOR0-82xcLnEEm-y9E4HnHyzsBxWXY9kK9DHXYD7Q" />
-    <link rel="stylesheet" href="style.css?v=131">
+    <link rel="stylesheet" href="style.css?v=132">
     <style>
         /* --- 建築升級進度條樣式 --- */
         .build-progress-bar {
@@ -216,9 +216,6 @@
                             <span style="font-size:0.7em; color:#ffeaa7;">(必得1張SR以上卡片)</span>
                         </button>
                     </div>
-
-                    <h3 style="margin-bottom:5px; color:#ccc;">最新獲得：</h3>
-                    <div id="card-display-area" class="card-container"></div>
                 </div>
 
                 <div class="leaderboard-area">
@@ -423,12 +420,17 @@
         </div>
     </div>
 
-    <div id="gacha-reveal-modal" class="modal hidden" style="background: rgba(0,0,0,0.98); z-index: 2000;">
-        <div style="position: absolute; top: 20px; right: 20px; z-index: 2005;">
-            <button id="gacha-skip-btn" class="btn-secondary" style="font-size: 1.2em; padding: 10px 20px; border: 2px solid white;">⏩ 跳過 (Skip)</button>
+    <div id="gacha-reveal-modal" class="modal hidden" style="background: rgba(0,0,0,0.98); z-index: 2000; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <h2 style="color: #f1c40f; margin-bottom: 20px; text-shadow: 0 0 10px #000;">🎉 召喚結果</h2>
+        <div id="gacha-reveal-container" class="gacha-result-grid"></div>
+        
+        <div style="margin-top: 30px; display:flex; gap: 20px;">
+            <div id="gacha-next-hint" style="color: #aaa; font-size: 0.9em;">(點擊卡片可查看詳情)</div>
         </div>
-        <div id="gacha-reveal-container" class="large-card-container"></div>
-        <div id="gacha-next-hint" style="margin-top: 30px; color: white; animation: blink 1s infinite;">點擊螢幕顯示下一張</div>
+        
+        <button id="gacha-close-btn" class="btn-primary" style="margin-top: 20px; font-size: 1.2em; padding: 10px 40px; border: 2px solid white; box-shadow: 0 0 15px #f1c40f;">
+            全部收下
+        </button>
     </div>
 
     <div id="gacha-overlay" class="hidden">
