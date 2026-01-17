@@ -14,7 +14,7 @@ export function initJoystick(gameState) {
 
     // 開始觸控
     zone.addEventListener('touchstart', (e) => {
-        e.preventDefault();
+        // e.preventDefault(); // 🔥 修改：註解掉這行，允許瀏覽器處理點擊與捲動
         const touch = e.changedTouches[0];
         touchId = touch.identifier;
         baseRect = base.getBoundingClientRect();
@@ -24,7 +24,7 @@ export function initJoystick(gameState) {
 
     // 移動觸控
     zone.addEventListener('touchmove', (e) => {
-        e.preventDefault();
+        // e.preventDefault(); // 🔥 修改：註解掉這行，這是導致無法捲動的主因
         for (let i = 0; i < e.changedTouches.length; i++) {
             if (e.changedTouches[i].identifier === touchId) {
                 handleMove(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
