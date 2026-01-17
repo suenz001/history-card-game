@@ -2550,3 +2550,22 @@ body.no-scroll {
     overflow: visible !important;
     padding-bottom: 20px;
 }
+
+/* --- iOS 手機版 PVP 列表捲動修復 (請補在 style.css 最下面) --- */
+
+/* 強制針對 PVP 視窗開啟 iOS 的慣性捲動 */
+#pvp-arena-modal .modal-content {
+    /* 強制覆蓋行內樣式，確保 iOS 能夠滑動 */
+    overflow-y: scroll !important; 
+    -webkit-overflow-scrolling: touch !important; /* iOS 關鍵屬性：慣性捲動 */
+    
+    /* 增加底部留白，避免手機瀏覽器的工具列擋住最後一個對手 */
+    padding-bottom: 80px !important; 
+}
+
+/* 確保列表容器本身不會限制高度，讓外層視窗負責捲動 */
+.opponent-list-container {
+    height: auto !important;
+    overflow: visible !important;
+    padding-bottom: 20px;
+}
