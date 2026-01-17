@@ -2421,3 +2421,132 @@ body.no-scroll {
     background-color: #f39c12 !important;
     transform: translateY(-2px);
 }
+
+/* =========================================
+   修正補丁 (Logo放大 + iOS捲動修復)
+   ========================================= */
+
+/* --- 1. 工作室 Logo 與文字放大 --- */
+
+/* 覆蓋舊的 Logo 設定，將寬度加大 */
+#studio-logo {
+    width: 220px !important;  /* 從 140px 改為 220px */
+    height: auto;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
+    opacity: 0.9;
+    transition: all 0.3s ease;
+}
+
+/* 放大下方的文字 */
+.studio-logo-container div {
+    font-size: 1.1em !important; /* 從 0.8em 改為 1.1em */
+    color: #bdc3c7;
+    margin-top: 5px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+/* --- 2. iOS 手機版 PVP 列表捲動修復 --- */
+
+/* 強制針對 PVP 視窗開啟 iOS 的慣性捲動 */
+#pvp-arena-modal .modal-content {
+    /* 強制覆蓋行內樣式，確保 iOS 能夠滑動 */
+    overflow-y: scroll !important; 
+    -webkit-overflow-scrolling: touch !important; /* iOS 關鍵屬性：慣性捲動 */
+    
+    /* 增加底部留白，避免手機瀏覽器的工具列擋住最後一個對手 */
+    padding-bottom: 80px !important; 
+}
+
+/* 確保列表容器本身不會限制高度，讓外層視窗負責捲動 */
+.opponent-list-container {
+    height: auto !important;
+    overflow: visible !important;
+    padding-bottom: 20px;
+}
+
+/* --- 排行榜視窗與工作室 Logo 樣式 --- */
+
+/* 確保排行榜列表有足夠空間與捲軸 */
+#leaderboard-list {
+    min-height: 150px;
+    max-height: 300px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2); /* 稍微深一點的背景區隔 */
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+/* 列表項目優化 */
+#leaderboard-list div {
+    transition: background 0.2s;
+}
+#leaderboard-list div:hover {
+    background: rgba(255, 255, 255, 0.05); /* 滑鼠懸停效果 */
+}
+
+/* 工作室 Logo 容器 */
+.studio-logo-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-top: 15px;
+    margin-top: auto; /* 推到底部 */
+}
+
+/* Logo 圖片樣式 - 放大版 */
+#studio-logo {
+    width: 220px !important;       /* 加大寬度 */
+    height: auto;       
+    margin-bottom: 5px;
+    filter: drop-shadow(0 0 5px rgba(0,0,0,0.5)); 
+    opacity: 0.9;
+    transition: all 0.3s ease;
+}
+
+/* Logo 滑鼠互動特效 */
+#studio-logo:hover {
+    opacity: 1;
+    transform: scale(1.05); 
+    filter: drop-shadow(0 0 8px rgba(241, 196, 15, 0.5)); 
+}
+
+/* 工作室文字放大 */
+.studio-logo-container div {
+    font-size: 1.1em !important; /* 加大文字 */
+    color: #bdc3c7;
+    margin-top: 5px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+/* 排行榜按鈕特別樣式 (讓它在按鈕群中顯眼一點) */
+#leaderboard-btn {
+    box-shadow: 0 0 5px rgba(241, 196, 15, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+#leaderboard-btn:hover {
+    background-color: #f39c12 !important;
+    transform: translateY(-2px);
+}
+
+/* --- iOS 手機版 PVP 列表捲動修復 --- */
+
+/* 強制針對 PVP 視窗開啟 iOS 的慣性捲動 */
+#pvp-arena-modal .modal-content {
+    /* 強制覆蓋行內樣式，確保 iOS 能夠滑動 */
+    overflow-y: scroll !important; 
+    -webkit-overflow-scrolling: touch !important; /* iOS 關鍵屬性：慣性捲動 */
+    
+    /* 增加底部留白，避免手機瀏覽器的工具列擋住最後一個對手 */
+    padding-bottom: 80px !important; 
+}
+
+/* 確保列表容器本身不會限制高度，讓外層視窗負責捲動 */
+.opponent-list-container {
+    height: auto !important;
+    overflow: visible !important;
+    padding-bottom: 20px;
+}
