@@ -23,7 +23,7 @@ import { initPvp, updatePvpContext, setPvpHero, startRevengeMatch } from './js/p
 import * as Inventory from './js/inventory.js';
 import * as Territory from './js/territory.js';
 
-// 🔥 冒險模式相關引入 (新增 setAdventureCardSlot)
+// 🔥 冒險模式相關引入
 import { initAdventure, updateAdventureContext, startAdventure } from './js/adventure.js';
 import { initPrepScreen, openPrepScreen, updatePrepData, updatePrepUser, setAdventureCardSlot } from './js/prep.js';
 import { generateItemInstance } from './js/items.js';
@@ -92,31 +92,27 @@ setTimeout(() => {
     // --- 冒險模式初始化 ---
     initAdventure(db, currentUser);
 
-    // 🔥 定義存檔回調函式 (讓 prep.js 可以呼叫)
     const handleAdventureSave = async (newAdventureData) => {
         if (!currentUser) return;
         try {
             await updateDoc(doc(db, "users", currentUser.uid), {
                 adventure: newAdventureData,
-                gems: gems, // 同步最新的錢
+                gems: gems, 
                 gold: gold
             });
-            // console.log("冒險資料已儲存");
         } catch(e) {
             console.error("存檔失敗", e);
         }
     };
 
-    // 初始化整裝介面，並傳入所需的 callback
     initPrepScreen(
         db, 
         currentUser, 
-        () => { startAdventure(); }, // 出發回調
-        handleAdventureSave,         // 🔥 存檔回調
-        currencyHandler              // 🔥 金流回調 (買東西用)
+        () => { startAdventure(); }, 
+        handleAdventureSave,         
+        currencyHandler              
     );
 
-    // 綁定「進入冒險模式」按鈕 -> 開啟整裝介面
     const advBtn = document.getElementById('enter-adventure-mode-btn');
     if (advBtn) {
         const newBtn = advBtn.cloneNode(true);
@@ -125,19 +121,36 @@ setTimeout(() => {
         newBtn.addEventListener('click', () => {
             playSound('click');
             if (!currentUser) return alert("請先登入");
-            
-            // 🔥【關鍵修正】：手動組合包含金幣/鑽石的資料傳給 prep.js
             updatePrepUser({
                 ...currentUser,
                 gold: gold,
                 gems: gems
             }); 
-            
-            openPrepScreen(); // 開啟整裝視窗
+            openPrepScreen(); 
         });
     }
 
-    // --- 其他按鈕綁定 ---
+    // --- 按鈕綁定 ---
+    
+    // 1. 排行榜按鈕 (新增)
+    const leaderBtn = document.getElementById('leaderboard-btn');
+    if (leaderBtn) {
+        leaderBtn.addEventListener('click', () => {
+            playSound('click');
+            document.getElementById('leaderboard-modal').classList.remove('hidden');
+            loadLeaderboard(); // 點擊時才讀取
+        });
+    }
+    
+    // 2. 排行榜關閉按鈕 (新增)
+    const closeLeaderBtn = document.getElementById('close-leaderboard-btn');
+    if (closeLeaderBtn) {
+        closeLeaderBtn.addEventListener('click', () => {
+             playSound('click');
+             document.getElementById('leaderboard-modal').classList.add('hidden');
+        });
+    }
+
     const invBtn = document.getElementById('inventory-btn');
     if (invBtn) invBtn.addEventListener('click', () => { playSound('click'); if (!currentUser) return alert("請先登入"); document.getElementById('inventory-title').innerText = "🎒 背包"; Inventory.setPvpSelectionMode(null, null); document.getElementById('inventory-modal').classList.remove('hidden'); Inventory.filterInventory('ALL'); });
 
@@ -153,13 +166,11 @@ setTimeout(() => {
     const draw10Btn = document.getElementById('draw-10-btn');
     if (draw10Btn) draw10Btn.addEventListener('click', () => { playSound('click'); performGacha(10); });
     
-    // 綁定抽卡結果頁面的關閉按鈕
     const gachaCloseBtn = document.getElementById('gacha-close-btn');
     if (gachaCloseBtn) {
         gachaCloseBtn.addEventListener('click', () => {
              playSound('click');
              document.getElementById('gacha-reveal-modal').classList.add('hidden');
-             // 關閉後重新載入背包，確保資料最新
              Inventory.filterInventory('ALL');
         });
     }
@@ -232,7 +243,14 @@ if(document.getElementById('settings-save-name-btn')) {
     document.getElementById('settings-save-name-btn').addEventListener('click', async () => {
         const newName = settingsNameInput.value.trim();
         if (!newName) return alert("請輸入暱稱");
-        try { await updateProfile(currentUser, { displayName: newName }); await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); document.getElementById('user-name').innerText = `玩家：${newName}`; loadLeaderboard(); alert("改名成功！"); settingsModal.classList.add('hidden'); } catch (e) { console.error(e); alert("改名失敗"); }
+        try { 
+            await updateProfile(currentUser, { displayName: newName }); 
+            await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); 
+            document.getElementById('user-name').innerText = `玩家：${newName}`; 
+            loadLeaderboard(); // 改名後刷新排行榜
+            alert("改名成功！"); 
+            settingsModal.classList.add('hidden'); 
+        } catch (e) { console.error(e); alert("改名失敗"); }
     });
 }
 
@@ -524,7 +542,7 @@ if (isFirebaseReady && auth) {
             try {
                 await loadUserData(user); 
                 await calculateTotalPowerOnly(user.uid); 
-                loadLeaderboard();
+                // loadLeaderboard(); // 🔥 移除自動讀取，改為點擊讀取
                 updateAccountUI();
             } catch(e) { console.error("載入使用者資料失敗", e); }
         } else { 
@@ -535,7 +553,6 @@ if (isFirebaseReady && auth) {
     });
 }
 
-// 🔥 修改：currencyHandler 新增邏輯，讓 prep.js 隨時知道最新的錢
 const currencyHandler = (action, data, extraType = 'gold') => {
     if (action === 'check') {
         if (extraType === 'iron') return iron >= data;
@@ -564,7 +581,6 @@ const currencyHandler = (action, data, extraType = 'gold') => {
         if (data.type === 'wood') wood += val; 
     }
     
-    // 🔥 關鍵修正：當錢有變動時，同步更新給 Prep 介面
     if (currentUser && (action === 'deduct' || action === 'add' || action === 'add_resource')) {
         updatePrepUser({
             ...currentUser,
@@ -596,20 +612,16 @@ async function loadUserData(user) {
         battleLogs = data.battleLogs || [];
         completedLevels = data.completedLevels || {};
         
-        // 🔥 冒險模式資料初始化檢查
         let adventureData = data.adventure;
         
-        // 如果該使用者還沒有冒險資料 (新玩家或老玩家第一次玩冒險)，幫他產生初始裝備
         if (!adventureData) {
             console.log("初始化冒險模式資料...");
             
-            // 產生初始裝備：生鏽鐵劍(R) & 草鞋(R)
             const starterSword = generateItemInstance('w_sword_r_01');
             const starterShoes = generateItemInstance('a_shoes_r_01');
             
-            // 建立預設資料結構
             adventureData = {
-                inventory: [starterSword, starterShoes], // 背包
+                inventory: [starterSword, starterShoes], 
                 equipment: {
                     weapon: null,
                     head: null,
@@ -622,19 +634,16 @@ async function loadUserData(user) {
                     hp: 1000,
                     atk: 50
                 },
-                selectedCards: new Array(6).fill(null) // 🔥 預設技能欄位
+                selectedCards: new Array(6).fill(null) 
             };
             
-            // 寫入資料庫
             await updateDoc(userRef, { adventure: adventureData });
         } 
         
-        // 🔥 老玩家資料遷移：如果沒有 selectedCards，補上
         if (adventureData && !adventureData.selectedCards) {
             adventureData.selectedCards = new Array(6).fill(null);
         }
         
-        // 將冒險資料傳遞給 prep.js，讓 UI 可以顯示
         updatePrepData(adventureData);
 
         const updateData = { lastLoginAt: serverTimestamp() };
@@ -644,7 +653,6 @@ async function loadUserData(user) {
         gems = 5000; gold = 5000; iron = 5000; food = 5000; wood = 5000; 
         claimedNotifs = []; deletedSystemNotifs = []; battleLogs = []; completedLevels = {};
         
-        // 新帳號直接包含冒險資料
         const starterSword = generateItemInstance('w_sword_r_01');
         const starterShoes = generateItemInstance('a_shoes_r_01');
         
@@ -652,14 +660,14 @@ async function loadUserData(user) {
             inventory: [starterSword, starterShoes],
             equipment: { weapon: null, head: null, armor: null, gloves: null, legs: null, shoes: null },
             stats: { hp: 1000, atk: 50 },
-            selectedCards: new Array(6).fill(null) // 🔥 預設技能欄位
+            selectedCards: new Array(6).fill(null) 
         };
 
         await setDoc(userRef, { 
             name: user.displayName || "未命名", email: user.email || null, 
             gems, gold, iron, food, wood, combatPower: 0, 
             claimedNotifs: [], deletedSystemNotifs: [], battleLogs: [], completedLevels: {}, 
-            adventure: adventureData, // 🔥 寫入冒險資料
+            adventure: adventureData, 
             createdAt: new Date(), lastLoginAt: serverTimestamp() 
         }); 
         
@@ -674,7 +682,7 @@ async function loadUserData(user) {
 
     Inventory.initInventory(db, user, currencyHandler, (index, card, type) => {
         if (type === 'pve_deploy') { return deployHeroToSlot(index, card); } 
-        else if (type === 'adventure_skill') { return setAdventureCardSlot(index, card); } // 🔥 處理冒險選卡
+        else if (type === 'adventure_skill') { return setAdventureCardSlot(index, card); } 
         else { return setPvpHero(index, card, type); }
     });
 
@@ -824,7 +832,6 @@ async function performGacha(times) {
             await updateCurrencyCloud(); 
             if(overlay) overlay.classList.add('hidden');
             
-            // 🔥 直接顯示所有結果 (取消逐張翻開的動畫邏輯)
             showGachaReveal(savedCards);
             
         } catch (e) {
@@ -835,18 +842,13 @@ async function performGacha(times) {
     }, 2500);
 }
 
-// 🔥 新增：一次顯示所有抽卡結果
 function showGachaReveal(cards) {
     const modal = document.getElementById('gacha-reveal-modal');
     const container = document.getElementById('gacha-reveal-container');
     
-    // 清空舊的
     container.innerHTML = "";
     
-    // 生成所有卡片 (使用標準 Card 樣式，點擊可看詳情)
     cards.forEach(card => {
-        // 這裡借用 inventory.js 的 renderCard 邏輯，但為了避免綁定背包專用事件，我們手動創建 HTML
-        // 並綁定 Inventory.openCardModal(card)
         const cardDiv = document.createElement('div');
         const charPath = `assets/cards/${card.id}.webp`;
         const framePath = `assets/frames/${card.rarity.toLowerCase()}.png`;
@@ -858,7 +860,6 @@ function showGachaReveal(cards) {
         let typeIcon = uType === 'CAVALRY' ? '🐴' : (uType === 'ARCHER' ? '🏹' : '⚔️');
         
         cardDiv.className = `card ${card.rarity} reveal-anim`; 
-        // 讓它看起來像剛翻開
         cardDiv.style.animation = "popIn 0.5s ease-out";
         
         cardDiv.innerHTML = `
@@ -872,7 +873,6 @@ function showGachaReveal(cards) {
             <img src="${framePath}" class="card-frame-img" onerror="this.remove()">
         `;
         
-        // 點擊事件：開啟詳情
         cardDiv.addEventListener('click', () => {
             playSound('click');
             Inventory.openCardModal(card);
@@ -881,7 +881,6 @@ function showGachaReveal(cards) {
         container.appendChild(cardDiv);
     });
 
-    // 顯示視窗
     modal.classList.remove('hidden');
     playSound('reveal');
 }
@@ -1206,6 +1205,10 @@ function checkUnreadNotifications() {
 async function loadLeaderboard() {
     const list = document.getElementById('leaderboard-list');
     if (!list) return;
+    
+    // 如果現在不是顯示狀態，就不要讀取（不過按鈕點擊已經控制了這點，這裡做雙重保險）
+    // 但因為我們改用彈窗，所以這裡還是可以直接讀取
+    
     try {
         const q = query(collection(db, "users"), orderBy("combatPower", "desc"), limit(5));
         const snap = await getDocs(q);
@@ -1213,14 +1216,22 @@ async function loadLeaderboard() {
         let rank = 1;
         snap.forEach(doc => {
             const d = doc.data();
-            html += `<div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #444;">
-                <span>#${rank++} ${d.name || "未命名"}</span>
-                <span style="color:#f1c40f;">${d.combatPower || 0}</span>
+            let rankColor = "#fff";
+            if (rank === 1) rankColor = "#f1c40f"; // 金
+            else if (rank === 2) rankColor = "#bdc3c7"; // 銀
+            else if (rank === 3) rankColor = "#e67e22"; // 銅
+
+            html += `<div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #444; align-items:center;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:1.2em; font-weight:bold; color:${rankColor}; width:30px;">#${rank++}</span>
+                    <span style="font-size:1.1em;">${d.name || "未命名"}</span>
+                </div>
+                <span style="color:#f1c40f; font-weight:bold;">🔥 ${d.combatPower || 0}</span>
             </div>`;
         });
-        list.innerHTML = html || "暫無資料";
+        list.innerHTML = html || "<p style='text-align:center; color:#aaa;'>暫無資料</p>";
     } catch(e) {
         console.warn("排行榜讀取失敗", e);
-        list.innerHTML = "讀取失敗";
+        list.innerHTML = "<p style='text-align:center; color:#e74c3c;'>讀取失敗</p>";
     }
 }

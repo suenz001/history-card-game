@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>歷史英靈：策略對決</title>
     <meta name="google-site-verification" content="rUWOR0-82xcLnEEm-y9E4HnHyzsBxWXY9kK9DHXYD7Q" />
-    <link rel="stylesheet" href="style.css?v=132">
+    <link rel="stylesheet" href="style.css?v=133">
     <style>
         /* --- 建築升級進度條樣式 --- */
         .build-progress-bar {
@@ -173,6 +173,7 @@
                     <button id="notification-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #e67e22;">
                         🔔 通知 <span id="notif-badge" class="notification-badge hidden">0</span>
                     </button>
+                    <button id="leaderboard-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #f1c40f; color: #333;">🏆 排行</button>
                     <button id="gallery-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; background: #1abc9c;">📖 圖鑑</button>
                     <button id="settings-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">⚙️ 設定</button>
                     <button id="logout-btn" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px;">登出</button>
@@ -218,15 +219,7 @@
                     </div>
                 </div>
 
-                <div class="leaderboard-area">
-                    <h2 style="margin-top:0; color:#f1c40f; text-align: center;">🏆 全服戰力榜</h2>
-                    <div id="leaderboard-list"><p style="text-align:center;">載入中...</p></div>
-                    <div class="studio-logo-container">
-                        <img src="assets/logo.png" alt="Studio Logo" id="studio-logo">
-                        <div style="font-size: 0.8em; color: #7f8c8d; margin-top: 5px;">Designed by SoonYoung Studio</div>
-                    </div>
                 </div>
-            </div>
         </div>
     </div>
 
@@ -399,6 +392,22 @@
         </div>
     </div>
 
+    <div id="leaderboard-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px; height: auto;">
+            <div class="modal-header">
+                <h2 style="color: #f1c40f;">🏆 全服戰力榜</h2>
+                <button id="close-leaderboard-btn" class="btn-primary" style="background:#c0392b;">關閉</button>
+            </div>
+            <div id="leaderboard-list" style="padding: 10px; text-align: left;">
+                <p style="text-align:center;">載入中...</p>
+            </div>
+            <div class="studio-logo-container" style="text-align: center; margin-top: 20px; border-top: 1px solid #555; padding-top: 15px;">
+                <img src="assets/logo.png" alt="Studio Logo" id="studio-logo" style="max-width: 150px;">
+                <div style="font-size: 0.8em; color: #7f8c8d; margin-top: 5px;">Designed by SoonYoung Studio</div>
+            </div>
+        </div>
+    </div>
+
     <div id="detail-modal" class="modal hidden" style="background: rgba(0,0,0,0.95);">
         <button id="close-detail-btn" class="btn-close-circle">✕</button>
         <button id="prev-card-btn" class="nav-arrow left">❮</button>
@@ -423,11 +432,9 @@
     <div id="gacha-reveal-modal" class="modal hidden" style="background: rgba(0,0,0,0.98); z-index: 2000; display:flex; flex-direction:column; align-items:center; justify-content:center;">
         <h2 style="color: #f1c40f; margin-bottom: 20px; text-shadow: 0 0 10px #000;">🎉 召喚結果</h2>
         <div id="gacha-reveal-container" class="gacha-result-grid"></div>
-        
         <div style="margin-top: 30px; display:flex; gap: 20px;">
             <div id="gacha-next-hint" style="color: #aaa; font-size: 0.9em;">(點擊卡片可查看詳情)</div>
         </div>
-        
         <button id="gacha-close-btn" class="btn-primary" style="margin-top: 20px; font-size: 1.2em; padding: 10px 40px; border: 2px solid white; box-shadow: 0 0 15px #f1c40f;">
             全部收下
         </button>
