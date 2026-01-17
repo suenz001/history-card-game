@@ -9,6 +9,12 @@ body {
     margin: 0;
     padding: 10px;
     overflow-x: hidden;
+overflow-y: auto;              /* 強制開啟垂直捲動 */
+    touch-action: pan-y;           /* 關鍵：允許單指垂直滑動，但禁止水平滑動(防止換頁)或縮放 */
+    -webkit-overflow-scrolling: touch; /* 讓 iOS 滑動有慣性效果 (絲滑感) */
+
+
+
 }
 
 .game-container { max-width: 1200px; margin: 0 auto; }
