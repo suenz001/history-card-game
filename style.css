@@ -2569,3 +2569,46 @@ body.no-scroll {
     overflow: visible !important;
     padding-bottom: 20px;
 }
+
+/* =========================================
+   最終修正：Logo 特大化 + iOS 捲動修復
+   (請複製這整段，貼在 style.css 的最下面)
+   ========================================= */
+
+/* 1. 排行榜視窗變寬，以容納特大 Logo */
+#leaderboard-modal .modal-content {
+    max-width: 600px !important; /* 原本 400px 太窄，強制改寬 */
+}
+
+/* 2. Logo 變更為 2.5 倍大 (220px -> 550px) */
+#studio-logo {
+    width: 550px !important;      /* 設定為目標大小 */
+    max-width: 90%;               /* 手機版不要超出螢幕，留點邊距 */
+    height: auto;
+    margin-bottom: 15px;
+    filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
+    opacity: 0.9;
+    transition: all 0.3s ease;
+}
+
+/* 3. 文字也稍微加大配合巨型 Logo */
+.studio-logo-container div {
+    font-size: 1.3em !important;
+    color: #bdc3c7;
+    margin-top: 5px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+/* 4. iOS 手機版 PVP 列表捲動修復 (上次漏掉的) */
+#pvp-arena-modal .modal-content {
+    overflow-y: scroll !important; 
+    -webkit-overflow-scrolling: touch !important; /* iOS 慣性滑動關鍵 */
+    padding-bottom: 80px !important; 
+}
+
+.opponent-list-container {
+    height: auto !important;
+    overflow: visible !important;
+    padding-bottom: 20px;
+}
