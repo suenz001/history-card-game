@@ -6,6 +6,21 @@ import { getSkillDescription } from './skills.js';
 import { HERO_BIOS } from './bios.js';
 import { battleSlots, isBattleActive } from './battle.js'; 
 
+// 🔥 SweetAlert2 Toast 設定
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 2000,
+    timerProgressBar: true,
+    background: '#34495e',
+    color: '#fff',
+    didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+    }
+});
+
 // --- 內部狀態變數 ---
 let db = null;
 let currentUser = null;
@@ -41,7 +56,7 @@ export function initInventory(database, user, currencyCallback, pvpCallback) {
     
     // 初始化 UI 元件
     injectRefreshButton();
-    injectAutoDismantleButton(); // 🔥 新增：插入自動分解按鈕
+    injectAutoDismantleButton(); // 保留您的功能
     bindInventoryEvents();
 }
 
@@ -58,7 +73,7 @@ export function refreshInventory() {
     filterInventory();
 }
 
-// 動態插入「強制刷新」按鈕
+// 動態插入「強制刷新」按鈕 (改為 Swal)
 function injectRefreshButton() {
     if (document.getElementById('force-refresh-btn')) return;
     const headerGroup = document.querySelector('#inventory-modal .modal-header > div');
@@ -71,25 +86,34 @@ function injectRefreshButton() {
         btn.innerText = "🔄 強制刷新";
         btn.onclick = () => {
             playSound('click');
-            if (confirm("確定要從伺服器重新下載最新資料嗎？\n(這會消耗少量讀取配額)")) {
-                loadInventory(currentUser.uid, true);
-            }
+            // 🔥 SweetAlert 確認
+            Swal.fire({
+                title: '確定要強制刷新？',
+                text: '將從伺服器重新下載最新資料 (消耗讀取配額)',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '刷新',
+                cancelButtonText: '取消',
+                background: '#2c3e50', color: '#fff', confirmButtonColor: '#e67e22'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    loadInventory(currentUser.uid, true);
+                }
+            });
         };
         headerGroup.appendChild(btn);
     }
 }
 
-// 🔥 新增：動態插入「自動清理」按鈕到批量操作列
+// 動態插入「自動清理」按鈕
 function injectAutoDismantleButton() {
     if (document.getElementById('auto-clean-btn')) return;
     
     const batchBar = document.getElementById('batch-action-bar');
     if (batchBar) {
-        // 建立新按鈕
         const btn = document.createElement('button');
         btn.id = 'auto-clean-btn';
         btn.className = 'btn-danger';
-        // 設定樣式：紅色背景，明顯一點
         btn.style.cssText = "background:#c0392b; margin-right: 10px; font-weight:bold;"; 
         btn.innerText = "⚡ 自動清理冗餘";
         
@@ -98,7 +122,6 @@ function injectAutoDismantleButton() {
             autoDismantleRedundant();
         };
         
-        // 插入到 "確認分解" 按鈕的前面
         const confirmBtn = document.getElementById('batch-confirm-btn');
         if (confirmBtn) {
             batchBar.insertBefore(btn, confirmBtn);
@@ -108,13 +131,12 @@ function injectAutoDismantleButton() {
     }
 }
 
-// 儲存背包到本地快取
 function saveToLocalStorage() {
     if (currentUser && allUserCards.length > 0) {
         try {
             const cacheKey = `inv_cache_${currentUser.uid}`;
             localStorage.setItem(cacheKey, JSON.stringify(allUserCards));
-            console.log("💾 背包已快取至本地");
+            // console.log("💾 背包已快取至本地");
         } catch (e) {
             console.warn("Local Storage Error:", e);
         }
@@ -139,7 +161,7 @@ export async function loadInventory(uid, forceRefresh = false) {
         const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
             try {
-                console.log("⚡ 使用本地快取讀取背包");
+                // console.log("⚡ 使用本地快取讀取背包");
                 allUserCards = JSON.parse(cachedData);
                 if (allUserCards.length > 0 && !allUserCards[0].docId) throw new Error("快取資料損毀");
                 updateInventoryCounts();
@@ -152,7 +174,7 @@ export async function loadInventory(uid, forceRefresh = false) {
     }
 
     try {
-        console.log("🌐 從 Firebase 下載背包資料...");
+        // console.log("🌐 從 Firebase 下載背包資料...");
         const q = query(collection(db, "inventory"), where("owner", "==", uid));
         const querySnapshot = await getDocs(q);
         allUserCards = [];
@@ -187,7 +209,7 @@ export async function loadInventory(uid, forceRefresh = false) {
         updateInventoryCounts();
         filterInventory(); 
         
-        if(forceRefresh) alert("背包資料已更新！");
+        if(forceRefresh) Toast.fire({ icon: 'success', title: '背包資料已更新！' });
 
     } catch (e) {
         console.error("Load Inventory Failed:", e);
@@ -195,7 +217,6 @@ export async function loadInventory(uid, forceRefresh = false) {
     }
 }
 
-// --- 卡片儲存 (Gacha 用) ---
 export async function saveCardToCloud(card) {
     if (!currentUser) return;
     const docRef = await addDoc(collection(db, "inventory"), { 
@@ -262,7 +283,7 @@ export function renderCard(card, targetContainer) {
         playSound('click'); 
         
         if (isBatchMode) { 
-            if (isDeployed) return alert("這位英雄正在出戰隊伍中，無法選取分解！\n(請先解除隊伍部署)");
+            if (isDeployed) return Toast.fire({ icon: 'warning', title: '出戰中無法選擇' });
             toggleBatchSelection(card, cardDiv); 
             return; 
         } 
@@ -400,7 +421,6 @@ export function openDetailModal(index) {
 export function openCardModal(card) {
     currentDisplayList = [card];
     currentCardIndex = 0;
-    
     playSound('click'); 
     const detailModal = document.getElementById('detail-modal');
     detailModal.classList.remove('hidden'); 
@@ -545,8 +565,8 @@ async function upgradeCardLevel(goldCost, ironCost) {
     const hasGold = onCurrencyUpdate('check', goldCost, 'gold'); 
     const hasIron = onCurrencyUpdate('check', ironCost, 'iron');
     
-    if (!hasGold) return alert(`金幣不足！(需要 ${goldCost} G)`);
-    if (!hasIron) return alert(`鐵礦不足！(需要 ${ironCost} 鐵)`);
+    if (!hasGold) return Swal.fire({ icon: 'error', title: '金幣不足', text: `需要 ${goldCost} G`, background: '#2c3e50', color: '#fff' });
+    if (!hasIron) return Swal.fire({ icon: 'error', title: '鐵礦不足', text: `需要 ${ironCost} 鐵`, background: '#2c3e50', color: '#fff' });
     
     const card = currentDisplayList[currentCardIndex];
     onCurrencyUpdate('deduct', goldCost, 'gold'); 
@@ -561,31 +581,51 @@ async function upgradeCardLevel(goldCost, ironCost) {
     saveToLocalStorage();
     renderDetailCard();
     onCurrencyUpdate('refresh'); 
+    Toast.fire({ icon: 'success', title: `升級成功 Lv.${card.level}` });
 }
 
 async function upgradeCardStar() {
     const card = currentDisplayList[currentCardIndex];
     const duplicate = allUserCards.find(c => c.id === card.id && c.docId !== card.docId);
-    if (!duplicate) return alert("沒有重複的卡片可以用來升星！");
-    if (!confirm(`確定要消耗一張【${duplicate.name}】來升星嗎？`)) return;
     
-    const isFodderDeployed = battleSlots.some(s => s && s.docId === duplicate.docId);
-    if (isFodderDeployed) return alert("作為素材的卡片正在出戰中，無法消耗！\n請先解除該卡片的部署。");
+    if (!duplicate) return Swal.fire({ icon: 'info', title: '素材不足', text: '需要一張同名卡片', background: '#2c3e50', color: '#fff' });
+    
+    // 🔥 SweetAlert 確認升星
+    Swal.fire({
+        title: `確定升星 ${card.name}？`,
+        text: `將消耗一張 ${duplicate.name}`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: '升星',
+        cancelButtonText: '取消',
+        background: '#2c3e50', color: '#fff', confirmButtonColor: '#8e44ad'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const isFodderDeployed = battleSlots.some(s => s && s.docId === duplicate.docId);
+            if (isFodderDeployed) return Swal.fire({ icon: 'warning', title: '無法消耗', text: '素材卡正在出戰中', background: '#2c3e50', color: '#fff' });
 
-    await deleteDoc(doc(db, "inventory", duplicate.docId)); 
-    const idx = allUserCards.findIndex(c => c.docId === duplicate.docId);
-    if(idx > -1) allUserCards.splice(idx, 1);
-    
-    card.stars++; 
-    calculateCardStats(card); 
-    playSound('upgrade'); 
-    
-    await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
-    saveToLocalStorage();
-    updateInventoryCounts();
-    filterInventory(); 
-    renderDetailCard(); 
-    alert(`升星成功！目前 ${card.stars} ★\n技能效果已提升 10%！`);
+            await deleteDoc(doc(db, "inventory", duplicate.docId)); 
+            const idx = allUserCards.findIndex(c => c.docId === duplicate.docId);
+            if(idx > -1) allUserCards.splice(idx, 1);
+            
+            card.stars++; 
+            calculateCardStats(card); 
+            playSound('upgrade'); 
+            
+            await updateDoc(doc(db, "inventory", card.docId), { stars: card.stars, atk: card.atk, hp: card.hp });
+            saveToLocalStorage();
+            updateInventoryCounts();
+            filterInventory(); 
+            renderDetailCard(); 
+            
+            Swal.fire({ 
+                icon: 'success', 
+                title: '升星成功！', 
+                text: `${card.name} 提升至 ${card.stars} ★\n技能效果提升 10%`, 
+                background: '#2c3e50', color: '#fff' 
+            });
+        }
+    });
 }
 
 async function dismantleCurrentCard() {
@@ -593,25 +633,36 @@ async function dismantleCurrentCard() {
     const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
     const totalValue = baseValue * (card.stars + 1);
 
-    if (card.rarity !== 'R') { 
-        if (!confirm(`確定要分解【${card.name}】嗎？\n獲得 ${totalValue} 金幣。`)) return; 
-    }
-    
-    try { 
-        if (card.docId) await deleteDoc(doc(db, "inventory", card.docId)); 
-        playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
-        
-        onCurrencyUpdate('add', totalValue);
-        onCurrencyUpdate('refresh'); 
-        
-        const idx = allUserCards.findIndex(c => c.docId === card.docId);
-        if(idx > -1) allUserCards.splice(idx, 1);
-        saveToLocalStorage();
-        updateInventoryCounts();
-        document.getElementById('detail-modal').classList.add('hidden'); 
-        filterInventory(); 
-        alert(`已分解！獲得 ${totalValue} 金幣`); 
-    } catch (e) { console.error("分解失敗", e); }
+    // 🔥 SweetAlert 分解確認
+    Swal.fire({
+        title: `分解 ${card.name}？`,
+        html: `分解後無法復原！<br>獲得 <b style="color:#f39c12">${totalValue} 金幣</b>`,
+        imageUrl: `assets/cards/${card.id}.webp`,
+        imageHeight: 100,
+        showCancelButton: true,
+        confirmButtonText: '分解',
+        cancelButtonText: '取消',
+        background: '#2c3e50', color: '#fff', confirmButtonColor: '#d33'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try { 
+                if (card.docId) await deleteDoc(doc(db, "inventory", card.docId)); 
+                playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
+                
+                onCurrencyUpdate('add', totalValue);
+                onCurrencyUpdate('refresh'); 
+                
+                const idx = allUserCards.findIndex(c => c.docId === card.docId);
+                if(idx > -1) allUserCards.splice(idx, 1);
+                saveToLocalStorage();
+                updateInventoryCounts();
+                document.getElementById('detail-modal').classList.add('hidden'); 
+                filterInventory(); 
+                
+                Toast.fire({ icon: 'success', title: `獲得 ${totalValue} 金幣` });
+            } catch (e) { console.error("分解失敗", e); }
+        }
+    });
 }
 
 function calculateCardStats(card) { 
@@ -665,10 +716,10 @@ function calculateBatchTotal() {
     }
 }
 
-// 🔥 新增：自動清理冗餘卡片 (Auto Dismantle)
+// 🔥 自動清理冗餘卡片 (Swal版)
 async function autoDismantleRedundant() {
     if (!currentUser) return;
-    if (allUserCards.length === 0) return alert("背包是空的");
+    if (allUserCards.length === 0) return Toast.fire({ icon: 'info', title: '背包是空的' });
 
     // 1. 分組邏輯
     const groups = {};
@@ -706,154 +757,180 @@ async function autoDismantleRedundant() {
     }
 
     if (toDismantle.length === 0) {
-        return alert("沒有發現可清理的冗餘卡片。\n(每種英雄都已保留最強的一張，或多餘卡片正在出戰中)");
-    }
-
-    // 3. 確認與執行
-    const confirmMsg = `⚡ 自動清理系統偵測到 ${toDismantle.length} 張冗餘卡片。\n\n` +
-                       `規則：保留每種英雄最高星、最高等的一張，其餘分解。\n` +
-                       `預計獲得：${totalValue} 金幣\n\n` +
-                       `⚠️ 確定要執行分解嗎？`;
-
-    if (!confirm(confirmMsg)) return;
-
-    try {
-        const btn = document.getElementById('auto-clean-btn');
-        if(btn) btn.innerText = "清理中...";
-        
-        const deletePromises = [];
-        toDismantle.forEach(card => {
-            if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId)));
+        return Swal.fire({ 
+            icon: 'info', 
+            title: '無需清理', 
+            text: '每種英雄已保留最強的一張，或多餘卡片正在出戰中', 
+            background: '#2c3e50', color: '#fff' 
         });
-
-        await Promise.all(deletePromises);
-
-        // 播放音效
-        playSound('dismantle'); setTimeout(() => playSound('coin'), 300);
-
-        // 更新資源
-        if(onCurrencyUpdate) onCurrencyUpdate('add', totalValue);
-        onCurrencyUpdate('refresh');
-
-        // 更新本地資料
-        const deletedIds = new Set(toDismantle.map(c => c.docId));
-        allUserCards = allUserCards.filter(c => !deletedIds.has(c.docId));
-        
-        saveToLocalStorage();
-        updateInventoryCounts();
-        filterInventory();
-
-        alert(`清理完成！\n已分解 ${toDismantle.length} 張卡片，獲得 ${totalValue} 金幣。`);
-
-    } catch (e) {
-        console.error("自動清理失敗", e);
-        alert("清理過程中發生錯誤，請重試");
-    } finally {
-        const btn = document.getElementById('auto-clean-btn');
-        if(btn) btn.innerText = "⚡ 自動清理冗餘";
-        
-        // 如果是在批量模式下執行的，順便清空選取狀態
-        selectedBatchCards.clear();
-        calculateBatchTotal();
     }
+
+    // 3. SweetAlert 確認
+    Swal.fire({
+        title: '自動清理冗餘卡片？',
+        html: `偵測到 <b>${toDismantle.length}</b> 張多餘卡片<br>預計獲得 <b style="color:#f1c40f">${totalValue} 金幣</b><br><span style="font-size:0.8em; color:#aaa;">(保留每種英雄最強的一張，其餘分解)</span>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '執行清理',
+        cancelButtonText: '取消',
+        confirmButtonColor: '#d33',
+        background: '#2c3e50', color: '#fff'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                const btn = document.getElementById('auto-clean-btn');
+                if(btn) btn.innerText = "清理中...";
+                
+                const deletePromises = [];
+                toDismantle.forEach(card => {
+                    if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId)));
+                });
+
+                await Promise.all(deletePromises);
+
+                playSound('dismantle'); setTimeout(() => playSound('coin'), 300);
+
+                if(onCurrencyUpdate) onCurrencyUpdate('add', totalValue);
+                onCurrencyUpdate('refresh');
+
+                const deletedIds = new Set(toDismantle.map(c => c.docId));
+                allUserCards = allUserCards.filter(c => !deletedIds.has(c.docId));
+                
+                saveToLocalStorage();
+                updateInventoryCounts();
+                filterInventory();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '清理完成',
+                    text: `已分解 ${toDismantle.length} 張卡片，獲得 ${totalValue} 金幣`,
+                    background: '#2c3e50', color: '#fff'
+                });
+
+            } catch (e) {
+                console.error("自動清理失敗", e);
+                Swal.fire({ icon: 'error', title: '錯誤', text: '清理過程中發生錯誤', background: '#2c3e50', color: '#fff' });
+            } finally {
+                const btn = document.getElementById('auto-clean-btn');
+                if(btn) btn.innerText = "⚡ 自動清理冗餘";
+                selectedBatchCards.clear();
+                calculateBatchTotal();
+            }
+        }
+    });
 }
 
-// --- 自動升星 ---
+// --- 自動升星 (Swal版) ---
 export async function autoStarUp() {
-    if (!currentUser) return alert("請先登入");
-    if (isBatchMode) return alert("請先關閉批量分解模式");
-    if (allUserCards.length < 2) return alert("卡片數量不足以進行升星");
+    if (!currentUser) return Toast.fire({ icon: 'warning', title: '請先登入' });
+    if (isBatchMode) return Toast.fire({ icon: 'warning', title: '請先關閉批量模式' });
+    if (allUserCards.length < 2) return Toast.fire({ icon: 'info', title: '卡片數量不足' });
 
-    const confirmed = confirm("⚡ 一鍵升星會自動合併重複的卡片，將每種英雄等級最高的卡片升到最高星數。\n\n確定要執行嗎？");
-    if (!confirmed) return;
+    Swal.fire({
+        title: '一鍵升星',
+        text: '自動合併重複的卡片，將每種英雄升到最高星數。確定執行？',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: '執行',
+        cancelButtonText: '取消',
+        confirmButtonColor: '#8e44ad',
+        background: '#2c3e50', color: '#fff'
+    }).then(async (result) => {
+        if (!result.isConfirmed) return;
 
-    const groups = {};
-    allUserCards.forEach(card => {
-        if (!groups[card.id]) groups[card.id] = [];
-        groups[card.id].push(card);
-    });
-
-    let upgradedCount = 0;
-    let consumedCount = 0;
-    const deletePromises = [];
-    const updatePromises = [];
-    const newCardsState = [];
-    const deletedDocIds = new Set();
-
-    for (const id in groups) {
-        let cards = groups[id];
-        if (cards.length < 2) {
-            newCardsState.push(...cards);
-            continue;
-        }
-
-        cards.sort((a, b) => {
-            if (b.stars !== a.stars) return b.stars - a.stars;
-            return b.level - a.level;
+        const groups = {};
+        allUserCards.forEach(card => {
+            if (!groups[card.id]) groups[card.id] = [];
+            groups[card.id].push(card);
         });
 
-        for (let i = 0; i < cards.length; i++) {
-            let mainCard = cards[i];
-            if (deletedDocIds.has(mainCard.docId)) continue;
-            
-            if (mainCard.stars >= 5) {
-                newCardsState.push(mainCard);
+        let upgradedCount = 0;
+        let consumedCount = 0;
+        const deletePromises = [];
+        const updatePromises = [];
+        const newCardsState = [];
+        const deletedDocIds = new Set();
+
+        for (const id in groups) {
+            let cards = groups[id];
+            if (cards.length < 2) {
+                newCardsState.push(...cards);
                 continue;
             }
 
-            let originalStars = mainCard.stars;
+            cards.sort((a, b) => {
+                if (b.stars !== a.stars) return b.stars - a.stars;
+                return b.level - a.level;
+            });
 
-            for (let j = i + 1; j < cards.length; j++) {
-                let fodder = cards[j];
-                if (deletedDocIds.has(fodder.docId)) continue;
-                if (mainCard.stars >= 5) break;
+            for (let i = 0; i < cards.length; i++) {
+                let mainCard = cards[i];
+                if (deletedDocIds.has(mainCard.docId)) continue;
                 
-                const isFodderDeployed = battleSlots.some(s => s && s.docId === fodder.docId);
-                if (isFodderDeployed) continue;
+                if (mainCard.stars >= 5) {
+                    newCardsState.push(mainCard);
+                    continue;
+                }
 
-                deletedDocIds.add(fodder.docId);
-                deletePromises.push(deleteDoc(doc(db, "inventory", fodder.docId)));
-                consumedCount++;
+                let originalStars = mainCard.stars;
 
-                mainCard.stars++;
-                calculateCardStats(mainCard);
+                for (let j = i + 1; j < cards.length; j++) {
+                    let fodder = cards[j];
+                    if (deletedDocIds.has(fodder.docId)) continue;
+                    if (mainCard.stars >= 5) break;
+                    
+                    const isFodderDeployed = battleSlots.some(s => s && s.docId === fodder.docId);
+                    if (isFodderDeployed) continue;
+
+                    deletedDocIds.add(fodder.docId);
+                    deletePromises.push(deleteDoc(doc(db, "inventory", fodder.docId)));
+                    consumedCount++;
+
+                    mainCard.stars++;
+                    calculateCardStats(mainCard);
+                }
+
+                if (mainCard.stars > originalStars) {
+                    upgradedCount++;
+                    updatePromises.push(updateDoc(doc(db, "inventory", mainCard.docId), {
+                        stars: mainCard.stars,
+                        atk: mainCard.atk,
+                        hp: mainCard.hp
+                    }));
+                }
+                newCardsState.push(mainCard);
             }
-
-            if (mainCard.stars > originalStars) {
-                upgradedCount++;
-                updatePromises.push(updateDoc(doc(db, "inventory", mainCard.docId), {
-                    stars: mainCard.stars,
-                    atk: mainCard.atk,
-                    hp: mainCard.hp
-                }));
-            }
-            newCardsState.push(mainCard);
         }
-    }
 
-    if (upgradedCount === 0 && consumedCount === 0) {
-        return alert("目前沒有可升星的卡片組合 (或素材卡正在出戰中)");
-    }
+        if (upgradedCount === 0 && consumedCount === 0) {
+            return Toast.fire({ icon: 'info', title: '沒有可升星的組合' });
+        }
 
-    try {
-        document.getElementById('auto-star-btn').innerText = "處理中...";
-        await Promise.all([...deletePromises, ...updatePromises]);
-        
-        playSound('upgrade');
-        allUserCards = newCardsState; 
-        saveToLocalStorage();
-        updateInventoryCounts();
-        filterInventory(); 
-        
-        if(onCurrencyUpdate) onCurrencyUpdate('refresh');
-        
-        alert(`升星完成！\n共升級了 ${upgradedCount} 次\n消耗了 ${consumedCount} 張素材卡`);
-    } catch (e) {
-        console.error("自動升星失敗", e);
-        alert("升星過程中發生錯誤，請重試");
-    } finally {
-        document.getElementById('auto-star-btn').innerText = "⚡ 一鍵升星";
-    }
+        try {
+            document.getElementById('auto-star-btn').innerText = "處理中...";
+            await Promise.all([...deletePromises, ...updatePromises]);
+            
+            playSound('upgrade');
+            allUserCards = newCardsState; 
+            saveToLocalStorage();
+            updateInventoryCounts();
+            filterInventory(); 
+            
+            if(onCurrencyUpdate) onCurrencyUpdate('refresh');
+            
+            Swal.fire({
+                icon: 'success',
+                title: '升星完成',
+                text: `升級 ${upgradedCount} 次，消耗 ${consumedCount} 張素材`,
+                background: '#2c3e50', color: '#fff'
+            });
+        } catch (e) {
+            console.error("自動升星失敗", e);
+            Swal.fire({ icon: 'error', title: '錯誤', text: '升星失敗', background: '#2c3e50', color: '#fff' });
+        } finally {
+            document.getElementById('auto-star-btn').innerText = "⚡ 一鍵升星";
+        }
+    });
 }
 
 // --- 圖鑑系統 ---
@@ -1021,51 +1098,67 @@ function bindInventoryEvents() {
     
     document.getElementById('batch-confirm-btn')?.addEventListener('click', async () => {
         playSound('click'); 
-        if (selectedBatchCards.size === 0) return; 
-        if (!confirm(`確定要分解這 ${selectedBatchCards.size} 張卡片嗎？\n此操作無法復原！`)) return; 
+        if (selectedBatchCards.size === 0) return Toast.fire({ icon: 'warning', title: '請先選擇卡片' });
         
         let totalGold = 0; 
-        const deletePromises = []; 
         const cardsToRemove = allUserCards.filter(c => selectedBatchCards.has(c.docId)); 
-        
         cardsToRemove.forEach(card => { 
             const baseValue = DISMANTLE_VALUES[card.rarity] || 0;
-            const cardValue = baseValue * (card.stars + 1);
-            totalGold += cardValue; 
-            
-            if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); 
+            totalValue += baseValue * (card.stars + 1);
         }); 
-        
-        try { 
-            const btn = document.getElementById('batch-confirm-btn');
-            btn.innerText = "分解中..."; 
-            await Promise.all(deletePromises); 
-            
-            playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
-            
-            if(onCurrencyUpdate) onCurrencyUpdate('add', totalGold);
-            onCurrencyUpdate('refresh'); 
-            
-            allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); 
-            selectedBatchCards.clear(); 
-            isBatchMode = false; 
-            
-            saveToLocalStorage();
 
-            const toggleBtn = document.getElementById('batch-toggle-btn');
-            const bar = document.getElementById('batch-action-bar');
-            toggleBtn.classList.remove('active'); toggleBtn.innerText = "🔧 批量分解"; bar.classList.add('hidden'); 
-            
-            updateInventoryCounts();
-            filterInventory(); 
-            
-            alert(`批量分解成功！獲得 ${totalGold} 金幣`); 
-        } catch (e) { 
-            console.error("批量分解失敗", e); 
-            alert("分解過程中發生錯誤，請重試"); 
-        } finally {
-            document.getElementById('batch-confirm-btn').innerText = "確認分解";
-        }
+        // 🔥 SweetAlert 批量分解確認
+        Swal.fire({
+            title: `確定要分解這 ${selectedBatchCards.size} 張卡片嗎？`,
+            html: `分解後無法復原！<br>獲得 <b style="color:#f39c12">${totalGold} 金幣</b>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: '分解',
+            cancelButtonText: '取消',
+            background: '#2c3e50', color: '#fff', confirmButtonColor: '#d33'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                const btn = document.getElementById('batch-confirm-btn');
+                btn.innerText = "分解中...";
+                const deletePromises = [];
+                cardsToRemove.forEach(card => { 
+                    if (card.docId) deletePromises.push(deleteDoc(doc(db, "inventory", card.docId))); 
+                }); 
+                
+                try { 
+                    await Promise.all(deletePromises); 
+                    playSound('dismantle'); setTimeout(() => playSound('coin'), 300); 
+                    
+                    if(onCurrencyUpdate) onCurrencyUpdate('add', totalGold);
+                    onCurrencyUpdate('refresh'); 
+                    
+                    allUserCards = allUserCards.filter(c => !selectedBatchCards.has(c.docId)); 
+                    selectedBatchCards.clear(); 
+                    isBatchMode = false; 
+                    
+                    saveToLocalStorage();
+
+                    const toggleBtn = document.getElementById('batch-toggle-btn');
+                    const bar = document.getElementById('batch-action-bar');
+                    toggleBtn.classList.remove('active'); toggleBtn.innerText = "🔧 批量分解"; bar.classList.add('hidden'); 
+                    
+                    updateInventoryCounts();
+                    filterInventory(); 
+                    
+                    Swal.fire({ 
+                        icon: 'success', 
+                        title: '批量分解成功！', 
+                        text: `獲得 ${totalGold} 金幣`, 
+                        background: '#2c3e50', color: '#fff' 
+                    });
+                } catch (e) { 
+                    console.error("批量分解失敗", e); 
+                    Swal.fire({ icon: 'error', title: '錯誤', text: '分解失敗', background: '#2c3e50', color: '#fff' });
+                } finally {
+                    document.getElementById('batch-confirm-btn').innerText = "確認分解";
+                }
+            }
+        });
     });
     
     document.getElementById('auto-star-btn')?.addEventListener('click', () => { playSound('click'); autoStarUp(); });
