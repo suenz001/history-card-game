@@ -201,6 +201,15 @@ setTimeout(() => {
         document.getElementById('territory-modal').classList.remove('hidden'); 
     });
 
+    // 🔥 補上這裡：領地關閉按鈕監聽 (修復離開按鈕失效問題)
+    const closeTerBtn = document.getElementById('close-territory-btn');
+    if (closeTerBtn) {
+        closeTerBtn.addEventListener('click', () => {
+            playSound('click');
+            document.getElementById('territory-modal').classList.add('hidden');
+        });
+    }
+
     const galBtn = document.getElementById('gallery-btn');
     if (galBtn) galBtn.addEventListener('click', () => { playSound('click'); Inventory.openGalleryModal(); });
 
