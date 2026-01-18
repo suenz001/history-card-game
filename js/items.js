@@ -52,7 +52,8 @@ const EQUIPMENT_DATABASE = [
         type: EQUIP_TYPES.WEAPON,
         subType: WEAPON_TYPES.SWORD,
         rarity: 'R',
-        img: 'assets/items/sword_r_01.png',
+        // 🔥 修改：改為 .webp
+        img: 'assets/items/sword_r_01.webp',
         stats: {
             atk: [10, 10],          // 固定 10
             defBonus: [5, 5],       // 固定 5
@@ -69,7 +70,8 @@ const EQUIPMENT_DATABASE = [
         type: EQUIP_TYPES.WEAPON,
         subType: WEAPON_TYPES.SWORD,
         rarity: 'SSR',
-        img: 'assets/items/sword_ssr_01.png',
+        // 🔥 修改：改為 .webp
+        img: 'assets/items/sword_ssr_01.webp',
         stats: {
             atk: [35, 70],          // 🔥 SSR 浮動數值
             defBonus: [15, 25],     // 額外防禦
@@ -92,7 +94,8 @@ const EQUIPMENT_DATABASE = [
         type: EQUIP_TYPES.WEAPON,
         subType: WEAPON_TYPES.BOW,
         rarity: 'R',
-        img: 'assets/items/bow_r_01.png',
+        // 🔥 修改：改為 .webp
+        img: 'assets/items/bow_r_01.webp',
         stats: {
             atk: [12, 12],
             defBonus: [0, 0],
@@ -109,7 +112,8 @@ const EQUIPMENT_DATABASE = [
         type: EQUIP_TYPES.WEAPON,
         subType: WEAPON_TYPES.BOW,
         rarity: 'SSR',
-        img: 'assets/items/bow_ssr_01.png',
+        // 🔥 修改：改為 .webp
+        img: 'assets/items/bow_ssr_01.webp',
         stats: {
             atk: [40, 80],
             defBonus: [0, 0],
@@ -132,7 +136,8 @@ const EQUIPMENT_DATABASE = [
         type: EQUIP_TYPES.WEAPON,
         subType: WEAPON_TYPES.STAFF,
         rarity: 'SR',
-        img: 'assets/items/staff_sr_01.png',
+        // 🔥 修改：改為 .webp
+        img: 'assets/items/staff_sr_01.webp',
         stats: {
             atk: [25, 25],
             defBonus: [0, 0],
@@ -152,7 +157,8 @@ const EQUIPMENT_DATABASE = [
         name: '皮帽',
         type: EQUIP_TYPES.HEAD,
         rarity: 'R',
-        img: 'assets/items/head_r_01.png',
+        // 🔥 修改：改為 .webp
+        img: 'assets/items/head_r_01.webp',
         stats: {
             def: [5, 5],
             weight: [2, 2]          // 輕
@@ -163,7 +169,8 @@ const EQUIPMENT_DATABASE = [
         name: '👑 霸王戰盔',
         type: EQUIP_TYPES.HEAD,
         rarity: 'SSR',
-        img: 'assets/items/head_ssr_01.png',
+        // 🔥 修改：改為 .webp
+        img: 'assets/items/head_ssr_01.webp',
         stats: {
             def: [20, 40],          // SSR 浮動防禦
             weight: [15, 20]        // 重量較重
@@ -179,7 +186,8 @@ const EQUIPMENT_DATABASE = [
         name: '草鞋',
         type: EQUIP_TYPES.SHOES,
         rarity: 'R',
-        img: 'assets/items/shoes_r_01.png',
+        // 🔥 修改：改為 .webp
+        img: 'assets/items/shoes_r_01.webp',
         stats: {
             def: [2, 2],
             weight: [1, 1],
@@ -191,7 +199,8 @@ const EQUIPMENT_DATABASE = [
         name: '⚡ 赫爾墨斯之靴',
         type: EQUIP_TYPES.SHOES,
         rarity: 'SSR',
-        img: 'assets/items/shoes_ssr_01.png',
+        // 🔥 修改：改為 .webp
+        img: 'assets/items/shoes_ssr_01.webp',
         stats: {
             def: [10, 20],
             weight: [0, 0],         // 神器無重量
@@ -202,11 +211,13 @@ const EQUIPMENT_DATABASE = [
     
     // (您可以依照此格式繼續增加 盔甲、手套、護腿...)
     {
-        id: 'a_armor_r_01', name: '旅人皮甲', type: EQUIP_TYPES.ARMOR, rarity: 'R', img: 'assets/items/armor_r_01.png',
+        id: 'a_armor_r_01', name: '旅人皮甲', type: EQUIP_TYPES.ARMOR, rarity: 'R', 
+        img: 'assets/items/armor_r_01.webp', // 🔥 修改
         stats: { def: [8, 8], weight: [5, 5] }
     },
     {
-        id: 'a_legs_r_01', name: '亞麻褲', type: EQUIP_TYPES.LEGS, rarity: 'R', img: 'assets/items/legs_r_01.png',
+        id: 'a_legs_r_01', name: '亞麻褲', type: EQUIP_TYPES.LEGS, rarity: 'R', 
+        img: 'assets/items/legs_r_01.webp', // 🔥 修改
         stats: { def: [3, 3], weight: [2, 2] }
     }
 ];
