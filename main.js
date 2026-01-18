@@ -30,6 +30,39 @@ import { generateItemInstance } from './js/items.js';
 
 window.onerror = function(msg, url, line) { console.error("Global Error:", msg); };
 
+// 🔥 SweetAlert2 全域設定 🔥
+// 1. 定義右上角的小提示 (Toast)
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 2000,
+    timerProgressBar: true,
+    background: '#34495e',
+    color: '#fff',
+    didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+    }
+});
+
+// 2. 統一的登入提示視窗
+function showLoginAlert() {
+    Swal.fire({
+        title: '⛔ 權限不足',
+        text: '請先登入才能使用此功能！',
+        icon: 'warning',
+        background: '#2c3e50',
+        color: '#fff',
+        confirmButtonColor: '#e74c3c',
+        confirmButtonText: '好的，去登入'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById('login-section').scrollIntoView({ behavior: 'smooth' });
+        }
+    });
+}
+
 const firebaseConfig = {
   apiKey: "AIzaSyCaLWMEi7wNxeCjUQC86axbRsxLMDWQrq8",
   authDomain: "gacha-game-v1.firebaseapp.com",
@@ -50,7 +83,7 @@ try {
     isFirebaseReady = true;
 } catch (e) {
     console.error("Firebase Init Error:", e);
-    alert("遊戲初始化失敗，請檢查網路連線");
+    Swal.fire({ icon: 'error', title: '初始化失敗', text: '請檢查網路連線', background: '#2c3e50', color: '#fff' });
 }
 
 let currentUser = null;
@@ -120,7 +153,7 @@ setTimeout(() => {
 
         newBtn.addEventListener('click', () => {
             playSound('click');
-            if (!currentUser) return alert("請先登入");
+            if (!currentUser) return showLoginAlert();
             updatePrepUser({
                 ...currentUser,
                 gold: gold,
@@ -132,17 +165,17 @@ setTimeout(() => {
 
     // --- 按鈕綁定 ---
     
-    // 1. 排行榜按鈕 (新增)
+    // 1. 排行榜按鈕
     const leaderBtn = document.getElementById('leaderboard-btn');
     if (leaderBtn) {
         leaderBtn.addEventListener('click', () => {
             playSound('click');
             document.getElementById('leaderboard-modal').classList.remove('hidden');
-            loadLeaderboard(); // 點擊時才讀取
+            loadLeaderboard(); 
         });
     }
     
-    // 2. 排行榜關閉按鈕 (新增)
+    // 2. 排行榜關閉按鈕
     const closeLeaderBtn = document.getElementById('close-leaderboard-btn');
     if (closeLeaderBtn) {
         closeLeaderBtn.addEventListener('click', () => {
@@ -152,10 +185,21 @@ setTimeout(() => {
     }
 
     const invBtn = document.getElementById('inventory-btn');
-    if (invBtn) invBtn.addEventListener('click', () => { playSound('click'); if (!currentUser) return alert("請先登入"); document.getElementById('inventory-title').innerText = "🎒 背包"; Inventory.setPvpSelectionMode(null, null); document.getElementById('inventory-modal').classList.remove('hidden'); Inventory.filterInventory('ALL'); });
+    if (invBtn) invBtn.addEventListener('click', () => { 
+        playSound('click'); 
+        if (!currentUser) return showLoginAlert();
+        document.getElementById('inventory-title').innerText = "🎒 背包"; 
+        Inventory.setPvpSelectionMode(null, null); 
+        document.getElementById('inventory-modal').classList.remove('hidden'); 
+        Inventory.filterInventory('ALL'); 
+    });
 
     const terBtn = document.getElementById('territory-btn');
-    if (terBtn) terBtn.addEventListener('click', () => { playSound('click'); if (!currentUser) return alert("請先登入"); document.getElementById('territory-modal').classList.remove('hidden'); });
+    if (terBtn) terBtn.addEventListener('click', () => { 
+        playSound('click'); 
+        if (!currentUser) return showLoginAlert(); 
+        document.getElementById('territory-modal').classList.remove('hidden'); 
+    });
 
     const galBtn = document.getElementById('gallery-btn');
     if (galBtn) galBtn.addEventListener('click', () => { playSound('click'); Inventory.openGalleryModal(); });
@@ -175,30 +219,50 @@ setTimeout(() => {
         });
     }
 
+    // 忘記密碼 (使用 SweetAlert2 Confirm)
     const forgotBtn = document.getElementById('forgot-pass-btn');
     if (forgotBtn) {
         forgotBtn.addEventListener('click', () => {
             playSound('click');
             const email = document.getElementById('email-input').value.trim();
             if (!email) {
-                return alert("請先在上方的「電子信箱」欄位輸入您的 Email，系統才能發送重置信件給您。");
+                return Swal.fire({ 
+                    icon: 'info', 
+                    title: '提示', 
+                    text: '請先在「電子信箱」欄位輸入您的 Email',
+                    background: '#2c3e50', color: '#fff', confirmButtonColor: '#3498db'
+                });
             }
-            if (confirm(`確定要發送密碼重置信件到：\n${email} 嗎？`)) {
-                sendPasswordResetEmail(auth, email)
-                    .then(() => {
-                        alert("✅ 重置信件已發送！\n請前往您的信箱收信 (若沒收到請檢查垃圾郵件)。\n點擊信中連結重設密碼後，即可使用新密碼登入。");
-                    })
-                    .catch((error) => {
-                        console.error("重置密碼失敗", error);
-                        if (error.code === 'auth/user-not-found') {
-                            alert("❌ 找不到此信箱註冊的帳號。");
-                        } else if (error.code === 'auth/invalid-email') {
-                            alert("❌ 信箱格式不正確。");
-                        } else {
-                            alert("❌ 發送失敗，請稍後再試。\n" + error.message);
-                        }
-                    });
-            }
+            
+            Swal.fire({
+                title: '重置密碼',
+                text: `確定要發送密碼重置信件到：${email} 嗎？`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '發送',
+                cancelButtonText: '取消',
+                background: '#2c3e50', color: '#fff', confirmButtonColor: '#f1c40f'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    sendPasswordResetEmail(auth, email)
+                        .then(() => {
+                            Swal.fire({
+                                icon: 'success',
+                                title: '信件已發送',
+                                text: '請前往信箱收信 (若沒收到請檢查垃圾郵件)',
+                                background: '#2c3e50', color: '#fff'
+                            });
+                        })
+                        .catch((error) => {
+                            console.error("重置密碼失敗", error);
+                            let msg = "發送失敗";
+                            if (error.code === 'auth/user-not-found') msg = "找不到此信箱註冊的帳號";
+                            else if (error.code === 'auth/invalid-email') msg = "信箱格式不正確";
+                            
+                            Swal.fire({ icon: 'error', title: '錯誤', text: msg, background: '#2c3e50', color: '#fff' });
+                        });
+                }
+            });
         });
     }
 
@@ -242,15 +306,18 @@ if(sfxSlider) sfxSlider.addEventListener('input', (e) => { setSfxVolume(parseFlo
 if(document.getElementById('settings-save-name-btn')) {
     document.getElementById('settings-save-name-btn').addEventListener('click', async () => {
         const newName = settingsNameInput.value.trim();
-        if (!newName) return alert("請輸入暱稱");
+        if (!newName) return Swal.fire({ icon: 'warning', title: '請輸入暱稱', background: '#2c3e50', color: '#fff' });
         try { 
             await updateProfile(currentUser, { displayName: newName }); 
             await updateDoc(doc(db, "users", currentUser.uid), { name: newName }); 
             document.getElementById('user-name').innerText = `玩家：${newName}`; 
-            loadLeaderboard(); // 改名後刷新排行榜
-            alert("改名成功！"); 
+            loadLeaderboard(); 
+            Toast.fire({ icon: 'success', title: '改名成功！' }); 
             settingsModal.classList.add('hidden'); 
-        } catch (e) { console.error(e); alert("改名失敗"); }
+        } catch (e) { 
+            console.error(e); 
+            Swal.fire({ icon: 'error', title: '改名失敗', text: e.message, background: '#2c3e50', color: '#fff' }); 
+        }
     });
 }
 
@@ -260,9 +327,9 @@ if (bindBtn) {
         const email = document.getElementById('bind-email-input').value.trim();
         const pass = document.getElementById('bind-pass-input').value.trim();
         
-        if (!email || !pass) return alert("請輸入 Email 和密碼");
-        if (pass.length < 6) return alert("密碼強度至少需 6 碼");
-        if (!currentUser) return alert("請先登入遊戲");
+        if (!email || !pass) return Swal.fire({ icon: 'info', title: '請輸入 Email 和密碼', background: '#2c3e50', color: '#fff' });
+        if (pass.length < 6) return Swal.fire({ icon: 'warning', title: '密碼強度不足', text: '密碼至少需 6 碼', background: '#2c3e50', color: '#fff' });
+        if (!currentUser) return showLoginAlert();
 
         const credential = EmailAuthProvider.credential(email, pass);
 
@@ -279,7 +346,7 @@ if (bindBtn) {
                 isAnonymous: false 
             });
 
-            alert("✅ 綁定成功！您現在可以使用 Email 登入，資料不會遺失。");
+            Swal.fire({ icon: 'success', title: '綁定成功！', text: '現在可以使用 Email 登入，資料不會遺失。', background: '#2c3e50', color: '#fff' });
             updateAccountUI();
             
             document.getElementById('bind-email-input').value = "";
@@ -287,15 +354,12 @@ if (bindBtn) {
 
         } catch (error) {
             console.error("綁定失敗", error);
-            if (error.code === 'auth/email-already-in-use') {
-                alert("綁定失敗：此 Email 已經被其他帳號註冊過了。");
-            } else if (error.code === 'auth/invalid-email') {
-                alert("綁定失敗：Email 格式不正確。");
-            } else if (error.code === 'auth/weak-password') {
-                alert("綁定失敗：密碼強度不足。");
-            } else {
-                alert(`綁定失敗：${error.message}`);
-            }
+            let msg = error.message;
+            if (error.code === 'auth/email-already-in-use') msg = "此 Email 已經被其他帳號註冊過了";
+            else if (error.code === 'auth/invalid-email') msg = "Email 格式不正確";
+            else if (error.code === 'auth/weak-password') msg = "密碼強度不足";
+            
+            Swal.fire({ icon: 'error', title: '綁定失敗', text: msg, background: '#2c3e50', color: '#fff' });
         } finally {
             bindBtn.innerText = "綁定帳號";
             bindBtn.classList.remove('btn-disabled');
@@ -320,28 +384,58 @@ function updateAccountUI() {
     }
 }
 
+// 序號兌換邏輯
 if(document.getElementById('redeem-btn')) {
     document.getElementById('redeem-btn').addEventListener('click', async () => {
         const codeInput = document.getElementById('redeem-code-input');
         const code = codeInput.value.trim().toLowerCase();
-        if (!code) return alert("請輸入序號");
-        if (!currentUser) return alert("請先登入");
+        if (!code) return Toast.fire({ icon: 'info', title: '請輸入序號' });
+        if (!currentUser) return showLoginAlert();
 
-        if (code === 'make diamond') { gems += 5000; alert("💎 獲得 5000 鑽石！"); } 
-        else if (code === 'make gold') { gold += 50000; alert("💰 獲得 50000 金幣！"); } 
-        else if (code === 'make iron') { iron += 5000; alert("⛏️ 獲得 5000 鐵礦！"); }
-        else if (code === 'make food') { food += 5000; alert("🌾 獲得 5000 糧食！"); }
-        else if (code === 'make wood') { wood += 5000; alert("🪵 獲得 5000 木頭！"); }
+        let rewardMsg = "";
+        let rewardIcon = 'success';
+
+        if (code === 'make diamond') { 
+            gems += 5000; rewardMsg = "💎 獲得 5000 鑽石！"; 
+        } 
+        else if (code === 'make gold') { 
+            gold += 50000; rewardMsg = "💰 獲得 50000 金幣！"; 
+        } 
+        else if (code === 'make iron') { 
+            iron += 5000; rewardMsg = "⛏️ 獲得 5000 鐵礦！"; 
+        }
+        else if (code === 'make food') { 
+            food += 5000; rewardMsg = "🌾 獲得 5000 糧食！"; 
+        }
+        else if (code === 'make wood') { 
+            wood += 5000; rewardMsg = "🪵 獲得 5000 木頭！"; 
+        }
         else if (code === 'unlock stage') {
             const allLevels = {}; for(let i=1; i<=8; i++) { allLevels[`${i}_easy`] = true; allLevels[`${i}_normal`] = true; allLevels[`${i}_hard`] = true; }
-            completedLevels = allLevels; await updateDoc(doc(db, "users", currentUser.uid), { completedLevels: completedLevels }); alert("🔓 全關卡已解鎖！");
+            completedLevels = allLevels; await updateDoc(doc(db, "users", currentUser.uid), { completedLevels: completedLevels }); 
+            rewardMsg = "🔓 全關卡已解鎖！"; 
         }
         else if (code === 'lock stage') {
-            completedLevels = {}; await updateDoc(doc(db, "users", currentUser.uid), { completedLevels: completedLevels }); alert("🔒 關卡進度已重置。");
+            completedLevels = {}; await updateDoc(doc(db, "users", currentUser.uid), { completedLevels: completedLevels }); 
+            rewardMsg = "🔒 關卡進度已重置。"; 
+            rewardIcon = 'info';
         }
-        else { return alert("無效的序號"); }
+        else { 
+            return Swal.fire({ icon: 'error', title: '無效的序號', background: '#2c3e50', color: '#fff' }); 
+        }
 
-        playSound('coin'); await updateCurrencyCloud(); updateUIDisplay(); codeInput.value = ""; 
+        playSound('coin'); 
+        await updateCurrencyCloud(); 
+        updateUIDisplay(); 
+        codeInput.value = ""; 
+        
+        Swal.fire({
+            title: '兌換成功！',
+            text: rewardMsg,
+            icon: rewardIcon,
+            background: '#2c3e50', color: '#f1c40f',
+            confirmButtonColor: '#27ae60'
+        });
     });
 }
 
@@ -388,24 +482,42 @@ function toggleSelectAllNotifs() {
 function toggleNotifSelection(id) { if (selectedNotifIds.has(id)) selectedNotifIds.delete(id); else selectedNotifIds.add(id); playSound('click'); renderNotifications(); }
 
 async function executeBatchDelete() {
-    if (selectedNotifIds.size === 0) return alert("請至少選擇一條通知！");
-    if (!confirm(`確定要刪除這 ${selectedNotifIds.size} 條紀錄嗎？`)) return;
+    if (selectedNotifIds.size === 0) return Toast.fire({ icon: 'warning', title: '請至少選擇一條通知！' });
+    
+    Swal.fire({
+        title: `確定要刪除這 ${selectedNotifIds.size} 條紀錄嗎？`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '是的，刪除',
+        cancelButtonText: '取消',
+        confirmButtonColor: '#d33',
+        background: '#2c3e50', color: '#fff'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const newBattleLogs = battleLogs.filter((log, index) => {
+                const tempId = `battle_log_${log.timestamp ? log.timestamp.seconds : Date.now()}_${index}`;
+                return !selectedNotifIds.has(tempId);
+            });
+            const newDeletedSystemNotifs = [...deletedSystemNotifs];
+            selectedNotifIds.forEach(id => {
+                if (!id.startsWith('battle_log_') && !newDeletedSystemNotifs.includes(id)) newDeletedSystemNotifs.push(id);
+            });
 
-    const newBattleLogs = battleLogs.filter((log, index) => {
-        const tempId = `battle_log_${log.timestamp ? log.timestamp.seconds : Date.now()}_${index}`;
-        return !selectedNotifIds.has(tempId);
+            try {
+                const btn = document.getElementById('notif-batch-confirm-btn'); if(btn) btn.innerText = "刪除中...";
+                await updateDoc(doc(db, "users", currentUser.uid), { battleLogs: newBattleLogs, deletedSystemNotifs: newDeletedSystemNotifs });
+                battleLogs = newBattleLogs; deletedSystemNotifs = newDeletedSystemNotifs;
+                isNotifBatchMode = false; selectedNotifIds.clear(); 
+                playSound('dismantle'); 
+                renderNotifications(); 
+                checkUnreadNotifications();
+                Toast.fire({ icon: 'success', title: '刪除成功' });
+            } catch (e) { 
+                console.error("批量刪除失敗", e); 
+                Swal.fire({ icon: 'error', title: '刪除失敗', background: '#2c3e50', color: '#fff' }); 
+            }
+        }
     });
-    const newDeletedSystemNotifs = [...deletedSystemNotifs];
-    selectedNotifIds.forEach(id => {
-        if (!id.startsWith('battle_log_') && !newDeletedSystemNotifs.includes(id)) newDeletedSystemNotifs.push(id);
-    });
-
-    try {
-        const btn = document.getElementById('notif-batch-confirm-btn'); if(btn) btn.innerText = "刪除中...";
-        await updateDoc(doc(db, "users", currentUser.uid), { battleLogs: newBattleLogs, deletedSystemNotifs: newDeletedSystemNotifs });
-        battleLogs = newBattleLogs; deletedSystemNotifs = newDeletedSystemNotifs;
-        isNotifBatchMode = false; selectedNotifIds.clear(); playSound('dismantle'); renderNotifications(); checkUnreadNotifications();
-    } catch (e) { console.error("批量刪除失敗", e); alert("刪除失敗"); }
 }
 
 function renderNotifications() {
@@ -480,7 +592,17 @@ function renderNotifications() {
                 deleteSingleBtn.className = "delete-log-btn";
                 deleteSingleBtn.style.cssText = "position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; font-size:1.2em; color:#e74c3c;";
                 deleteSingleBtn.innerText = "❌";
-                deleteSingleBtn.addEventListener('click', (e) => { e.stopPropagation(); if(confirm("確定要刪除這條戰鬥紀錄嗎？")) deleteBattleLog(item.originalLog); });
+                deleteSingleBtn.addEventListener('click', (e) => { 
+                    e.stopPropagation(); 
+                    Swal.fire({
+                        title: '確定刪除此紀錄？',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: '刪除',
+                        cancelButtonText: '取消',
+                        background: '#2c3e50', color: '#fff', confirmButtonColor: '#d33'
+                    }).then((res) => { if(res.isConfirmed) deleteBattleLog(item.originalLog); });
+                });
                 div.appendChild(deleteSingleBtn);
                 if (item.attackerUid) div.addEventListener('click', () => { playSound('click'); document.getElementById('notification-modal').classList.add('hidden'); startRevengeMatch(item.attackerUid); });
             }
@@ -493,19 +615,27 @@ function renderNotifications() {
 async function deleteBattleLog(logToRemove) {
     if (!currentUser) return;
     const newLogs = battleLogs.filter(log => { if(log.timestamp && logToRemove.timestamp) return log.timestamp.seconds !== logToRemove.timestamp.seconds; return true; });
-    try { await updateDoc(doc(db, "users", currentUser.uid), { battleLogs: newLogs }); battleLogs = newLogs; renderNotifications(); playSound('dismantle'); checkUnreadNotifications(); } catch (e) { console.error(e); }
+    try { await updateDoc(doc(db, "users", currentUser.uid), { battleLogs: newLogs }); battleLogs = newLogs; renderNotifications(); playSound('dismantle'); checkUnreadNotifications(); Toast.fire({icon:'success', title:'紀錄已刪除'}); } catch (e) { console.error(e); }
 }
 
 async function claimReward(notif) {
-    if (!currentUser) return alert("請先登入");
+    if (!currentUser) return showLoginAlert();
     try {
         if (notif.reward.type === 'gems') gems += notif.reward.amount;
         else if (notif.reward.type === 'gold') gold += notif.reward.amount;
         claimedNotifs.push(notif.id);
         await updateDoc(doc(db, "users", currentUser.uid), { gems: gems, gold: gold, claimedNotifs: claimedNotifs });
-        playSound('coin'); alert(`領取成功！獲得 ${notif.reward.amount} ${notif.reward.type === 'gems' ? '鑽石' : '金幣'}`);
+        playSound('coin'); 
+        
+        Swal.fire({
+            icon: 'success',
+            title: '領取成功！',
+            text: `獲得 ${notif.reward.amount} ${notif.reward.type === 'gems' ? '鑽石' : '金幣'}`,
+            background: '#2c3e50', color: '#fff'
+        });
+        
         updateUIDisplay(); renderNotifications(); checkUnreadNotifications();
-    } catch (e) { console.error("領取失敗", e); alert("領取失敗"); }
+    } catch (e) { console.error("領取失敗", e); Toast.fire({icon:'error', title:'領取失敗'}); }
 }
 
 const loginSection = document.getElementById('login-section');
@@ -514,20 +644,20 @@ const gameUI = document.getElementById('game-ui');
 const userNameDisplay = document.getElementById('user-name');
 
 if(document.getElementById('email-signup-btn')) document.getElementById('email-signup-btn').addEventListener('click', () => { 
-    if(!isFirebaseReady) return alert("Firebase 尚未初始化");
+    if(!isFirebaseReady) return Toast.fire({icon:'error', title:'連線尚未就緒'});
     playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; 
-    if(!email || !pass) return alert("請輸入帳號密碼");
-    createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { await updateProfile(res.user, { displayName: "新玩家" }); location.reload(); }).catch(e=>alert(e.message)); 
+    if(!email || !pass) return Toast.fire({icon:'warning', title:'請輸入帳號密碼'});
+    createUserWithEmailAndPassword(auth, email, pass).then(async (res) => { await updateProfile(res.user, { displayName: "新玩家" }); location.reload(); }).catch(e=>Swal.fire({icon:'error', title:'註冊失敗', text: e.message, background:'#2c3e50', color:'#fff'})); 
 });
 if(document.getElementById('email-login-btn')) document.getElementById('email-login-btn').addEventListener('click', () => { 
-    if(!isFirebaseReady) return alert("Firebase 尚未初始化");
+    if(!isFirebaseReady) return Toast.fire({icon:'error', title:'連線尚未就緒'});
     playSound('click'); const email = document.getElementById('email-input').value; const pass = document.getElementById('pass-input').value; 
-    if(!email || !pass) return alert("請輸入帳號密碼");
-    signInWithEmailAndPassword(auth, email, pass).catch(e=>alert(e.message)); 
+    if(!email || !pass) return Toast.fire({icon:'warning', title:'請輸入帳號密碼'});
+    signInWithEmailAndPassword(auth, email, pass).catch(e=>Swal.fire({icon:'error', title:'登入失敗', text: e.message, background:'#2c3e50', color:'#fff'})); 
 });
 if(document.getElementById('guest-btn')) document.getElementById('guest-btn').addEventListener('click', () => { 
-    if(!isFirebaseReady) return alert("Firebase 尚未初始化");
-    playSound('click'); signInAnonymously(auth).then(async (res) => { await updateProfile(res.user, { displayName: "神秘客" }); }).catch(e=>alert(e.message)); 
+    if(!isFirebaseReady) return Toast.fire({icon:'error', title:'連線尚未就緒'});
+    playSound('click'); signInAnonymously(auth).then(async (res) => { await updateProfile(res.user, { displayName: "神秘客" }); }).catch(e=>Swal.fire({icon:'error', title:'登入失敗', text: e.message, background:'#2c3e50', color:'#fff'})); 
 });
 if(document.getElementById('logout-btn')) document.getElementById('logout-btn').addEventListener('click', () => { playSound('click'); signOut(auth).then(() => location.reload()); });
 
@@ -542,7 +672,6 @@ if (isFirebaseReady && auth) {
             try {
                 await loadUserData(user); 
                 await calculateTotalPowerOnly(user.uid); 
-                // loadLeaderboard(); // 🔥 移除自動讀取，改為點擊讀取
                 updateAccountUI();
             } catch(e) { console.error("載入使用者資料失敗", e); }
         } else { 
@@ -768,9 +897,16 @@ if(document.getElementById('sort-select')) document.getElementById('sort-select'
 });
 
 async function performGacha(times) {
-    if (!currentUser) return alert("請先登入！");
+    if (!currentUser) return showLoginAlert();
     const cost = times * 100;
-    if (gems < cost) return alert(`鑽石不足！需要 ${cost} 鑽石`);
+    if (gems < cost) {
+        return Swal.fire({ 
+            icon: 'error', 
+            title: '鑽石不足', 
+            text: `需要 ${cost} 鑽石，目前只有 ${gems}`, 
+            background: '#2c3e50', color: '#fff' 
+        });
+    }
     gems -= cost;
     updateUIDisplay();
     playSound('draw');
@@ -836,7 +972,7 @@ async function performGacha(times) {
             
         } catch (e) {
             console.error("抽卡錯誤", e);
-            alert("抽卡過程發生錯誤，請聯繫管理員");
+            Swal.fire({ icon: 'error', title: '抽卡錯誤', text: '請聯繫管理員', background: '#2c3e50', color: '#fff' });
             if(overlay) overlay.classList.add('hidden');
         }
     }, 2500);
@@ -887,7 +1023,7 @@ function showGachaReveal(cards) {
 
 if(document.getElementById('enter-battle-mode-btn')) document.getElementById('enter-battle-mode-btn').addEventListener('click', async () => {
     playSound('click');
-    if(!currentUser) return alert("請先登入");
+    if(!currentUser) return showLoginAlert();
     if(Inventory.getAllCards().length === 0) await Inventory.loadInventory(currentUser.uid);
     updateLevelButtonsLockState();
     document.getElementById('level-selection-modal').classList.remove('hidden');
@@ -939,9 +1075,15 @@ document.querySelectorAll('.defense-slot').forEach(slot => {
 
 function deployHeroToSlot(slotIndex, card) {
     const isAlreadyDeployed = battleSlots.some(s => s && s.docId === card.docId);
-    if(isAlreadyDeployed) { alert("這位英雄已經在場上了！"); return false; }
+    if(isAlreadyDeployed) { 
+        Toast.fire({icon: 'warning', title: '已經在場上了'}); 
+        return false; 
+    }
     const isSameHeroIdDeployed = battleSlots.some(s => s && s.id === card.id);
-    if(isSameHeroIdDeployed) { alert("同名英雄不能重複上陣！"); return false; }
+    if(isSameHeroIdDeployed) { 
+        Toast.fire({icon: 'warning', title: '同名英雄不能重複上陣'}); 
+        return false; 
+    }
 
     const newSlots = [...battleSlots];
     newSlots[slotIndex] = { ...card, currentHp: card.hp, maxHp: card.hp, lastAttackTime: 0 };
@@ -1205,10 +1347,6 @@ function checkUnreadNotifications() {
 async function loadLeaderboard() {
     const list = document.getElementById('leaderboard-list');
     if (!list) return;
-    
-    // 如果現在不是顯示狀態，就不要讀取（不過按鈕點擊已經控制了這點，這裡做雙重保險）
-    // 但因為我們改用彈窗，所以這裡還是可以直接讀取
-    
     try {
         const q = query(collection(db, "users"), orderBy("combatPower", "desc"), limit(5));
         const snap = await getDocs(q);
