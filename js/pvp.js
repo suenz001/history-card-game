@@ -4,6 +4,21 @@ import { playSound, audioBgm, audioBattle, isBgmOn } from './audio.js';
 import { startPvpMatch, setOnBattleEnd, resetBattleState } from './battle.js';
 import { cardDatabase } from './data.js'; 
 
+// 🔥 SweetAlert2 Toast 設定
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 2000,
+    timerProgressBar: true,
+    background: '#34495e',
+    color: '#fff',
+    didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+    }
+});
+
 let db;
 let currentUser;
 let allUserCards = [];
@@ -15,16 +30,15 @@ export let currentEnemyData = null;
 
 let requestOpenInventory = null;
 let showEnemyCardCallback = null;
-let onCurrencyUpdate = null; // 🔥 新增：資源扣除回調
+let onCurrencyUpdate = null; // 資源扣除回調
 
-// 🔥 修改：接收 currencyCallback
 export function initPvp(database, user, inventory, openInventoryCallback, onCardClick, currencyCallback) {
     db = database;
     currentUser = user;
     allUserCards = inventory;
     requestOpenInventory = openInventoryCallback; 
     showEnemyCardCallback = onCardClick; 
-    onCurrencyUpdate = currencyCallback; // 存下來
+    onCurrencyUpdate = currencyCallback; 
 
     const pvpBtn = document.getElementById('pvp-menu-btn');
     if (pvpBtn) {
@@ -124,18 +138,16 @@ function updateMyArenaPowerDisplay() {
     
     powerEl.innerText = currentTeamPower;
     
-    // 🔥 同步更新開戰按鈕上的糧食消耗提示
     const btn = document.getElementById('start-pvp-battle-btn');
     if(btn) {
         const foodCost = Math.ceil(currentTeamPower * 0.01);
-        // 🔥 修改提示：奪取 5% 資源
         btn.innerHTML = `⚔️ 開戰 (奪取 5% 資源)<br><span style="font-size:0.7em; color:#f1c40f;">🌾 -${foodCost} 糧食</span>`;
         btn.dataset.cost = foodCost;
     }
 }
 
 async function openPvpModal() {
-    if (!currentUser) return alert("請先登入");
+    if (!currentUser) return Swal.fire({ icon: 'warning', title: '請先登入', background: '#2c3e50', color: '#fff' });
     document.getElementById('pvp-setup-modal').classList.remove('hidden');
     
     const userRef = doc(db, "users", currentUser.uid);
@@ -155,13 +167,13 @@ export function setPvpHero(slotIndex, card, type) {
 
     const isAlreadyDeployed = targetArray.some(h => h && h.docId === card.docId);
     if(isAlreadyDeployed) {
-        alert("該英雄已經在此陣容中！");
+        Toast.fire({ icon: 'warning', title: '該英雄已經在此陣容中！' });
         return false;
     }
 
     const isSameHeroTypeDeployed = targetArray.some((h, index) => h && h.id == card.id && index !== slotIndex);
     if(isSameHeroTypeDeployed) {
-        alert("同名英雄只能上陣一位！");
+        Toast.fire({ icon: 'warning', title: '同名英雄只能上陣一位！' });
         return false;
     }
 
@@ -197,7 +209,7 @@ function handleSlotClick(slotElement, type) {
     } 
     else {
         const currentCount = targetArray.filter(x => x !== null).length;
-        if (currentCount >= 6) return alert("PVP 隊伍最多只能上陣 6 名英雄！");
+        if (currentCount >= 6) return Toast.fire({ icon: 'warning', title: 'PVP 隊伍最多只能上陣 6 名英雄' });
         
         playSound('click'); 
         
@@ -237,8 +249,8 @@ function updateSaveButtonState() { const count = pvpDefenseSlots.filter(x => x !
 async function saveDefenseTeam() {
     if (!currentUser) return;
     const count = pvpDefenseSlots.filter(x => x !== null).length; 
-    if (count === 0) return alert("請至少配置 1 名英雄！"); 
-    if (count > 6) return alert("防守英雄不能超過 6 名！"); 
+    if (count === 0) return Toast.fire({ icon: 'warning', title: '請至少配置 1 名英雄' });
+    if (count > 6) return Toast.fire({ icon: 'warning', title: '防守英雄不能超過 6 名' });
     
     const btn = document.getElementById('save-pvp-team-btn'); 
     btn.innerText = "儲存中..."; 
@@ -270,11 +282,11 @@ async function saveDefenseTeam() {
         const userRef = doc(db, "users", currentUser.uid); 
         await updateDoc(userRef, { defenseTeam: teamData });
         playSound('upgrade'); 
-        alert("✅ 防守陣容已更新！"); 
+        Swal.fire({ icon: 'success', title: '設定成功', text: '防守陣容已更新！', background: '#2c3e50', color: '#fff' });
         document.getElementById('pvp-setup-modal').classList.add('hidden');
     } catch (e) { 
         console.error("儲存失敗", e); 
-        alert("儲存失敗，請檢查網路連線"); 
+        Swal.fire({ icon: 'error', title: '儲存失敗', text: '請檢查網路連線', background: '#2c3e50', color: '#fff' });
     } finally { 
         btn.classList.remove('btn-disabled'); 
         updateSaveButtonState(); 
@@ -307,17 +319,17 @@ async function manualSaveAttackTeam() {
     
     try {
         await saveAttackTeam();
-        alert("✅ 進攻陣容已儲存！下次將自動帶入。");
+        Toast.fire({ icon: 'success', title: '進攻陣容已儲存！' });
     } catch(e) {
         console.error(e);
-        alert("儲存失敗，請檢查網路");
+        Toast.fire({ icon: 'error', title: '儲存失敗' });
     } finally {
         if(btn) btn.innerText = "💾 儲存陣容";
     }
 }
 
 function openPvpArena() {
-    if (!currentUser) return alert("請先登入");
+    if (!currentUser) return Swal.fire({ icon: 'warning', title: '請先登入', background: '#2c3e50', color: '#fff' });
     document.getElementById('pvp-arena-modal').classList.remove('hidden');
     document.getElementById('pvp-loading').classList.remove('hidden');
     document.getElementById('pvp-opponent-list-view').classList.add('hidden');
@@ -395,7 +407,7 @@ async function searchOpponent() {
 
     } catch (e) { 
         console.error("搜尋對手失敗", e); 
-        alert("搜尋失敗，請檢查網路"); 
+        Toast.fire({ icon: 'error', title: '搜尋失敗，請檢查網路' }); 
         document.getElementById('pvp-arena-modal').classList.add('hidden'); 
     }
 }
@@ -441,8 +453,8 @@ function selectOpponent(enemyData) {
 }
 
 export async function startRevengeMatch(targetUid) {
-    if (!currentUser) return alert("請先登入");
-    if (!targetUid) return alert("無法找到該玩家的資料 (舊戰報)");
+    if (!currentUser) return Swal.fire({ icon: 'warning', title: '請先登入', background: '#2c3e50', color: '#fff' });
+    if (!targetUid) return Swal.fire({ icon: 'error', title: '錯誤', text: '無法找到戰報資料', background: '#2c3e50', color: '#fff' });
 
     document.getElementById('pvp-arena-modal').classList.remove('hidden');
     document.getElementById('pvp-loading').classList.remove('hidden');
@@ -454,7 +466,7 @@ export async function startRevengeMatch(targetUid) {
         const targetSnap = await getDoc(targetRef);
 
         if (!targetSnap.exists()) {
-            alert("該玩家似乎已經不存在了...");
+            Swal.fire({ icon: 'error', title: '對手不存在', text: '該玩家資料可能已被刪除', background: '#2c3e50', color: '#fff' });
             document.getElementById('pvp-arena-modal').classList.add('hidden');
             return;
         }
@@ -466,7 +478,7 @@ export async function startRevengeMatch(targetUid) {
 
     } catch(e) {
         console.error("Revenge failed", e);
-        alert("讀取對手資料失敗");
+        Swal.fire({ icon: 'error', title: '讀取失敗', background: '#2c3e50', color: '#fff' });
         document.getElementById('pvp-arena-modal').classList.add('hidden');
     }
 }
@@ -560,13 +572,13 @@ function renderMatchup() {
     }
 }
 
-// 🔥 修改：啟動 PVP 戰鬥，增加糧食檢查
+// 🔥 修改：啟動 PVP 戰鬥 (使用 SweetAlert)
 async function startActualPvp() {
     if (!currentEnemyData) return;
 
     const myCount = pvpAttackSlots.filter(x => x !== null).length;
-    if (myCount === 0) return alert("請至少配置 1 名進攻英雄！");
-    if (myCount > 6) return alert("進攻英雄不能超過 6 名！");
+    if (myCount === 0) return Toast.fire({ icon: 'warning', title: '請至少配置 1 名進攻英雄' });
+    if (myCount > 6) return Toast.fire({ icon: 'warning', title: '進攻英雄不能超過 6 名' });
     
     // 1. 計算糧食費用
     let totalPower = 0;
@@ -576,26 +588,42 @@ async function startActualPvp() {
     // 2. 檢查與扣除
     if (onCurrencyUpdate) {
         if (!onCurrencyUpdate('check', foodCost, 'food')) {
-            alert(`糧食不足！無法開戰\n需要 ${foodCost} 糧食 (依據戰力)`);
-            return;
+            return Swal.fire({
+                icon: 'error',
+                title: '糧食不足',
+                text: `無法開戰！需要 ${foodCost} 糧食 (依據戰力)`,
+                background: '#2c3e50', color: '#fff'
+            });
         }
         
-        // 再次確認
-        if(!confirm(`確定要消耗 ${foodCost} 糧食開始進攻嗎？`)) return;
+        // 🔥 SweetAlert 確認
+        Swal.fire({
+            title: '確定開戰？',
+            text: `將消耗 ${foodCost} 糧食進行掠奪`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: '⚔️ 進攻！',
+            cancelButtonText: '再等等',
+            confirmButtonColor: '#e74c3c',
+            background: '#2c3e50', color: '#fff'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // 扣除資源
+                onCurrencyUpdate('deduct', foodCost, 'food');
+                onCurrencyUpdate('refresh');
 
-        onCurrencyUpdate('deduct', foodCost, 'food');
-        onCurrencyUpdate('refresh');
+                saveAttackTeam(); 
+
+                document.getElementById('pvp-arena-modal').classList.add('hidden');
+                document.getElementById('battle-screen').classList.remove('hidden');
+                
+                if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
+
+                setOnBattleEnd(handlePvpResult);
+                startPvpMatch(currentEnemyData.defenseTeam || [], pvpAttackSlots);
+            }
+        });
     }
-
-    saveAttackTeam(); 
-
-    document.getElementById('pvp-arena-modal').classList.add('hidden');
-    document.getElementById('battle-screen').classList.remove('hidden');
-    
-    if(isBgmOn) { audioBgm.pause(); audioBattle.currentTime = 0; audioBattle.play().catch(()=>{}); }
-
-    setOnBattleEnd(handlePvpResult);
-    startPvpMatch(currentEnemyData.defenseTeam || [], pvpAttackSlots);
 }
 
 async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
@@ -714,10 +742,8 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
         goldText.innerText = "計算戰利品中...";
         
         try {
-            // 🔥 修改：改為接收物件
             const stolenRes = await executeStealTransaction(currentUser.uid, currentEnemyData.uid);
             
-            // 🔥 修改：顯示所有資源
             let stealMsg = "";
             if (stolenRes.gold > 0) stealMsg += `💰 +${stolenRes.gold} G\n`;
             if (stolenRes.food > 0) stealMsg += `🌾 +${stolenRes.food} 糧食\n`;
@@ -750,7 +776,7 @@ async function handlePvpResult(isWin, _unusedGold, heroStats, enemyStats) {
     };
 }
 
-// 🔥 修改：搶奪金幣、食物、木頭、鐵礦
+// 搶奪資源
 async function executeStealTransaction(myUid, enemyUid) {
     const myRef = doc(db, "users", myUid);
     const enemyRef = doc(db, "users", enemyUid);
@@ -818,7 +844,6 @@ async function executeStealTransaction(myUid, enemyUid) {
     }
 }
 
-// 🔥 修改：防守勝利時記錄所有損失為 0
 async function recordDefenseWinLog(enemyUid, attackerName, attackerUid) {
     try {
         const enemyRef = doc(db, "users", enemyUid);

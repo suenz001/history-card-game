@@ -1,7 +1,6 @@
 // js/adventure.js
 import { playSound } from './audio.js';
 import { initJoystick } from './joystick.js';
-// 🔥 1. 引入技能庫，讓技能邏輯可以被呼叫
 import { SKILL_LIBRARY } from './skills.js';
 
 let db = null;
@@ -17,7 +16,7 @@ const gameState = {
         hp: 1000, maxHp: 1000, 
         speed: 4, direction: 1, 
         width: 60, height: 60, 
-        // 🔥 新增屬性增強狀態
+        // 屬性增強狀態
         atkMult: 1.0,      // 攻擊倍率 (預設 1.0)
         defMult: 1.0,      // 防禦倍率
         isInvincible: false, // 無敵狀態 (預設 false)
@@ -184,12 +183,11 @@ function renderSkillBar() {
     });
 }
 
-// 🔥 重大修改：技能使用邏輯 (Adapter 核心)
+// 技能使用邏輯
 function handleSkillUse(index) {
     const skill = gameState.skills[index];
     if (!skill) return;
 
-    // 檢查冷卻
     if (skill.currentCd > 0) {
         createFloatingText(gameState.player.x, gameState.player.y - 80, "冷卻中...", "#ccc");
         return;
@@ -197,8 +195,7 @@ function handleSkillUse(index) {
 
     const p = gameState.player;
     
-    // --- 1. 決定目標 (Targeting Strategy) ---
-    // 判斷是否為自我施法 (Buff/Heal/Invincible)
+    // --- 1. 決定目標 ---
     const isBuffOrHeal = (skill.skillKey || "").includes("BUFF") || 
                          ((skill.skillKey || "").includes("HEAL") && !(skill.skillKey || "").includes("STRIKE")) ||
                          (skill.skillKey || "").includes("INVINCIBLE"); 
@@ -206,9 +203,8 @@ function handleSkillUse(index) {
     let target = p.target;
 
     if (isBuffOrHeal) {
-        target = p; // 強制對自己施放
+        target = p; 
     } else if (!target) {
-        // 沒有鎖定目標，自動找最近的敵人
         let nearest = null;
         let minDist = Infinity;
         gameState.enemies.forEach(e => {
@@ -221,48 +217,38 @@ function handleSkillUse(index) {
         target = nearest;
     }
 
-    // 如果是攻擊技能但還是沒找到目標，建立一個假目標在前方 (讓特效能發出去)
     if (!isBuffOrHeal && !target) {
         target = { 
             x: p.x + (p.direction * 300), 
             y: p.y, 
-            isDummy: true, // 標記為假目標
+            isDummy: true, 
             hp: 1, maxHp: 1 
         };
     }
 
-    // --- 2. 建立適配器物件 (Proxies) ---
-    // 這一步最重要！我們攔截屬性修改，轉為冒險模式的邏輯
-
+    // --- 2. 建立適配器 (Proxies) ---
     const playerProxy = new Proxy(p, {
         get: function(obj, prop) {
-            // 讓技能庫讀取到計算過後的攻擊力
             if (prop === 'atk') {
                 const base = obj.weapon.atk + (obj.stats?.atk || 0);
                 return base * (obj.atkMult || 1.0);
             }
-            // 讀取 DOM 屬性 (避免報錯)
             if (prop === 'el') return {}; 
             if (prop === 'position') return { x: obj.x, y: obj.y };
             return obj[prop];
         },
         set: function(obj, prop, value) {
-            // 🔥 攔截無敵狀態設定
             if (prop === 'isInvincible') {
                 obj.isInvincible = value;
                 if (value) {
                     createFloatingText(obj.x, obj.y - 120, "INVINCIBLE!", "#f1c40f");
                     spawnVfx(obj.x, obj.y, 'buff-shield', 1);
-                    
-                    // 確保無敵一定時間後會消失 (防呆機制)
                     setTimeout(() => { obj.isInvincible = false; }, 5000);
                 }
                 return true;
             }
 
-            // 🔥 攔截攻擊力設定 (Buff)
             if (prop === 'atk') {
-                // 我們反推倍率：新數值 / 舊數值
                 const currentAtk = (obj.weapon.atk + (obj.stats?.atk || 0)) * (obj.atkMult || 1.0);
                 if (currentAtk > 0 && value > currentAtk) {
                     const ratio = value / currentAtk;
@@ -273,7 +259,6 @@ function handleSkillUse(index) {
                 return true;
             }
             
-            // 直接寫入 atkMult (如果有技能這麼做)
             if (prop === 'atkMult') {
                 obj.atkMult = value;
                 createFloatingText(obj.x, obj.y - 100, "POWER UP!", "#e74c3c");
@@ -285,11 +270,10 @@ function handleSkillUse(index) {
         }
     });
 
-    // 目標也需要包裝
     const targetProxy = {
         ...target,
         realRef: target.isDummy ? null : target,
-        el: {}, // 假 DOM
+        el: {},
         position: target.x, 
         y: target.y,
         x: target.x,
@@ -297,14 +281,13 @@ function handleSkillUse(index) {
         maxHp: target.maxHp || 100
     };
 
-    // --- 3. 建立執行環境 Context (Adapter Functions) ---
+    // --- 3. 建立執行環境 Context ---
     const context = {
         dealDamage: (source, targetObj, mult) => {
             const realTarget = targetObj.realRef || targetObj;
             
-            // 計算傷害：使用來源的當前攻擊力 (含 Buff)
             const sourceAtk = (source.weapon?.atk || 50) + (source.stats?.atk || 0);
-            const buffedAtk = sourceAtk * (source.atkMult || 1.0); // 🔥 使用倍率
+            const buffedAtk = sourceAtk * (source.atkMult || 1.0); 
             
             const finalDmg = Math.floor(buffedAtk * (mult || 1));
 
@@ -324,7 +307,6 @@ function handleSkillUse(index) {
             }
         },
         addBuff: (targetObj, type, value, duration) => {
-            // 這裡可以處理更複雜的 Buff 邏輯，目前先 log
             console.log(`Buff applied: ${type}`);
         },
         createVfx: (x, y, type) => {
@@ -356,10 +338,7 @@ function handleSkillUse(index) {
     const skillFunc = SKILL_LIBRARY[key];
     
     if (skillFunc) {
-        // 重置 CD
         skill.currentCd = skill.maxCd;
-        
-        // 播放施法特效
         const skillNameText = skill.title || skill.name;
         createFloatingText(p.x, p.y - 80, `${skillNameText}!`, "#f1c40f");
         
@@ -381,7 +360,6 @@ export function updatePlayerStats(stats, weaponData) {
     gameState.player.maxHp = stats.hp || 1000;
     gameState.player.hp = stats.hp || 1000;
     
-    // 重置狀態
     gameState.player.atkMult = 1.0; 
     gameState.player.isInvincible = false;
     
@@ -527,7 +505,6 @@ function resizeCanvas() {
 function handleKey(e, isDown) {
     const k = e.key.toLowerCase();
     
-    // 鍵盤施放技能快捷鍵 (1-6)
     if (isDown && !e.repeat && ['1','2','3','4','5','6'].includes(k)) {
         const index = parseInt(k) - 1;
         handleSkillUse(index);
@@ -606,14 +583,13 @@ function update() {
     if (gameState.keys.d) dx += p.speed;
     p.x += dx; p.y += dy;
 
-    // 邊界限制
     const horizonY = canvas.height / 3;
     p.x = Math.max(20, Math.min(canvas.width - 20, p.x));
     p.y = Math.max(horizonY + 20, Math.min(canvas.height - 20, p.y));
 
     if (dx !== 0 && !p.target) p.direction = dx > 0 ? 1 : -1;
 
-    // 2. 更新傳送門位置
+    // 2. 更新傳送門
     if (gameState.isPortalOpen) {
         gameState.portal.x -= dx;
     }
@@ -633,9 +609,21 @@ function update() {
         hpBar.style.width = `${hpPercent}%`;
     }
 
+    // 🔥 修改：死亡判定改為 SweetAlert2，並暫停遊戲邏輯
     if (p.hp <= 0) {
-        alert(`你倒在了第 ${gameState.level} 關...`);
-        stopAdventure(); 
+        isRunning = false; // 先停止，避免重複觸發
+        Swal.fire({
+            title: '💀 冒險失敗',
+            text: `你倒在了第 ${gameState.level} 關...`,
+            icon: 'error',
+            background: '#2c3e50',
+            color: '#fff',
+            confirmButtonText: '返回營地',
+            confirmButtonColor: '#e74c3c',
+            allowOutsideClick: false
+        }).then(() => {
+            stopAdventure();
+        });
     }
 }
 
@@ -793,7 +781,6 @@ function performPlayerAttack(target) {
     p.attackCooldown = w.atkSpeed;
     const angle = Math.atan2(target.y - p.y, target.x - p.x);
 
-    // 🔥 攻擊力計算加入倍率 (Buff)
     const totalAtk = (w.atk + (p.stats?.atk || 0)) * (p.atkMult || 1.0);
 
     if (w.type === 'bow') {
@@ -940,7 +927,6 @@ function drawPlayer(p) {
     ctx.save();
     ctx.translate(p.x, p.y);
     
-    // 🔥 繪製 Buff 特效 (人物腳下的紅色光環)
     if (p.atkMult > 1.0) {
         ctx.save();
         ctx.scale(1, 0.4);
@@ -950,7 +936,6 @@ function drawPlayer(p) {
         ctx.restore();
     }
     
-    // 🔥 繪製無敵護盾 (人物身上的金色護罩)
     if (p.isInvincible) {
         ctx.save();
         ctx.strokeStyle = '#f1c40f';
@@ -1039,11 +1024,9 @@ function updateProjectiles() {
                 const dist = Math.hypot(p.x - e.x, p.y - e.y);
                 if (dist < e.radius + 10) {
                     hit = true;
-                    // 如果有 Callback (技能觸發的)，執行 Callback
                     if (p.onHitCallback) {
                         p.onHitCallback(p, e);
                     } else {
-                        // 一般普攻邏輯
                         if (p.type === 'orb') explodeProjectile(p);
                         else { 
                             damageEnemy(e, p.dmg); 
@@ -1056,7 +1039,6 @@ function updateProjectiles() {
         } else if (p.owner === 'enemy') {
             const dist = Math.hypot(p.x - gameState.player.x, p.y - gameState.player.y);
             if (dist < 30) {
-                // 🔥 檢查無敵狀態
                 if (gameState.player.isInvincible) {
                     createFloatingText(gameState.player.x, gameState.player.y - 60, "BLOCK", "#ccc");
                 } else {
@@ -1071,10 +1053,9 @@ function updateProjectiles() {
 }
 
 function spawnVfx(x, y, type, dir) {
-    // 根據特效類型決定持續時間
     let life = 10;
     if (type === 'explosion') life = 20;
-    if (type.startsWith('buff-')) life = 30; // Buff 特效久一點
+    if (type.startsWith('buff-')) life = 30;
 
     gameState.vfx.push({ x, y, type, dir, life: life, maxLife: life });
 }
@@ -1090,7 +1071,6 @@ function drawVfx() {
     gameState.vfx.forEach(v => {
         ctx.save(); ctx.translate(v.x, v.y);
         
-        // 🔥 繪製 Buff 特效
         if (v.type === 'buff-shield') {
             const scale = v.life / 10;
             ctx.strokeStyle = 'gold'; ctx.lineWidth = 3; 
@@ -1106,7 +1086,6 @@ function drawVfx() {
             ctx.fillStyle = 'rgba(46, 204, 113, 0.5)'; 
             ctx.beginPath(); ctx.arc(0, -20, 30 * scale, 0, Math.PI*2); ctx.fill();
         }
-        // 原有特效
         else if (v.type === 'slash') {
             if (v.dir === -1) ctx.scale(-1, 1);
             ctx.fillStyle = `rgba(255, 255, 255, ${v.life / 10})`;
@@ -1134,7 +1113,6 @@ function drawProjectiles() {
     });
 }
 
-// 支援 Callback
 function spawnProjectile(x, y, angle, speed, owner, dmg, color, type, onHitCallback = null) {
     gameState.projectiles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, angle, speed, owner, dmg, color, type, life: 60, onHitCallback });
 }
@@ -1167,7 +1145,6 @@ function updateEnemies() {
         if (e.type === 'melee' || e.type === 'boss') {
             if (dist > 60) { const angle = Math.atan2(dy, dx); e.x += Math.cos(angle) * e.speed; e.y += Math.sin(angle) * e.speed; } 
             else if (e.attackCooldown <= 0) { 
-                // 🔥 檢查無敵狀態
                 if (gameState.player.isInvincible) {
                     createFloatingText(p.x, p.y-60, "BLOCK", "#ccc");
                 } else {
