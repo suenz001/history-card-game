@@ -28,6 +28,16 @@ let adventureData = null;
 let currentSelectedSlot = null; 
 let shopItems = []; 
 
+// 🔥 輔助函式：強制取得最新的圖片路徑
+// (解決舊存檔是 .png 但新程式碼是 .webp 導致圖片破圖的問題)
+function getLatestItemImage(item) {
+    if (!item || !item.id) return 'https://placehold.co/90x90?text=Error';
+    const allBlueprints = getAllItems();
+    const blueprint = allBlueprints.find(bp => bp.id === item.id);
+    // 如果找到原始藍圖，就用藍圖的新圖片；否則用存檔裡的圖片
+    return blueprint ? blueprint.img : item.img;
+}
+
 export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb) {
     db = database;
     currentUser = user;
@@ -261,9 +271,10 @@ function renderEquippedSlots() {
         labelDiv.className = 'slot-label';
 
         if (item) {
-            // 🔥 修正：不再強制轉 webp，直接使用 item.img
+            // 🔥 修正：使用 getLatestItemImage 確保讀取到正確的 .webp 路徑
+            const imgSrc = getLatestItemImage(item);
             const img = document.createElement('img');
-            img.src = item.img;
+            img.src = imgSrc;
             img.onerror = () => { img.src = 'https://placehold.co/90x90?text=Error'; };
             slot.appendChild(img);
 
@@ -277,7 +288,6 @@ function renderEquippedSlots() {
             slot.onclick = (e) => {
                 e.stopPropagation(); 
                 if (currentSelectedSlot === type) {
-                    // 🔥 SweetAlert 確認
                     Swal.fire({
                         title: `卸下 ${item.name}？`,
                         icon: 'question',
@@ -343,8 +353,8 @@ function renderInventoryList() {
         const card = document.createElement('div');
         card.className = `equip-card rarity-${item.rarity}`;
         
-        // 🔥 修正：直接使用原始路徑
-        let imgSrc = item.img; 
+        // 🔥 修正：使用 getLatestItemImage 確保圖片路徑正確
+        const imgSrc = getLatestItemImage(item);
 
         let statsHtml = "";
         const s = item.stats || {};
@@ -474,8 +484,8 @@ function renderShop() {
     if(!container) return;
     container.innerHTML = "";
     shopItems.forEach((item, index) => {
-        // 🔥 修正：直接使用原始路徑
-        let imgSrc = item.img;
+        // 🔥 修正：使用 getLatestItemImage
+        const imgSrc = getLatestItemImage(item);
         
         const div = document.createElement('div');
         div.className = 'shop-item';
@@ -546,10 +556,11 @@ function performGacha(times) {
     let resultHtml = `<div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center; max-height:300px; overflow-y:auto;">`;
     results.forEach(item => {
         const color = getRarityColor(item.rarity);
-        // 圖片也使用原始路徑
+        // 🔥 修正：使用 getLatestItemImage
+        const imgSrc = getLatestItemImage(item);
         resultHtml += `
             <div style="background:rgba(0,0,0,0.3); border:1px solid ${color}; border-radius:5px; padding:5px; width:80px; text-align:center;">
-                <img src="${item.img}" style="width:50px; height:50px; object-fit:contain;">
+                <img src="${imgSrc}" style="width:50px; height:50px; object-fit:contain;">
                 <div style="font-size:0.7em; color:${color}; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${item.name}</div>
             </div>
         `;
