@@ -29,13 +29,24 @@ let currentSelectedSlot = null;
 let shopItems = []; 
 
 // 🔥 輔助函式：強制取得最新的圖片路徑
-// (解決舊存檔是 .png 但新程式碼是 .webp 導致圖片破圖的問題)
 function getLatestItemImage(item) {
     if (!item || !item.id) return 'https://placehold.co/90x90?text=Error';
-    const allBlueprints = getAllItems();
-    const blueprint = allBlueprints.find(bp => bp.id === item.id);
-    // 如果找到原始藍圖，就用藍圖的新圖片；否則用存檔裡的圖片
-    return blueprint ? blueprint.img : item.img;
+    try {
+        const allBlueprints = getAllItems(); // 確保 items.js 有匯出此函式
+        if (allBlueprints) {
+            const blueprint = allBlueprints.find(bp => bp.id === item.id);
+            if (blueprint && blueprint.img) return blueprint.img;
+        }
+    } catch (e) {
+        console.warn("Get Image Error:", e);
+    }
+    return item.img || 'https://placehold.co/90x90?text=NoImg';
+}
+
+// 🔥 輔助函式：安全取得數值 (無論是數字還是陣列都支援)
+function getStatValue(val) {
+    if (Array.isArray(val)) return val[0]; // 如果是舊存檔的陣列 [min, max]，取第一個
+    return val || 0;
 }
 
 export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb) {
@@ -59,7 +70,6 @@ export function initPrepScreen(database, user, onStartBattle, saveCb, currencyCb
             updatePlayerStats(adventureData.stats, adventureData.equipment?.weapon?.subType || 'unarmed');
         }
         
-        // 確保陣列長度為 6 (不足補 null)
         const battleCards = adventureData.selectedCards || new Array(6).fill(null);
         setAdventureSkills(battleCards);
 
@@ -133,7 +143,6 @@ export function openPrepScreen() {
     calculateAndShowStats(); 
 }
 
-// 設定特定欄位的卡片
 export function setAdventureCardSlot(index, card) {
     if (!adventureData) return false;
     if (!adventureData.selectedCards) adventureData.selectedCards = new Array(6).fill(null);
@@ -152,14 +161,12 @@ export function setAdventureCardSlot(index, card) {
     return true; 
 }
 
-// 處理卡片欄位點擊
 function handleCardSlotClick(index) {
     if (!adventureData.selectedCards) adventureData.selectedCards = new Array(6).fill(null);
     
     const currentCard = adventureData.selectedCards[index];
     
     if (currentCard) {
-        // 🔥 SweetAlert 確認卸下
         Swal.fire({
             title: `卸下 ${currentCard.name}？`,
             icon: 'question',
@@ -178,12 +185,9 @@ function handleCardSlotClick(index) {
         });
     } else {
         playSound('click');
-        
         Inventory.setPvpSelectionMode(index, 'adventure_skill');
-        
         const modal = document.getElementById('inventory-modal');
         const title = document.getElementById('inventory-title');
-        
         if(modal && title) {
             title.innerText = `👇 選擇第 ${index + 1} 格技能卡片`;
             modal.classList.remove('hidden');
@@ -271,7 +275,6 @@ function renderEquippedSlots() {
         labelDiv.className = 'slot-label';
 
         if (item) {
-            // 🔥 修正：使用 getLatestItemImage 確保讀取到正確的 .webp 路徑
             const imgSrc = getLatestItemImage(item);
             const img = document.createElement('img');
             img.src = imgSrc;
@@ -332,6 +335,7 @@ function renderEquippedSlots() {
     }
 }
 
+// 🔥 強固版 Render List：防止單一物品錯誤導致整個列表空白
 function renderInventoryList() {
     const list = document.getElementById('prep-equip-list');
     list.innerHTML = "";
@@ -340,7 +344,8 @@ function renderInventoryList() {
 
     const filteredItems = adventureData.inventory.filter(item => {
         if (!currentSelectedSlot) return true;
-        return item.type === currentSelectedSlot;
+        // 防呆：如果 item.type 不存在，預設顯示
+        return item.type ? (item.type === currentSelectedSlot) : true;
     });
 
     if (filteredItems.length === 0) {
@@ -350,48 +355,52 @@ function renderInventoryList() {
     }
     
     filteredItems.forEach(item => {
-        const card = document.createElement('div');
-        card.className = `equip-card rarity-${item.rarity}`;
-        
-        // 🔥 修正：使用 getLatestItemImage 確保圖片路徑正確
-        const imgSrc = getLatestItemImage(item);
+        try {
+            const card = document.createElement('div');
+            card.className = `equip-card rarity-${item.rarity}`;
+            
+            const imgSrc = getLatestItemImage(item);
+            let statsHtml = "";
+            const s = item.stats || {};
 
-        let statsHtml = "";
-        const s = item.stats || {};
+            if (item.type === 'weapon') {
+                statsHtml += `<div class="stat-row"><span class="stat-label">⚔️ 攻擊</span><span class="stat-val highlight">${getStatValue(s.atk)}</span></div>`;
+                const speedText = s.atkSpeed ? `${(getStatValue(s.atkSpeed)/60).toFixed(1)}s` : '-';
+                statsHtml += `<div class="stat-row"><span class="stat-label">⚡ 攻速</span><span class="stat-val">${speedText}</span></div>`;
+                statsHtml += `<div class="stat-row"><span class="stat-label">🎯 距離</span><span class="stat-val">${getStatValue(s.range)}</span></div>`;
+                statsHtml += `<div class="stat-row"><span class="stat-label">💥 範圍</span><span class="stat-val">${getStatValue(s.aoe)}</span></div>`;
 
-        if (item.type === 'weapon') {
-            statsHtml += `<div class="stat-row"><span class="stat-label">⚔️ 攻擊</span><span class="stat-val highlight">${s.atk || 0}</span></div>`;
-            const speedText = s.atkSpeed ? `${(s.atkSpeed/60).toFixed(1)}s` : '-';
-            statsHtml += `<div class="stat-row"><span class="stat-label">⚡ 攻速</span><span class="stat-val">${speedText}</span></div>`;
-            statsHtml += `<div class="stat-row"><span class="stat-label">🎯 距離</span><span class="stat-val">${s.range || 0}</span></div>`;
-            statsHtml += `<div class="stat-row"><span class="stat-label">💥 範圍</span><span class="stat-val">${s.aoe || 0}</span></div>`;
-
-            if (s.element && s.element.type !== 'none') {
-                let elIcon = ''; let elColor = '#fff';
-                if(s.element.type === 'fire') { elIcon = '🔥'; elColor = '#e74c3c'; }
-                if(s.element.type === 'ice') { elIcon = '❄️'; elColor = '#3498db'; }
-                if(s.element.type === 'poison') { elIcon = '☠️'; elColor = '#9b59b6'; }
-                statsHtml += `<div class="stat-row" style="grid-column: span 2;"><span class="stat-label">屬性</span><span class="stat-val" style="color:${elColor}">${elIcon} ${s.element.value}</span></div>`;
+                if (s.element && s.element.type !== 'none') {
+                    let elIcon = ''; let elColor = '#fff';
+                    if(s.element.type === 'fire') { elIcon = '🔥'; elColor = '#e74c3c'; }
+                    if(s.element.type === 'ice') { elIcon = '❄️'; elColor = '#3498db'; }
+                    if(s.element.type === 'poison') { elIcon = '☠️'; elColor = '#9b59b6'; }
+                    statsHtml += `<div class="stat-row" style="grid-column: span 2;"><span class="stat-label">屬性</span><span class="stat-val" style="color:${elColor}">${elIcon} ${getStatValue(s.element.value)}</span></div>`;
+                }
+            } else {
+                // 🔥 防呆：針對防具屬性，確保即使數值遺失也不會報錯
+                statsHtml += `<div class="stat-row"><span class="stat-label">🛡️ 防禦</span><span class="stat-val highlight">${getStatValue(s.def)}</span></div>`;
+                statsHtml += `<div class="stat-row"><span class="stat-label">⚖️ 重量</span><span class="stat-val">${getStatValue(s.weight)}</span></div>`;
+                if (s.moveSpeedBonus) {
+                    statsHtml += `<div class="stat-row" style="grid-column: span 2;"><span class="stat-label">💨 移速</span><span class="stat-val highlight">+${getStatValue(s.moveSpeedBonus)}%</span></div>`;
+                }
             }
-        } else {
-            statsHtml += `<div class="stat-row"><span class="stat-label">🛡️ 防禦</span><span class="stat-val highlight">${s.def || 0}</span></div>`;
-            statsHtml += `<div class="stat-row"><span class="stat-label">⚖️ 重量</span><span class="stat-val">${s.weight || 0}</span></div>`;
-            if (s.moveSpeedBonus) {
-                statsHtml += `<div class="stat-row" style="grid-column: span 2;"><span class="stat-label">💨 移速</span><span class="stat-val highlight">+${s.moveSpeedBonus}%</span></div>`;
-            }
+
+            let nameColor = '#fff';
+            if(item.rarity === 'SSR') nameColor = '#f1c40f';
+            else if(item.rarity === 'SR') nameColor = '#9b59b6';
+            else if(item.rarity === 'R') nameColor = '#3498db';
+
+            const descHtml = item.desc ? `<div class="equip-desc">${item.desc}</div>` : ''; 
+
+            card.innerHTML = `<div class="equip-header" style="color:${nameColor}; border-bottom-color:${item.color || '#555'}">${item.name || '未知裝備'}</div><div class="equip-img-container"><img src="${imgSrc}" onerror="this.src='https://placehold.co/100x100?text=Item'"></div><div class="equip-stats-grid">${statsHtml}</div>${descHtml}`;
+            
+            card.onclick = () => equipItem(item.uid);
+            list.appendChild(card);
+        } catch (err) {
+            console.error("Render Item Error:", err, item);
+            // 略過錯誤的物品，繼續渲染下一個
         }
-
-        let nameColor = '#fff';
-        if(item.rarity === 'SSR') nameColor = '#f1c40f';
-        else if(item.rarity === 'SR') nameColor = '#9b59b6';
-        else if(item.rarity === 'R') nameColor = '#3498db';
-
-        const descHtml = item.desc ? `<div class="equip-desc">${item.desc}</div>` : ''; 
-
-        card.innerHTML = `<div class="equip-header" style="color:${nameColor}; border-bottom-color:${item.color || '#555'}">${item.name}</div><div class="equip-img-container"><img src="${imgSrc}" onerror="this.src='https://placehold.co/100x100?text=Item'"></div><div class="equip-stats-grid">${statsHtml}</div>${descHtml}`;
-        
-        card.onclick = () => equipItem(item.uid);
-        list.appendChild(card);
     });
 }
 
@@ -402,9 +411,9 @@ function calculateAndShowStats() {
     if (adventureData.equipment) {
         Object.values(adventureData.equipment).forEach(item => {
             if (item && item.stats) {
-                if (item.stats.atk) totalAtk += item.stats.atk;
-                if (item.stats.def) totalHp += item.stats.def * 10;
-                if (item.stats.defBonus) totalHp += item.stats.defBonus * 10;
+                if (item.stats.atk) totalAtk += getStatValue(item.stats.atk);
+                if (item.stats.def) totalHp += getStatValue(item.stats.def) * 10;
+                if (item.stats.defBonus) totalHp += getStatValue(item.stats.defBonus) * 10;
             }
         });
     }
@@ -484,9 +493,7 @@ function renderShop() {
     if(!container) return;
     container.innerHTML = "";
     shopItems.forEach((item, index) => {
-        // 🔥 修正：使用 getLatestItemImage
         const imgSrc = getLatestItemImage(item);
-        
         const div = document.createElement('div');
         div.className = 'shop-item';
         div.innerHTML = `<img src="${imgSrc}" style="width:50px; height:50px; object-fit:contain;" onerror="this.src='https://placehold.co/50x50?text=Item'"><div class="shop-name" style="font-size:0.9em; margin:5px 0;">${item.name}</div><button class="btn-mini" style="width:100%;">${item.price} G</button>`;
@@ -516,7 +523,6 @@ function buyItem(blueprint, index) {
     if(onSave) onSave(adventureData);
 }
 
-// 🔥 鍛造裝備 (Swal版)
 function performGacha(times) {
     if(!handleCurrency) return;
     const cost = times * 200; 
@@ -552,11 +558,9 @@ function performGacha(times) {
     const hasSSR = results.some(i => i.rarity === 'SSR');
     if(hasSSR) playSound('ssr');
     
-    // 🔥 顯示抽獎結果清單 (SweetAlert)
     let resultHtml = `<div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center; max-height:300px; overflow-y:auto;">`;
     results.forEach(item => {
         const color = getRarityColor(item.rarity);
-        // 🔥 修正：使用 getLatestItemImage
         const imgSrc = getLatestItemImage(item);
         resultHtml += `
             <div style="background:rgba(0,0,0,0.3); border:1px solid ${color}; border-radius:5px; padding:5px; width:80px; text-align:center;">
